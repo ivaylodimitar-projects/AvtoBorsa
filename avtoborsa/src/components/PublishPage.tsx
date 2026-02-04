@@ -1,39 +1,222 @@
 import React, { useState } from "react";
 import Navbar from "./Navbar";
+import { CAR_FEATURES } from "../constants/carFeatures";
 
 const BRANDS = [
-  "Audi",
-  "BMW",
-  "Mercedes-Benz",
-  "Volkswagen",
-  "Opel",
-  "Ford",
-  "Toyota",
-  "Honda",
-  "Peugeot",
-  "Renault",
-  "Skoda",
-  "Hyundai",
-  "Kia",
-  "Nissan",
+  "Audi", "BMW", "Mercedes-Benz", "Volkswagen", "Opel", "Ford", "Toyota", 
+  "Honda", "Peugeot", "Renault", "Skoda", "Hyundai", "Kia", "Nissan", 
+  "Citroen", "Fiat", "Lexus", "Mazda", "Subaru", "Jaguar", "Land Rover", 
+  "Alfa Romeo", "Porsche", "Tesla", "Mini", "Chrysler", "Mitsubishi", 
+  "Suzuki", "Volvo", "Dacia", "Chevrolet", "Buick", "Lincoln", "Ram", 
+  "Cadillac", "GMC", "Rivian", "Polestar", "Acura", "Infiniti", "Maserati", 
+  "Bentley", "Rolls Royce", "Aston Martin", "Ferrari", "Lamborghini", 
+  "AC", "AITO", "Abarth", "Aixam", "Alpina", "Aonew", "Aro", "Asia", 
+  "Avatr", "Austin", "BAIC", "BAW", "BENTU", "BYD", "Berliner", "Bertone", 
+  "Borgward", "Brilliance", "Bugatti", "Berliner", "Bertone", "Borgward", 
+  "Brilliance", "Bugatti", "Bugatti", "Buick", "Carbodies", "Changan", 
+  "Chery", "Chevrolet", "Chrysler", "Citroen", "Corvette", "Cupra", "DFSK", 
+  "DONGFENG", "DR Automobiles", "DS", "Daewoo", "Daihatsu", "Daimler", "Datsun", 
+  "Denza", "Dkw", "Dodge", "Dr", "Eagle", "Exceed", "FSO", "FangChengBau", 
+  "Fisker", "Foton", "GMC", "Gonow", "Great Wall", "Heinkel", "Hillman", 
+  "Haval", "HongQi", "Hummer", "Ineos Grenadier", "Innocenti", "Isuzu", 
+  "Iveco", "JAC", "JAS", "Jaguar", "Jeep", "Jinpeng", "Jmev", "Jpx", "KGM", 
+  "Kia", "Lada", "Laforza", "Lamborghini", "Lancia", "Land Rover", "Landwind", 
+  "Leapmotor", "Li Auto", "Lifan", "Lotus", "Lucid Air", "LynkCo", "Mahindra", 
+  "Maple", "Matra", "Maxus", "Maybach", "McLaren", "Mercury", "Mg", "Microcar", 
+  "Microlino", "Morgan", "Moskvich", "NIO", "Nissan", "Oldsmobile", "Peugeot", 
+  "Pgo", "Plymouth", "Polestar", "Polonez", "Pontiac", "Proton", "Qoros", "Renault", 
+  "Renault Samsung", "Rieju", "Rivian", "Rolls-Royce", "Rover", "SECMA", "SH auto", 
+  "SIN CARS", "SWM", "Saab", "Samand", "Santana", "Saturn", "Scion", "Seat", "Seres", 
+  "Shatenet", "Shuanghuan", "Simca", "Smart", "SsangYong", "Subaru", "Suzuki", 
+  "Talbot", "Tata", "Tatra", "Tavria", "Tazzari", "TelStar", "Tempo", "Terberg", 
+  "Today Sunshine", "Tofas", "Togg", "Trabant", "Triumph", "Uaz", "VROMOS", "VW", 
+  "VinFast", "Vmoto", "Volga", "Voyah", "Warszawa", "Wartburg", "Wey", "Wiesmann", 
+  "Xiaomi", "Xinkai", "Xinshun", "Xpeng", "Yogomo", "Zastava", "Zaz", "Zeekr", 
+   "Победа", "София", "Чайка", "Други"
 ];
 
-const MODELS: Record<string, string[]> = {
-  "Audi": ["A1", "A3", "A4", "A5", "A6", "A7", "A8", "Q3", "Q5", "Q7"],
-  "BMW": ["116", "118", "120", "316", "318", "320", "330", "520", "530", "X1", "X3", "X5"],
-  "Mercedes-Benz": ["A-Class", "C-Class", "E-Class", "S-Class", "GLA", "GLC", "GLE", "GLS"],
-  "Volkswagen": ["Golf", "Passat", "Tiguan", "Touareg", "Polo", "Jetta", "Arteon"],
-  "Opel": ["Astra", "Insignia", "Corsa", "Grandland", "Crossland"],
-  "Ford": ["Focus", "Mondeo", "Fiesta", "Kuga", "Edge"],
-  "Toyota": ["Corolla", "Camry", "RAV4", "Yaris", "Auris"],
-  "Honda": ["Civic", "Accord", "CR-V", "Jazz", "Pilot"],
-  "Peugeot": ["208", "308", "3008", "5008", "2008"],
-  "Renault": ["Clio", "Megane", "Scenic", "Duster", "Captur"],
-  "Skoda": ["Octavia", "Superb", "Fabia", "Kodiaq", "Karoq"],
-  "Hyundai": ["i30", "i40", "Tucson", "Santa Fe", "Elantra"],
-  "Kia": ["Ceed", "Sportage", "Sorento", "Picanto", "Niro"],
-  "Nissan": ["Qashqai", "X-Trail", "Altima", "Micra", "Juke"],
+
+const MODELS = {
+  "Audi": [
+    "A1", "A3", "A3 Sportback", "A4", "A4 Avant", "A5", "A5 Sportback", "A6", "A6 Avant", 
+    "A7", "A7 Sportback", "A8", "Q3", "Q5", "Q5 Sportback", "Q7", "Q8", "RS Q8", "RS3", 
+    "RS4", "RS5", "RS7", "RS5 Sportback", "R8", "S3", "S4", "S5", "S6", "S7", "S8", 
+    "SQ5", "SQ7", "SQ8", "Q2", "e-tron", "Q4 e-tron", "e-tron GT", "R8 V10"
+  ],
+  "BMW": [
+    "114", "116", "118", "120", "123", "125", "128", "130", "135", "140", "1500", "1600", 
+    "1602", "1800", "1M", "2 Active Tourer", "2 Gran Coupe", "2 Gran Tourer", "2000", "2002", 
+    "216", "218", "220", "220 d", "225", "228", "230", "235", "240", "2800", "315", "316", 
+    "318", "320", "323", "324", "325", "328", "330", "335", "340", "3gt", "418", "420", 
+    "425", "428", "430", "435", "440", "5 Gran Turismo", "501", "518", "520", "523", "524", 
+    "525", "528", "530", "530E", "535", "540", "545", "550", "6 GT", "620", "628", "630", 
+    "633", "635", "640", "645", "650", "700", "721", "723", "725", "728", "730", "732", 
+    "733", "735", "740", "745", "750", "760", "840", "850", "Izetta", "M Coupé", "M135", 
+    "M140", "M2", "M3", "M4", "M5", "M6", "M8", "X1", "X2", "X3", "X4", "X5", "X5M", "X6", 
+    "X7", "XM", "Z1", "Z3", "Z4", "Z8", "i3", "i4", "i5", "i7", "i8", "iX", "iX1", "iX2", 
+    "iX3"
+  ],
+  "Mercedes-Benz": [
+    "A-Class", "A-Class Sedan", "B-Class", "C-Class", "C-Class Sedan", "C-Class Coupe", 
+    "C-Class Cabriolet", "C220", "C250", "C300", "C350", "C63", "E-Class", "E-Class Sedan", 
+    "E-Class Coupe", "E-Class Cabriolet", "E-Class All-Terrain", "E53 AMG", "E63 AMG", 
+    "EQS", "S-Class", "S-Class Sedan", "S-Class Coupe", "S-Class Cabriolet", "G-Class", 
+    "G-Wagon", "GLA", "GLB", "GLC", "GLC Coupe", "GLE", "GLE Coupe", "GLS", "AMG GT", 
+    "V-Class", "CLA", "CLA Coupe", "V-Class", "SLC", "A45 AMG", "C63 AMG", "G63 AMG", 
+    "A-Class Hatchback", "C-Class Estate", "C-Class Wagon"
+  ],
+  "Volkswagen": [
+    "Golf", "Golf R", "Golf GTI", "Golf Sportsvan", "Golf Estate", "Golf Variant", "Passat", 
+    "Passat Alltrack", "Tiguan", "Tiguan Allspace", "Touareg", "Polo", "Polo GTI", "Arteon", 
+    "Arteon R", "ID.3", "ID.4", "ID. Buzz", "ID.7", "Jetta", "Jetta GLI", "Touran", "T-Roc", 
+    "Passat GTE"
+  ],
+  "Opel": [
+    "Astra", "Astra GTC", "Astra Sports Tourer", "Corsa", "Corsa-e", "Corsa OPC", "Mokka", 
+    "Mokka X", "Mokka-e", "Grandland", "Grandland X", "Insignia", "Insignia Sports Tourer", 
+    "Insignia GSi", "Zafira", "Zafira Life", "Vivaro", "Combo", "Astra-e", "Crossland", 
+    "Corsa-e"
+  ],
+  "Ford": [
+    "Fiesta", "Focus", "Focus ST", "Focus RS", "Mondeo", "Kuga", "Mustang", "Explorer", 
+    "EcoSport", "Puma", "Ranger", "F-150", "F-250", "F-350", "F-450", "Expedition", 
+    "Maverick", "Transit", "F-550", "Fusion", "C-MAX", "Mustang Mach-E", "Transit Connect"
+  ],
+  "Toyota": [
+    "Corolla", "Corolla Hatchback", "Camry", "RAV4", "Hilux", "Tacoma", "Yaris", "Auris", 
+    "C-HR", "Prius", "Land Cruiser", "Land Cruiser Prado", "Sequoia", "Sienna", "4Runner", 
+    "Tundra", "Mirai", "Avalon", "Venza", "Lexus RX", "Lexus NX", "Lexus ES"
+  ],
+  "Honda": [
+    "Civic", "Civic Sedan", "Civic Coupe", "Civic Hatchback", "Civic Type R", "Accord", 
+    "CR-V", "Pilot", "HR-V", "Insight", "Odyssey", "Passport", "Ridgeline", "Fit", 
+    "Accord Hybrid", "CR-V Hybrid", "Ridgeline Black Edition", "Passport TrailSport"
+  ],
+  "Peugeot": [
+    "208", "2008", "308", "3008", "5008", "508", "Partner", "Rifter", "Expert", "Traveller", 
+    "508 GT", "3008 GT", "308 GT", "208 GT", "508 SW", "308 SW"
+  ],
+  "Renault": [
+    "Clio", "Megane", "Captur", "Kadjar", "Talisman", "Koleos", "Zoe", "Twizy", "Scenic", 
+    "Kangoo", "Clio RS", "Megane RS", "Kadjar GT Line", "Zoe Electric", "Talisman Estate"
+  ],
+  "Skoda": [
+    "Octavia", "Octavia RS", "Superb", "Superb iV", "Fabia", "Kodiaq", "Karoq", "Kamiq", 
+    "Rapid", "Scala", "Citigo", "Kodiaq RS", "Superb Sportline"
+  ],
+  "Hyundai": [
+    "i10", "i20", "i30", "i40", "Kona", "Tucson", "Santa Fe", "Palisade", "Elantra", "Sonata", 
+    "Ioniq", "Ioniq 5", "Ioniq 6", "Kona EV", "Santa Fe Hybrid", "Tucson Plug-in Hybrid", 
+    "Kona N", "Elantra N"
+  ],
+  "Kia": [
+    "Picanto", "Stonic", "Ceed", "Ceed SW", "Sportage", "Seltos", "Sorento", "Niro", "Niro EV", 
+    "Stinger", "XCeed", "Soul", "Tucson", "Niro PHEV", "Sportage PHEV"
+  ],
+  "Nissan": [
+    "Micra", "Juke", "Leaf", "Qashqai", "X-Trail", "Rogue", "Navara", "Murano", "Pathfinder", 
+    "Ariya", "370Z", "Maxima", "Versa", "Frontier", "Murano Platinum"
+  ],
+  "Citroen": [
+    "C3", "C4", "C5", "Berlingo", "C3 Aircross", "C4 Cactus", "SpaceTourer", "Grand C4 Spacetourer", 
+    "C5 Aircross"
+  ],
+  "Fiat": [
+    "500", "Panda", "Tipo", "500X", "500L", "Punto", "Freemont", "Qubo", "Panda 4x4", "500e"
+  ],
+  "Lexus": [
+    "IS", "GS", "RX", "NX", "ES", "UX", "LX", "LC", "RX 350", "RX 450h", "NX 300h", "UX 250h", "LX 570"
+  ],
+  "Mazda": [
+    "CX-3", "CX-5", "CX-9", "Mazda 2", "Mazda 3", "Mazda 6", "MX-5", "CX-50", "CX-60"
+  ],
+  "Subaru": [
+    "Impreza", "Outback", "Forester", "XV", "BRZ", "Crosstrek", "WRX", "Ascent", "Legacy"
+  ],
+  "Jaguar": [
+    "XE", "XF", "XJ", "F-Type", "I-Pace", "F-Pace", "E-Pace"
+  ],
+  "Land Rover": [
+    "Defender", "Discovery", "Range Rover", "Evoque", "Sport", "Discovery Sport", "Range Rover Sport"
+  ],
+  "Alfa Romeo": [
+    "Giulia", "Stelvio", "MiTo", "4C", "Giulietta"
+  ],
+  "Porsche": [
+    "911", "Cayenne", "Macan", "Panamera", "Taycan", "Cayman", "Boxster", "Taycan Cross Turismo"
+  ],
+  "Tesla": [
+    "Model S", "Model 3", "Model X", "Model Y", "Cybertruck", "Roadster"
+  ],
+  "Mini": [
+    "Cooper", "Countryman", "Clubman", "Convertible", "Paceman"
+  ],
+  "Chrysler": [
+    "300C", "Voyager", "Pacifica", "Saratoga"
+  ],
+  "Mitsubishi": [
+    "Outlander", "ASX", "Lancer", "Pajero", "Eclipse Cross"
+  ],
+  "Suzuki": [
+    "Swift", "Vitara", "Ignis", "S-Cross", "Baleno", "Celerio", "Jimny"
+  ],
+  "Volvo": [
+    "S60", "S90", "V60", "V90", "XC40", "XC60", "XC90"
+  ],
+  "Dacia": [
+    "Duster", "Spring", "Lodgy", "Dokker", "Sandero", "Logan"
+  ],
+  "Chevrolet": [
+    "Cruze", "Malibu", "Traverse", "Tahoe", "Silverado", "Camaro", "Equinox", "Impala"
+  ],
+  "Buick": [
+    "Enclave", "Encore", "Regal", "LaCrosse", "Verano"
+  ],
+  "Lincoln": [
+    "Navigator", "Continental", "MKZ", "Aviator", "Corsair"
+  ],
+  "Ram": [
+    "1500", "2500", "3500", "ProMaster", "Ram Rebel", "Laramie"
+  ],
+  "Cadillac": [
+    "Escalade", "XT5", "XT6", "CT4", "CT5", "CTS"
+  ],
+  "GMC": [
+    "Sierra", "Canyon", "Yukon", "Terrain"
+  ],
+  "Rivian": [
+    "R1T", "R1S"
+  ],
+  "Polestar": [
+    "Polestar 1", "Polestar 2"
+  ],
+  "Acura": [
+    "TLX", "MDX", "RDX", "ILX", "NSX"
+  ],
+  "Infiniti": [
+    "Q50", "Q60", "QX50", "QX60", "QX80"
+  ],
+  "Maserati": [
+    "Ghibli", "Levante", "Quattroporte", "GranTurismo"
+  ],
+  "Bentley": [
+    "Continental GT", "Flying Spur", "Bentayga"
+  ],
+  "Rolls Royce": [
+    "Phantom", "Cullinan", "Ghost", "Dawn", "Wraith"
+  ],
+  "Aston Martin": [
+    "Vantage", "DB11", "DBX", "Vanquish"
+  ],
+  "Ferrari": [
+    "488 GTB", "812 Superfast", "Portofino", "Roma", "F8 Tributo"
+  ],
+  "Lamborghini": [
+    "Aventador", "Huracan", "Urus", "Gallardo"
+  ]
 };
+
+
 
 const CATEGORIES = [
   { value: "1", label: "Автомобили и Джипове" },
@@ -74,10 +257,12 @@ const PublishPage: React.FC = () => {
     phone: "",
     email: "",
     pictures: [] as File[],
+    features: [] as string[],
   });
 
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [dragActive, setDragActive] = useState(false);
+  const [currentStep, setCurrentStep] = useState<1 | 2>(1);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -139,7 +324,7 @@ const PublishPage: React.FC = () => {
     setPreviewUrls((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     alert("Обявата е изпратена! (Демо режим)");
     setFormData({
@@ -158,8 +343,18 @@ const PublishPage: React.FC = () => {
       phone: "",
       email: "",
       pictures: [],
+      features: [],
     });
     setPreviewUrls([]);
+  };
+
+  const handleFeatureChange = (feature: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      features: prev.features.includes(feature)
+        ? prev.features.filter((f) => f !== feature)
+        : [...prev.features, feature],
+    }));
   };
 
   const styles: Record<string, React.CSSProperties> = {
@@ -213,8 +408,155 @@ const PublishPage: React.FC = () => {
         }
       `}</style>
       <div style={styles.container} className="publish-container">
+        <style>{`
+          /* Features table responsive styles */
+          .features-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px auto;
+          }
+
+          .features-table td {
+            vertical-align: top;
+            padding-right: 20px;
+            border-right: 1px solid #e0e0e0;
+          }
+
+          /* Desktop (1201px+) - 4 columns */
+          @media (min-width: 1201px) {
+            .features-table td {
+              width: 25%;
+              padding-right: 20px;
+            }
+          }
+
+          /* Tablet Large (1024px - 1200px) - 2 columns */
+          @media (min-width: 1024px) and (max-width: 1200px) {
+            .features-table td {
+              width: 50%;
+              padding-right: 15px;
+              border-right: 1px solid #e0e0e0;
+            }
+            .features-table td:nth-child(odd) {
+              border-right: 1px solid #e0e0e0;
+            }
+            .features-table td:nth-child(even) {
+              border-right: none;
+            }
+          }
+
+          /* Tablet (768px - 1023px) - 2 columns */
+          @media (min-width: 768px) and (max-width: 1023px) {
+            .features-table td {
+              width: 50%;
+              padding-right: 15px;
+            }
+            .features-table td:nth-child(odd) {
+              border-right: 1px solid #e0e0e0;
+            }
+            .features-table td:nth-child(even) {
+              border-right: none;
+            }
+          }
+
+          /* Mobile Large (640px - 767px) - 1 column */
+          @media (min-width: 640px) and (max-width: 767px) {
+            .features-table {
+              display: block;
+            }
+            .features-table tbody {
+              display: block;
+            }
+            .features-table tr {
+              display: block;
+            }
+            .features-table td {
+              display: block;
+              width: 100% !important;
+              padding: 12px 0 !important;
+              border-right: none !important;
+              border-bottom: 1px solid #e0e0e0;
+            }
+            .features-table td:last-child {
+              border-bottom: none;
+            }
+          }
+
+          /* Mobile Small (< 640px) - 1 column */
+          @media (max-width: 639px) {
+            .features-table {
+              display: block;
+            }
+            .features-table tbody {
+              display: block;
+            }
+            .features-table tr {
+              display: block;
+            }
+            .features-table td {
+              display: block;
+              width: 100% !important;
+              padding: 12px 0 !important;
+              border-right: none !important;
+              border-bottom: 1px solid #e0e0e0;
+            }
+            .features-table td:last-child {
+              border-bottom: none;
+            }
+          }
+        `}</style>
         <form style={styles.form} className="publish-form" onSubmit={handleSubmit}>
           <h1 style={styles.title}>Публикуване на обява</h1>
+
+          {/* Progress Navigation */}
+          <div style={{ width: "100%", margin: "10px 0 30px 0", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            {/* Step 1 */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 12px",
+                  borderRadius: 4,
+                  background: currentStep === 1 ? "#0066cc" : "#f0f0f0",
+                  color: currentStep === 1 ? "#fff" : "#666",
+                  fontWeight: currentStep === 1 ? 600 : 500,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  transition: "all 0.3s ease",
+                }}
+              >
+                <span style={{ fontWeight: "bold" }}>1.</span>
+                <span>Въвеждане на описанието и качване на снимки</span>
+              </div>
+            </div>
+
+            {/* Arrow */}
+            <div style={{ fontSize: 18, color: "#ccc" }}>→</div>
+
+            {/* Step 2 */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 12px",
+                  borderRadius: 4,
+                  background: currentStep === 2 ? "#0066cc" : "#f0f0f0",
+                  color: currentStep === 2 ? "#fff" : "#666",
+                  fontWeight: currentStep === 2 ? 600 : 500,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  transition: "all 0.3s ease",
+                }}
+              >
+                <span style={{ fontWeight: "bold" }}>2.</span>
+                <span>Публикуване - Избор на тип обява и срок</span>
+              </div>
+            </div>
+          </div>
 
           {/* Picture Upload */}
           <div style={styles.section}>
@@ -431,6 +773,37 @@ const PublishPage: React.FC = () => {
                 </select>
               </div>
             </div>
+          </div>
+
+          {/* Features */}
+          <div style={styles.section}>
+            <h2 style={styles.sectionTitle}>Характеристики</h2>
+            <table className="features-table">
+              <tbody>
+                <tr>
+                  {Object.entries(CAR_FEATURES).map(([category, features]) => (
+                    <td key={category}>
+                      <label style={{ fontSize: 12, fontWeight: 700, color: "#333", marginBottom: 12, display: "block", textTransform: "capitalize", paddingBottom: 8, borderBottom: "2px solid #0066cc" }}>
+                        {category.charAt(0).toUpperCase() + category.slice(1)}
+                      </label>
+                      {features.map((feature) => (
+                        <div key={feature}>
+                          <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, fontSize: 11, cursor: "pointer", padding: "3px 0" }}>
+                            <input
+                              type="checkbox"
+                              checked={formData.features.includes(feature)}
+                              onChange={() => handleFeatureChange(feature)}
+                              style={{ cursor: "pointer", width: 16, height: 16 }}
+                            />
+                            <span style={{ color: "black",  fontSize: 14 }}>{feature}</span>
+                          </label>
+                        </div>
+                      ))}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
           </div>
 
           {/* Description */}

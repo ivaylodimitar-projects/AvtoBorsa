@@ -1,8 +1,20 @@
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const Navbar: React.FC = () => {
+  const navigate = useNavigate();
+  const { user, logout, isAuthenticated } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const [savedCount, setSavedCount] = React.useState(0);
+  const [draftCount, setDraftCount] = React.useState(0);
+  const [hoveredIcon, setHoveredIcon] = React.useState<string | null>(null);
+
+  const handleLogout = async () => {
+    await logout();
+    setMobileMenuOpen(false);
+    navigate("/");
+  };
 
   const styles: Record<string, React.CSSProperties> = {
     navbar: {
@@ -86,6 +98,56 @@ const Navbar: React.FC = () => {
       whiteSpace: "nowrap",
       flexShrink: 0,
     },
+    iconBtn: {
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      fontSize: 20,
+      color: "#333",
+      padding: "6px 8px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 4,
+      transition: "background-color 0.2s, color 0.2s",
+      position: "relative",
+    },
+    iconBtnHover: {
+      background: "#f0f0f0",
+      color: "#0066cc",
+    },
+    badge: {
+      position: "absolute",
+      top: -4,
+      right: -4,
+      background: "#d32f2f",
+      color: "#fff",
+      borderRadius: "50%",
+      width: 20,
+      height: 20,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 11,
+      fontWeight: 700,
+    },
+    logoutBtn: {
+      height: 36,
+      padding: "0 20px",
+      borderRadius: 4,
+      border: "1px solid #d32f2f",
+      background: "#fff",
+      color: "#d32f2f",
+      fontWeight: 600,
+      fontSize: 14,
+      cursor: "pointer",
+      textDecoration: "none",
+      display: "inline-flex",
+      alignItems: "center",
+      whiteSpace: "nowrap",
+      flexShrink: 0,
+      transition: "background-color 0.2s, color 0.2s",
+    },
     hamburger: {
       display: "none",
       background: "none",
@@ -167,9 +229,76 @@ const Navbar: React.FC = () => {
           <Link to="/dealers" style={{ ...styles.navLink }} onClick={() => setMobileMenuOpen(false)}>
             Дилъри
           </Link>
-          <Link to="/profile" style={styles.primaryBtn} onClick={() => setMobileMenuOpen(false)}>
-            Профил
-          </Link>
+
+          {/* Saved Listings Icon - Only show when logged in */}
+          {isAuthenticated && (
+            <Link
+              to="/saved"
+              style={{
+                ...styles.iconBtn,
+                ...(hoveredIcon === "saved" ? styles.iconBtnHover : {}),
+              }}
+              onMouseEnter={() => setHoveredIcon("saved")}
+              onMouseLeave={() => setHoveredIcon(null)}
+              onClick={() => setMobileMenuOpen(false)}
+              title="Запазени обяви"
+            >
+              ❤️
+              {savedCount > 0 && <div style={styles.badge}>{savedCount}</div>}
+            </Link>
+          )}
+
+          {/* Draft Ads Icon - Only show when logged in */}
+          {isAuthenticated && (
+            <Link
+              to="/drafts"
+              style={{
+                ...styles.iconBtn,
+                ...(hoveredIcon === "drafts" ? styles.iconBtnHover : {}),
+              }}
+              onMouseEnter={() => setHoveredIcon("drafts")}
+              onMouseLeave={() => setHoveredIcon(null)}
+              onClick={() => setMobileMenuOpen(false)}
+              title="Чернови обяви"
+            >
+              📝
+              {draftCount > 0 && <div style={styles.badge}>{draftCount}</div>}
+            </Link>
+          )}
+
+          {isAuthenticated ? (
+            <>
+              {/* My Ads Button - Only show when logged in */}
+              <Link
+                to="/my-ads"
+                style={styles.primaryBtn}
+                onClick={() => setMobileMenuOpen(false)}
+                title="Моите обяви"
+              >
+                Моите Обяви
+              </Link>
+
+              {/* Logout Button */}
+              <button
+                style={styles.logoutBtn}
+                onClick={handleLogout}
+                title="Изход"
+              >
+                Изход
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Login Button - Only show when not logged in */}
+              <Link to="/auth" style={styles.primaryBtn} onClick={() => setMobileMenuOpen(false)}>
+                Влизане
+              </Link>
+              {/* Profile Button - Only show when not logged in */}
+              <Link to="/profile" style={styles.primaryBtn} onClick={() => setMobileMenuOpen(false)}>
+                Профил
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </nav>

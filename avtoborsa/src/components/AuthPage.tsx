@@ -1,28 +1,67 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
+import { useAuth } from "../context/AuthContext";
 
 const AuthPage: React.FC = () => {
   const navigate = useNavigate();
+  const { login, setUserFromToken } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    // Clear error for this field when user starts typing
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: "" }));
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isLogin) {
-      alert("Влизане успешно! (Демо режим)");
-    } else {
-      alert("Регистрация успешна! (Демо режим)");
+    setLoading(true);
+    setErrors({});
+
+    try {
+      if (isLogin) {
+        // Call the login endpoint
+        const response = await fetch("http://localhost:8000/api/auth/login/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          // Set user in auth context
+          if (data.token && data.user) {
+            setUserFromToken(data.user, data.token);
+          }
+          alert("Влизане успешно!");
+          navigate("/");
+        } else {
+          const errorData = await response.json();
+          setErrors({ submit: errorData.error || "Невалиден email или парола" });
+        }
+      } else {
+        // Redirect to profile type selection for registration
+        navigate("/profile");
+      }
+    } catch (error) {
+      setErrors({ submit: "Грешка при свързване със сървъра" });
+      console.error("Error:", error);
+    } finally {
+      setLoading(false);
     }
-    navigate("/");
   };
 
   const styles: Record<string, React.CSSProperties> = {
@@ -34,10 +73,11 @@ const AuthPage: React.FC = () => {
     formGroup: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 },
     label: { fontSize: 13, fontWeight: 500, color: "#555" },
     input: { padding: "12px 14px", border: "1px solid #ccc", borderRadius: 6, fontSize: 14, fontFamily: "inherit", width: "100%", boxSizing: "border-box" },
-    button: { padding: "12px 24px", background: "#0066cc", color: "#fff", border: "none", borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: "pointer", width: "100%", marginTop: 8, boxSizing: "border-box" },
+    button: { padding: "12px 24px", background: "#0066cc", color: "#fff", border: "none", borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: "pointer", width: "100%", marginTop: 8, boxSizing: "border-box", opacity: loading ? 0.6 : 1 },
     toggleContainer: { textAlign: "center" as const, marginTop: 20, paddingTop: 20, borderTop: "1px solid #e0e0e0" },
     toggleText: { fontSize: 14, color: "#666", marginBottom: 12, margin: 0 },
     toggleButton: { background: "none", border: "none", color: "#0066cc", cursor: "pointer", fontWeight: 600, fontSize: 14, textDecoration: "underline" },
+    errorMessage: { color: "#d32f2f", fontSize: 13, marginBottom: 16, padding: "10px 12px", background: "#ffebee", borderRadius: 4, border: "1px solid #ffcdd2" },
   };
 
   return (
@@ -77,6 +117,8 @@ const AuthPage: React.FC = () => {
             {isLogin ? "Влез в твоя профил" : "Създай нов профил"}
           </p>
 
+          {errors.submit && <div style={styles.errorMessage}>{errors.submit}</div>}
+
           <div style={styles.formGroup}>
             <label style={styles.label}>Email *</label>
             <input
@@ -103,8 +145,8 @@ const AuthPage: React.FC = () => {
             />
           </div>
 
-          <button style={styles.button} type="submit">
-            {isLogin ? "Влизане" : "Регистрация"}
+          <button style={styles.button} type="submit" disabled={loading}>
+            {loading ? "Зареждане..." : (isLogin ? "Влизане" : "Регистрация")}
           </button>
 
           <div style={styles.toggleContainer}>

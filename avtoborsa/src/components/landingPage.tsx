@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import Navbar from "./Navbar";
+import { CAR_FEATURES } from "../constants/carFeatures";
 
 type Fuel = "Бензин" | "Дизел" | "Газ/Бензин" | "Хибрид" | "Електро";
 type Gearbox = "Ръчна" | "Автоматик";
@@ -182,6 +183,8 @@ export default function LandingPage() {
   const [yearTo, setYearTo] = useState<string>("");
 
   const [hasPhotosOnly, setHasPhotosOnly] = useState(false);
+  const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
+  const [showFeaturesDropdown, setShowFeaturesDropdown] = useState(false);
 
   const yearNow = new Date().getFullYear();
 
@@ -250,11 +253,110 @@ export default function LandingPage() {
     setYearFrom("");
     setYearTo("");
     setHasPhotosOnly(false);
+    setSelectedFeatures([]);
+  };
+
+  const handleFeatureToggle = (feature: string) => {
+    setSelectedFeatures((prev) =>
+      prev.includes(feature) ? prev.filter((f) => f !== feature) : [...prev, feature]
+    );
   };
 
   return (
     <div style={styles.page}>
       <style>{globalCss}</style>
+      <style>{`
+        /* Features dropdown table responsive styles */
+        .features-dropdown-table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+
+        .features-dropdown-table td {
+          vertical-align: top;
+          padding: 12px;
+          border-right: 1px solid #e0e0e0;
+        }
+
+        /* Desktop (1201px+) - 4 columns */
+        @media (min-width: 1201px) {
+          .features-dropdown-table td {
+            width: 25%;
+          }
+        }
+
+        /* Tablet Large (1024px - 1200px) - 2 columns */
+        @media (min-width: 1024px) and (max-width: 1200px) {
+          .features-dropdown-table td {
+            width: 50%;
+          }
+          .features-dropdown-table td:nth-child(odd) {
+            border-right: 1px solid #e0e0e0;
+          }
+          .features-dropdown-table td:nth-child(even) {
+            border-right: none;
+          }
+        }
+
+        /* Tablet (768px - 1023px) - 2 columns */
+        @media (min-width: 768px) and (max-width: 1023px) {
+          .features-dropdown-table td {
+            width: 50%;
+          }
+          .features-dropdown-table td:nth-child(odd) {
+            border-right: 1px solid #e0e0e0;
+          }
+          .features-dropdown-table td:nth-child(even) {
+            border-right: none;
+          }
+        }
+
+        /* Mobile Large (640px - 767px) - 1 column */
+        @media (min-width: 640px) and (max-width: 767px) {
+          .features-dropdown-table {
+            display: block;
+          }
+          .features-dropdown-table tbody {
+            display: block;
+          }
+          .features-dropdown-table tr {
+            display: block;
+          }
+          .features-dropdown-table td {
+            display: block;
+            width: 100% !important;
+            padding: 12px 0 !important;
+            border-right: none !important;
+            border-bottom: 1px solid #e0e0e0;
+          }
+          .features-dropdown-table td:last-child {
+            border-bottom: none;
+          }
+        }
+
+        /* Mobile Small (< 640px) - 1 column */
+        @media (max-width: 639px) {
+          .features-dropdown-table {
+            display: block;
+          }
+          .features-dropdown-table tbody {
+            display: block;
+          }
+          .features-dropdown-table tr {
+            display: block;
+          }
+          .features-dropdown-table td {
+            display: block;
+            width: 100% !important;
+            padding: 12px 0 !important;
+            border-right: none !important;
+            border-bottom: 1px solid #e0e0e0;
+          }
+          .features-dropdown-table td:last-child {
+            border-bottom: none;
+          }
+        }
+      `}</style>
       <Navbar />
 
       <main style={styles.main}>
@@ -400,6 +502,163 @@ export default function LandingPage() {
                       placeholder={String(yearNow)}
                     />
                   </Field>
+
+                  {/* Features Dropdown */}
+                  <div style={{ gridColumn: "1 / -1", position: "relative" }}>
+                    <label style={styles.label}>Характеристики</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowFeaturesDropdown(!showFeaturesDropdown)}
+                      style={{
+                        width: "100%",
+                        height: 36,
+                        borderRadius: 4,
+                        border: "1px solid #ccc",
+                        background: "#fff",
+                        color: "#333",
+                        padding: "0 12px",
+                        outline: "none",
+                        fontSize: 14,
+                        textAlign: "left",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        transition: "all 0.2s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = "#0066cc";
+                        e.currentTarget.style.boxShadow = "0 0 0 2px rgba(0, 102, 204, 0.1)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = "#ccc";
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    >
+                      <span>{selectedFeatures.length > 0 ? `${selectedFeatures.length} избрани` : "Избери характеристики"}</span>
+                      <span style={{ transform: showFeaturesDropdown ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s", fontSize: 16 }}>▾</span>
+                    </button>
+
+                    {/* Modal Overlay */}
+                    {showFeaturesDropdown && (
+                      <div
+                        style={{
+                          position: "fixed",
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          background: "rgba(0, 0, 0, 0.5)",
+                          zIndex: 10000,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                        onClick={() => setShowFeaturesDropdown(false)}
+                      >
+                        {/* Modal Content */}
+                        <div
+                          style={{
+                            background: "#fff",
+                            borderRadius: 8,
+                            padding: 24,
+                            maxWidth: 1000,
+                            width: "90%",
+                            maxHeight: "80vh",
+                            overflowY: "auto",
+                            boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                            <h2 style={{ fontSize: 18, fontWeight: 700, color: "#333", margin: 0 }}>Характеристики</h2>
+                            <button
+                              type="button"
+                              onClick={() => setShowFeaturesDropdown(false)}
+                              style={{
+                                background: "none",
+                                border: "none",
+                                fontSize: 24,
+                                cursor: "pointer",
+                                color: "#666",
+                                padding: 0,
+                                width: 32,
+                                height: 32,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                            >
+                              ✕
+                            </button>
+                          </div>
+
+                          <table className="features-table">
+                            <tbody>
+                              <tr>
+                                {Object.entries(CAR_FEATURES).map(([category, features]) => (
+                                  <td key={category}>
+                                    <label style={{ fontSize: 12, fontWeight: 700, color: "#333", marginBottom: 12, display: "block", textTransform: "capitalize", paddingBottom: 8, borderBottom: "2px solid #0066cc" }}>
+                                      {category.charAt(0).toUpperCase() + category.slice(1)}
+                                    </label>
+                                    {features.map((feature) => (
+                                      <div key={feature}>
+                                        <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, fontSize: 11, cursor: "pointer", padding: "3px 0" }}>
+                                          <input
+                                            type="checkbox"
+                                            checked={selectedFeatures.includes(feature)}
+                                            onChange={() => handleFeatureToggle(feature)}
+                                            style={{ cursor: "pointer", width: 16, height: 16 }}
+                                          />
+                                          <span style={{ color: "black", fontWeight: "bold", fontSize: 14 }}>{feature}</span>
+                                        </label>
+                                      </div>
+                                    ))}
+                                  </td>
+                                ))}
+                              </tr>
+                            </tbody>
+                          </table>
+
+                          <div style={{ marginTop: 20, display: "flex", gap: 12, justifyContent: "flex-end" }}>
+                            <button
+                              type="button"
+                              onClick={() => setShowFeaturesDropdown(false)}
+                              style={{
+                                padding: "10px 20px",
+                                background: "#f0f0f0",
+                                border: "1px solid #ccc",
+                                borderRadius: 4,
+                                fontSize: 14,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                color: "#333",
+                              }}
+                            >
+                              Затвори
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowFeaturesDropdown(false)}
+                              style={{
+                                padding: "10px 20px",
+                                background: "#0066cc",
+                                border: "none",
+                                borderRadius: 4,
+                                fontSize: 14,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                color: "#fff",
+                              }}
+                            >
+                              Готово
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div style={styles.formBottom} className="form-bottom">
