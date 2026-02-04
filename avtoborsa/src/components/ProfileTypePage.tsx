@@ -98,10 +98,10 @@ const ProfileTypePage: React.FC = () => {
       `}</style>
       <div style={styles.container} className="profile-type-container">
         <div style={styles.header} className="profile-type-header">
-          <h1 style={styles.title}>Профил</h1>
-          <p style={styles.subtitle}>Избери опция</p>
+          {/* <h1 style={styles.title}>Профил</h1> */}
+          {/* <p style={styles.subtitle}>Избери опция</p> */}
           <div style={{ display: "flex", gap: 12, justifyContent: "center", marginBottom: 30 }} className="profile-type-buttons">
-            <button
+            {/* <button
               onClick={() => navigate("/auth")}
               style={{
                 padding: "10px 20px",
@@ -115,8 +115,8 @@ const ProfileTypePage: React.FC = () => {
               }}
             >
               Влизане
-            </button>
-            <button
+            </button> */}
+            {/* <button
               onClick={() => {}}
               style={{
                 padding: "10px 20px",
@@ -130,7 +130,7 @@ const ProfileTypePage: React.FC = () => {
               }}
             >
               Създай профил
-            </button>
+            </button> */}
           </div>
         </div>
 

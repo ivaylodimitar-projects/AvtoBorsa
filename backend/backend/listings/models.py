@@ -6,16 +6,16 @@ class CarListing(models.Model):
     """Model for car listings/advertisements"""
 
     FUEL_CHOICES = [
-        ('бензин', 'Бензин'),
-        ('дизел', 'Дизел'),
-        ('газ/Бензин', 'Газ/Бензин'),
-        ('xибрид', 'Хибрид'),
-        ('електро', 'Електро'),
+        ('benzin', 'Бензин'),
+        ('dizel', 'Дизел'),
+        ('gaz_benzin', 'Газ/Бензин'),
+        ('hibrid', 'Хибрид'),
+        ('elektro', 'Електро'),
     ]
 
     GEARBOX_CHOICES = [
-        ('ръчна', 'Ръчна'),
-        ('автоматична', 'Автоматик'),
+        ('ruchna', 'Ръчна'),
+        ('avtomatik', 'Автоматик'),
     ]
 
     CATEGORY_CHOICES = [

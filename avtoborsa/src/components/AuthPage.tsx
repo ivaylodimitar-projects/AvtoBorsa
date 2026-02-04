@@ -153,16 +153,22 @@ const AuthPage: React.FC = () => {
             <p style={styles.toggleText}>
               {isLogin ? "Нямаш профил?" : "Вече имаш профил?"}
             </p>
+
             <button
               type="button"
               style={styles.toggleButton}
               onClick={() => {
-                setIsLogin(!isLogin);
-                setFormData({ email: "", password: "" });
+                if (isLogin) {
+                  navigate("/profile");
+                } else {
+                  setIsLogin(true);
+                  setFormData({ email: "", password: "" });
+                }
               }}
             >
               {isLogin ? "Създай профил" : "Влизане"}
             </button>
+
           </div>
         </form>
       </div>
