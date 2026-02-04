@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "corsheaders",
 
     "backend.accounts",
+    "backend.listings",
 ]
 
 MIDDLEWARE = [
@@ -147,3 +148,7 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
 }
+
+# Media Files Configuration
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'

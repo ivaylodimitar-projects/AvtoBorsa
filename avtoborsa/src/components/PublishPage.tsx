@@ -1,5 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
+import { useAuth } from "../context/AuthContext";
 import { CAR_FEATURES } from "../constants/carFeatures";
 
 const BRANDS = [
@@ -238,8 +240,21 @@ const CATEGORIES = [
 ];
 
 const PublishPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 30 }, (_, i) => currentYear - i);
+
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [successMessage, setSuccessMessage] = useState("");
+
+  // Check authentication on mount
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      navigate("/auth");
+    }
+  }, [isAuthenticated, authLoading, navigate]);
 
   const [formData, setFormData] = useState({
     category: "1",
@@ -247,7 +262,6 @@ const PublishPage: React.FC = () => {
     brand: "",
     model: "",
     yearFrom: "",
-    yearTo: "",
     price: "",
     city: "",
     fuel: "",
@@ -324,28 +338,106 @@ const PublishPage: React.FC = () => {
     setPreviewUrls((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    alert("Обявата е изпратена! (Демо режим)");
-    setFormData({
-      category: "1",
-      title: "",
-      brand: "",
-      model: "",
-      yearFrom: "",
-      yearTo: "",
-      price: "",
-      city: "",
-      fuel: "",
-      gearbox: "",
-      mileage: "",
-      description: "",
-      phone: "",
-      email: "",
-      pictures: [],
-      features: [],
-    });
-    setPreviewUrls([]);
+    setErrors({});
+    setSuccessMessage("");
+    setLoading(true);
+
+    try {
+      // Create FormData for multipart/form-data
+      const formDataToSend = new FormData();
+      formDataToSend.append("category", formData.category);
+      formDataToSend.append("title", formData.title);
+      formDataToSend.append("brand", formData.brand);
+      formDataToSend.append("model", formData.model);
+      formDataToSend.append("year_from", formData.yearFrom);
+      formDataToSend.append("price", formData.price);
+      formDataToSend.append("city", formData.city);
+      formDataToSend.append("fuel", formData.fuel);
+      formDataToSend.append("gearbox", formData.gearbox);
+      formDataToSend.append("mileage", formData.mileage);
+      formDataToSend.append("description", formData.description);
+      formDataToSend.append("phone", formData.phone);
+      formDataToSend.append("email", formData.email);
+      formDataToSend.append("features", JSON.stringify(formData.features));
+      formDataToSend.append("is_draft", "false");
+
+      // Add images as images_upload field
+      formData.pictures.forEach((file) => {
+        formDataToSend.append("images_upload", file);
+      });
+
+      // Get token from localStorage
+      const token = localStorage.getItem("authToken");
+      if (!token) {
+        setErrors({ submit: "Не сте логнати. Моля, влезте отново." });
+        navigate("/auth");
+        return;
+      }
+
+      // Submit to backend
+      const response = await fetch("http://localhost:8000/api/listings/", {
+        method: "POST",
+        headers: {
+          Authorization: `Token ${token}`,
+        },
+        body: formDataToSend,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("Backend error:", errorData);
+        // Handle both detail and field-specific errors
+        let errorMessage = "Грешка при изпращане на обявата";
+        if (errorData.detail) {
+          errorMessage = errorData.detail;
+        } else if (typeof errorData === 'object') {
+          // Get first field error
+          const firstError = Object.values(errorData)[0];
+          if (Array.isArray(firstError)) {
+            errorMessage = firstError[0];
+          } else if (typeof firstError === 'string') {
+            errorMessage = firstError;
+          }
+        }
+        setErrors({ submit: errorMessage });
+        return;
+      }
+
+      const data = await response.json();
+      setSuccessMessage("Обявата е успешно публикувана!");
+
+      // Reset form
+      setFormData({
+        category: "1",
+        title: "",
+        brand: "",
+        model: "",
+        yearFrom: "",
+        price: "",
+        city: "",
+        fuel: "",
+        gearbox: "",
+        mileage: "",
+        description: "",
+        phone: "",
+        email: "",
+        pictures: [],
+        features: [],
+      });
+      setPreviewUrls([]);
+
+      // Redirect to my ads after 2 seconds
+      setTimeout(() => {
+        navigate("/my-ads");
+      }, 2000);
+    } catch (error) {
+      setErrors({ submit: "Грешка при изпращане на обявата" });
+      console.error("Error submitting listing:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFeatureChange = (feature: string) => {
@@ -507,6 +599,36 @@ const PublishPage: React.FC = () => {
         `}</style>
         <form style={styles.form} className="publish-form" onSubmit={handleSubmit}>
           <h1 style={styles.title}>Публикуване на обява</h1>
+
+          {/* Error Message */}
+          {errors.submit && (
+            <div style={{
+              color: "#d32f2f",
+              fontSize: 13,
+              marginBottom: 16,
+              padding: "10px 12px",
+              background: "#ffebee",
+              borderRadius: 4,
+              border: "1px solid #ffcdd2"
+            }}>
+              {errors.submit}
+            </div>
+          )}
+
+          {/* Success Message */}
+          {successMessage && (
+            <div style={{
+              color: "#2e7d32",
+              fontSize: 13,
+              marginBottom: 16,
+              padding: "10px 12px",
+              background: "#e8f5e9",
+              borderRadius: 4,
+              border: "1px solid #a5d6a7"
+            }}>
+              {successMessage}
+            </div>
+          )}
 
           {/* Progress Navigation */}
           <div style={{ width: "100%", margin: "10px 0 30px 0", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -685,6 +807,10 @@ const PublishPage: React.FC = () => {
                 </select>
               </div>
               <div style={styles.formGroup}>
+                <label style={styles.label}>Модификация</label>
+                <input style={styles.input} type="text" name="title" placeholder="Напр. 320d, M Sport" value={formData.title} onChange={handleChange} />
+              </div>
+              <div style={styles.formGroup}>
                 <label style={styles.label}>Марка *</label>
                 <select style={styles.input} name="brand" value={formData.brand} onChange={handleChange} required>
                   <option value="">Избери марка</option>
@@ -716,19 +842,8 @@ const PublishPage: React.FC = () => {
                 </select>
               </div>
               <div style={styles.formGroup}>
-                <label style={styles.label}>Година от *</label>
+                <label style={styles.label}>Година *</label>
                 <select style={styles.input} name="yearFrom" value={formData.yearFrom} onChange={handleChange} required>
-                  <option value="">Избери година</option>
-                  {years.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Година до *</label>
-                <select style={styles.input} name="yearTo" value={formData.yearTo} onChange={handleChange} required>
                   <option value="">Избери година</option>
                   {years.map((year) => (
                     <option key={year} value={year}>
@@ -745,18 +860,19 @@ const PublishPage: React.FC = () => {
                 <label style={styles.label}>Гориво</label>
                 <select style={styles.input} name="fuel" value={formData.fuel} onChange={handleChange}>
                   <option value="">Избери гориво</option>
-                  <option value="Бензин">Бензин</option>
-                  <option value="Дизел">Дизел</option>
-                  <option value="Газ/Бензин">Газ/Бензин</option>
-                  <option value="Хибрид">Хибрид</option>
+                  <option value="benzin">Бензин</option>
+                  <option value="dizel">Дизел</option>
+                  <option value="gaz_benzin">Газ/Бензин</option>
+                  <option value="hibrid">Хибрид</option>
+                  <option value="elektro">Електро</option>
                 </select>
               </div>
               <div style={styles.formGroup}>
                 <label style={styles.label}>Скоростна кутия</label>
                 <select style={styles.input} name="gearbox" value={formData.gearbox} onChange={handleChange}>
                   <option value="">Избери кутия</option>
-                  <option value="Ръчна">Ръчна</option>
-                  <option value="Автоматик">Автоматик</option>
+                  <option value="ruchna">Ръчна</option>
+                  <option value="avtomatik">Автоматик</option>
                 </select>
               </div>
               <div style={styles.formGroup}>
@@ -830,8 +946,8 @@ const PublishPage: React.FC = () => {
             </div>
           </div>
 
-          <button style={styles.button} type="submit">
-            Публикуване на обява
+          <button style={{...styles.button, opacity: loading ? 0.6 : 1}} type="submit" disabled={loading}>
+            {loading ? "Изпращане..." : "Публикуване на обява"}
           </button>
           <p style={styles.note}>* Задължителни полета</p>
         </form>
