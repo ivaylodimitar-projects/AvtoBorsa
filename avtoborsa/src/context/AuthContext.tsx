@@ -5,6 +5,7 @@ interface User {
   email: string;
   username?: string;
   userType: "private" | "business";
+  balance?: number;
 }
 
 interface AuthContextType {
@@ -14,6 +15,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   setUserFromToken: (userData: User, token: string) => void;
   isAuthenticated: boolean;
+  updateBalance: (newBalance: number) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -71,6 +73,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(userData);
   };
 
+  const updateBalance = (newBalance: number) => {
+    if (user) {
+      setUser({ ...user, balance: newBalance });
+    }
+  };
+
   const logout = async () => {
     try {
       const token = localStorage.getItem("authToken");
@@ -98,6 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         logout,
         setUserFromToken,
+        updateBalance,
         isAuthenticated: !!user,
       }}
     >

@@ -154,6 +154,7 @@ class CarImage(models.Model):
     listing = models.ForeignKey(CarListing, on_delete=models.CASCADE, related_name='images')
     image = models.ImageField(upload_to='car_listings/%Y/%m/%d/')
     order = models.IntegerField(default=0)
+    is_cover = models.BooleanField(default=False, help_text="Mark this image as the cover/main image for the listing")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -298,6 +298,7 @@ const VehicleDetailsPage: React.FC = () => {
             sellerName={listing.user_email.split('@')[0]}
             sellerEmail={listing.user_email}
             phone={listing.phone}
+            listingId={listing.id}
             isMobile={false}
           />
         )}
@@ -309,6 +310,7 @@ const VehicleDetailsPage: React.FC = () => {
           sellerName={listing.user_email.split('@')[0]}
           sellerEmail={listing.user_email}
           phone={listing.phone}
+          listingId={listing.id}
           isMobile={true}
         />
       )}

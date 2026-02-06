@@ -6,7 +6,7 @@ class CarImageSerializer(serializers.ModelSerializer):
     """Serializer for car images"""
     class Meta:
         model = CarImage
-        fields = ['id', 'image', 'order', 'created_at']
+        fields = ['id', 'image', 'order', 'is_cover', 'created_at']
         read_only_fields = ['id', 'created_at']
 
 
@@ -110,10 +110,13 @@ class CarListingSerializer(serializers.ModelSerializer):
 
         # Create image objects
         for index, image in enumerate(images_data):
+            # First image is cover by default
+            is_cover = index == 0 and len(images_data) > 0
             CarImage.objects.create(
                 listing=listing,
                 image=image,
-                order=index
+                order=index,
+                is_cover=is_cover
             )
 
         return listing

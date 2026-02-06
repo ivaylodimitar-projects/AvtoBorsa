@@ -289,15 +289,59 @@ def upload_listing_images(request, listing_id):
 
     images = request.FILES.getlist('images')
     for index, image in enumerate(images):
+        # First image is cover by default
+        is_cover = index == 0 and len(images) > 0
         CarImage.objects.create(
             listing=listing,
             image=image,
-            order=index
+            order=index,
+            is_cover=is_cover
         )
 
     return Response(
         {'message': f'{len(images)} images uploaded successfully'},
         status=status.HTTP_201_CREATED
+    )
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_listing_images(request, listing_id):
+    """Update image order and cover status for a listing"""
+    listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
+
+    images_data = request.data.get('images', [])
+
+    # Update each image with new order and cover status
+    for image_data in images_data:
+        image_id = image_data.get('id')
+        order = image_data.get('order')
+        is_cover = image_data.get('is_cover', False)
+
+        try:
+            image = CarImage.objects.get(id=image_id, listing=listing)
+            image.order = order
+            image.is_cover = is_cover
+            image.save()
+        except CarImage.DoesNotExist:
+            return Response(
+                {'error': f'Image {image_id} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    # Ensure only one image is marked as cover
+    CarImage.objects.filter(listing=listing).exclude(
+        id__in=[img.get('id') for img in images_data if img.get('is_cover')]
+    ).update(is_cover=False)
+
+    serializer = CarImageSerializer(
+        listing.images.all(),
+        many=True
+    )
+
+    return Response(
+        {'message': 'Images updated successfully', 'images': serializer.data},
+        status=status.HTTP_200_OK
     )
 
 

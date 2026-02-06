@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Phone, Heart, Share2 } from 'lucide-react';
 import SellerCard from './SellerCard';
 
@@ -7,6 +7,7 @@ interface ContactSidebarProps {
   sellerName: string;
   sellerEmail: string;
   phone: string;
+  listingId?: number;
   isMobile?: boolean;
 }
 
@@ -15,8 +16,77 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
   sellerName,
   sellerEmail,
   phone,
+  listingId,
   isMobile = false,
 }) => {
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Check if listing is already in favorites
+  useEffect(() => {
+    const checkFavorite = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        if (!token || !listingId) return;
+
+        // Fetch user's favorites to check if this listing is favorited
+        const response = await fetch(
+          `http://localhost:8000/api/my-favorites/`,
+          {
+            headers: {
+              'Authorization': `Token ${token}`,
+            },
+          }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          // Check if current listing is in favorites
+          const isFav = data.some((fav: any) => fav.listing.id === listingId);
+          setIsFavorite(isFav);
+        }
+      } catch (err) {
+        console.error('Error checking favorite status:', err);
+      }
+    };
+
+    checkFavorite();
+  }, [listingId]);
+
+  const handleToggleFavorite = async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token || !listingId) {
+        alert('Трябва да си логнат за да запазиш обяви');
+        return;
+      }
+
+      setIsLoading(true);
+
+      // Use the correct backend endpoints
+      const endpoint = isFavorite
+        ? `http://localhost:8000/api/listings/${listingId}/unfavorite/`
+        : `http://localhost:8000/api/listings/${listingId}/favorite/`;
+
+      const response = await fetch(endpoint, {
+        method: isFavorite ? 'DELETE' : 'POST',
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        setIsFavorite(!isFavorite);
+      } else {
+        alert('Грешка при запазване на обявата');
+      }
+    } catch (err) {
+      console.error('Error toggling favorite:', err);
+      alert('Грешка при запазване на обявата');
+    } finally {
+      setIsLoading(false);
+    }
+  };
   const styles: Record<string, React.CSSProperties> = {
     container: isMobile
       ? {
@@ -154,16 +224,24 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
         {!isMobile && (
           <>
             <button
-              style={styles.secondaryButton}
+              style={{
+                ...styles.secondaryButton,
+                background: isFavorite ? '#ffe0e0' : '#f0f0f0',
+                borderColor: isFavorite ? '#ff6b6b' : '#e0e0e0',
+                color: isFavorite ? '#d32f2f' : '#1a1a1a',
+              }}
+              onClick={handleToggleFavorite}
+              disabled={isLoading}
               onMouseEnter={(e) =>
-                (e.currentTarget.style.background = '#e8e8e8')
+                (e.currentTarget.style.background = isFavorite ? '#ffc9c9' : '#e8e8e8')
               }
               onMouseLeave={(e) =>
-                (e.currentTarget.style.background = '#f0f0f0')
+                (e.currentTarget.style.background = isFavorite ? '#ffe0e0' : '#f0f0f0')
               }
+              title={isFavorite ? 'Премахни от любими' : 'Добави в любими'}
             >
-              <Heart size={18} />
-              Запази
+              <Heart size={18} fill={isFavorite ? 'currentColor' : 'none'} />
+              {isFavorite ? 'Запазено' : 'Запази'}
             </button>
 
             <button

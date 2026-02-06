@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import PrivateUser, BusinessUser
+from .models import PrivateUser, BusinessUser, UserProfile
 
 
 class PrivateUserSerializer(serializers.ModelSerializer):
@@ -78,6 +78,21 @@ class BusinessUserSerializer(serializers.ModelSerializer):
             user=user,
             **validated_data
         )
-        
+
         return business_user
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    """Serializer for user profile and balance"""
+    class Meta:
+        model = UserProfile
+        fields = ['id', 'balance', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class UserBalanceSerializer(serializers.ModelSerializer):
+    """Serializer for user balance updates"""
+    class Meta:
+        model = UserProfile
+        fields = ['balance']
 

@@ -240,7 +240,7 @@ const SearchPage: React.FC = () => {
                       <div style={styles.itemPrice}>
                         € {listing.price.toLocaleString("bg-BG")}
                         <div style={styles.itemPriceSmall}>
-                          {(listing.price * 1.95).toLocaleString("bg-BG", { maximumFractionDigits: 2 })} лв.
+                          {(listing.price * 1.96).toLocaleString("bg-BG", { maximumFractionDigits: 2 })} лв.
                         </div>
                       </div>
                     </div>

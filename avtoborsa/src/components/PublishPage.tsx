@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { CAR_FEATURES } from "../constants/carFeatures";
 import { BULGARIAN_CITIES_BY_REGION } from "../constants/bulgarianCities";
+import ListingFormStepper from "./ListingFormStepper";
+import AdvancedImageUpload from "./AdvancedImageUpload";
+import FormFieldWithTooltip from "./FormFieldWithTooltip";
+import ListingPreview from "./ListingPreview";
+import ListingQualityIndicator from "./ListingQualityIndicator";
 
 const BRANDS = [
   "Audi", "BMW", "Mercedes-Benz", "Volkswagen", "Opel", "Ford", "Toyota", 
@@ -220,49 +224,6 @@ const MODELS = {
 
 
 
-const CATEGORIES = [
-  { value: "1", label: "Автомобили и Джипове" },
-  { value: "w", label: "Гуми и джанти" },
-  { value: "u", label: "Части" },
-  { value: "3", label: "Бусове" },
-  { value: "4", label: "Камиони" },
-  { value: "5", label: "Мотоциклети" },
-  { value: "6", label: "Селскостопански" },
-  { value: "7", label: "Индустриални" },
-  { value: "8", label: "Кари" },
-  { value: "9", label: "Каравани" },
-  { value: "a", label: "Яхти и Лодки" },
-  { value: "b", label: "Ремаркета" },
-  { value: "c", label: "Велосипеди" },
-  { value: "v", label: "Аксесоари" },
-  { value: "y", label: "Купува" },
-  { value: "z", label: "Услуги" },
-];
-
-const CAR_TYPES = [
-  { value: "", label: "" },
-  { value: "van", label: "Ван" },
-  { value: "jeep", label: "Джип" },
-  { value: "cabriolet", label: "Кабрио" },
-  { value: "wagon", label: "Комби" },
-  { value: "coupe", label: "Купе" },
-  { value: "minivan", label: "Миниван" },
-  { value: "pickup", label: "Пикап" },
-  { value: "sedan", label: "Седан" },
-  { value: "stretch_limo", label: "Стреч лимузина" },
-  { value: "hatchback", label: "Хечбек" },
-];
-
-const EURO_STANDARDS = [
-  { value: "", label: "" },
-  { value: "1", label: "Евро 1" },
-  { value: "2", label: "Евро 2" },
-  { value: "3", label: "Евро 3" },
-  { value: "4", label: "Евро 4" },
-  { value: "5", label: "Евро 5" },
-  { value: "6", label: "Евро 6" },
-];
-
 const BULGARIA_REGIONS = [
   { value: "Благоевград", label: "обл. Благоевград" },
   { value: "Бургас", label: "обл. Бургас" },
@@ -295,77 +256,11 @@ const BULGARIA_REGIONS = [
   { value: "Извън страната", label: "Извън страната" },
 ];
 
-const INTERNATIONAL_COUNTRIES = [
-  { value: "Австрия", label: "Австрия" },
-  { value: "Азербайджан", label: "Азербайджан" },
-  { value: "Албания", label: "Албания" },
-  { value: "Андора", label: "Андора" },
-  { value: "Армения", label: "Армения" },
-  { value: "Беларус", label: "Беларус" },
-  { value: "Белгия", label: "Белгия" },
-  { value: "Босна и Херцеговина", label: "Босна и Херцеговина" },
-  { value: "Ватикан", label: "Ватикан" },
-  { value: "Великобритания", label: "Великобритания" },
-  { value: "Германия", label: "Германия" },
-  { value: "Грузия", label: "Грузия" },
-  { value: "Гърция", label: "Гърция" },
-  { value: "Дания", label: "Дания" },
-  { value: "Дубай", label: "Дубай" },
-  { value: "Естония", label: "Естония" },
-  { value: "Ирландия", label: "Ирландия" },
-  { value: "Исландия", label: "Исландия" },
-  { value: "Испания", label: "Испания" },
-  { value: "Италия", label: "Италия" },
-  { value: "Казахстан", label: "Казахстан" },
-  { value: "Канада", label: "Канада" },
-  { value: "Кипър", label: "Кипър" },
-  { value: "Латвия", label: "Латвия" },
-  { value: "Литва", label: "Литва" },
-  { value: "Лихтенщайн", label: "Лихтенщайн" },
-  { value: "Люксембург", label: "Люксембург" },
-  { value: "Македония", label: "Македония" },
-  { value: "Малта", label: "Малта" },
-  { value: "Молдова", label: "Молдова" },
-  { value: "Монако", label: "Монако" },
-  { value: "Нидерландия", label: "Нидерландия" },
-  { value: "Норвегия", label: "Норвегия" },
-  { value: "Полша", label: "Полша" },
-  { value: "Португалия", label: "Португалия" },
-  { value: "Румъния", label: "Румъния" },
-  { value: "Русия", label: "Русия" },
-  { value: "Сан Марино", label: "Сан Марино" },
-  { value: "САЩ", label: "САЩ" },
-  { value: "Словакия", label: "Словакия" },
-  { value: "Словения", label: "Словения" },
-  { value: "Сърбия", label: "Сърбия" },
-  { value: "Турция", label: "Турция" },
-  { value: "Украйна", label: "Украйна" },
-  { value: "Унгария", label: "Унгария" },
-  { value: "Финландия", label: "Финландия" },
-  { value: "Франция", label: "Франция" },
-  { value: "Хърватия", label: "Хърватия" },
-  { value: "Черна гора", label: "Черна гора" },
-  { value: "Чехия", label: "Чехия" },
-  { value: "Швейцария", label: "Швейцария" },
-  { value: "Швеция", label: "Швеция" },
-  { value: "Южна Корея", label: "Южна Корея" },
-  { value: "Япония", label: "Япония" },
-];
-
-const MONTHS = [
-  { value: "1", label: "Януари" },
-  { value: "2", label: "Февруари" },
-  { value: "3", label: "Март" },
-  { value: "4", label: "Април" },
-  { value: "5", label: "Май" },
-  { value: "6", label: "Юни" },
-  { value: "7", label: "Юли" },
-  { value: "8", label: "Август" },
-  { value: "9", label: "Септември" },
-  { value: "10", label: "Октомври" },
-  { value: "11", label: "Ноември" },
-  { value: "12", label: "Декември" },
-];
+interface ImageItem {
+  file: File;
+  preview: string;
+  isCover: boolean;
+}
 
 const PublishPage: React.FC = () => {
   const navigate = useNavigate();
@@ -377,7 +272,6 @@ const PublishPage: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [successMessage, setSuccessMessage] = useState("");
   const [userListingsCount, setUserListingsCount] = useState(0);
-  const [listingsLoading, setListingsLoading] = useState(true);
 
   // Check authentication on mount and fetch user's listings count
   useEffect(() => {
@@ -402,8 +296,6 @@ const PublishPage: React.FC = () => {
           }
         } catch (err) {
           console.error("Error fetching listings count:", err);
-        } finally {
-          setListingsLoading(false);
         }
       };
 
@@ -439,69 +331,97 @@ const PublishPage: React.FC = () => {
     features: [] as string[],
   });
 
-  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
-  const [dragActive, setDragActive] = useState(false);
-  const [currentStep, setCurrentStep] = useState<1 | 2>(1);
+  const [images, setImages] = useState<ImageItem[]>([]);
+  const [currentStep, setCurrentStep] = useState(1);
+  const totalSteps = 9;
+
+  // Car features/extras
+  const CAR_FEATURES = [
+    "Климатик",
+    "Автоматичен климатик",
+    "Панорамен покрив",
+    "Кожен салон",
+    "Електрически прозорци",
+    "Електрически огледала",
+    "Круиз контрол",
+    "Паркинг сензори",
+    "Камера за паркиране",
+    "Навигация",
+    "Bluetooth",
+    "USB",
+    "AUX",
+    "Мултимедия",
+    "Спортен пакет",
+    "Люк",
+    "Тонирани стъкла",
+    "Алуминиеви джанти",
+    "Спортни джанти",
+    "Всички подушки",
+    "Странични подушки",
+    "Предни подушки",
+    "Задни подушки",
+    "Система за стабилност",
+    "ABS",
+    "ESP",
+    "Тракшън контрол",
+    "Помощ при паркиране",
+    "Адаптивен круиз контрол",
+    "Система за следене на пътната лента",
+    "Автоматични светлини",
+    "Дневни светлини",
+    "LED светлини",
+    "Ксенонови светлини",
+    "Лазерни светлини",
+    "Отопляемо предно стъкло",
+    "Отопляемо задно стъкло",
+    "Отопляеми седалки",
+    "Масаж на седалки",
+    "Вентилирани седалки",
+    "Памет на седалки",
+    "Електрически седалки",
+    "Регулируемо волан",
+    "Волан с отопление",
+    "Волан с управление",
+    "Спортен волан",
+    "Кожен волан",
+    "Система за контрол на стабилност",
+    "Система за помощ при спиране",
+    "Система за предупреждение при сблъсък",
+    "Система за разпознаване на пътни знаци",
+    "Система за контрол на налягането на гумите",
+    "Система за помощ при катерене",
+    "Система за помощ при спускане",
+    "Система за контрол на тягата",
+    "Система за контрол на динамиката",
+    "Система за контрол на скоростта",
+    "Система за контрол на стабилността",
+  ];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      addPictures(Array.from(files));
-    }
+  const calculateCompletion = (): number => {
+    const fields = [
+      formData.brand,
+      formData.model,
+      formData.yearFrom,
+      formData.price,
+      formData.city,
+      formData.fuel,
+      formData.gearbox,
+      formData.mileage,
+      formData.description,
+      formData.phone,
+      formData.email,
+      images.length > 0 ? "yes" : "",
+    ];
+    const filled = fields.filter((f) => f).length;
+    return Math.round((filled / fields.length) * 100);
   };
 
-  const addPictures = (newFiles: File[]) => {
-    const validFiles = newFiles.filter((file) => file.type.startsWith("image/"));
-    const currentCount = formData.pictures.length;
-    const availableSlots = 15 - currentCount;
-    const filesToAdd = validFiles.slice(0, availableSlots);
-
-    setFormData((prev) => ({
-      ...prev,
-      pictures: [...prev.pictures, ...filesToAdd],
-    }));
-
-    filesToAdd.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setPreviewUrls((prev) => [...prev, event.target?.result as string]);
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const handleDrag = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    const files = e.dataTransfer.files;
-    if (files) {
-      addPictures(Array.from(files));
-    }
-  };
-
-  const removePicture = (index: number) => {
-    setFormData((prev) => ({
-      ...prev,
-      pictures: prev.pictures.filter((_, i) => i !== index),
-    }));
-    setPreviewUrls((prev) => prev.filter((_, i) => i !== index));
-  };
+  const completionPercentage = calculateCompletion();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -557,8 +477,8 @@ const PublishPage: React.FC = () => {
       formDataToSend.append("features", JSON.stringify(formData.features));
 
       // Add images as images_upload field
-      formData.pictures.forEach((file) => {
-        formDataToSend.append("images_upload", file);
+      images.forEach((img) => {
+        formDataToSend.append("images_upload", img.file);
       });
 
       // Get token from localStorage
@@ -598,7 +518,7 @@ const PublishPage: React.FC = () => {
         return;
       }
 
-      const data = await response.json();
+      await response.json();
       setSuccessMessage("Обявата е успешно публикувана!");
 
       // Reset form
@@ -629,7 +549,7 @@ const PublishPage: React.FC = () => {
         pictures: [],
         features: [],
       });
-      setPreviewUrls([]);
+      setImages([]);
 
       // Redirect to my ads after 2 seconds
       setTimeout(() => {
@@ -833,445 +753,322 @@ const PublishPage: React.FC = () => {
           )}
 
           {/* Progress Navigation */}
-          <div style={{ width: "100%", margin: "10px 0 30px 0", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            {/* Step 1 */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "8px 12px",
-                  borderRadius: 4,
-                  background: currentStep === 1 ? "#0066cc" : "#f0f0f0",
-                  color: currentStep === 1 ? "#fff" : "#666",
-                  fontWeight: currentStep === 1 ? 600 : 500,
-                  fontSize: 13,
-                  cursor: "pointer",
-                  transition: "all 0.3s ease",
-                }}
-              >
-                <span style={{ fontWeight: "bold" }}>1.</span>
-                <span>Въвеждане на описанието и качване на снимки</span>
-              </div>
-            </div>
+          <ListingFormStepper
+            currentStep={currentStep}
+            totalSteps={totalSteps}
+            steps={[
+              { id: 1, label: "Основна информация", icon: "📋", description: "Марка, модел, година" },
+              { id: 2, label: "Детайли", icon: "⚙️", description: "Гориво, пробег" },
+              { id: 3, label: "Цена & Локация", icon: "💰", description: "Цена, град" },
+              { id: 4, label: "Снимки", icon: "📸", description: "Качи снимки" },
+              { id: 5, label: "Екстри", icon: "✨", description: "Опции и екстри" },
+              { id: 6, label: "Описание", icon: "📝", description: "Описание" },
+              { id: 7, label: "Контакт", icon: "📞", description: "Телефон" },
+              { id: 8, label: "Преглед", icon: "👁️", description: "Преглед" },
+            ]}
+            onStepClick={setCurrentStep}
+            completedSteps={Array.from({ length: currentStep - 1 }, (_, i) => i + 1)}
+          />
 
-            {/* Arrow */}
-            <div style={{ fontSize: 18, color: "#ccc" }}>→</div>
-
-            {/* Step 2 */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "8px 12px",
-                  borderRadius: 4,
-                  background: currentStep === 2 ? "#0066cc" : "#f0f0f0",
-                  color: currentStep === 2 ? "#fff" : "#666",
-                  fontWeight: currentStep === 2 ? 600 : 500,
-                  fontSize: 13,
-                  cursor: "pointer",
-                  transition: "all 0.3s ease",
-                }}
-              >
-                <span style={{ fontWeight: "bold" }}>2.</span>
-                <span>Публикуване - Избор на тип обява и срок</span>
-              </div>
-            </div>
-          </div>
+          {/* Quality Indicator */}
+          <ListingQualityIndicator
+            completionPercentage={completionPercentage}
+            tips={[
+              { id: "images", title: "Добри снимки", description: "Качи поне 3 снимки", icon: "📸", completed: images.length >= 3 },
+              { id: "description", title: "Подробно описание", description: "Напиши поне 50 символа", icon: "📝", completed: formData.description.length >= 50 },
+              { id: "price", title: "Конкурентна цена", description: "Задай реалистична цена", icon: "💰", completed: !!formData.price },
+              { id: "contact", title: "Контактна информация", description: "Добави телефон и имейл", icon: "📞", completed: !!formData.phone && !!formData.email },
+            ]}
+          />
 
           {/* Picture Upload */}
-          <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>Снимки ({formData.pictures.length}/15)</h2>
-            {formData.pictures.length < 15 && (
-              <div
-                style={{
-                  border: dragActive ? "2px solid #0066cc" : "2px dashed #ccc",
-                  borderRadius: 8,
-                  padding: "32px 20px",
-                  textAlign: "center",
-                  cursor: "pointer",
-                  background: dragActive ? "#f0f7ff" : "#fafafa",
-                  transition: "all 0.3s ease",
-                  marginBottom: 20,
-                }}
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-              >
-                <div style={{ fontSize: 40, marginBottom: 12 }}>📸</div>
-                <p style={{ fontSize: 15, fontWeight: 600, color: "#333", margin: "0 0 8px 0" }}>
-                  Качи снимки на автомобила
-                </p>
-                <p style={{ fontSize: 13, color: "#666", margin: "0 0 16px 0" }}>
-                  Влачи и пусни снимките тук или кликни за избор (до 15 снимки)
-                </p>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleFileChange}
-                  style={{
-                    display: "none",
-                  }}
-                  id="picture-input"
-                />
-                <label
-                  htmlFor="picture-input"
-                  style={{
-                    display: "inline-block",
-                    padding: "10px 20px",
-                    background: "#0066cc",
-                    color: "#fff",
-                    borderRadius: 6,
-                    cursor: "pointer",
-                    fontSize: 14,
-                    fontWeight: 600,
-                  }}
-                >
-                  Избери снимки
-                </label>
-              </div>
-            )}
+          {currentStep === 4 && (
+            <div style={styles.section}>
+              <h2 style={styles.sectionTitle}>📸 Снимки на автомобила</h2>
+              <AdvancedImageUpload images={images} onImagesChange={setImages} maxImages={15} />
+            </div>
+          )}
 
-            {previewUrls.length > 0 && (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
-                  gap: 12,
-                }}
-              >
-                {previewUrls.map((url, index) => (
-                  <div
-                    key={index}
-                    style={{
-                      position: "relative",
-                      borderRadius: 8,
-                      overflow: "hidden",
-                      border: "1px solid #e0e0e0",
-                      background: "#fafafa",
-                    }}
+          {/* Step 1: Basic Info */}
+          {currentStep === 1 && (
+            <div style={styles.section}>
+              <h2 style={styles.sectionTitle}>📋 Основна информация</h2>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <FormFieldWithTooltip label="Марка" required tooltip="Производител на автомобила" example="BMW, Mercedes">
+                  <select style={styles.input} name="brand" value={formData.brand} onChange={handleChange} required>
+                    <option value="">Избери марка</option>
+                    {BRANDS.map((brand) => (
+                      <option key={brand} value={brand}>
+                        {brand}
+                      </option>
+                    ))}
+                  </select>
+                </FormFieldWithTooltip>
+
+                <FormFieldWithTooltip label="Модел" required tooltip="Модел на автомобила" example="3 Series, C-Class">
+                  <select
+                    style={styles.input}
+                    name="model"
+                    value={formData.model}
+                    onChange={handleChange}
+                    required
+                    disabled={!formData.brand}
                   >
-                    <img
-                      src={url}
-                      alt={`Preview ${index + 1}`}
-                      style={{
-                        width: "100%",
-                        height: 150,
-                        objectFit: "cover",
-                        display: "block",
-                      }}
+                    <option value="">{formData.brand ? "Избери модел" : "Избери марка първо"}</option>
+                    {formData.brand && MODELS[formData.brand as keyof typeof MODELS]
+                      ? MODELS[formData.brand as keyof typeof MODELS].map((model: string) => (
+                          <option key={model} value={model}>
+                            {model}
+                          </option>
+                        ))
+                      : null}
+                  </select>
+                </FormFieldWithTooltip>
+
+                <FormFieldWithTooltip label="Година" required tooltip="Година на производство" example="2020, 2019">
+                  <select style={styles.input} name="yearFrom" value={formData.yearFrom} onChange={handleChange} required>
+                    <option value="">Избери година</option>
+                    {years.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </FormFieldWithTooltip>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Car Details */}
+          {currentStep === 2 && (
+            <div style={styles.section}>
+              <h2 style={styles.sectionTitle}>⚙️ Детайли на автомобила</h2>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <FormFieldWithTooltip label="Гориво" required tooltip="Тип на горивото" example="Бензин, Дизел">
+                  <select style={styles.input} name="fuel" value={formData.fuel} onChange={handleChange}>
+                    <option value="">Избери гориво</option>
+                    <option value="benzin">Бензин</option>
+                    <option value="dizel">Дизел</option>
+                    <option value="gaz_benzin">Газ/Бензин</option>
+                    <option value="hibrid">Хибрид</option>
+                    <option value="elektro">Електро</option>
+                  </select>
+                </FormFieldWithTooltip>
+
+                <FormFieldWithTooltip label="Скоростна кутия" required tooltip="Тип на скоростната кутия" example="Ръчна, Автоматик">
+                  <select style={styles.input} name="gearbox" value={formData.gearbox} onChange={handleChange}>
+                    <option value="">Избери кутия</option>
+                    <option value="ruchna">Ръчна</option>
+                    <option value="avtomatik">Автоматик</option>
+                  </select>
+                </FormFieldWithTooltip>
+
+                <FormFieldWithTooltip label="Пробег (км)" required tooltip="Общо изминати километри" example="150000, 75000">
+                  <input style={styles.input} type="number" name="mileage" placeholder="Въведи пробег" min="0" value={formData.mileage} onChange={handleChange} />
+                </FormFieldWithTooltip>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Price & Location */}
+          {currentStep === 3 && (
+            <div style={styles.section}>
+              <h2 style={styles.sectionTitle}>💰 Цена и локация</h2>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <FormFieldWithTooltip label="Цена (EUR)" required tooltip="Цена на автомобила" example="5000, 10000">
+                  <input style={styles.input} type="number" name="price" placeholder="Въведи цена" min="0" step="0.01" value={formData.price} onChange={handleChange} required />
+                </FormFieldWithTooltip>
+
+                <FormFieldWithTooltip label="Местоположение - Регион" required tooltip="Регион, където се намира автомобилът">
+                  <select style={styles.input} name="locationCountry" value={formData.locationCountry} onChange={handleChange} required>
+                    <option value="">Избери местоположение</option>
+                    {BULGARIA_REGIONS.map((region) => (
+                      <option key={region.value} value={region.value}>
+                        {region.label}
+                      </option>
+                    ))}
+                  </select>
+                </FormFieldWithTooltip>
+
+                {formData.locationCountry && formData.locationCountry !== "Извън страната" && (
+                  <FormFieldWithTooltip label="Град" required tooltip="Град, където се намира автомобилът" example="София, Пловдив">
+                    <select style={styles.input} name="city" value={formData.city} onChange={handleChange} required>
+                      <option value="">Избери град</option>
+                      {BULGARIAN_CITIES_BY_REGION[formData.locationCountry]?.map((city) => (
+                        <option key={city.value} value={city.value}>
+                          {city.label}
+                        </option>
+                      ))}
+                    </select>
+                  </FormFieldWithTooltip>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Step 5: Features/Extras */}
+          {currentStep === 5 && (
+            <div style={styles.section}>
+              <h2 style={styles.sectionTitle}>✨ Екстри и опции</h2>
+              <p style={{ color: "#666", marginBottom: 16, fontSize: 14 }}>Избери всички екстри и опции, които има автомобилът</p>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
+                {CAR_FEATURES.map((feature) => (
+                  <label key={feature} style={{ display: "flex", alignItems: "center", cursor: "pointer", padding: "8px 12px", borderRadius: 6, border: "1px solid #e0e0e0", backgroundColor: formData.features.includes(feature) ? "#e3f2fd" : "#fff", transition: "all 0.2s" }}>
+                    <input
+                      type="checkbox"
+                      checked={formData.features.includes(feature)}
+                      onChange={() => handleFeatureChange(feature)}
+                      style={{ marginRight: 8, cursor: "pointer", width: 18, height: 18 }}
                     />
-                    <button
-                      type="button"
-                      onClick={() => removePicture(index)}
-                      style={{
-                        position: "absolute",
-                        top: 4,
-                        right: 4,
-                        background: "rgba(0, 0, 0, 0.6)",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: 4,
-                        width: 28,
-                        height: 28,
-                        cursor: "pointer",
-                        fontSize: 16,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      ✕
-                    </button>
-                  </div>
+                    <span style={{ fontSize: 14, color: "#333" }}>{feature}</span>
+                  </label>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Step 6: Description */}
+          {currentStep === 6 && (
+            <div style={styles.section}>
+              <h2 style={styles.sectionTitle}>📝 Описание на обявата</h2>
+              <FormFieldWithTooltip
+                label="Описание"
+                required
+                tooltip="Подробно описание на автомобила"
+                helperText="Напиши поне 50 символа за по-добра видимост"
+                hint="Включи информация за състояние, история на обслужване, причина за продажба"
+              >
+                <textarea
+                  style={styles.textarea}
+                  name="description"
+                  placeholder="Опишете състоянието, особеностите и причината за продажба..."
+                  value={formData.description}
+                  onChange={handleChange}
+                  rows={8}
+                />
+              </FormFieldWithTooltip>
+            </div>
+          )}
+
+          {/* Step 7: Contact */}
+          {currentStep === 7 && (
+            <div style={styles.section}>
+              <h2 style={styles.sectionTitle}>📞 Контактна информация</h2>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <FormFieldWithTooltip
+                  label="Телефон"
+                  required
+                  tooltip="Телефонен номер за връзка"
+                  example="+359 88 123 4567"
+                >
+                  <input
+                    style={styles.input}
+                    type="tel"
+                    name="phone"
+                    placeholder="Въведи телефон"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    required
+                  />
+                </FormFieldWithTooltip>
+
+                <FormFieldWithTooltip
+                  label="Имейл"
+                  required
+                  tooltip="Имейл адрес за връзка"
+                  example="example@gmail.com"
+                >
+                  <input
+                    style={styles.input}
+                    type="email"
+                    name="email"
+                    placeholder="Въведи имейл"
+                    value={formData.email}
+                    onChange={handleChange}
+                  />
+                </FormFieldWithTooltip>
+              </div>
+            </div>
+          )}
+
+          {/* Step 8: Preview */}
+          {currentStep === 8 && (
+            <div style={styles.section}>
+              <h2 style={styles.sectionTitle}>👁️ Преглед на обявата</h2>
+              <ListingPreview
+                title={`${formData.brand} ${formData.model}`}
+                brand={formData.brand}
+                model={formData.model}
+                year={formData.yearFrom}
+                price={formData.price}
+                city={formData.city}
+                mileage={formData.mileage}
+                fuel={formData.fuel}
+                gearbox={formData.gearbox}
+                coverImage={images.find((img) => img.isCover)?.preview}
+                description={formData.description}
+                completionPercentage={completionPercentage}
+              />
+            </div>
+          )}
+
+          {/* Navigation Buttons */}
+          <div style={{ display: "flex", gap: 12, marginTop: 24, justifyContent: "space-between" }}>
+            <button
+              type="button"
+              onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
+              disabled={currentStep === 1}
+              style={{
+                padding: "12px 24px",
+                background: currentStep === 1 ? "#ccc" : "#666",
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                cursor: currentStep === 1 ? "not-allowed" : "pointer",
+                fontWeight: 600,
+                fontSize: 14,
+              }}
+            >
+              ← Назад
+            </button>
+
+            {currentStep === 8 ? (
+              <button
+                type="submit"
+                disabled={loading}
+                style={{
+                  padding: "12px 24px",
+                  background: loading ? "#ccc" : "#0066cc",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 6,
+                  cursor: loading ? "not-allowed" : "pointer",
+                  fontWeight: 600,
+                  fontSize: 14,
+                }}
+              >
+                {loading ? "Публикуване..." : "✓ Публикувай обява"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setCurrentStep(Math.min(8, currentStep + 1))}
+                style={{
+                  padding: "12px 24px",
+                  background: "#0066cc",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  fontWeight: 600,
+                  fontSize: 14,
+                }}
+              >
+                Напред →
+              </button>
             )}
           </div>
 
-          {/* Car Details */}
-          <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>Данни за автомобила</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              {/* Row 1: Brand */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Марка *</label>
-                <select style={styles.input} name="brand" value={formData.brand} onChange={handleChange} required>
-                  <option value="">Избери марка</option>
-                  {BRANDS.map((brand) => (
-                    <option key={brand} value={brand}>
-                      {brand}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Row 1: Model */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Модел *</label>
-                <select
-                  style={styles.input}
-                  name="model"
-                  value={formData.model}
-                  onChange={handleChange}
-                  required
-                  disabled={!formData.brand}
-                >
-                  <option value="">{formData.brand ? "Избери модел" : "Избери марка първо"}</option>
-                  {formData.brand && MODELS[formData.brand as keyof typeof MODELS]
-                    ? MODELS[formData.brand as keyof typeof MODELS].map((model: string) => (
-                        <option key={model} value={model}>
-                          {model}
-                        </option>
-                      ))
-                    : null}
-                </select>
-              </div>
-
-              {/* Row 2: Modification */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Модификация</label>
-                <input style={styles.input} type="text" name="title" placeholder="Напр. 320d, M Sport" value={formData.title} onChange={handleChange} />
-              </div>
-
-              {/* Row 2: Fuel */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Гориво</label>
-                <select style={styles.input} name="fuel" value={formData.fuel} onChange={handleChange}>
-                  <option value="">Избери гориво</option>
-                  <option value="benzin">Бензин</option>
-                  <option value="dizel">Дизел</option>
-                  <option value="gaz_benzin">Газ/Бензин</option>
-                  <option value="hibrid">Хибрид</option>
-                  <option value="elektro">Електро</option>
-                </select>
-              </div>
-
-              {/* Row 3: Condition */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Състояние *</label>
-                <select style={styles.input} name="condition" value={formData.condition} onChange={handleChange} required>
-                  <option value="1">Нов</option>
-                  <option value="0">Употребяван</option>
-                  <option value="3">Повреден/ударен</option>
-                  <option value="2">За части</option>
-                </select>
-              </div>
-
-              {/* Row 3: Power */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Мощност (к.с.)</label>
-                <input style={styles.input} type="number" name="power" placeholder="150" value={formData.power} onChange={handleChange} />
-              </div>
-
-              {/* Row 4: Euro Standard */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Евро стандарт</label>
-                <select style={styles.input} name="euroStandard" value={formData.euroStandard} onChange={handleChange}>
-                  {EURO_STANDARDS.map((standard) => (
-                    <option key={standard.value} value={standard.value}>
-                      {standard.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Row 4: Gearbox */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Скоростна кутия</label>
-                <select style={styles.input} name="gearbox" value={formData.gearbox} onChange={handleChange}>
-                  <option value="">Избери кутия</option>
-                  <option value="ruchna">Ръчна</option>
-                  <option value="avtomatik">Автоматик</option>
-                </select>
-              </div>
-
-              {/* Row 5: Category */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Категория</label>
-                <select style={styles.input} name="category" value={formData.category} onChange={handleChange}>
-                  {CAR_TYPES.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Row 5: Displacement */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Кубатура (куб.см.)</label>
-                <input style={styles.input} type="number" name="displacement" placeholder="2000" value={formData.displacement} onChange={handleChange} />
-              </div>
-
-              {/* Row 6: Year */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Година *</label>
-                <select style={styles.input} name="yearFrom" value={formData.yearFrom} onChange={handleChange} required>
-                  <option value="">Избери година</option>
-                  {years.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Row 6: Month */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Месец</label>
-                <select style={styles.input} name="month" value={formData.month} onChange={handleChange}>
-                  <option value="">Избери месец</option>
-                  {MONTHS.map((m) => (
-                    <option key={m.value} value={m.value}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Row 7: VIN */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>VIN номер</label>
-                <input style={styles.input} type="text" name="vin" placeholder="Напр. WVWZZZ3CZ9E123456" value={formData.vin} onChange={handleChange} />
-              </div>
-
-              {/* Row 7: Color */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Цвят</label>
-                <input style={styles.input} type="text" name="color" placeholder="Напр. Черен, Бял" value={formData.color} onChange={handleChange} />
-              </div>
-
-              {/* Row 8: Mileage */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Пробег (км)</label>
-                <input style={styles.input} type="number" name="mileage" placeholder="150000" value={formData.mileage} onChange={handleChange} />
-              </div>
-
-              {/* Row 8: Price */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Цена (€) *</label>
-                <input style={styles.input} type="number" name="price" placeholder="15000" value={formData.price} onChange={handleChange} required />
-              </div>
-
-              {/* Row 9: Main Category */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Основна Категория *</label>
-                <select style={styles.input} name="mainCategory" value={formData.mainCategory} onChange={handleChange} required>
-                  {CATEGORIES.map((cat) => (
-                    <option key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Row 9: Location Country/Region */}
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Местоположение - Държава/Регион *</label>
-                <select style={styles.input} name="locationCountry" value={formData.locationCountry} onChange={handleChange} required>
-                  <option value="">Избери местоположение</option>
-                  {BULGARIA_REGIONS.map((region) => (
-                    <option key={region.value} value={region.value}>
-                      {region.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Row 10: City or International Country */}
-              {formData.locationCountry === "Извън страната" && (
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Държава *</label>
-                  <select style={styles.input} name="locationRegion" value={formData.locationRegion} onChange={handleChange} required>
-                    <option value="">Избери държава</option>
-                    {INTERNATIONAL_COUNTRIES.map((country) => (
-                      <option key={country.value} value={country.value}>
-                        {country.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              {formData.locationCountry && formData.locationCountry !== "Извън страната" && (
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Град/Населено място *</label>
-                  <select style={styles.input} name="city" value={formData.city} onChange={handleChange} required>
-                    <option value="">Избери град</option>
-                    {BULGARIAN_CITIES_BY_REGION[formData.locationCountry]?.map((city) => (
-                      <option key={city.value} value={city.value}>
-                        {city.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Features */}
-          <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>Характеристики</h2>
-            <table className="features-table">
-              <tbody>
-                <tr>
-                  {Object.entries(CAR_FEATURES).map(([category, features]) => (
-                    <td key={category}>
-                      <label style={{ fontSize: 12, fontWeight: 700, color: "#333", marginBottom: 12, display: "block", textTransform: "capitalize", paddingBottom: 8, borderBottom: "2px solid #0066cc" }}>
-                        {category.charAt(0).toUpperCase() + category.slice(1)}
-                      </label>
-                      {features.map((feature) => (
-                        <div key={feature}>
-                          <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, fontSize: 11, cursor: "pointer", padding: "3px 0" }}>
-                            <input
-                              type="checkbox"
-                              checked={formData.features.includes(feature)}
-                              onChange={() => handleFeatureChange(feature)}
-                              style={{ cursor: "pointer", width: 16, height: 16 }}
-                            />
-                            <span style={{ color: "black",  fontSize: 14 }}>{feature}</span>
-                          </label>
-                        </div>
-                      ))}
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Description */}
-          <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>Описание</h2>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Описание на обявата</label>
-              <textarea style={styles.textarea} name="description" placeholder="Опишете състоянието, особеностите и причината за продажба..." value={formData.description} onChange={handleChange} />
-            </div>
-          </div>
-
-          {/* Contact */}
-          <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>Контактни данни</h2>
-            <div style={styles.grid} className="publish-grid">
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Телефон *</label>
-                <input style={styles.input} type="tel" name="phone" placeholder="+359 88 123 4567" value={formData.phone} onChange={handleChange} required />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Email</label>
-                <input style={styles.input} type="email" name="email" placeholder="your@email.com" value={formData.email} onChange={handleChange} />
-              </div>
-            </div>
-          </div>
-
-          <button style={{...styles.button, opacity: loading ? 0.6 : 1}} type="submit" disabled={loading}>
-            {loading ? "Изпращане..." : "Публикуване на обява"}
-          </button>
           <p style={styles.note}>* Задължителни полета</p>
         </form>
       </div>

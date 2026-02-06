@@ -336,24 +336,26 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         position: 'absolute' as const,
         top: '50%',
         transform: 'translateY(-50%)',
-        background: 'rgba(0,0,0,0.5)',
+        background: 'rgba(0,0,0,0.6)',
         color: '#fff',
         border: 'none',
-        width: isMobile ? 36 : 44,
-        height: isMobile ? 36 : 44,
+        width: isMobile ? 40 : 50,
+        height: isMobile ? 40 : 50,
         borderRadius: '50%',
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 10,
-        transition: 'background 0.2s, transform 0.2s',
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        backdropFilter: 'blur(4px)',
       } as React.CSSProperties,
       prevButton: {
-        left: isMobile ? 8 : 12,
+        left: isMobile ? 12 : 16,
       } as React.CSSProperties,
       nextButton: {
-        right: isMobile ? 8 : 12,
+        right: isMobile ? 12 : 16,
       } as React.CSSProperties,
       fullscreenButton: {
         position: 'absolute' as const,
@@ -431,28 +433,36 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
               <button
                 onClick={() => throttledPrevious()}
                 style={{ ...styles.controls, ...styles.prevButton }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = 'rgba(0,0,0,0.7)')
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = 'rgba(0,0,0,0.5)')
-                }
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(0,0,0,0.8)';
+                  e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(0,0,0,0.6)';
+                  e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+                }}
                 aria-label="Previous image"
               >
-                <ChevronLeft size={isMobile ? 20 : 24} />
+                <ChevronLeft size={isMobile ? 22 : 28} strokeWidth={3} />
               </button>
               <button
                 onClick={() => throttledNext()}
                 style={{ ...styles.controls, ...styles.nextButton }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = 'rgba(0,0,0,0.7)')
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = 'rgba(0,0,0,0.5)')
-                }
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(0,0,0,0.8)';
+                  e.currentTarget.style.transform = 'translateY(-50%) scale(1.1)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(0,0,0,0.6)';
+                  e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+                }}
                 aria-label="Next image"
               >
-                <ChevronRight size={isMobile ? 20 : 24} />
+                <ChevronRight size={isMobile ? 22 : 28} strokeWidth={3} />
               </button>
             </>
           )}
