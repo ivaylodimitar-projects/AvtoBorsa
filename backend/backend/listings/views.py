@@ -6,8 +6,8 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
-from .models import CarListing, CarImage
-from .serializers import CarListingSerializer, CarImageSerializer
+from .models import CarListing, CarImage, Favorite
+from .serializers import CarListingSerializer, CarImageSerializer, FavoriteSerializer
 
 
 class CarListingViewSet(viewsets.ModelViewSet):
@@ -224,8 +224,8 @@ class CarListingViewSet(viewsets.ModelViewSet):
 @permission_classes([IsAuthenticated])
 def get_user_listings(request):
     """Get current user's active listings"""
-    listings = CarListing.objects.filter(user=request.user, is_active=True, is_draft=False)
-    serializer = CarListingSerializer(listings, many=True)
+    listings = CarListing.objects.filter(user=request.user, is_active=True, is_draft=False).prefetch_related('images')
+    serializer = CarListingSerializer(listings, many=True, context={'request': request})
     return Response(serializer.data)
 
 
@@ -233,8 +233,8 @@ def get_user_listings(request):
 @permission_classes([IsAuthenticated])
 def get_user_drafts(request):
     """Get current user's draft listings"""
-    drafts = CarListing.objects.filter(user=request.user, is_draft=True)
-    serializer = CarListingSerializer(drafts, many=True)
+    drafts = CarListing.objects.filter(user=request.user, is_draft=True).prefetch_related('images')
+    serializer = CarListingSerializer(drafts, many=True, context={'request': request})
     return Response(serializer.data)
 
 
@@ -242,8 +242,8 @@ def get_user_drafts(request):
 @permission_classes([IsAuthenticated])
 def get_user_archived(request):
     """Get current user's archived listings"""
-    archived = CarListing.objects.filter(user=request.user, is_archived=True)
-    serializer = CarListingSerializer(archived, many=True)
+    archived = CarListing.objects.filter(user=request.user, is_archived=True).prefetch_related('images')
+    serializer = CarListingSerializer(archived, many=True, context={'request': request})
     return Response(serializer.data)
 
 
@@ -299,3 +299,48 @@ def upload_listing_images(request, listing_id):
         {'message': f'{len(images)} images uploaded successfully'},
         status=status.HTTP_201_CREATED
     )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_favorite(request, listing_id):
+    """Add a listing to user's favorites"""
+    listing = get_object_or_404(CarListing, id=listing_id)
+
+    favorite, created = Favorite.objects.get_or_create(
+        user=request.user,
+        listing=listing
+    )
+
+    if created:
+        return Response(
+            {'message': 'Listing added to favorites'},
+            status=status.HTTP_201_CREATED
+        )
+    else:
+        return Response(
+            {'message': 'Listing already in favorites'},
+            status=status.HTTP_200_OK
+        )
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def remove_favorite(request, listing_id):
+    """Remove a listing from user's favorites"""
+    favorite = get_object_or_404(Favorite, user=request.user, listing_id=listing_id)
+    favorite.delete()
+
+    return Response(
+        {'message': 'Listing removed from favorites'},
+        status=status.HTTP_204_NO_CONTENT
+    )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user_favorites(request):
+    """Get current user's favorite listings"""
+    favorites = Favorite.objects.filter(user=request.user).select_related('listing').prefetch_related('listing__images')
+    serializer = FavoriteSerializer(favorites, many=True, context={'request': request})
+    return Response(serializer.data)

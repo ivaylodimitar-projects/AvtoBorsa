@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import CarListing, CarImage
+from .models import CarListing, CarImage, Favorite
 
 
 class CarImageSerializer(serializers.ModelSerializer):
@@ -19,6 +19,10 @@ class CarListingSerializer(serializers.ModelSerializer):
     gearbox_display = serializers.SerializerMethodField()
     condition_display = serializers.SerializerMethodField()
     category_display = serializers.SerializerMethodField()
+    # Get the first image URL for list views
+    image_url = serializers.SerializerMethodField()
+    # Check if current user has favorited this listing
+    is_favorited = serializers.SerializerMethodField()
     # Handle image uploads during creation
     images_upload = serializers.ListField(
         child=serializers.ImageField(),
@@ -33,9 +37,9 @@ class CarListingSerializer(serializers.ModelSerializer):
             'year_from', 'month', 'vin', 'price', 'location_country', 'location_region', 'city',
             'fuel', 'fuel_display', 'gearbox', 'gearbox_display', 'mileage', 'color', 'condition', 'condition_display', 'power', 'displacement', 'euro_standard',
             'description', 'phone', 'email', 'features',
-            'is_draft', 'is_active', 'is_archived', 'created_at', 'updated_at', 'images', 'images_upload'
+            'is_draft', 'is_active', 'is_archived', 'created_at', 'updated_at', 'images', 'image_url', 'is_favorited', 'images_upload'
         ]
-        read_only_fields = ['id', 'slug', 'user', 'user_email', 'created_at', 'updated_at', 'images', 'is_draft', 'is_active', 'fuel_display', 'gearbox_display', 'condition_display', 'category_display']
+        read_only_fields = ['id', 'slug', 'user', 'user_email', 'created_at', 'updated_at', 'images', 'image_url', 'is_favorited', 'is_draft', 'is_active', 'fuel_display', 'gearbox_display', 'condition_display', 'category_display']
 
     def get_fuel_display(self, obj):
         """Return display name for fuel"""
@@ -82,6 +86,23 @@ class CarListingSerializer(serializers.ModelSerializer):
         }
         return category_choices.get(obj.category, obj.category)
 
+    def get_image_url(self, obj):
+        """Return the URL of the first image"""
+        if obj.images.exists():
+            first_image = obj.images.first()
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(first_image.image.url)
+            return first_image.image.url
+        return None
+
+    def get_is_favorited(self, obj):
+        """Check if current user has favorited this listing"""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return Favorite.objects.filter(user=request.user, listing=obj).exists()
+        return False
+
     def create(self, validated_data):
         """Create listing and handle image uploads"""
         images_data = validated_data.pop('images_upload', [])
@@ -96,4 +117,15 @@ class CarListingSerializer(serializers.ModelSerializer):
             )
 
         return listing
+
+
+class FavoriteSerializer(serializers.ModelSerializer):
+    """Serializer for favorite listings"""
+    listing = CarListingSerializer(read_only=True)
+    listing_id = serializers.IntegerField(write_only=True)
+
+    class Meta:
+        model = Favorite
+        fields = ['id', 'listing', 'listing_id', 'created_at']
+        read_only_fields = ['id', 'created_at']
 

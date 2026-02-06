@@ -28,9 +28,16 @@ interface CarListing {
   euro_standard: string;
   description: string;
   images: Array<{ id: number; image: string }>;
+  image_url?: string;
   created_at: string;
   is_archived: boolean;
   is_draft: boolean;
+}
+
+interface Favorite {
+  id: number;
+  listing: CarListing;
+  created_at: string;
 }
 
 type TabType = "active" | "archived" | "drafts" | "liked";
@@ -60,7 +67,7 @@ const MyAdsPage: React.FC = () => {
         const token = localStorage.getItem("authToken");
 
         // Fetch all listing types in parallel
-        const [activeRes, archivedRes, draftsRes] = await Promise.all([
+        const [activeRes, archivedRes, draftsRes, favoritesRes] = await Promise.all([
           fetch("http://localhost:8000/api/my-listings/", {
             headers: { Authorization: `Token ${token}` },
           }),
@@ -70,20 +77,25 @@ const MyAdsPage: React.FC = () => {
           fetch("http://localhost:8000/api/my-drafts/", {
             headers: { Authorization: `Token ${token}` },
           }),
+          fetch("http://localhost:8000/api/my-favorites/", {
+            headers: { Authorization: `Token ${token}` },
+          }),
         ]);
 
-        if (!activeRes.ok || !archivedRes.ok || !draftsRes.ok) {
+        if (!activeRes.ok || !archivedRes.ok || !draftsRes.ok || !favoritesRes.ok) {
           throw new Error("Failed to fetch listings");
         }
 
         const activeData = await activeRes.json();
         const archivedData = await archivedRes.json();
         const draftsData = await draftsRes.json();
+        const favoritesData = await favoritesRes.json();
 
         setActiveListings(activeData);
         setArchivedListings(archivedData);
         setDraftListings(draftsData);
-        setLikedListings([]); // Placeholder for future liked listings feature
+        // Extract listings from favorites (which have a nested listing property)
+        setLikedListings(favoritesData.map((fav: Favorite) => fav.listing));
         setError(null);
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : "An error occurred";
@@ -196,6 +208,30 @@ const MyAdsPage: React.FC = () => {
       showToast("Обявата е изтрита успешно!");
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Failed to delete listing";
+      showToast(errorMsg, "error");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRemoveFromFavorites = async (listingId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActionLoading(listingId);
+
+    try {
+      const token = localStorage.getItem("authToken");
+      const response = await fetch(`http://localhost:8000/api/listings/${listingId}/unfavorite/`, {
+        method: "DELETE",
+        headers: { Authorization: `Token ${token}` },
+      });
+
+      if (!response.ok) throw new Error("Failed to remove from favorites");
+
+      // Optimistic UI update
+      setLikedListings((prev) => prev.filter((l) => l.id !== listingId));
+      showToast("Премахнато от любими!");
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Failed to remove from favorites";
       showToast(errorMsg, "error");
     } finally {
       setActionLoading(null);
@@ -565,9 +601,9 @@ const MyAdsPage: React.FC = () => {
                   "0 2px 8px rgba(0,0,0,0.08)";
               }}
             >
-              {listing.images && listing.images.length > 0 ? (
+              {listing.image_url ? (
                 <img
-                  src={`http://localhost:8000${listing.images[0].image}`}
+                  src={listing.image_url}
                   alt={listing.title}
                   style={styles.listingImage}
                 />
@@ -801,20 +837,32 @@ const MyAdsPage: React.FC = () => {
                   {/* Liked Tab Actions: Remove from Favorites */}
                   {activeTab === "liked" && (
                     <button
+                      onClick={(e) => handleRemoveFromFavorites(listing.id, e)}
+                      disabled={actionLoading === listing.id}
                       style={{
                         ...styles.actionButton,
                         background: "#e91e63",
                         color: "#fff",
+                        opacity: actionLoading === listing.id ? 0.6 : 1,
+                        cursor: actionLoading === listing.id ? "not-allowed" : "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "4px",
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "#c2185b";
+                        if (actionLoading !== listing.id) {
+                          e.currentTarget.style.background = "#c2185b";
+                        }
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "#e91e63";
+                        if (actionLoading !== listing.id) {
+                          e.currentTarget.style.background = "#e91e63";
+                        }
                       }}
                     >
-                      <Heart size={14} style={{ marginRight: "4px" }} />
-                      Премахни от любими
+                      <Heart size={14} />
+                      {actionLoading === listing.id ? "..." : "Премахни от любими"}
                     </button>
                   )}
                 </div>

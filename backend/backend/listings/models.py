@@ -163,3 +163,19 @@ class CarImage(models.Model):
 
     def __str__(self):
         return f"Image for {self.listing.title}"
+
+
+class Favorite(models.Model):
+    """Model for storing user's favorite listings"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='favorites')
+    listing = models.ForeignKey(CarListing, on_delete=models.CASCADE, related_name='favorited_by')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'listing')
+        ordering = ['-created_at']
+        verbose_name = 'Favorite'
+        verbose_name_plural = 'Favorites'
+
+    def __str__(self):
+        return f"{self.user.email} favorited {self.listing.brand} {self.listing.model}"

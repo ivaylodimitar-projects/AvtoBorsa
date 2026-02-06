@@ -4,10 +4,8 @@ import { useAuth } from "../context/AuthContext";
 
 const Navbar: React.FC = () => {
   const navigate = useNavigate();
-  const { user, logout, isAuthenticated } = useAuth();
+  const { logout, isAuthenticated } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
-  const [savedCount, setSavedCount] = React.useState(0);
-  const [draftCount, setDraftCount] = React.useState(0);
   const [hoveredIcon, setHoveredIcon] = React.useState<string | null>(null);
 
   const handleLogout = async () => {
@@ -230,24 +228,6 @@ const Navbar: React.FC = () => {
             Дилъри
           </Link>
 
-          {/* Saved Listings Icon - Only show when logged in */}
-          {isAuthenticated && (
-            <Link
-              to="/saved"
-              style={{
-                ...styles.iconBtn,
-                ...(hoveredIcon === "saved" ? styles.iconBtnHover : {}),
-              }}
-              onMouseEnter={() => setHoveredIcon("saved")}
-              onMouseLeave={() => setHoveredIcon(null)}
-              onClick={() => setMobileMenuOpen(false)}
-              title="Запазени обяви"
-            >
-              ❤️
-              {savedCount > 0 && <div style={styles.badge}>{savedCount}</div>}
-            </Link>
-          )}
-
           {/* Draft Ads Icon - Only show when logged in */}
           {isAuthenticated && (
             <Link
@@ -262,7 +242,6 @@ const Navbar: React.FC = () => {
               title="Чернови обяви"
             >
               📝
-              {draftCount > 0 && <div style={styles.badge}>{draftCount}</div>}
             </Link>
           )}
 

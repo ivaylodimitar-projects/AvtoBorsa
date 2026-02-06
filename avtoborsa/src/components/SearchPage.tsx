@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import { Heart } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 type CarListing = {
   id: number;
@@ -19,6 +21,7 @@ type CarListing = {
   is_active: boolean;
   is_draft: boolean;
   is_archived: boolean;
+  is_favorited?: boolean;
   description?: string;
   category?: string;
   category_display?: string;
@@ -29,9 +32,11 @@ type CarListing = {
 const SearchPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
   const [listings, setListings] = useState<CarListing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [favoriteStates, setFavoriteStates] = useState<Record<number, boolean>>({});
 
   // Fetch listings from backend with search parameters
   useEffect(() => {
@@ -69,6 +74,38 @@ const SearchPage: React.FC = () => {
 
     fetchListings();
   }, [searchParams]);
+
+  // Toggle favorite status
+  const toggleFavorite = async (e: React.MouseEvent, listingId: number, isFavorited: boolean) => {
+    e.stopPropagation();
+
+    if (!isAuthenticated) {
+      navigate("/auth");
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("authToken");
+      const endpoint = isFavorited ? "unfavorite" : "favorite";
+      const response = await fetch(`http://localhost:8000/api/listings/${listingId}/${endpoint}/`, {
+        method: isFavorited ? "DELETE" : "POST",
+        headers: {
+          Authorization: `Token ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        // Update the listing's favorite status
+        setListings(listings.map(listing =>
+          listing.id === listingId
+            ? { ...listing, is_favorited: !isFavorited }
+            : listing
+        ));
+      }
+    } catch (err) {
+      console.error("Error toggling favorite:", err);
+    }
+  };
 
   // Results are already filtered by backend, no need for client-side filtering
   const results = listings;
@@ -112,6 +149,8 @@ const SearchPage: React.FC = () => {
     item: { background: "#fff", borderRadius: 4, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.1)", display: "flex", cursor: "pointer", transition: "box-shadow 0.2s" },
     itemPhoto: { width: 200, height: 150, background: "#e0e0e0", flexShrink: 0, position: "relative" as const, overflow: "hidden" },
     itemImage: { width: "100%", height: "100%", objectFit: "cover" },
+    itemPhotoOverlay: { position: "absolute" as const, top: 0, right: 0, bottom: 0, left: 0, display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 8, background: "linear-gradient(to top, rgba(0,0,0,0.3), transparent)" },
+    favoriteButton: { background: "rgba(255,255,255,0.9)", border: "none", borderRadius: "50%", width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s", padding: 0 },
     itemText: { flex: 1, padding: 16, display: "flex", flexDirection: "column" as const, justifyContent: "space-between" },
     itemHeader: { marginBottom: 12 },
     itemTitle: { fontSize: 18, fontWeight: 600, color: "#0066cc", marginBottom: 8, textDecoration: "none" },
@@ -167,7 +206,25 @@ const SearchPage: React.FC = () => {
               >
                 <div style={styles.itemPhoto}>
                   {listing.image_url ? (
-                    <img src={listing.image_url} alt={`${listing.brand} ${listing.model}`} style={styles.itemImage} />
+                    <>
+                      <img src={listing.image_url} alt={`${listing.brand} ${listing.model}`} style={styles.itemImage} />
+                      <div style={styles.itemPhotoOverlay}>
+                        <button
+                          style={{
+                            ...styles.favoriteButton,
+                            background: listing.is_favorited ? "#ff4458" : "rgba(255,255,255,0.9)",
+                          }}
+                          onClick={(e) => toggleFavorite(e, listing.id, listing.is_favorited || false)}
+                          title={listing.is_favorited ? "Премахни от бележника" : "Добави в бележника"}
+                        >
+                          <Heart
+                            size={20}
+                            color={listing.is_favorited ? "#fff" : "#ff4458"}
+                            fill={listing.is_favorited ? "#ff4458" : "none"}
+                          />
+                        </button>
+                      </div>
+                    </>
                   ) : (
                     <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#999" }}>
                       Снимка
