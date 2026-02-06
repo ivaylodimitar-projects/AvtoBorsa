@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
+from django.db.models import Q
 from .models import CarListing, CarImage
 from .serializers import CarListingSerializer, CarImageSerializer
 
@@ -16,12 +17,167 @@ class CarListingViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Get listings based on user and filters"""
-        queryset = CarListing.objects.filter(is_active=True, is_draft=False)
+        queryset = CarListing.objects.filter(is_active=True, is_draft=False, is_archived=False)
 
         # Filter by user if requested
         user_id = self.request.query_params.get('user_id')
         if user_id:
             queryset = queryset.filter(user_id=user_id)
+
+        # Search filters
+        brand = self.request.query_params.get('brand')
+        if brand:
+            queryset = queryset.filter(brand__icontains=brand)
+
+        model = self.request.query_params.get('model')
+        if model:
+            queryset = queryset.filter(model__icontains=model)
+
+        # Price filters
+        price_from = self.request.query_params.get('priceFrom')
+        if price_from:
+            queryset = queryset.filter(price__gte=float(price_from))
+
+        price_to = self.request.query_params.get('priceTo')
+        if price_to:
+            queryset = queryset.filter(price__lte=float(price_to))
+
+        max_price = self.request.query_params.get('maxPrice')
+        if max_price:
+            queryset = queryset.filter(price__lte=float(max_price))
+
+        # Year filters
+        year_from = self.request.query_params.get('yearFrom')
+        if year_from:
+            queryset = queryset.filter(year_from__gte=int(year_from))
+
+        year_to = self.request.query_params.get('yearTo')
+        if year_to:
+            queryset = queryset.filter(year_from__lte=int(year_to))
+
+        # Sorting
+        sort_by = self.request.query_params.get('sortBy')
+        if sort_by:
+            if sort_by == 'price-asc':
+                queryset = queryset.order_by('price')
+            elif sort_by == 'price-desc':
+                queryset = queryset.order_by('-price')
+            elif sort_by == 'year-desc':
+                queryset = queryset.order_by('-year_from')
+            elif sort_by == 'year-asc':
+                queryset = queryset.order_by('year_from')
+            elif sort_by == 'Марка/Модел/Цена' or sort_by == '':
+                # Default: Марка/Модел/Цена
+                queryset = queryset.order_by('brand', 'model', 'price')
+            else:
+                # Default fallback
+                queryset = queryset.order_by('brand', 'model', 'price')
+
+        # Fuel filter - handle both display names and keys
+        fuel = self.request.query_params.get('fuel')
+        if fuel:
+            # Map display names to database keys
+            fuel_mapping = {
+                'Бензин': 'benzin',
+                'Дизел': 'dizel',
+                'Газ/Бензин': 'gaz_benzin',
+                'Хибрид': 'hibrid',
+                'Електро': 'elektro',
+                'benzin': 'benzin',
+                'dizel': 'dizel',
+                'gaz_benzin': 'gaz_benzin',
+                'hibrid': 'hibrid',
+                'elektro': 'elektro',
+            }
+            fuel_key = fuel_mapping.get(fuel, fuel)
+            queryset = queryset.filter(fuel=fuel_key)
+
+        # Gearbox filter - handle both display names and keys
+        gearbox = self.request.query_params.get('gearbox')
+        if gearbox:
+            # Map display names to database keys
+            gearbox_mapping = {
+                'Ръчна': 'ruchna',
+                'Автоматик': 'avtomatik',
+                'ruchna': 'ruchna',
+                'avtomatik': 'avtomatik',
+            }
+            gearbox_key = gearbox_mapping.get(gearbox, gearbox)
+            queryset = queryset.filter(gearbox=gearbox_key)
+
+        # Mileage filters
+        mileage_from = self.request.query_params.get('mileageFrom')
+        if mileage_from:
+            queryset = queryset.filter(mileage__gte=int(mileage_from))
+
+        mileage_to = self.request.query_params.get('mileageTo')
+        if mileage_to:
+            queryset = queryset.filter(mileage__lte=int(mileage_to))
+
+        # Engine/Power filters
+        engine_from = self.request.query_params.get('engineFrom')
+        if engine_from:
+            queryset = queryset.filter(power__gte=int(engine_from))
+
+        engine_to = self.request.query_params.get('engineTo')
+        if engine_to:
+            queryset = queryset.filter(power__lte=int(engine_to))
+
+        # Color filter
+        color = self.request.query_params.get('color')
+        if color:
+            queryset = queryset.filter(color__icontains=color)
+
+        # Region filter (for "Намира се в" and "Регион")
+        region = self.request.query_params.get('region')
+        if region:
+            queryset = queryset.filter(location_region__icontains=region)
+
+        # Condition filter - handle both display names and keys
+        condition = self.request.query_params.get('condition')
+        if condition:
+            # Map display names to database keys
+            condition_mapping = {
+                'Нов': '0',
+                'Употребяван': '1',
+                'Повреден/ударен': '2',
+                'За части': '3',
+                '0': '0',
+                '1': '1',
+                '2': '2',
+                '3': '3',
+            }
+            condition_key = condition_mapping.get(condition, condition)
+            queryset = queryset.filter(condition=condition_key)
+
+        # Category filter - handle both display names and keys
+        category = self.request.query_params.get('category')
+        if category:
+            # Map display names to database keys
+            category_mapping = {
+                'Ван': 'van',
+                'Джип': 'jeep',
+                'Кабрио': 'cabriolet',
+                'Комби': 'wagon',
+                'Купе': 'coupe',
+                'Миниван': 'minivan',
+                'Пикап': 'pickup',
+                'Седан': 'sedan',
+                'Стреч лимузина': 'stretch_limo',
+                'Хечбек': 'hatchback',
+                'van': 'van',
+                'jeep': 'jeep',
+                'cabriolet': 'cabriolet',
+                'wagon': 'wagon',
+                'coupe': 'coupe',
+                'minivan': 'minivan',
+                'pickup': 'pickup',
+                'sedan': 'sedan',
+                'stretch_limo': 'stretch_limo',
+                'hatchback': 'hatchback',
+            }
+            category_key = category_mapping.get(category, category)
+            queryset = queryset.filter(category=category_key)
 
         return queryset
 

@@ -1,221 +1,220 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 
-type Listing = {
-  id: string;
-  title: string;
-  priceBgn: number;
-  year: number;
-  mileageKm: number;
-  city: string;
+type CarListing = {
+  id: number;
+  slug: string;
+  brand: string;
+  model: string;
+  year_from: number;
+  price: number;
+  mileage: number;
   fuel: string;
+  fuel_display: string;
   gearbox: string;
-  powerHp: number;
-  imageUrl?: string;
-  tags?: string[];
+  gearbox_display: string;
+  power: number;
+  city: string;
+  image_url?: string;
+  is_active: boolean;
+  is_draft: boolean;
+  is_archived: boolean;
+  description?: string;
+  category?: string;
+  category_display?: string;
+  condition?: string;
+  condition_display?: string;
 };
 
-const BRANDS = ["Всички", "Audi", "BMW", "Mercedes-Benz", "Volkswagen", "Opel", "Ford", "Toyota", "Honda"];
-const CITIES = ["Всички", "София", "Пловдив", "Варна", "Бургас", "Русе"];
-const FUEL = ["Всички", "Бензин", "Дизел", "Газ/Бензин", "Хибрид", "Електро"];
-const GEARBOX = ["Всички", "Ръчна", "Автоматик"];
-
-const SAMPLE_LISTINGS: Listing[] = [
-  {
-    id: "1",
-    title: "VW Golf 6 1.6 TDI",
-    priceBgn: 9800,
-    year: 2011,
-    mileageKm: 212000,
-    city: "Пловдив",
-    fuel: "Дизел",
-    gearbox: "Ръчна",
-    powerHp: 105,
-    tags: ["Топ оферта"],
-  },
-  {
-    id: "2",
-    title: "BMW 320d F30",
-    priceBgn: 25500,
-    year: 2014,
-    mileageKm: 178000,
-    city: "София",
-    fuel: "Дизел",
-    gearbox: "Автоматик",
-    powerHp: 184,
-  },
-  {
-    id: "3",
-    title: "Opel Astra 1.4",
-    priceBgn: 5200,
-    year: 2008,
-    mileageKm: 240000,
-    city: "Русе",
-    fuel: "Бензин",
-    gearbox: "Ръчна",
-    powerHp: 90,
-  },
-  {
-    id: "4",
-    title: "Toyota Auris Hybrid",
-    priceBgn: 18900,
-    year: 2015,
-    mileageKm: 156000,
-    city: "Варна",
-    fuel: "Хибрид",
-    gearbox: "Автоматик",
-    powerHp: 136,
-  },
-  {
-    id: "5",
-    title: "Mercedes-Benz C-Class",
-    priceBgn: 35000,
-    year: 2016,
-    mileageKm: 98000,
-    city: "София",
-    fuel: "Дизел",
-    gearbox: "Автоматик",
-    powerHp: 170,
-  },
-];
-
 const SearchPage: React.FC = () => {
-  const [brand, setBrand] = useState("Всички");
-  const [city, setCity] = useState("Всички");
-  const [fuel, setFuel] = useState("Всички");
-  const [gearbox, setGearbox] = useState("Всички");
-  const [priceFrom, setPriceFrom] = useState("");
-  const [priceTo, setPriceTo] = useState("");
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [listings, setListings] = useState<CarListing[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const results = useMemo(() => {
-    return SAMPLE_LISTINGS.filter((x) => {
-      if (brand !== "Всички" && !x.title.toLowerCase().includes(brand.toLowerCase())) return false;
-      if (city !== "Всички" && x.city !== city) return false;
-      if (fuel !== "Всички" && x.fuel !== fuel) return false;
-      if (gearbox !== "Всички" && x.gearbox !== gearbox) return false;
-      if (priceFrom && x.priceBgn < Number(priceFrom)) return false;
-      if (priceTo && x.priceBgn > Number(priceTo)) return false;
-      return true;
-    });
-  }, [brand, city, fuel, gearbox, priceFrom, priceTo]);
+  // Fetch listings from backend with search parameters
+  useEffect(() => {
+    const fetchListings = async () => {
+      try {
+        setIsLoading(true);
+
+        // Build query string from search parameters
+        const queryParams = new URLSearchParams();
+
+        // Add all search parameters to the query
+        searchParams.forEach((value, key) => {
+          queryParams.append(key, value);
+        });
+
+        const url = `http://localhost:8000/api/listings/?${queryParams.toString()}`;
+        console.log("Fetching from URL:", url);
+
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Failed to fetch listings");
+        const data = await response.json();
+
+        // Handle both paginated and direct array responses
+        const listingsData = Array.isArray(data) ? data : (data.results || []);
+        setListings(listingsData);
+        setError(null);
+      } catch (err) {
+        console.error("Error fetching listings:", err);
+        setError("Failed to load listings");
+        setListings([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchListings();
+  }, [searchParams]);
+
+  // Results are already filtered by backend, no need for client-side filtering
+  const results = listings;
+
+  // Build search criteria display
+  const searchCriteriaDisplay = useMemo(() => {
+    const criteria: string[] = [];
+    const brand = searchParams.get("brand");
+    const model = searchParams.get("model");
+    const yearFrom = searchParams.get("yearFrom");
+    const yearTo = searchParams.get("yearTo");
+    const priceFrom = searchParams.get("priceFrom");
+    const priceTo = searchParams.get("priceTo");
+    const fuel = searchParams.get("fuel");
+    const gearbox = searchParams.get("gearbox");
+
+    if (brand) criteria.push(`Марка: ${brand}`);
+    if (model) criteria.push(`Модел: ${model}`);
+    if (yearFrom || yearTo) {
+      const yearRange = `${yearFrom || "всички"} - ${yearTo || "всички"}`;
+      criteria.push(`Година: ${yearRange}`);
+    }
+    if (priceFrom || priceTo) {
+      const priceRange = `€${priceFrom || "0"} - €${priceTo || "∞"}`;
+      criteria.push(`Цена: ${priceRange}`);
+    }
+    if (fuel) criteria.push(`Гориво: ${fuel}`);
+    if (gearbox) criteria.push(`Скоростна кутия: ${gearbox}`);
+
+    return criteria;
+  }, [searchParams]);
 
   const styles: Record<string, React.CSSProperties> = {
-    page: { minHeight: "100vh", background: "#f5f5f5", width: "100%", overflow: "hidden" },
-    container: { width: "100%", maxWidth: 1200, margin: "0 auto", padding: "20px" },
-    layout: { display: "grid", gridTemplateColumns: "250px 1fr", gap: 20 },
-    sidebar: { background: "#fff", borderRadius: 8, padding: 16, height: "fit-content", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" },
-    filterGroup: { marginBottom: 20 },
-    filterLabel: { fontSize: 13, fontWeight: 600, color: "#333", marginBottom: 8 },
-    filterInput: { width: "100%", padding: "8px 10px", border: "1px solid #ccc", borderRadius: 4, fontSize: 13 },
-    results: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 },
-    card: { background: "#fff", borderRadius: 8, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.08)", cursor: "pointer" },
-    cardImage: { width: "100%", height: 200, background: "#e0e0e0", display: "flex", alignItems: "center", justifyContent: "center", color: "#999" },
-    cardBody: { padding: 12 },
-    cardTitle: { fontWeight: 600, fontSize: 14, color: "#333", marginBottom: 8 },
-    cardPrice: { fontSize: 16, fontWeight: 700, color: "#0066cc", marginBottom: 8 },
-    cardMeta: { fontSize: 12, color: "#666", marginBottom: 4 },
-    empty: { gridColumn: "1 / -1", textAlign: "center", padding: 40, background: "#fff", borderRadius: 8 },
+    page: { minHeight: "100vh", background: "#f5f5f5", width: "100%", paddingTop: 20 },
+    container: { width: "100%", maxWidth: 1000, margin: "0 auto", padding: "0 20px" },
+    header: { marginBottom: 24, background: "#fff", padding: 20, borderRadius: 4 },
+    title: { fontSize: 28, fontWeight: 700, color: "#333", margin: "0 0 12px 0" },
+    criteria: { display: "flex", flexWrap: "wrap", gap: 12, marginTop: 12 },
+    criteriaTag: { background: "#f0f0f0", padding: "6px 12px", borderRadius: 4, fontSize: 13, color: "#555" },
+    results: { display: "flex", flexDirection: "column", gap: 12 },
+    item: { background: "#fff", borderRadius: 4, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.1)", display: "flex", cursor: "pointer", transition: "box-shadow 0.2s" },
+    itemPhoto: { width: 200, height: 150, background: "#e0e0e0", flexShrink: 0, position: "relative" as const, overflow: "hidden" },
+    itemImage: { width: "100%", height: "100%", objectFit: "cover" },
+    itemText: { flex: 1, padding: 16, display: "flex", flexDirection: "column" as const, justifyContent: "space-between" },
+    itemHeader: { marginBottom: 12 },
+    itemTitle: { fontSize: 18, fontWeight: 600, color: "#0066cc", marginBottom: 8, textDecoration: "none" },
+    itemPrice: { fontSize: 20, fontWeight: 700, color: "#333", marginBottom: 4 },
+    itemPriceSmall: { fontSize: 12, color: "#999" },
+    itemParams: { display: "flex", flexWrap: "wrap", gap: 12, fontSize: 13, color: "#666", marginBottom: 12 },
+    itemParam: { display: "flex", alignItems: "center", gap: 4 },
+    itemDescription: { fontSize: 13, color: "#666", lineHeight: 1.4, marginBottom: 12, maxHeight: 60, overflow: "hidden", textOverflow: "ellipsis" },
+    itemLocation: { fontSize: 12, color: "#999" },
+    empty: { textAlign: "center", padding: 60, background: "#fff", borderRadius: 4 },
+    loading: { textAlign: "center", padding: 60, background: "#fff", borderRadius: 4 },
   };
 
   return (
     <div style={styles.page}>
-      <style>{`
-        @media (max-width: 1024px) {
-          .search-layout { grid-template-columns: 200px 1fr !important; }
-        }
-        @media (max-width: 768px) {
-          .search-layout { grid-template-columns: 1fr !important; }
-          .search-sidebar { display: none; }
-          .search-results { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-        }
-        @media (max-width: 640px) {
-          .search-results { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
       <div style={styles.container}>
-        <div style={styles.layout} className="search-layout">
-          {/* Sidebar Filters */}
-          <aside style={styles.sidebar} className="search-sidebar">
-            <div style={styles.filterGroup}>
-              <label style={styles.filterLabel}>Марка</label>
-              <select style={styles.filterInput} value={brand} onChange={(e) => setBrand(e.target.value)}>
-                {BRANDS.map((b) => (
-                  <option key={b} value={b}>
-                    {b}
-                  </option>
-                ))}
-              </select>
+        <div style={styles.header}>
+          <h1 style={styles.title}>Резултати от търсене</h1>
+          {searchCriteriaDisplay.length > 0 && (
+            <div style={styles.criteria}>
+              {searchCriteriaDisplay.map((criterion, idx) => (
+                <span key={idx} style={styles.criteriaTag}>{criterion}</span>
+              ))}
             </div>
-
-            <div style={styles.filterGroup}>
-              <label style={styles.filterLabel}>Град</label>
-              <select style={styles.filterInput} value={city} onChange={(e) => setCity(e.target.value)}>
-                {CITIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={styles.filterGroup}>
-              <label style={styles.filterLabel}>Гориво</label>
-              <select style={styles.filterInput} value={fuel} onChange={(e) => setFuel(e.target.value)}>
-                {FUEL.map((f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={styles.filterGroup}>
-              <label style={styles.filterLabel}>Скоростна кутия</label>
-              <select style={styles.filterInput} value={gearbox} onChange={(e) => setGearbox(e.target.value)}>
-                {GEARBOX.map((g) => (
-                  <option key={g} value={g}>
-                    {g}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={styles.filterGroup}>
-              <label style={styles.filterLabel}>Цена от</label>
-              <input style={styles.filterInput} type="number" placeholder="0" value={priceFrom} onChange={(e) => setPriceFrom(e.target.value)} />
-            </div>
-
-            <div style={styles.filterGroup}>
-              <label style={styles.filterLabel}>Цена до</label>
-              <input style={styles.filterInput} type="number" placeholder="100000" value={priceTo} onChange={(e) => setPriceTo(e.target.value)} />
-            </div>
-          </aside>
-
-          {/* Results */}
-          <div>
-            <h2 style={{ marginTop: 0, marginBottom: 16, color: "#333" }}>Резултати: {results.length} обяви</h2>
-            {results.length > 0 ? (
-              <div style={styles.results} className="search-results">
-                {results.map((listing) => (
-                  <div key={listing.id} style={styles.card}>
-                    <div style={styles.cardImage}>📷 Снимка</div>
-                    <div style={styles.cardBody}>
-                      <div style={styles.cardTitle}>{listing.title}</div>
-                      <div style={styles.cardPrice}>{listing.priceBgn.toLocaleString("bg-BG")} лв</div>
-                      <div style={styles.cardMeta}>📅 {listing.year}</div>
-                      <div style={styles.cardMeta}>🛣️ {listing.mileageKm.toLocaleString("bg-BG")} км</div>
-                      <div style={styles.cardMeta}>📍 {listing.city}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={styles.empty}>
-                <h3>Няма намерени обяви</h3>
-                <p>Опитайте да промените филтрите</p>
-              </div>
-            )}
-          </div>
+          )}
+          <p style={{ fontSize: 14, color: "#666", margin: "12px 0 0 0" }}>
+            Намерени обяви: <strong>{results.length}</strong>
+          </p>
         </div>
+
+        {isLoading ? (
+          <div style={styles.loading}>
+            <p>Зареждане на обяви...</p>
+          </div>
+        ) : error ? (
+          <div style={styles.empty}>
+            <h3>Грешка при зареждане</h3>
+            <p>{error}</p>
+          </div>
+        ) : results.length > 0 ? (
+          <div style={styles.results} className="search-results">
+            {results.map((listing) => (
+              <div
+                key={listing.id}
+                style={styles.item}
+                onClick={() => navigate(`/details/${listing.slug}`)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)";
+                }}
+              >
+                <div style={styles.itemPhoto}>
+                  {listing.image_url ? (
+                    <img src={listing.image_url} alt={`${listing.brand} ${listing.model}`} style={styles.itemImage} />
+                  ) : (
+                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#999" }}>
+                      Снимка
+                    </div>
+                  )}
+                </div>
+                <div style={styles.itemText}>
+                  <div>
+                    <div style={styles.itemHeader}>
+                      <a href={`/details/${listing.slug}`} style={styles.itemTitle} onClick={(e) => e.stopPropagation()}>
+                        {listing.brand} {listing.model}
+                      </a>
+                      <div style={styles.itemPrice}>
+                        € {listing.price.toLocaleString("bg-BG")}
+                        <div style={styles.itemPriceSmall}>
+                          {(listing.price * 1.95).toLocaleString("bg-BG", { maximumFractionDigits: 2 })} лв.
+                        </div>
+                      </div>
+                    </div>
+                    <div style={styles.itemParams}>
+                      <span>{listing.year_from} г.</span>
+                      <span>•</span>
+                      <span>{listing.mileage.toLocaleString("bg-BG")} км</span>
+                      <span>•</span>
+                      <span>{listing.fuel_display}</span>
+                      <span>•</span>
+                      <span>{listing.power} к.с.</span>
+                      <span>•</span>
+                      <span>{listing.gearbox_display}</span>
+                    </div>
+                    {listing.description && (
+                      <div style={styles.itemDescription}>{listing.description}</div>
+                    )}
+                  </div>
+                  <div style={styles.itemLocation}>
+                    📍 {listing.city}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={styles.empty}>
+            <h3>Няма намерени обяви</h3>
+            <p>Опитайте да промените филтрите или се върнете на начална страница</p>
+          </div>
+        )}
       </div>
     </div>
   );

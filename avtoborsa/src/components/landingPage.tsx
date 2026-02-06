@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
 import { CAR_FEATURES } from "../constants/carFeatures";
+import { AdvancedSearch } from "./AdvancedSearch";
 
 type Fuel = "Бензин" | "Дизел" | "Газ/Бензин" | "Хибрид" | "Електро";
 type Gearbox = "Ръчна" | "Автоматик";
@@ -21,7 +21,7 @@ type Listing = {
   tags?: string[];
 };
 
-const BRANDS = [
+const BRANDS: string[] = [
   "Audi",
   "BMW",
   "Mercedes-Benz",
@@ -36,7 +36,7 @@ const BRANDS = [
   "Hyundai",
   "Kia",
   "Nissan",
-] as const;
+];
 
 const CITIES = [
   "София",
@@ -90,66 +90,6 @@ const CATEGORIES = [
   { value: "z", label: "Услуги" },
 ];
 
-const FEATURED: Listing[] = [
-  {
-    id: "1",
-    slug: "obiava-1-vw-golf-6",
-    title: "VW Golf 6 1.6 TDI",
-    priceBgn: 9800,
-    year: 2011,
-    mileageKm: 212000,
-    city: "Пловдив",
-    fuel: "Дизел",
-    gearbox: "Ръчна",
-    powerHp: 105,
-    tags: ["Топ оферта", "Нов внос"],
-  },
-  {
-    id: "2",
-    slug: "obiava-2-bmw-320d",
-    title: "BMW 320d F30",
-    priceBgn: 25500,
-    year: 2014,
-    mileageKm: 178000,
-    city: "София",
-    fuel: "Дизел",
-    gearbox: "Автоматик",
-    powerHp: 184,
-    tags: ["Проверен продавач"],
-  },
-  {
-    id: "3",
-    slug: "obiava-3-opel-astra",
-    title: "Opel Astra 1.4",
-    priceBgn: 5200,
-    year: 2008,
-    mileageKm: 240000,
-    city: "Русе",
-    fuel: "Бензин",
-    gearbox: "Ръчна",
-    powerHp: 90,
-    tags: ["До 5 500 лв"],
-  },
-  {
-    id: "4",
-    slug: "obiava-4-toyota-auris",
-    title: "Toyota Auris Hybrid",
-    priceBgn: 18900,
-    year: 2015,
-    mileageKm: 156000,
-    city: "Варна",
-    fuel: "Хибрид",
-    gearbox: "Автоматик",
-    powerHp: 136,
-    tags: ["Икономична"],
-  },
-];
-
-function formatBgn(value: number) {
-  // BG формат със space групиране
-  return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " лв";
-}
-
 function clampNumber(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
@@ -173,7 +113,6 @@ const selectBase: React.CSSProperties = {
 };
 
 export default function LandingPage() {
-  const navigate = useNavigate();
   // filters
   const [category, setCategory] = useState<string>("1");
   const [brand, setBrand] = useState<string>("");
@@ -194,56 +133,31 @@ export default function LandingPage() {
 
   const yearNow = new Date().getFullYear();
 
-  const results = useMemo(() => {
-    // В реален проект тук ще е API call; засега филтрираме FEATURED като демо.
-    const pFrom = priceFrom ? Number(priceFrom) : undefined;
-    const pTo = priceTo ? Number(priceTo) : undefined;
-    const yFrom = yearFrom ? Number(yearFrom) : undefined;
-    const yTo = yearTo ? Number(yearTo) : undefined;
-
-    return FEATURED.filter((x) => {
-      if (brand && !x.title.toLowerCase().startsWith(brand.toLowerCase())) return false;
-      if (model && !x.title.toLowerCase().includes(model.toLowerCase())) return false;
-      if (city && x.city !== city) return false;
-      if (fuel && x.fuel !== fuel) return false;
-      if (gearbox && x.gearbox !== gearbox) return false;
-
-      if (condition !== "Всички") {
-        // демо: приемаме че няма нови коли във FEATURED
-        if (condition === "Нова") return false;
-      }
-
-      if (pFrom != null && x.priceBgn < pFrom) return false;
-      if (pTo != null && x.priceBgn > pTo) return false;
-
-      if (yFrom != null && x.year < yFrom) return false;
-      if (yTo != null && x.year > yTo) return false;
-
-      if (hasPhotosOnly && !x.imageUrl) {
-        // демо: ако няма imageUrl, го броим като "без снимка"
-        return false;
-      }
-
-      return true;
-    });
-  }, [
-    brand,
-    model,
-    city,
-    fuel,
-    gearbox,
-    condition,
-    priceFrom,
-    priceTo,
-    yearFrom,
-    yearTo,
-    hasPhotosOnly,
-  ]);
+  // Results are now fetched from the search page via navigation
+  // This variable is no longer used on the landing page
+  const results: Listing[] = [];
 
   const onSubmitSearch = (e: React.FormEvent) => {
     e.preventDefault();
     // Тук би навигирал към /search?... или би викнал API.
     // Засега само държим резултатите в UI.
+  };
+
+  const handleAdvancedSearch = (criteria: any) => {
+    // Update filters based on search criteria
+    setCategory(criteria.category || "1");
+    setBrand(criteria.brand || "");
+    setModel(criteria.model || "");
+    setCity(criteria.region || "");
+    setFuel(criteria.fuel || "");
+    setGearbox(criteria.gearbox || "");
+    setPriceFrom(criteria.priceFrom || "");
+    setPriceTo(criteria.priceTo || "");
+    setYearFrom(criteria.yearFrom || "");
+    setYearTo(criteria.yearTo || "");
+
+    // Log the search query to console
+    console.log("Advanced Search Criteria:", criteria);
   };
 
   const resetFilters = () => {
@@ -400,7 +314,15 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              <form onSubmit={onSubmitSearch} style={styles.form}>
+              <AdvancedSearch
+                onSearch={handleAdvancedSearch}
+                brands={BRANDS}
+                models={MODELS}
+                categories={CATEGORIES}
+              />
+
+              {/* OLD FORM - REPLACED WITH ADVANCEDSEARCH */}
+              {false && <form onSubmit={onSubmitSearch} style={styles.form}>
                 <div style={styles.grid} className="search-grid">
 
                   <Field label="Марка">
@@ -692,33 +614,8 @@ export default function LandingPage() {
                 <div style={styles.note}>
                   * Демо: резултатите филтрират примерни “топ обяви”. В реален проект тук се връзва API.
                 </div>
-              </form>
+              </form>}
             </div>
-          </div>
-        </section>
-
-        {/* FEATURED */}
-        <section id="featured" style={styles.section}>
-          <div style={styles.sectionHeader}>
-            <h2 style={styles.h2}>Топ обяви</h2>
-            <p style={styles.sectionLead}>
-              Подбрани оферти — идеални за начална страница (можеш да ги смениш с реални от базата).
-            </p>
-          </div>
-
-          <div style={styles.cardsGrid} className="cards-grid">
-            {results.map((x) => (
-              <ListingCard key={x.id} item={x} navigate={navigate} />
-            ))}
-            {results.length === 0 && (
-              <div style={styles.empty}>
-                <div style={styles.emptyTitle}>Няма резултати по тези филтри</div>
-                <div style={styles.emptyText}>Пробвай да разшириш търсенето или изчисти филтрите.</div>
-                <button style={styles.secondaryBtn} onClick={resetFilters} type="button">
-                  Изчисти филтрите
-                </button>
-              </div>
-            )}
           </div>
         </section>
 
@@ -776,7 +673,6 @@ export default function LandingPage() {
           <div style={styles.footerCol}>
             <div style={styles.footerTitle}>Бързи връзки</div>
             <a style={styles.footerLink} href="#search">Търсене</a>
-            <a style={styles.footerLink} href="#featured">Топ обяви</a>
             <a style={styles.footerLink} href="#categories">Категории</a>
           </div>
 
@@ -833,88 +729,7 @@ function Select({
   );
 }
 
-function ListingCard({ item, navigate }: { item: Listing; navigate: ReturnType<typeof useNavigate> }) {
-  const placeholder = useMemo(() => {
-    // SVG placeholder (без външни зависимости)
-    const svg = encodeURIComponent(`
-      <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720">
-        <defs>
-          <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stop-color="#1b2a4a"/>
-            <stop offset="1" stop-color="#0f1a2f"/>
-          </linearGradient>
-        </defs>
-        <rect width="1200" height="720" fill="url(#g)"/>
-        <g fill="rgba(255,255,255,0.12)">
-          <circle cx="950" cy="160" r="90"/>
-          <circle cx="1020" cy="280" r="60"/>
-          <circle cx="840" cy="300" r="50"/>
-        </g>
-        <text x="60" y="120" font-family="Arial" font-size="54" fill="rgba(255,255,255,0.85)">AvtoBorsa.bg</text>
-        <text x="60" y="190" font-family="Arial" font-size="28" fill="rgba(255,255,255,0.65)">Снимката ще бъде тук</text>
-        <rect x="60" y="260" width="520" height="320" rx="24" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
-        <text x="90" y="330" font-family="Arial" font-size="26" fill="rgba(255,255,255,0.72)">• Бързо качване</text>
-        <text x="90" y="380" font-family="Arial" font-size="26" fill="rgba(255,255,255,0.72)">• Ясна цена</text>
-        <text x="90" y="430" font-family="Arial" font-size="26" fill="rgba(255,255,255,0.72)">• Удобни филтри</text>
-      </svg>
-    `);
-    return `data:image/svg+xml;charset=utf-8,${svg}`;
-  }, []);
 
-  return (
-    <article style={styles.card} className="card">
-      <div style={styles.cardMedia}>
-        <img
-          src={item.imageUrl || placeholder}
-          alt={item.title}
-          style={styles.cardImg}
-          loading="lazy"
-        />
-        <div style={styles.pricePill}>{formatBgn(item.priceBgn)}</div>
-      </div>
-
-      <div style={styles.cardBody}>
-        <div style={styles.cardTitleRow}>
-          <div style={styles.cardTitle}>{item.title}</div>
-          <div style={styles.cityPill}>{item.city}</div>
-        </div>
-
-        <div style={styles.metaRow}>
-          <Meta>{item.year} г.</Meta>
-          <Dot />
-          <Meta>{formatKm(item.mileageKm)}</Meta>
-          <Dot />
-          <Meta>{item.fuel}</Meta>
-          <Dot />
-          <Meta>{item.gearbox}</Meta>
-          <Dot />
-          <Meta>{item.powerHp} к.с.</Meta>
-        </div>
-
-        <div style={styles.tagsRow}>
-          {(item.tags ?? []).slice(0, 3).map((t) => (
-            <span key={t} style={styles.tag}>
-              {t}
-            </span>
-          ))}
-        </div>
-
-        <div style={styles.cardActions}>
-          <button style={styles.secondaryBtnSmall} type="button">
-            Запази
-          </button>
-          <button
-            style={styles.primaryBtnSmall}
-            type="button"
-            onClick={() => navigate(`/details/${item.slug}`)}
-          >
-            Виж обявата
-          </button>
-        </div>
-      </div>
-    </article>
-  );
-}
 
 function Category({ title, subtitle }: { title: string; subtitle: string }) {
   return (
@@ -924,18 +739,6 @@ function Category({ title, subtitle }: { title: string; subtitle: string }) {
       <div style={styles.categoryCta}>Разгледай →</div>
     </div>
   );
-}
-
-function Meta({ children }: { children: React.ReactNode }) {
-  return <span style={styles.meta}>{children}</span>;
-}
-
-function Dot() {
-  return <span style={{ opacity: 0.25 }}>•</span>;
-}
-
-function formatKm(km: number) {
-  return km.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " км";
 }
 
 /* ---------- Styles (inline, без Tailwind) ---------- */

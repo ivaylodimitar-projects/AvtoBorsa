@@ -11,6 +11,7 @@ import SavedListingsPage from './components/SavedListingsPage'
 import DraftAdsPage from './components/DraftAdsPage'
 import MyAdsPage from './components/MyAdsPage'
 import VehicleDetailsPage from './components/details/VehicleDetailsPage'
+import SearchPage from './components/SearchPage'
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
       <Navbar />
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/search" element={<SearchPage />} />
         <Route path="/publish" element={<PublishPage />} />
         <Route path="/dealers" element={<DealersPage />} />
         <Route path="/profile" element={<ProfileTypePage />} />
