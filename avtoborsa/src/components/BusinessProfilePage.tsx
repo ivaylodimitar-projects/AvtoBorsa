@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Navbar from "./Navbar";
 import { useAuth } from "../context/AuthContext";
 
 const CITIES = [
@@ -207,7 +206,6 @@ const BusinessProfilePage: React.FC = () => {
           .business-form button { font-size: 13px !important; padding: 10px 16px !important; }
         }
       `}</style>
-      <Navbar />
       <div style={styles.container} className="business-container">
         <form style={styles.form} className="business-form" onSubmit={handleSubmit}>
           <h1 style={styles.title}>Бизнес профил</h1>

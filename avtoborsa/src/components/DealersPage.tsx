@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import Navbar from "./Navbar";
 
 type Dealer = {
   id: string;
@@ -95,7 +94,6 @@ const DealersPage: React.FC = () => {
 
   return (
     <div style={styles.page}>
-      <Navbar />
       <style>{`
         .dealers-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12) !important; }
 

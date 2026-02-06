@@ -9,6 +9,10 @@ urlpatterns = [
     path('', include(router.urls)),
     path('my-listings/', views.get_user_listings, name='my_listings'),
     path('my-drafts/', views.get_user_drafts, name='my_drafts'),
+    path('my-archived/', views.get_user_archived, name='my_archived'),
     path('listings/<int:listing_id>/upload-images/', views.upload_listing_images, name='upload_images'),
+    path('listings/<int:listing_id>/archive/', views.archive_listing, name='archive_listing'),
+    path('listings/<int:listing_id>/unarchive/', views.unarchive_listing, name='unarchive_listing'),
+    path('listings/<int:listing_id>/delete/', views.delete_listing, name='delete_listing'),
 ]
 

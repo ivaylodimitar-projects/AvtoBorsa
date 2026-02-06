@@ -24,12 +24,13 @@ class CarListingSerializer(serializers.ModelSerializer):
     class Meta:
         model = CarListing
         fields = [
-            'id', 'user', 'user_email', 'category', 'title', 'brand', 'model',
-            'year_from', 'year_to', 'price', 'city', 'fuel', 'gearbox',
-            'mileage', 'description', 'phone', 'email', 'features',
-            'is_draft', 'is_active', 'created_at', 'updated_at', 'images', 'images_upload'
+            'id', 'slug', 'user', 'user_email', 'main_category', 'category', 'title', 'brand', 'model',
+            'year_from', 'month', 'vin', 'price', 'location_country', 'location_region', 'city',
+            'fuel', 'gearbox', 'mileage', 'color', 'condition', 'power', 'displacement', 'euro_standard',
+            'description', 'phone', 'email', 'features',
+            'is_draft', 'is_active', 'is_archived', 'created_at', 'updated_at', 'images', 'images_upload'
         ]
-        read_only_fields = ['id', 'user', 'user_email', 'created_at', 'updated_at', 'images']
+        read_only_fields = ['id', 'slug', 'user', 'user_email', 'created_at', 'updated_at', 'images', 'is_draft', 'is_active']
 
     def create(self, validated_data):
         """Create listing and handle image uploads"""

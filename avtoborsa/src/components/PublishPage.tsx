@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import Navbar from "./Navbar";
 import { useAuth } from "../context/AuthContext";
 import { CAR_FEATURES } from "../constants/carFeatures";
+import { BULGARIAN_CITIES_BY_REGION } from "../constants/bulgarianCities";
 
 const BRANDS = [
   "Audi", "BMW", "Mercedes-Benz", "Volkswagen", "Opel", "Ford", "Toyota", 
@@ -239,6 +239,134 @@ const CATEGORIES = [
   { value: "z", label: "Услуги" },
 ];
 
+const CAR_TYPES = [
+  { value: "", label: "" },
+  { value: "van", label: "Ван" },
+  { value: "jeep", label: "Джип" },
+  { value: "cabriolet", label: "Кабрио" },
+  { value: "wagon", label: "Комби" },
+  { value: "coupe", label: "Купе" },
+  { value: "minivan", label: "Миниван" },
+  { value: "pickup", label: "Пикап" },
+  { value: "sedan", label: "Седан" },
+  { value: "stretch_limo", label: "Стреч лимузина" },
+  { value: "hatchback", label: "Хечбек" },
+];
+
+const EURO_STANDARDS = [
+  { value: "", label: "" },
+  { value: "1", label: "Евро 1" },
+  { value: "2", label: "Евро 2" },
+  { value: "3", label: "Евро 3" },
+  { value: "4", label: "Евро 4" },
+  { value: "5", label: "Евро 5" },
+  { value: "6", label: "Евро 6" },
+];
+
+const BULGARIA_REGIONS = [
+  { value: "Благоевград", label: "обл. Благоевград" },
+  { value: "Бургас", label: "обл. Бургас" },
+  { value: "Варна", label: "обл. Варна" },
+  { value: "Велико Търново", label: "обл. Велико Търново" },
+  { value: "Видин", label: "обл. Видин" },
+  { value: "Враца", label: "обл. Враца" },
+  { value: "Габрово", label: "обл. Габрово" },
+  { value: "Добрич", label: "обл. Добрич" },
+  { value: "Дупница", label: "общ. Дупница" },
+  { value: "Кърджали", label: "обл. Кърджали" },
+  { value: "Кюстендил", label: "обл. Кюстендил" },
+  { value: "Ловеч", label: "обл. Ловеч" },
+  { value: "Монтана", label: "обл. Монтана" },
+  { value: "Пазарджик", label: "обл. Пазарджик" },
+  { value: "Перник", label: "обл. Перник" },
+  { value: "Плевен", label: "обл. Плевен" },
+  { value: "Пловдив", label: "обл. Пловдив" },
+  { value: "Разград", label: "обл. Разград" },
+  { value: "Русе", label: "обл. Русе" },
+  { value: "Силистра", label: "обл. Силистра" },
+  { value: "Сливен", label: "обл. Сливен" },
+  { value: "Смолян", label: "обл. Смолян" },
+  { value: "София", label: "обл. София" },
+  { value: "Стара Загора", label: "обл. Стара Загора" },
+  { value: "Търговище", label: "обл. Търговище" },
+  { value: "Хасково", label: "обл. Хасково" },
+  { value: "Шумен", label: "обл. Шумен" },
+  { value: "Ямбол", label: "обл. Ямбол" },
+  { value: "Извън страната", label: "Извън страната" },
+];
+
+const INTERNATIONAL_COUNTRIES = [
+  { value: "Австрия", label: "Австрия" },
+  { value: "Азербайджан", label: "Азербайджан" },
+  { value: "Албания", label: "Албания" },
+  { value: "Андора", label: "Андора" },
+  { value: "Армения", label: "Армения" },
+  { value: "Беларус", label: "Беларус" },
+  { value: "Белгия", label: "Белгия" },
+  { value: "Босна и Херцеговина", label: "Босна и Херцеговина" },
+  { value: "Ватикан", label: "Ватикан" },
+  { value: "Великобритания", label: "Великобритания" },
+  { value: "Германия", label: "Германия" },
+  { value: "Грузия", label: "Грузия" },
+  { value: "Гърция", label: "Гърция" },
+  { value: "Дания", label: "Дания" },
+  { value: "Дубай", label: "Дубай" },
+  { value: "Естония", label: "Естония" },
+  { value: "Ирландия", label: "Ирландия" },
+  { value: "Исландия", label: "Исландия" },
+  { value: "Испания", label: "Испания" },
+  { value: "Италия", label: "Италия" },
+  { value: "Казахстан", label: "Казахстан" },
+  { value: "Канада", label: "Канада" },
+  { value: "Кипър", label: "Кипър" },
+  { value: "Латвия", label: "Латвия" },
+  { value: "Литва", label: "Литва" },
+  { value: "Лихтенщайн", label: "Лихтенщайн" },
+  { value: "Люксембург", label: "Люксембург" },
+  { value: "Македония", label: "Македония" },
+  { value: "Малта", label: "Малта" },
+  { value: "Молдова", label: "Молдова" },
+  { value: "Монако", label: "Монако" },
+  { value: "Нидерландия", label: "Нидерландия" },
+  { value: "Норвегия", label: "Норвегия" },
+  { value: "Полша", label: "Полша" },
+  { value: "Португалия", label: "Португалия" },
+  { value: "Румъния", label: "Румъния" },
+  { value: "Русия", label: "Русия" },
+  { value: "Сан Марино", label: "Сан Марино" },
+  { value: "САЩ", label: "САЩ" },
+  { value: "Словакия", label: "Словакия" },
+  { value: "Словения", label: "Словения" },
+  { value: "Сърбия", label: "Сърбия" },
+  { value: "Турция", label: "Турция" },
+  { value: "Украйна", label: "Украйна" },
+  { value: "Унгария", label: "Унгария" },
+  { value: "Финландия", label: "Финландия" },
+  { value: "Франция", label: "Франция" },
+  { value: "Хърватия", label: "Хърватия" },
+  { value: "Черна гора", label: "Черна гора" },
+  { value: "Чехия", label: "Чехия" },
+  { value: "Швейцария", label: "Швейцария" },
+  { value: "Швеция", label: "Швеция" },
+  { value: "Южна Корея", label: "Южна Корея" },
+  { value: "Япония", label: "Япония" },
+];
+
+const MONTHS = [
+  { value: "1", label: "Януари" },
+  { value: "2", label: "Февруари" },
+  { value: "3", label: "Март" },
+  { value: "4", label: "Април" },
+  { value: "5", label: "Май" },
+  { value: "6", label: "Юни" },
+  { value: "7", label: "Юли" },
+  { value: "8", label: "Август" },
+  { value: "9", label: "Септември" },
+  { value: "10", label: "Октомври" },
+  { value: "11", label: "Ноември" },
+  { value: "12", label: "Декември" },
+];
+
 const PublishPage: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -248,25 +376,62 @@ const PublishPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [successMessage, setSuccessMessage] = useState("");
+  const [userListingsCount, setUserListingsCount] = useState(0);
+  const [listingsLoading, setListingsLoading] = useState(true);
 
-  // Check authentication on mount
+  // Check authentication on mount and fetch user's listings count
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       navigate("/auth");
+    } else if (!authLoading && isAuthenticated) {
+      // Fetch user's active listings count
+      const fetchListingsCount = async () => {
+        try {
+          const token = localStorage.getItem("authToken");
+          if (!token) return;
+
+          const response = await fetch("http://localhost:8000/api/my-listings/", {
+            headers: {
+              Authorization: `Token ${token}`,
+            },
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            setUserListingsCount(Array.isArray(data) ? data.length : 0);
+          }
+        } catch (err) {
+          console.error("Error fetching listings count:", err);
+        } finally {
+          setListingsLoading(false);
+        }
+      };
+
+      fetchListingsCount();
     }
   }, [isAuthenticated, authLoading, navigate]);
 
   const [formData, setFormData] = useState({
-    category: "1",
+    mainCategory: "1",
+    category: "",
     title: "",
     brand: "",
     model: "",
     yearFrom: "",
+    month: "",
+    vin: "",
+    locationCountry: "",
+    locationRegion: "",
     price: "",
     city: "",
     fuel: "",
     gearbox: "",
     mileage: "",
+    color: "",
+    condition: "0",
+    power: "",
+    displacement: "",
+    euroStandard: "",
     description: "",
     phone: "",
     email: "",
@@ -344,24 +509,52 @@ const PublishPage: React.FC = () => {
     setSuccessMessage("");
     setLoading(true);
 
+    // Check if user has reached the 3 advert limit
+    if (userListingsCount >= 3) {
+      setErrors({
+        submit: "Можете да публикувате максимум 3 активни обяви. Моля, изтрийте или архивирайте някоя от вашите обяви, за да добавите нова.",
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
       // Create FormData for multipart/form-data
       const formDataToSend = new FormData();
+      formDataToSend.append("main_category", formData.mainCategory);
       formDataToSend.append("category", formData.category);
       formDataToSend.append("title", formData.title);
       formDataToSend.append("brand", formData.brand);
       formDataToSend.append("model", formData.model);
       formDataToSend.append("year_from", formData.yearFrom);
+
+      // Only append optional numeric fields if they have values
+      if (formData.month) formDataToSend.append("month", formData.month);
+      if (formData.power) formDataToSend.append("power", formData.power);
+      if (formData.displacement) formDataToSend.append("displacement", formData.displacement);
+
+      formDataToSend.append("location_country", formData.locationCountry);
+      formDataToSend.append("location_region", formData.locationRegion);
       formDataToSend.append("price", formData.price);
       formDataToSend.append("city", formData.city);
       formDataToSend.append("fuel", formData.fuel);
       formDataToSend.append("gearbox", formData.gearbox);
+
       formDataToSend.append("mileage", formData.mileage);
+
+      // Only append optional string fields if they have values
+      if (formData.vin) formDataToSend.append("vin", formData.vin);
+      if (formData.color) formDataToSend.append("color", formData.color);
+
+      formDataToSend.append("condition", formData.condition);
+
+      if (formData.euroStandard) formDataToSend.append("euro_standard", formData.euroStandard);
+
       formDataToSend.append("description", formData.description);
+
       formDataToSend.append("phone", formData.phone);
       formDataToSend.append("email", formData.email);
       formDataToSend.append("features", JSON.stringify(formData.features));
-      formDataToSend.append("is_draft", "false");
 
       // Add images as images_upload field
       formData.pictures.forEach((file) => {
@@ -410,16 +603,26 @@ const PublishPage: React.FC = () => {
 
       // Reset form
       setFormData({
-        category: "1",
+        mainCategory: "1",
+        category: "",
         title: "",
         brand: "",
         model: "",
         yearFrom: "",
+        month: "",
+        vin: "",
+        locationCountry: "",
+        locationRegion: "",
         price: "",
         city: "",
         fuel: "",
         gearbox: "",
         mileage: "",
+        color: "",
+        condition: "0",
+        power: "",
+        displacement: "",
+        euroStandard: "",
         description: "",
         phone: "",
         email: "",
@@ -468,7 +671,6 @@ const PublishPage: React.FC = () => {
 
   return (
     <div style={styles.page}>
-      <Navbar />
       <style>{`
         /* Tablet (768px - 1023px) */
         @media (min-width: 768px) and (max-width: 1023px) {
@@ -795,21 +997,8 @@ const PublishPage: React.FC = () => {
           {/* Car Details */}
           <div style={styles.section}>
             <h2 style={styles.sectionTitle}>Данни за автомобила</h2>
-            <div style={styles.grid} className="publish-grid">
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Категория *</label>
-                <select style={styles.input} name="category" value={formData.category} onChange={handleChange} required>
-                  {CATEGORIES.map((cat) => (
-                    <option key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Модификация</label>
-                <input style={styles.input} type="text" name="title" placeholder="Напр. 320d, M Sport" value={formData.title} onChange={handleChange} />
-              </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              {/* Row 1: Brand */}
               <div style={styles.formGroup}>
                 <label style={styles.label}>Марка *</label>
                 <select style={styles.input} name="brand" value={formData.brand} onChange={handleChange} required>
@@ -821,6 +1010,8 @@ const PublishPage: React.FC = () => {
                   ))}
                 </select>
               </div>
+
+              {/* Row 1: Model */}
               <div style={styles.formGroup}>
                 <label style={styles.label}>Модел *</label>
                 <select
@@ -832,8 +1023,8 @@ const PublishPage: React.FC = () => {
                   disabled={!formData.brand}
                 >
                   <option value="">{formData.brand ? "Избери модел" : "Избери марка първо"}</option>
-                  {formData.brand && MODELS[formData.brand]
-                    ? MODELS[formData.brand].map((model) => (
+                  {formData.brand && MODELS[formData.brand as keyof typeof MODELS]
+                    ? MODELS[formData.brand as keyof typeof MODELS].map((model: string) => (
                         <option key={model} value={model}>
                           {model}
                         </option>
@@ -841,21 +1032,14 @@ const PublishPage: React.FC = () => {
                     : null}
                 </select>
               </div>
+
+              {/* Row 2: Modification */}
               <div style={styles.formGroup}>
-                <label style={styles.label}>Година *</label>
-                <select style={styles.input} name="yearFrom" value={formData.yearFrom} onChange={handleChange} required>
-                  <option value="">Избери година</option>
-                  {years.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
+                <label style={styles.label}>Модификация</label>
+                <input style={styles.input} type="text" name="title" placeholder="Напр. 320d, M Sport" value={formData.title} onChange={handleChange} />
               </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Цена (€) *</label>
-                <input style={styles.input} type="number" name="price" placeholder="15000" value={formData.price} onChange={handleChange} required />
-              </div>
+
+              {/* Row 2: Fuel */}
               <div style={styles.formGroup}>
                 <label style={styles.label}>Гориво</label>
                 <select style={styles.input} name="fuel" value={formData.fuel} onChange={handleChange}>
@@ -867,6 +1051,37 @@ const PublishPage: React.FC = () => {
                   <option value="elektro">Електро</option>
                 </select>
               </div>
+
+              {/* Row 3: Condition */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Състояние *</label>
+                <select style={styles.input} name="condition" value={formData.condition} onChange={handleChange} required>
+                  <option value="1">Нов</option>
+                  <option value="0">Употребяван</option>
+                  <option value="3">Повреден/ударен</option>
+                  <option value="2">За части</option>
+                </select>
+              </div>
+
+              {/* Row 3: Power */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Мощност (к.с.)</label>
+                <input style={styles.input} type="number" name="power" placeholder="150" value={formData.power} onChange={handleChange} />
+              </div>
+
+              {/* Row 4: Euro Standard */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Евро стандарт</label>
+                <select style={styles.input} name="euroStandard" value={formData.euroStandard} onChange={handleChange}>
+                  {EURO_STANDARDS.map((standard) => (
+                    <option key={standard.value} value={standard.value}>
+                      {standard.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Row 4: Gearbox */}
               <div style={styles.formGroup}>
                 <label style={styles.label}>Скоростна кутия</label>
                 <select style={styles.input} name="gearbox" value={formData.gearbox} onChange={handleChange}>
@@ -875,19 +1090,127 @@ const PublishPage: React.FC = () => {
                   <option value="avtomatik">Автоматик</option>
                 </select>
               </div>
+
+              {/* Row 5: Category */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Категория</label>
+                <select style={styles.input} name="category" value={formData.category} onChange={handleChange}>
+                  {CAR_TYPES.map((type) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Row 5: Displacement */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Кубатура (куб.см.)</label>
+                <input style={styles.input} type="number" name="displacement" placeholder="2000" value={formData.displacement} onChange={handleChange} />
+              </div>
+
+              {/* Row 6: Year */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Година *</label>
+                <select style={styles.input} name="yearFrom" value={formData.yearFrom} onChange={handleChange} required>
+                  <option value="">Избери година</option>
+                  {years.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Row 6: Month */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Месец</label>
+                <select style={styles.input} name="month" value={formData.month} onChange={handleChange}>
+                  <option value="">Избери месец</option>
+                  {MONTHS.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Row 7: VIN */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>VIN номер</label>
+                <input style={styles.input} type="text" name="vin" placeholder="Напр. WVWZZZ3CZ9E123456" value={formData.vin} onChange={handleChange} />
+              </div>
+
+              {/* Row 7: Color */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Цвят</label>
+                <input style={styles.input} type="text" name="color" placeholder="Напр. Черен, Бял" value={formData.color} onChange={handleChange} />
+              </div>
+
+              {/* Row 8: Mileage */}
               <div style={styles.formGroup}>
                 <label style={styles.label}>Пробег (км)</label>
                 <input style={styles.input} type="number" name="mileage" placeholder="150000" value={formData.mileage} onChange={handleChange} />
               </div>
+
+              {/* Row 8: Price */}
               <div style={styles.formGroup}>
-                <label style={styles.label}>Град</label>
-                <select style={styles.input} name="city" value={formData.city} onChange={handleChange}>
-                  <option value="">Избери град</option>
-                  <option value="София">София</option>
-                  <option value="Пловдив">Пловдив</option>
-                  <option value="Варна">Варна</option>
+                <label style={styles.label}>Цена (€) *</label>
+                <input style={styles.input} type="number" name="price" placeholder="15000" value={formData.price} onChange={handleChange} required />
+              </div>
+
+              {/* Row 9: Main Category */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Основна Категория *</label>
+                <select style={styles.input} name="mainCategory" value={formData.mainCategory} onChange={handleChange} required>
+                  {CATEGORIES.map((cat) => (
+                    <option key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </option>
+                  ))}
                 </select>
               </div>
+
+              {/* Row 9: Location Country/Region */}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>Местоположение - Държава/Регион *</label>
+                <select style={styles.input} name="locationCountry" value={formData.locationCountry} onChange={handleChange} required>
+                  <option value="">Избери местоположение</option>
+                  {BULGARIA_REGIONS.map((region) => (
+                    <option key={region.value} value={region.value}>
+                      {region.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Row 10: City or International Country */}
+              {formData.locationCountry === "Извън страната" && (
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Държава *</label>
+                  <select style={styles.input} name="locationRegion" value={formData.locationRegion} onChange={handleChange} required>
+                    <option value="">Избери държава</option>
+                    {INTERNATIONAL_COUNTRIES.map((country) => (
+                      <option key={country.value} value={country.value}>
+                        {country.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {formData.locationCountry && formData.locationCountry !== "Извън страната" && (
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>Град/Населено място *</label>
+                  <select style={styles.input} name="city" value={formData.city} onChange={handleChange} required>
+                    <option value="">Избери град</option>
+                    {BULGARIAN_CITIES_BY_REGION[formData.locationCountry]?.map((city) => (
+                      <option key={city.value} value={city.value}>
+                        {city.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 

@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils.text import slugify
 
 class CarListing(models.Model):
     """Model for car listings/advertisements"""
@@ -18,7 +19,36 @@ class CarListing(models.Model):
         ('avtomatik', 'Автоматик'),
     ]
 
-    CATEGORY_CHOICES = [
+    CONDITION_CHOICES = [
+        ('0', 'Нов'),
+        ('1', 'Употребяван'),
+        ('2', 'Повреден/ударен'),
+        ('3', 'За части'),
+    ]
+
+    CAR_TYPE_CHOICES = [
+        ('van', 'Ван'),
+        ('jeep', 'Джип'),
+        ('cabriolet', 'Кабрио'),
+        ('wagon', 'Комби'),
+        ('coupe', 'Купе'),
+        ('minivan', 'Миниван'),
+        ('pickup', 'Пикап'),
+        ('sedan', 'Седан'),
+        ('stretch_limo', 'Стреч лимузина'),
+        ('hatchback', 'Хечбек'),
+    ]
+
+    EURO_STANDARD_CHOICES = [
+        ('1', 'Евро 1'),
+        ('2', 'Евро 2'),
+        ('3', 'Евро 3'),
+        ('4', 'Евро 4'),
+        ('5', 'Евро 5'),
+        ('6', 'Евро 6'),
+    ]
+
+    MAIN_CATEGORY_CHOICES = [
         ('1', 'Автомобили и Джипове'),
         ('w', 'Гуми и джанти'),
         ('u', 'Части'),
@@ -39,23 +69,33 @@ class CarListing(models.Model):
 
     # User and basic info
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='car_listings')
-    category = models.CharField(max_length=1, choices=CATEGORY_CHOICES, default='1')
+    main_category = models.CharField(max_length=1, choices=MAIN_CATEGORY_CHOICES, default='1')
+    category = models.CharField(max_length=20, choices=CAR_TYPE_CHOICES, null=True, blank=True)
     title = models.CharField(max_length=200, null=True, blank=True)
 
     # Car details
     brand = models.CharField(max_length=100)
     model = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=255, unique=True, db_index=True, null=True, blank=True)
     year_from = models.IntegerField(validators=[MinValueValidator(1900), MaxValueValidator(2100)])
-    year_to = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(1900), MaxValueValidator(2100)])
+    month = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(12)])
+    vin = models.CharField(max_length=17, null=True, blank=True)
 
     # Price and location
     price = models.DecimalField(max_digits=10, decimal_places=2)
+    location_country = models.CharField(max_length=100, null=True, blank=True)
+    location_region = models.CharField(max_length=100, null=True, blank=True)
     city = models.CharField(max_length=100)
 
     # Technical details
     fuel = models.CharField(max_length=20, choices=FUEL_CHOICES)
     gearbox = models.CharField(max_length=20, choices=GEARBOX_CHOICES)
     mileage = models.IntegerField(validators=[MinValueValidator(0)])
+    color = models.CharField(max_length=50, null=True, blank=True)
+    condition = models.CharField(max_length=1, choices=CONDITION_CHOICES, default='0')
+    power = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
+    displacement = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
+    euro_standard = models.CharField(max_length=1, choices=EURO_STANDARD_CHOICES, null=True, blank=True)
 
     # Description and contact
     description = models.TextField()
@@ -68,6 +108,7 @@ class CarListing(models.Model):
     # Status
     is_draft = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    is_archived = models.BooleanField(default=False)
 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -80,6 +121,32 @@ class CarListing(models.Model):
 
     def __str__(self):
         return f"{self.brand} {self.model} - {self.title}"
+
+    def generate_slug(self):
+        """Generate slug in format: obiava-{id}-{brand}-{model}"""
+        if self.id and self.brand and self.model:
+            brand_slug = slugify(self.brand)
+            model_slug = slugify(self.model)
+            return f"obiava-{self.id}-{brand_slug}-{model_slug}"
+        return None
+
+    def save(self, *args, **kwargs):
+        """Override save to auto-generate slug"""
+        # First save to get an ID if it's a new object
+        if not self.pk:
+            # Remove force_insert to allow normal insert
+            kwargs.pop('force_insert', None)
+            super().save(*args, **kwargs)
+
+        # Generate slug if not already set
+        if not self.slug:
+            generated_slug = self.generate_slug()
+            if generated_slug:
+                self.slug = generated_slug
+
+        # Save again with the slug (now it's an update since we have pk)
+        kwargs.pop('force_insert', None)
+        super().save(*args, **kwargs)
 
 
 class CarImage(models.Model):

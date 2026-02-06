@@ -1,6 +1,5 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import Navbar from "./Navbar";
 
 const ProfileTypePage: React.FC = () => {
   const navigate = useNavigate();
@@ -47,7 +46,6 @@ const ProfileTypePage: React.FC = () => {
 
   return (
     <div style={styles.page}>
-      <Navbar />
       <style>{`
         /* Tablet Large (1024px - 1200px) */
         @media (min-width: 1024px) and (max-width: 1200px) {

@@ -1,5 +1,4 @@
 import React from "react";
-import Navbar from "./Navbar";
 
 const DraftAdsPage: React.FC = () => {
   const styles: Record<string, React.CSSProperties> = {
@@ -58,7 +57,6 @@ const DraftAdsPage: React.FC = () => {
 
   return (
     <div style={styles.page}>
-      <Navbar />
       <div style={styles.container}>
         <div style={styles.header}>
           <h1 style={styles.title}>📝 Чернови обяви</h1>

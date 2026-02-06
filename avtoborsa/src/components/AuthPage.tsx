@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Navbar from "./Navbar";
 import { useAuth } from "../context/AuthContext";
 
 const AuthPage: React.FC = () => {
@@ -109,7 +108,6 @@ const AuthPage: React.FC = () => {
           .auth-form button { font-size: 13px !important; padding: 10px 16px !important; }
         }
       `}</style>
-      <Navbar />
       <div style={styles.container} className="auth-container">
         <form style={styles.form} className="auth-form" onSubmit={handleSubmit}>
           <h1 style={styles.title}>{isLogin ? "Влизане" : "Регистрация"}</h1>

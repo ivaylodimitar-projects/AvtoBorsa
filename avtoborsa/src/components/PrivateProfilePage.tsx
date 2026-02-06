@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Navbar from "./Navbar";
 import { useAuth } from "../context/AuthContext";
 
 const PrivateProfilePage: React.FC = () => {
@@ -236,7 +235,6 @@ const PrivateProfilePage: React.FC = () => {
           .submit-button { font-size: 13px !important; padding: 10px 16px !important; }
         }
       `}</style>
-      <Navbar />
       <div className="registration-container">
         <h1 className="registration-title">Регистрация в AvtoBorsa</h1>
         <p className="registration-subtitle">Създай профил, за да публикуваш обяви</p>

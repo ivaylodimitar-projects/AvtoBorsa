@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import Navbar from "./Navbar";
+import { useNavigate } from "react-router-dom";
 import { CAR_FEATURES } from "../constants/carFeatures";
 
 type Fuel = "Бензин" | "Дизел" | "Газ/Бензин" | "Хибрид" | "Електро";
@@ -8,6 +8,7 @@ type Condition = "Всички" | "Нова" | "Употребявана";
 
 type Listing = {
   id: string;
+  slug: string;
   title: string;
   priceBgn: number;
   year: number;
@@ -92,6 +93,7 @@ const CATEGORIES = [
 const FEATURED: Listing[] = [
   {
     id: "1",
+    slug: "obiava-1-vw-golf-6",
     title: "VW Golf 6 1.6 TDI",
     priceBgn: 9800,
     year: 2011,
@@ -104,6 +106,7 @@ const FEATURED: Listing[] = [
   },
   {
     id: "2",
+    slug: "obiava-2-bmw-320d",
     title: "BMW 320d F30",
     priceBgn: 25500,
     year: 2014,
@@ -116,6 +119,7 @@ const FEATURED: Listing[] = [
   },
   {
     id: "3",
+    slug: "obiava-3-opel-astra",
     title: "Opel Astra 1.4",
     priceBgn: 5200,
     year: 2008,
@@ -128,6 +132,7 @@ const FEATURED: Listing[] = [
   },
   {
     id: "4",
+    slug: "obiava-4-toyota-auris",
     title: "Toyota Auris Hybrid",
     priceBgn: 18900,
     year: 2015,
@@ -168,6 +173,7 @@ const selectBase: React.CSSProperties = {
 };
 
 export default function LandingPage() {
+  const navigate = useNavigate();
   // filters
   const [category, setCategory] = useState<string>("1");
   const [brand, setBrand] = useState<string>("");
@@ -357,7 +363,6 @@ export default function LandingPage() {
           }
         }
       `}</style>
-      <Navbar />
 
       <main style={styles.main}>
         {/* HERO */}
@@ -703,7 +708,7 @@ export default function LandingPage() {
 
           <div style={styles.cardsGrid} className="cards-grid">
             {results.map((x) => (
-              <ListingCard key={x.id} item={x} />
+              <ListingCard key={x.id} item={x} navigate={navigate} />
             ))}
             {results.length === 0 && (
               <div style={styles.empty}>
@@ -828,7 +833,7 @@ function Select({
   );
 }
 
-function ListingCard({ item }: { item: Listing }) {
+function ListingCard({ item, navigate }: { item: Listing; navigate: ReturnType<typeof useNavigate> }) {
   const placeholder = useMemo(() => {
     // SVG placeholder (без външни зависимости)
     const svg = encodeURIComponent(`
@@ -898,7 +903,11 @@ function ListingCard({ item }: { item: Listing }) {
           <button style={styles.secondaryBtnSmall} type="button">
             Запази
           </button>
-          <button style={styles.primaryBtnSmall} type="button">
+          <button
+            style={styles.primaryBtnSmall}
+            type="button"
+            onClick={() => navigate(`/details/${item.slug}`)}
+          >
             Виж обявата
           </button>
         </div>

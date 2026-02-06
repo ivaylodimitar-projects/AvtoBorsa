@@ -3,6 +3,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from .models import CarListing, CarImage
 from .serializers import CarListingSerializer, CarImageSerializer
@@ -34,6 +35,19 @@ class CarListingViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """Create listing and associate with current user"""
+        # Check if user has reached the 3 advert limit
+        active_listings_count = CarListing.objects.filter(
+            user=self.request.user,
+            is_active=True,
+            is_draft=False
+        ).count()
+
+        if active_listings_count >= 3:
+            raise ValidationError(
+                "Можете да публикувате максимум 3 активни обяви. "
+                "Моля, изтрийте или архивирайте някоя от вашите обяви, за да добавите нова."
+            )
+
         serializer.save(user=self.request.user)
 
     def perform_update(self, serializer):
@@ -66,6 +80,49 @@ def get_user_drafts(request):
     drafts = CarListing.objects.filter(user=request.user, is_draft=True)
     serializer = CarListingSerializer(drafts, many=True)
     return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user_archived(request):
+    """Get current user's archived listings"""
+    archived = CarListing.objects.filter(user=request.user, is_archived=True)
+    serializer = CarListingSerializer(archived, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def archive_listing(request, listing_id):
+    """Archive a listing"""
+    listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
+    listing.is_archived = True
+    listing.save()
+    serializer = CarListingSerializer(listing)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def unarchive_listing(request, listing_id):
+    """Unarchive a listing"""
+    listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
+    listing.is_archived = False
+    listing.save()
+    serializer = CarListingSerializer(listing)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_listing(request, listing_id):
+    """Delete a listing"""
+    listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
+    listing.delete()
+    return Response(
+        {'message': 'Listing deleted successfully'},
+        status=status.HTTP_204_NO_CONTENT
+    )
 
 
 @api_view(['POST'])

@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from "react";
-import Navbar from "./Navbar";
 
 type Listing = {
   id: string;
@@ -119,7 +118,6 @@ const SearchPage: React.FC = () => {
 
   return (
     <div style={styles.page}>
-      <Navbar />
       <style>{`
         @media (max-width: 1024px) {
           .search-layout { grid-template-columns: 200px 1fr !important; }
