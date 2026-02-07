@@ -1,7 +1,7 @@
 import React from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { FileText, LogOut, User, Plus, Home, Building2, Bookmark } from "lucide-react";
+import { Home, Building2, Plus, User, LogOut } from "lucide-react";
 import ProfileMenu from "./ProfileMenu";
 import SavedSearchesMenu from "./SavedSearchesMenu";
 
@@ -9,285 +9,73 @@ const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout, isAuthenticated } = useAuth();
-  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
-
-  const handleLogout = async () => {
-    await logout();
-    setMobileMenuOpen(false);
-    navigate("/");
-  };
+  const [mobileOpen, setMobileOpen] = React.useState(false);
 
   const isActive = (path: string) => location.pathname === path;
 
-  const styles: Record<string, React.CSSProperties> = {
-    navbar: {
-      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-      boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-      width: "100%",
-      position: "sticky",
-      top: 0,
-      zIndex: 100,
-    },
-    navInner: {
-      maxWidth: 1400,
-      margin: "0 auto",
-      padding: "16px 24px",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      gap: 20,
-    },
-    brandRow: {
-      display: "flex",
-      alignItems: "center",
-      gap: 12,
-      minWidth: 0,
-    },
-    logo: {
-      width: 48,
-      height: 48,
-      borderRadius: 12,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontWeight: 800,
-      letterSpacing: 0.5,
-      background: "#fff",
-      color: "#667eea",
-      fontSize: 18,
-      flexShrink: 0,
-      boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-    },
-    brandName: {
-      fontSize: 24,
-      fontWeight: 800,
-      lineHeight: 1.1,
-      color: "#fff",
-      whiteSpace: "nowrap",
-      letterSpacing: "-0.5px",
-    },
-    navLinks: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      flexWrap: "wrap",
-      justifyContent: "flex-end",
-    },
-    navLink: {
-      color: "rgba(255,255,255,0.9)",
-      textDecoration: "none",
-      fontSize: 15,
-      padding: "10px 16px",
-      borderRadius: 8,
-      fontWeight: 600,
-      transition: "all 0.2s",
-      whiteSpace: "nowrap",
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      background: "rgba(255,255,255,0.1)",
-      border: "1px solid rgba(255,255,255,0.2)",
-    },
-    navLinkActive: {
-      background: "#fff",
-      color: "#667eea",
-      border: "1px solid #fff",
-    },
-    primaryBtn: {
-      height: 42,
-      padding: "0 20px",
-      borderRadius: 8,
-      border: "none",
-      background: "#fff",
-      color: "#667eea",
-      fontWeight: 700,
-      fontSize: 15,
-      cursor: "pointer",
-      textDecoration: "none",
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 8,
-      whiteSpace: "nowrap",
-      flexShrink: 0,
-      transition: "all 0.2s",
-      boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-    },
-    secondaryBtn: {
-      height: 42,
-      padding: "0 20px",
-      borderRadius: 8,
-      border: "2px solid #fff",
-      background: "transparent",
-      color: "#fff",
-      fontWeight: 700,
-      fontSize: 15,
-      cursor: "pointer",
-      textDecoration: "none",
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 8,
-      whiteSpace: "nowrap",
-      flexShrink: 0,
-      transition: "all 0.2s",
-    },
-    logoutBtn: {
-      height: 42,
-      padding: "0 20px",
-      borderRadius: 8,
-      border: "2px solid rgba(255,255,255,0.5)",
-      background: "transparent",
-      color: "#fff",
-      fontWeight: 600,
-      fontSize: 15,
-      cursor: "pointer",
-      textDecoration: "none",
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 8,
-      whiteSpace: "nowrap",
-      flexShrink: 0,
-      transition: "all 0.2s",
-    },
-    hamburger: {
-      display: "none",
-      background: "rgba(255,255,255,0.2)",
-      border: "1px solid rgba(255,255,255,0.3)",
-      borderRadius: 8,
-      padding: "8px 12px",
-      fontSize: 24,
-      cursor: "pointer",
-      color: "#fff",
-      transition: "all 0.2s",
-    },
+  const handleLogout = async () => {
+    await logout();
+    setMobileOpen(false);
+    navigate("/");
   };
 
   return (
-    <nav style={styles.navbar}>
-      <style>{`
-        .nav-link:hover {
-          background: rgba(255,255,255,0.2) !important;
-          transform: translateY(-2px);
-        }
-        .primary-btn:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        }
-        .secondary-btn:hover {
-          background: rgba(255,255,255,0.1);
-          transform: translateY(-2px);
-        }
-        .logout-btn:hover {
-          background: rgba(255,255,255,0.1);
-          border-color: #fff;
-        }
-        .hamburger:hover {
-          background: rgba(255,255,255,0.3);
-        }
+    <header style={styles.header}>
+      <style>{css}</style>
 
-        @media (max-width: 992px) {
-          .nav-links {
-            display: ${mobileMenuOpen ? "flex" : "none"} !important;
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            flex-direction: column;
-            gap: 8px !important;
-            border-top: 1px solid rgba(255,255,255,0.2);
-            padding: 16px;
-            z-index: 99;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-          }
-          .nav-links a, .nav-links button {
-            width: 100%;
-            justify-content: center;
-          }
-          .hamburger {
-            display: block !important;
-          }
-          .nav-inner {
-            position: relative;
-          }
-        }
-        @media (max-width: 640px) {
-          .brand-name {
-            display: none;
-          }
-          .nav-inner {
-            padding: 12px 16px !important;
-          }
-        }
-      `}</style>
-      <div style={styles.navInner} className="nav-inner">
-        <Link to="/" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={styles.inner} className="nav-inner">
+        {/* Brand */}
+        <Link to="/" style={styles.brand}>
           <div style={styles.logo}>KB</div>
-          <div style={styles.brandName} className="brand-name">Kar.Bg</div>
+          <div style={styles.brandText}>Kar.bg</div>
         </Link>
 
+        {/* Mobile burger */}
         <button
-          style={styles.hamburger}
-          className="hamburger"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="burger"
+          onClick={() => setMobileOpen((v) => !v)}
           aria-label="Toggle menu"
         >
           ☰
         </button>
 
-        <div style={styles.navLinks} className="nav-links">
+        {/* Nav */}
+        <nav className={`nav ${mobileOpen ? "open" : ""}`} style={styles.nav}>
           <Link
             to="/"
-            style={{
-              ...styles.navLink,
-              ...(isActive("/") ? styles.navLinkActive : {}),
-            }}
-            className="nav-link"
-            onClick={() => setMobileMenuOpen(false)}
+            className={`nav-link ${isActive("/") ? "active" : ""}`}
+            onClick={() => setMobileOpen(false)}
           >
-            <Home size={18} />
+            <Home size={16} />
             Начало
           </Link>
 
           <Link
             to="/dealers"
-            style={{
-              ...styles.navLink,
-              ...(isActive("/dealers") ? styles.navLinkActive : {}),
-            }}
-            className="nav-link"
-            onClick={() => setMobileMenuOpen(false)}
+            className={`nav-link ${isActive("/dealers") ? "active" : ""}`}
+            onClick={() => setMobileOpen(false)}
           >
-            <Building2 size={18} />
+            <Building2 size={16} />
             Дилъри
           </Link>
 
-          {/* Saved Searches Menu */}
           <SavedSearchesMenu />
 
           {isAuthenticated ? (
             <>
-
-              {/* My Ads Button */}
               <Link
                 to="/my-ads"
-                style={styles.primaryBtn}
-                className="primary-btn"
-                onClick={() => setMobileMenuOpen(false)}
+                className="nav-link"
+                onClick={() => setMobileOpen(false)}
               >
-                <Plus size={18} />
-                Моите Обяви
+                <Plus size={16} />
+                Моите обяви
               </Link>
 
-              {/* Profile Menu */}
               <ProfileMenu />
 
-              {/* Logout Button */}
-              <button
-                style={styles.logoutBtn}
-                className="logout-btn"
-                onClick={handleLogout}
-              >
-                <LogOut size={18} />
+              <button className="btn-ghost" onClick={handleLogout}>
+                <LogOut size={16} />
                 Изход
               </button>
             </>
@@ -295,33 +83,198 @@ const Navbar: React.FC = () => {
             <>
               <Link
                 to="/publish"
-                style={{
-                  ...styles.navLink,
-                  ...(isActive("/publish") ? styles.navLinkActive : {}),
-                }}
-                className="nav-link"
-                onClick={() => setMobileMenuOpen(false)}
+                className={`nav-link ${isActive("/publish") ? "active" : ""}`}
+                onClick={() => setMobileOpen(false)}
               >
-                <Plus size={18} />
+                <Plus size={16} />
                 Публикуване
               </Link>
 
               <Link
                 to="/auth"
-                style={styles.primaryBtn}
-                className="primary-btn"
-                onClick={() => setMobileMenuOpen(false)}
+                className="btn-primary"
+                onClick={() => setMobileOpen(false)}
               >
-                <User size={18} />
+                <User size={16} />
                 Влизане
               </Link>
             </>
           )}
-        </div>
+        </nav>
       </div>
-    </nav>
+    </header>
   );
 };
 
 export default Navbar;
+
+/* ---------------- styles ---------------- */
+
+const styles: Record<string, React.CSSProperties> = {
+  header: {
+    background: "#ffffff",
+    borderBottom: "1px solid #e0e0e0",
+    boxShadow: "0 1px 3px rgba(0, 0, 0, 0.08)",
+    position: "sticky",
+    top: 0,
+    zIndex: 100,
+    display: "flex",
+    justifyContent: "center",
+    padding: "10px 0",
+  },
+  inner: {
+    maxWidth: 1200,
+    margin: "0 auto",
+    padding: "0 20px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 32, // Разстояние между бутоните
+  },
+  brand: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    textDecoration: "none",
+    justifyContent: "flex-start", // Преместихме логото вляво
+    paddingLeft: 0, // Махнахме padding-а, за да е още по-вляво
+  },
+  logo: {
+    width: 40,
+    height: 40,
+    borderRadius: 6,
+    background: "#0066cc",
+    color: "#fff",
+    fontWeight: 800,
+    display: "grid",
+    placeItems: "center",
+    fontSize: 14,
+  },
+  brandText: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: "#0066cc",
+  },
+  nav: {
+    display: "flex",
+    alignItems: "center",
+    gap: 24, // Увеличаваме разстоянието между бутоните
+    fontFamily: "Arial, sans-serif",
+  },
+};
+
+const css = `
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2937;
+  border: 1px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.nav-link:hover {
+  background: #eaf2ff;
+  border-color: #c7dcff;
+}
+
+.nav-link.active {
+  background: #0066cc;
+  color: #fff;
+  border-color: #0066cc;
+  box-shadow: 0 4px 10px rgba(0, 102, 204, 0.25);
+}
+
+/* PRIMARY BUTTON */
+.btn-primary {
+  height: 38px;
+  padding: 0 18px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #1e88e5, #1565c0);
+  color: #fff;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  box-shadow: 0 6px 14px rgba(30, 136, 229, 0.35);
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(30, 136, 229, 0.45);
+}
+
+/* GHOST BUTTON */
+.btn-ghost {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #0066cc;
+  color: #0066cc;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+.btn-ghost:hover {
+  background: #eaf2ff;
+}
+
+/* BURGER */
+.burger {
+  display: none;
+  background: #0066cc;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+/* MOBILE */
+@media (max-width: 900px) {
+  .burger {
+    display: block;
+  }
+
+  .nav {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    border-top: 1px solid #e0e0e0;
+    padding: 14px;
+    flex-direction: column;
+    gap: 14px;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+  }
+
+  .nav.open {
+    display: flex;
+  }
+
+  .nav a,
+  .nav button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+`;
 

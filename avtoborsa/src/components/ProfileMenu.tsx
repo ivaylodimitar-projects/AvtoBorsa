@@ -31,25 +31,25 @@ const ProfileMenu: React.FC = () => {
       position: "relative",
     },
     profileIcon: {
-      color: "rgba(255,255,255,0.9)",
+      color: "#1f2937", // Използваме по-тъмен текст за по-стилен вид
       textDecoration: "none",
       fontSize: 15,
       padding: "10px 16px",
       borderRadius: 8,
       fontWeight: 600,
-      transition: "all 0.2s",
-      whiteSpace: "nowrap" as const,
+      transition: "all 0.3s ease", // По-плавен преход
+      whiteSpace: "nowrap",
       display: "flex",
       alignItems: "center",
       gap: 8,
-      background: "rgba(255,255,255,0.1)",
-      border: "1px solid rgba(255,255,255,0.2)",
+      background: "#f0f4ff", // Лек фон за плавност
+      border: "1px solid #c7dcff", // Граница с леко синкав оттенък
       cursor: "pointer",
     },
     profileIconHover: {
-      background: "#fff",
-      color: "#667eea",
-      border: "1px solid #fff",
+      background: "#0066cc", // По-силен активен фон
+      color: "#fff",
+      border: "1px solid #0066cc",
     },
     dropdown: {
       position: "absolute",
@@ -86,14 +86,14 @@ const ProfileMenu: React.FC = () => {
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      transition: "all 0.2s",
+      transition: "all 0.3s ease",
       color: "#fff",
     },
     balanceLabel: {
       fontSize: 12,
       color: "rgba(255,255,255,0.8)",
       fontWeight: 600,
-      textTransform: "uppercase" as const,
+      textTransform: "uppercase",
       letterSpacing: "0.5px",
       marginBottom: 8,
       display: "flex",
@@ -120,7 +120,7 @@ const ProfileMenu: React.FC = () => {
       cursor: "pointer",
       fontWeight: 700,
       fontSize: 14,
-      transition: "all 0.2s",
+      transition: "all 0.3s ease",
       display: "flex",
       alignItems: "center",
       gap: 8,
@@ -141,11 +141,11 @@ const ProfileMenu: React.FC = () => {
       fontSize: 14,
       fontWeight: 500,
       cursor: "pointer",
-      transition: "all 0.2s",
+      transition: "all 0.3s ease",
       border: "none",
       background: "none",
       width: "100%",
-      textAlign: "left" as const,
+      textAlign: "left",
       borderRadius: 8,
     },
     divider: {
@@ -263,40 +263,6 @@ const ProfileMenu: React.FC = () => {
                   <span>Моите обяви</span>
                 </Link>
 
-                <Link
-                  to="/drafts"
-                  style={styles.menuItem}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = "#f5f5f5";
-                    (e.currentTarget as HTMLElement).style.color = "#667eea";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = "none";
-                    (e.currentTarget as HTMLElement).style.color = "#333";
-                  }}
-                  onClick={closeDropdown}
-                >
-                  <FileText size={18} />
-                  <span>Чернови</span>
-                </Link>
-
-                <Link
-                  to="/saved"
-                  style={styles.menuItem}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = "#f5f5f5";
-                    (e.currentTarget as HTMLElement).style.color = "#667eea";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = "none";
-                    (e.currentTarget as HTMLElement).style.color = "#333";
-                  }}
-                  onClick={closeDropdown}
-                >
-                  <Heart size={18} />
-                  <span>Любими обяви</span>
-                </Link>
-
                 <div style={styles.divider} />
 
                 <button
@@ -354,4 +320,3 @@ const ProfileMenu: React.FC = () => {
 };
 
 export default ProfileMenu;
-

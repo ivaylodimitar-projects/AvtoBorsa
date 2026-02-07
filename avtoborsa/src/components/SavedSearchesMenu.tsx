@@ -7,7 +7,6 @@ const SavedSearchesMenu: React.FC = () => {
   const navigate = useNavigate();
   const { savedSearches, removeSearch } = useSavedSearches();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [hoveredIcon, setHoveredIcon] = useState(false);
 
   const closeDropdown = () => setIsDropdownOpen(false);
 
@@ -27,33 +26,32 @@ const SavedSearchesMenu: React.FC = () => {
       position: "relative",
     },
     navLink: {
-      color: "rgba(255,255,255,0.9)",
+      color: "#1f2937", // Използваме по-тъмен текст за по-стилен вид
       textDecoration: "none",
       fontSize: 15,
       padding: "10px 16px",
       borderRadius: 8,
       fontWeight: 600,
-      transition: "all 0.2s",
-      whiteSpace: "nowrap" as const,
+      transition: "all 0.3s ease", // По-плавен преход
       display: "flex",
       alignItems: "center",
       gap: 8,
-      background: "rgba(255,255,255,0.1)",
-      border: "1px solid rgba(255,255,255,0.2)",
+      background: "#f0f4ff", // Лек фон за плавност
+      border: "1px solid #c7dcff", // Граница с леко синкав оттенък
       cursor: "pointer",
-      position: "relative" as const,
+      position: "relative",
     },
     navLinkActive: {
-      background: "#fff",
-      color: "#667eea",
-      border: "1px solid #fff",
+      background: "#0066cc", // По-силно изразен активен фон
+      color: "#fff",
+      border: "1px solid #0066cc",
     },
     badge: {
-      position: "absolute" as const,
+      position: "absolute",
       top: -4,
       right: -4,
-      background: "#fff",
-      color: "#667eea",
+      background: "#0066cc", // Същия син оттенък
+      color: "#fff",
       borderRadius: "50%",
       width: 18,
       height: 18,
@@ -106,13 +104,13 @@ const SavedSearchesMenu: React.FC = () => {
     },
     searchList: {
       maxHeight: 400,
-      overflowY: "auto" as const,
+      overflowY: "auto",
     },
     searchItem: {
       padding: "12px 16px",
       borderBottom: "1px solid #f0f0f0",
       cursor: "pointer",
-      transition: "background-color 0.2s",
+      transition: "background-color 0.3s ease",
       display: "flex",
       justifyContent: "space-between",
       alignItems: "flex-start",
@@ -129,7 +127,7 @@ const SavedSearchesMenu: React.FC = () => {
       marginBottom: 4,
       overflow: "hidden",
       textOverflow: "ellipsis",
-      whiteSpace: "nowrap" as const,
+      whiteSpace: "nowrap",
     },
     searchDate: {
       fontSize: 11,
@@ -145,12 +143,12 @@ const SavedSearchesMenu: React.FC = () => {
       justifyContent: "center",
       color: "#999",
       borderRadius: 4,
-      transition: "all 0.2s",
+      transition: "all 0.3s ease",
       flexShrink: 0,
     },
     empty: {
       padding: "32px 16px",
-      textAlign: "center" as const,
+      textAlign: "center",
       color: "#999",
       fontSize: 13,
     },
@@ -164,8 +162,6 @@ const SavedSearchesMenu: React.FC = () => {
           ...(isDropdownOpen ? styles.navLinkActive : {}),
         }}
         className="nav-link"
-        onMouseEnter={() => setHoveredIcon(true)}
-        onMouseLeave={() => setHoveredIcon(false)}
         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
         title="Запазени търсения"
       >
@@ -195,12 +191,6 @@ const SavedSearchesMenu: React.FC = () => {
               <button
                 style={styles.closeBtn}
                 onClick={closeDropdown}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "#f0f0f0";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "none";
-                }}
               >
                 <X size={16} />
               </button>
@@ -217,12 +207,6 @@ const SavedSearchesMenu: React.FC = () => {
                     key={search.id}
                     style={styles.searchItem}
                     onClick={() => handleSearchClick(search.criteria)}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "#f9f9f9";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "transparent";
-                    }}
                   >
                     <div style={styles.searchItemContent}>
                       <div style={styles.searchName}>{search.name}</div>
@@ -237,15 +221,6 @@ const SavedSearchesMenu: React.FC = () => {
                     <button
                       style={styles.deleteBtn}
                       onClick={(e) => handleDeleteSearch(e, search.id)}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "#fee";
-                        e.currentTarget.style.color = "#d32f2f";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "none";
-                        e.currentTarget.style.color = "#999";
-                      }}
-                      title="Изтрий"
                     >
                       <Trash2 size={16} />
                     </button>
