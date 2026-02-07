@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
 import { BrandSelector } from "./BrandSelector";
 import { BULGARIAN_CITIES_BY_REGION } from "../constants/bulgarianCities";
 
@@ -19,7 +19,6 @@ interface SearchCriteria {
   isUsed: boolean;
   isPartial: boolean;
   isParts: boolean;
-  // Advanced filters (price, mileage, engine ranges)
   priceFrom: string;
   priceTo: string;
   mileageFrom: string;
@@ -66,7 +65,6 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     isUsed: true,
     isPartial: false,
     isParts: false,
-    // Advanced filters
     priceFrom: "",
     priceTo: "",
     mileageFrom: "",
@@ -90,7 +88,6 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
 
   const handleInputChange = (field: keyof SearchCriteria, value: string | boolean) => {
     setSearchCriteria((prev) => {
-      // Handle boolean fields
       if (typeof value === "string" && (value === "true" || value === "false")) {
         return { ...prev, [field]: value === "true" };
       }
@@ -162,370 +159,480 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     setShowAdvanced(false);
   };
 
+  const advancedSearchCSS = `
+    .adv-search-root {
+      background: #f9fafb;
+      border-radius: 16px;
+      padding: 28px 24px 24px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1.5px 6px rgba(0,0,0,0.04);
+      max-width: 900px;
+      margin: 0 auto;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .adv-search-form {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .adv-search-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px 16px;
+    }
+    .adv-field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .adv-label {
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #6b7280;
+      text-transform: uppercase;
+      padding-left: 2px;
+    }
+    .adv-select,
+    .adv-input {
+      width: 100%;
+      height: 42px;
+      padding: 0 12px;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 10px;
+      background: #fff;
+      font-size: 14px;
+      color: #1f2937;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      appearance: none;
+      -webkit-appearance: none;
+      box-sizing: border-box;
+    }
+    .adv-select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236b7280' viewBox='0 0 16 16'%3E%3Cpath d='M1.5 5.5l6.5 6 6.5-6' stroke='%236b7280' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 32px;
+    }
+    .adv-select:focus,
+    .adv-input:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.10);
+    }
+    .adv-select--disabled {
+      background: #f3f4f6;
+      color: #9ca3af;
+      cursor: not-allowed;
+      border-color: #e5e7eb;
+    }
+    .adv-lock-icon {
+      position: absolute;
+      right: 34px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 13px;
+      pointer-events: none;
+      opacity: 0.5;
+    }
+    .adv-chips-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .adv-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 16px;
+      border-radius: 20px;
+      border: 1.5px solid #e5e7eb;
+      background: #fff;
+      font-size: 13px;
+      color: #4b5563;
+      cursor: pointer;
+      transition: all 0.2s;
+      user-select: none;
+    }
+    .adv-chip:hover {
+      border-color: #3b82f6;
+      color: #3b82f6;
+    }
+    .adv-chip--active {
+      background: #eff6ff;
+      border-color: #3b82f6;
+      color: #2563eb;
+      font-weight: 600;
+    }
+    .adv-action-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-top: 2px;
+    }
+    .adv-search-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 32px;
+      height: 48px;
+      border: none;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.2s;
+      box-shadow: 0 2px 8px rgba(37,99,235,0.3);
+      letter-spacing: 0.02em;
+    }
+    .adv-search-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 16px rgba(37,99,235,0.35);
+    }
+    .adv-search-btn:active {
+      transform: translateY(0);
+    }
+    .adv-detailed-link {
+      display: inline-flex;
+      align-items: center;
+      background: none;
+      border: none;
+      color: #6b7280;
+      font-size: 13px;
+      cursor: pointer;
+      padding: 4px 0;
+      transition: color 0.2s;
+    }
+    .adv-detailed-link:hover {
+      color: #2563eb;
+    }
+    .adv-detailed-section {
+      border-top: 1px solid #e5e7eb;
+      padding-top: 18px;
+      animation: advSlideDown 0.25s ease;
+    }
+    @keyframes advSlideDown {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .adv-detailed-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px 16px;
+      margin-bottom: 14px;
+    }
+    .adv-clear-btn {
+      display: inline-flex;
+      align-items: center;
+      background: none;
+      border: 1.5px solid #e5e7eb;
+      border-radius: 10px;
+      color: #6b7280;
+      font-size: 13px;
+      padding: 8px 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .adv-clear-btn:hover {
+      border-color: #ef4444;
+      color: #ef4444;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .adv-search-root {
+        padding: 20px 16px 18px;
+        border-radius: 12px;
+      }
+      .adv-search-grid,
+      .adv-detailed-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+      .adv-action-row {
+        flex-direction: column;
+        gap: 10px;
+      }
+      .adv-search-btn {
+        width: 100%;
+      }
+    }
+    @media (min-width: 769px) and (max-width: 1024px) {
+      .adv-search-grid,
+      .adv-detailed-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  `;
+
   return (
-    <div style={styles.container}>
-      <form onSubmit={handleSearch} style={styles.form}>
-        {/* QUICK SEARCH SECTION - Mobile.bg Style */}
-        <div style={styles.quickSearchSection}>
-          {/* Row 1: Category, Brand, Model, Condition */}
-          <div style={styles.quickSearchRow}>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Тип на колата</label>
-              <select
-                value={searchCriteria.category}
-                onChange={(e) => handleInputChange("category", e.target.value)}
-                style={styles.select}
-              >
-                <option value="">Всички</option>
-                <option value="Седан">Седан</option>
-                <option value="Хечбек">Хечбек</option>
-                <option value="Комби">Комби</option>
-                <option value="Купе">Купе</option>
-                <option value="Кабрио">Кабрио</option>
-                <option value="Джип">Джип</option>
-                <option value="Ван">Ван</option>
-                <option value="Миниван">Миниван</option>
-                <option value="Пикап">Пикап</option>
-                <option value="Стреч лимузина">Стреч лимузина</option>
-              </select>
-            </div>
+    <div className="adv-search-root">
+      <style>{advancedSearchCSS}</style>
+      <form onSubmit={handleSearch} className="adv-search-form">
+        {/* PRIMARY GRID — 3 columns on desktop, stacks on mobile */}
+        <div className="adv-search-grid">
+          {/* Make */}
+          <div className="adv-field">
+            <label className="adv-label">МАРКА</label>
+            <BrandSelector
+              value={searchCriteria.brand}
+              onChange={(brand) => {
+                handleInputChange("brand", brand);
+                handleInputChange("model", "");
+              }}
+              brands={brands}
+              placeholder="Всички марки"
+            />
+          </div>
 
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Марка</label>
-              <BrandSelector
-                value={searchCriteria.brand}
-                onChange={(brand) => {
-                  handleInputChange("brand", brand);
-                  handleInputChange("model", "");
-                }}
-                brands={brands}
-                placeholder="Всички"
-              />
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Модел</label>
+          {/* Model — locked until Make is selected */}
+          <div className="adv-field">
+            <label className="adv-label">МОДЕЛ</label>
+            <div style={{ position: "relative" }}>
               <select
                 value={searchCriteria.model}
                 onChange={(e) => handleInputChange("model", e.target.value)}
-                style={styles.select}
+                className={`adv-select ${!searchCriteria.brand ? "adv-select--disabled" : ""}`}
                 disabled={!searchCriteria.brand}
               >
-                <option value="">Всички</option>
+                <option value="">{searchCriteria.brand ? "Всички модели" : "Избери марка първо"}</option>
                 {availableModels.map((model) => (
-                  <option key={model} value={model}>
-                    {model}
-                  </option>
+                  <option key={model} value={model}>{model}</option>
                 ))}
               </select>
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Намира се в:</label>
-              <select
-                value={searchCriteria.region}
-                onChange={(e) => handleInputChange("region", e.target.value)}
-                style={styles.select}
-              >
-                <option value="">Всички</option>
-                {regions.map((region) => (
-                  <option key={region} value={region}>
-                    {region}
-                  </option>
-                ))}
-              </select>
+              {!searchCriteria.brand && (
+                <span className="adv-lock-icon" title="Избери марка първо">🔒</span>
+              )}
             </div>
           </div>
 
-          {/* Row 2: Max Price, Year, Fuel, Gearbox */}
-          <div style={styles.quickSearchRow}>
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Максимална цена</label>
-              <input
-                type="number"
-                placeholder="€"
-                value={searchCriteria.maxPrice}
-                onChange={(e) => handleInputChange("maxPrice", e.target.value)}
-                style={styles.input}
-              />
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Година след:</label>
-              <select
-                value={searchCriteria.yearFrom}
-                onChange={(e) => handleInputChange("yearFrom", e.target.value)}
-                style={styles.select}
-              >
-                <option value="">Всички</option>
-                {Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i).map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Двигател</label>
-              <select
-                value={searchCriteria.fuel}
-                onChange={(e) => handleInputChange("fuel", e.target.value)}
-                style={styles.select}
-              >
-                <option value="">Всички</option>
-                {FUEL_OPTIONS.map((fuel) => (
-                  <option key={fuel} value={fuel}>
-                    {fuel}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Скоростна кутия</label>
-              <select
-                value={searchCriteria.gearbox}
-                onChange={(e) => handleInputChange("gearbox", e.target.value)}
-                style={styles.select}
-              >
-                <option value="">Всички</option>
-                {GEARBOX_OPTIONS.map((gb) => (
-                  <option key={gb} value={gb}>
-                    {gb}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Row 3: Checkboxes & Sort & Search Button */}
-          <div style={styles.quickSearchRow}>
-            <div style={styles.checkboxGroup}>
-              <label style={styles.checkbox}>
-                <input
-                  type="checkbox"
-                  checked={searchCriteria.isNew}
-                  onChange={(e) => handleInputChange("isNew", e.target.checked ? "true" : "false")}
-                />
-                <span>Нов</span>
-              </label>
-              <label style={styles.checkbox}>
-                <input
-                  type="checkbox"
-                  checked={searchCriteria.isUsed}
-                  onChange={(e) => handleInputChange("isUsed", e.target.checked ? "true" : "false")}
-                />
-                <span>Употребяван</span>
-              </label>
-              <label style={styles.checkbox}>
-                <input
-                  type="checkbox"
-                  checked={searchCriteria.isPartial}
-                  onChange={(e) => handleInputChange("isPartial", e.target.checked ? "true" : "false")}
-                />
-                <span>Поведен/ударен</span>
-              </label>
-              <label style={styles.checkbox}>
-                <input
-                  type="checkbox"
-                  checked={searchCriteria.isParts}
-                  onChange={(e) => handleInputChange("isParts", e.target.checked ? "true" : "false")}
-                />
-                <span>За части</span>
-              </label>
-            </div>
-
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Подреди резултатите по</label>
-              <select
-                value={searchCriteria.sortBy}
-                onChange={(e) => handleInputChange("sortBy", e.target.value)}
-                style={styles.select}
-              >
-                <option value="Марка/Модел/Цена">Марка/Модел/Цена</option>
-                <option value="price-asc">Цена (възходящо)</option>
-                <option value="price-desc">Цена (низходящо)</option>
-                <option value="year-desc">Година (нови първо)</option>
-                <option value="year-asc">Година (стари първо)</option>
-              </select>
-            </div>
-
-            <button type="submit" style={styles.searchButton}>
-              🔍 Търси
-            </button>
-          </div>
-
-          {/* Advanced Filters Toggle */}
-          <div style={styles.advancedToggleRow}>
-            <button
-              type="button"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              style={styles.advancedToggleButton}
+          {/* Body Type */}
+          <div className="adv-field">
+            <label className="adv-label">ТИП</label>
+            <select
+              value={searchCriteria.category}
+              onChange={(e) => handleInputChange("category", e.target.value)}
+              className="adv-select"
             >
-              <ChevronDown
-                size={16}
-                style={{
-                  transform: showAdvanced ? "rotate(180deg)" : "rotate(0deg)",
-                  transition: "transform 0.3s",
-                  marginRight: "6px",
-                }}
-              />
-              Още критерии за търсене
-            </button>
+              <option value="">Всички типове</option>
+              <option value="Седан">Седан</option>
+              <option value="Хечбек">Хечбек</option>
+              <option value="Комби">Комби</option>
+              <option value="Купе">Купе</option>
+              <option value="Кабрио">Кабрио</option>
+              <option value="Джип">Джип / SUV</option>
+              <option value="Ван">Ван</option>
+              <option value="Миниван">Миниван</option>
+              <option value="Пикап">Пикап</option>
+            </select>
+          </div>
+
+          {/* Max Price */}
+          <div className="adv-field">
+            <label className="adv-label">МАКС. ЦЕНА</label>
+            <input
+              type="number"
+              placeholder="€ Без ограничение"
+              value={searchCriteria.maxPrice}
+              onChange={(e) => handleInputChange("maxPrice", e.target.value)}
+              className="adv-input"
+            />
+          </div>
+
+          {/* Year From */}
+          <div className="adv-field">
+            <label className="adv-label">ГОДИНА ОТ</label>
+            <select
+              value={searchCriteria.yearFrom}
+              onChange={(e) => handleInputChange("yearFrom", e.target.value)}
+              className="adv-select"
+            >
+              <option value="">Всички години</option>
+              {Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Region */}
+          <div className="adv-field">
+            <label className="adv-label">РЕГИОН</label>
+            <select
+              value={searchCriteria.region}
+              onChange={(e) => handleInputChange("region", e.target.value)}
+              className="adv-select"
+            >
+              <option value="">Цяла България</option>
+              {regions.map((region) => (
+                <option key={region} value={region}>{region}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Fuel */}
+          <div className="adv-field">
+            <label className="adv-label">ГОРИВО</label>
+            <select
+              value={searchCriteria.fuel}
+              onChange={(e) => handleInputChange("fuel", e.target.value)}
+              className="adv-select"
+            >
+              <option value="">Всички</option>
+              {FUEL_OPTIONS.map((fuel) => (
+                <option key={fuel} value={fuel}>{fuel}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Gearbox */}
+          <div className="adv-field">
+            <label className="adv-label">СКОРОСТИ</label>
+            <select
+              value={searchCriteria.gearbox}
+              onChange={(e) => handleInputChange("gearbox", e.target.value)}
+              className="adv-select"
+            >
+              <option value="">Всички</option>
+              {GEARBOX_OPTIONS.map((gb) => (
+                <option key={gb} value={gb}>{gb}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Sort */}
+          <div className="adv-field">
+            <label className="adv-label">ПОДРЕДИ ПО</label>
+            <select
+              value={searchCriteria.sortBy}
+              onChange={(e) => handleInputChange("sortBy", e.target.value)}
+              className="adv-select"
+            >
+              <option value="Марка/Модел/Цена">Марка / Модел / Цена</option>
+              <option value="price-asc">Цена ↑</option>
+              <option value="price-desc">Цена ↓</option>
+              <option value="year-desc">Най-нови</option>
+              <option value="year-asc">Най-стари</option>
+            </select>
           </div>
         </div>
 
-        {/* ADVANCED FILTERS SECTION */}
+        {/* CONDITION CHIPS */}
+        <div className="adv-chips-row">
+          {[
+            { key: "isUsed" as const, label: "Употребяван" },
+            { key: "isNew" as const, label: "Нов" },
+            { key: "isPartial" as const, label: "Повреден / ударен" },
+            { key: "isParts" as const, label: "За части" },
+          ].map(({ key, label }) => (
+            <label
+              key={key}
+              className={`adv-chip ${searchCriteria[key] ? "adv-chip--active" : ""}`}
+            >
+              <input
+                type="checkbox"
+                checked={searchCriteria[key] as boolean}
+                onChange={(e) => handleInputChange(key, e.target.checked ? "true" : "false")}
+                style={{ display: "none" }}
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+
+        {/* ACTION ROW — Search button + Detailed Search link */}
+        <div className="adv-action-row">
+          <button type="submit" className="adv-search-btn">
+            <Search size={18} style={{ marginRight: 8 }} />
+            Търси обяви
+          </button>
+          <button
+            type="button"
+            className="adv-detailed-link"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+          >
+            <ChevronDown
+              size={14}
+              style={{
+                transform: showAdvanced ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 0.3s",
+                marginRight: 4,
+              }}
+            />
+            Детайлно търсене
+          </button>
+        </div>
+
+        {/* ADVANCED / DETAILED FILTERS */}
         {showAdvanced && (
-          <div style={styles.advancedSection}>
-            <h3 style={styles.advancedTitle}>Детайлни филтри</h3>
-
-            {/* Price Range */}
-            <div style={styles.rangeGroup}>
-              <label style={styles.rangeLabel}>Цена (€)</label>
-              <div style={styles.rangeInputs}>
-                <input
-                  type="number"
-                  placeholder="От"
-                  value={searchCriteria.priceFrom}
-                  onChange={(e) => handleInputChange("priceFrom", e.target.value)}
-                  style={styles.rangeInput}
-                />
-                <span style={styles.rangeSeparator}>—</span>
-                <input
-                  type="number"
-                  placeholder="До"
-                  value={searchCriteria.priceTo}
-                  onChange={(e) => handleInputChange("priceTo", e.target.value)}
-                  style={styles.rangeInput}
-                />
+          <div className="adv-detailed-section">
+            <div className="adv-detailed-grid">
+              {/* Price Range */}
+              <div className="adv-field">
+                <label className="adv-label">ЦЕНА ОТ (€)</label>
+                <input type="number" placeholder="Мин." value={searchCriteria.priceFrom} onChange={(e) => handleInputChange("priceFrom", e.target.value)} className="adv-input" />
               </div>
-            </div>
-
-            {/* Year Range */}
-            <div style={styles.rangeGroup}>
-              <label style={styles.rangeLabel}>Година</label>
-              <div style={styles.rangeInputs}>
-                <input
-                  type="number"
-                  placeholder="От"
-                  value={searchCriteria.yearFrom}
-                  onChange={(e) => handleInputChange("yearFrom", e.target.value)}
-                  style={styles.rangeInput}
-                />
-                <span style={styles.rangeSeparator}>—</span>
-                <input
-                  type="number"
-                  placeholder="До"
-                  value={searchCriteria.yearTo}
-                  onChange={(e) => handleInputChange("yearTo", e.target.value)}
-                  style={styles.rangeInput}
-                />
+              <div className="adv-field">
+                <label className="adv-label">ЦЕНА ДО (€)</label>
+                <input type="number" placeholder="Макс." value={searchCriteria.priceTo} onChange={(e) => handleInputChange("priceTo", e.target.value)} className="adv-input" />
               </div>
-            </div>
 
-            {/* Mileage Range */}
-            <div style={styles.rangeGroup}>
-              <label style={styles.rangeLabel}>Пробег (км)</label>
-              <div style={styles.rangeInputs}>
-                <input
-                  type="number"
-                  placeholder="От"
-                  value={searchCriteria.mileageFrom}
-                  onChange={(e) => handleInputChange("mileageFrom", e.target.value)}
-                  style={styles.rangeInput}
-                />
-                <span style={styles.rangeSeparator}>—</span>
-                <input
-                  type="number"
-                  placeholder="До"
-                  value={searchCriteria.mileageTo}
-                  onChange={(e) => handleInputChange("mileageTo", e.target.value)}
-                  style={styles.rangeInput}
-                />
+              {/* Mileage Range */}
+              <div className="adv-field">
+                <label className="adv-label">ПРОБЕГ ОТ (КМ)</label>
+                <input type="number" placeholder="Мин." value={searchCriteria.mileageFrom} onChange={(e) => handleInputChange("mileageFrom", e.target.value)} className="adv-input" />
               </div>
-            </div>
-
-            {/* Engine Size Range */}
-            <div style={styles.rangeGroup}>
-              <label style={styles.rangeLabel}>Кубатура (cc)</label>
-              <div style={styles.rangeInputs}>
-                <input
-                  type="number"
-                  placeholder="От"
-                  value={searchCriteria.engineFrom}
-                  onChange={(e) => handleInputChange("engineFrom", e.target.value)}
-                  style={styles.rangeInput}
-                />
-                <span style={styles.rangeSeparator}>—</span>
-                <input
-                  type="number"
-                  placeholder="До"
-                  value={searchCriteria.engineTo}
-                  onChange={(e) => handleInputChange("engineTo", e.target.value)}
-                  style={styles.rangeInput}
-                />
+              <div className="adv-field">
+                <label className="adv-label">ПРОБЕГ ДО (КМ)</label>
+                <input type="number" placeholder="Макс." value={searchCriteria.mileageTo} onChange={(e) => handleInputChange("mileageTo", e.target.value)} className="adv-input" />
               </div>
-            </div>
 
-            {/* Single Selects - Region, Color, Condition, Category */}
-            <div style={styles.selectsGrid}>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Регион</label>
-                <select
-                  value={searchCriteria.region}
-                  onChange={(e) => handleInputChange("region", e.target.value)}
-                  style={styles.select}
-                >
-                  <option value="">Всички</option>
-                  {regions.map((region) => (
-                    <option key={region} value={region}>
-                      {region}
-                    </option>
+              {/* Engine Range */}
+              <div className="adv-field">
+                <label className="adv-label">КУБАТУРА ОТ (CC)</label>
+                <input type="number" placeholder="Мин." value={searchCriteria.engineFrom} onChange={(e) => handleInputChange("engineFrom", e.target.value)} className="adv-input" />
+              </div>
+              <div className="adv-field">
+                <label className="adv-label">КУБАТУРА ДО (CC)</label>
+                <input type="number" placeholder="Макс." value={searchCriteria.engineTo} onChange={(e) => handleInputChange("engineTo", e.target.value)} className="adv-input" />
+              </div>
+
+              {/* Year To */}
+              <div className="adv-field">
+                <label className="adv-label">ГОДИНА ДО</label>
+                <select value={searchCriteria.yearTo} onChange={(e) => handleInputChange("yearTo", e.target.value)} className="adv-select">
+                  <option value="">Без ограничение</option>
+                  {Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                    <option key={year} value={year}>{year}</option>
                   ))}
                 </select>
               </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Цвят</label>
-                <select
-                  value={searchCriteria.color}
-                  onChange={(e) => handleInputChange("color", e.target.value)}
-                  style={styles.select}
-                >
+              {/* Color */}
+              <div className="adv-field">
+                <label className="adv-label">ЦВЯТ</label>
+                <select value={searchCriteria.color} onChange={(e) => handleInputChange("color", e.target.value)} className="adv-select">
                   <option value="">Всички</option>
                   {COLOR_OPTIONS.map((color) => (
-                    <option key={color} value={color}>
-                      {color}
-                    </option>
+                    <option key={color} value={color}>{color}</option>
                   ))}
                 </select>
               </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Състояние</label>
-                <select
-                  value={searchCriteria.condition}
-                  onChange={(e) => handleInputChange("condition", e.target.value)}
-                  style={styles.select}
-                >
+              {/* Condition */}
+              <div className="adv-field">
+                <label className="adv-label">СЪСТОЯНИЕ</label>
+                <select value={searchCriteria.condition} onChange={(e) => handleInputChange("condition", e.target.value)} className="adv-select">
                   <option value="">Всички</option>
                   <option value="Нов">Нов</option>
                   <option value="Употребяван">Употребяван</option>
-                  <option value="Повреден/ударен">Повреден/ударен</option>
+                  <option value="Повреден/ударен">Повреден / ударен</option>
                   <option value="За части">За части</option>
                 </select>
               </div>
             </div>
 
-            {/* Clear Filters Button */}
-            <button
-              type="button"
-              onClick={handleClearFilters}
-              style={styles.clearButton}
-            >
-              Изчисти филтрите
+            <button type="button" onClick={handleClearFilters} className="adv-clear-btn">
+              Изчисти всички филтри
             </button>
           </div>
         )}
@@ -534,182 +641,4 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   );
 };
 
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    background: "#fff",
-    borderRadius: "8px",
-    padding: "24px",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-    marginBottom: "32px",
-  },
-  form: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "16px",
-  },
-  quickSearchSection: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "16px",
-  },
-  quickSearchGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-    gap: "16px",
-  },
-  formGroup: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "6px",
-  },
-  label: {
-    fontSize: "14px",
-    fontWeight: "600",
-    color: "#333",
-  },
-  select: {
-    padding: "10px 12px",
-    border: "1px solid #ddd",
-    borderRadius: "4px",
-    fontSize: "14px",
-    fontFamily: "inherit",
-    cursor: "pointer",
-    background: "#fff",
-  },
-  buttonRow: {
-    display: "flex",
-    gap: "12px",
-    marginTop: "8px",
-  },
-  searchButton: {
-    flex: 1,
-    padding: "12px 24px",
-    background: "#0066cc",
-    color: "#fff",
-    border: "none",
-    borderRadius: "4px",
-    fontSize: "16px",
-    fontWeight: "600",
-    cursor: "pointer",
-    transition: "background 0.2s",
-  },
-  toggleButton: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "12px 16px",
-    background: "#f5f5f5",
-    color: "#333",
-    border: "1px solid #ddd",
-    borderRadius: "4px",
-    fontSize: "14px",
-    fontWeight: "600",
-    cursor: "pointer",
-    transition: "background 0.2s",
-  },
-  advancedSection: {
-    borderTop: "1px solid #eee",
-    paddingTop: "24px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "20px",
-  },
-  advancedTitle: {
-    fontSize: "16px",
-    fontWeight: "700",
-    color: "#333",
-    margin: "0 0 12px 0",
-  },
-  rangeGroup: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-  },
-  rangeLabel: {
-    fontSize: "14px",
-    fontWeight: "600",
-    color: "#333",
-  },
-  rangeInputs: {
-    display: "grid",
-    gridTemplateColumns: "1fr auto 1fr",
-    gap: "12px",
-    alignItems: "center",
-  },
-  rangeInput: {
-    padding: "10px 12px",
-    border: "1px solid #ddd",
-    borderRadius: "4px",
-    fontSize: "14px",
-    fontFamily: "inherit",
-  },
-  rangeSeparator: {
-    textAlign: "center",
-    color: "#999",
-    fontWeight: "600",
-  },
-  selectsGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-    gap: "16px",
-  },
-  clearButton: {
-    padding: "12px 24px",
-    background: "#f5f5f5",
-    color: "#d32f2f",
-    border: "1px solid #ddd",
-    borderRadius: "4px",
-    fontSize: "14px",
-    fontWeight: "600",
-    cursor: "pointer",
-    transition: "background 0.2s",
-    alignSelf: "flex-start",
-  },
-  quickSearchRow: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: "16px",
-    alignItems: "flex-end",
-  },
-  input: {
-    padding: "10px 12px",
-    border: "1px solid #ddd",
-    borderRadius: "4px",
-    fontSize: "14px",
-    fontFamily: "inherit",
-  },
-  checkboxGroup: {
-    display: "flex",
-    gap: "16px",
-    flexWrap: "wrap",
-    alignItems: "center",
-  },
-  checkbox: {
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-    cursor: "pointer",
-    fontSize: "14px",
-    color: "#333",
-  },
-  advancedToggleRow: {
-    display: "flex",
-    justifyContent: "center",
-    paddingTop: "12px",
-    borderTop: "1px solid #eee",
-  },
-  advancedToggleButton: {
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-    padding: "8px 16px",
-    background: "none",
-    color: "#0066cc",
-    border: "none",
-    fontSize: "14px",
-    fontWeight: "600",
-    cursor: "pointer",
-    transition: "color 0.2s",
-  },
-};
 

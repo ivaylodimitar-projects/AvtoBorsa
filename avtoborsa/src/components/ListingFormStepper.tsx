@@ -51,6 +51,7 @@ const ListingFormStepper: React.FC<ListingFormStepperProps> = ({
       gap: 12,
       overflowX: "auto",
       paddingBottom: 8,
+      scrollbarWidth: "none",
     },
     step: {
       display: "flex",

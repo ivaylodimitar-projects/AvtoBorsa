@@ -58,11 +58,14 @@ export const BrandSelector: React.FC<BrandSelectorProps> = ({
         style={{
           display: "flex",
           alignItems: "center",
-          border: "1px solid #ddd",
-          borderRadius: "4px",
-          padding: "8px 12px",
+          border: "1.5px solid #e5e7eb",
+          borderRadius: "10px",
+          padding: "0 12px",
+          height: 42,
           cursor: "pointer",
           background: "#fff",
+          transition: "border-color 0.2s, box-shadow 0.2s",
+          boxSizing: "border-box",
         }}
         onClick={() => setIsOpen(!isOpen)}
       >
@@ -85,6 +88,8 @@ export const BrandSelector: React.FC<BrandSelectorProps> = ({
             outline: "none",
             fontSize: "14px",
             fontFamily: "inherit",
+            color: "#1f2937",
+            background: "transparent",
           }}
         />
         {value && (
@@ -111,17 +116,16 @@ export const BrandSelector: React.FC<BrandSelectorProps> = ({
         <div
           style={{
             position: "absolute",
-            top: "100%",
+            top: "calc(100% + 4px)",
             left: 0,
             right: 0,
             background: "#fff",
-            border: "1px solid #ddd",
-            borderTop: "none",
-            borderRadius: "0 0 4px 4px",
+            border: "1.5px solid #e5e7eb",
+            borderRadius: "10px",
             maxHeight: "300px",
             overflowY: "auto",
             zIndex: 1000,
-            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
           }}
           className="akSearchMarki"
         >

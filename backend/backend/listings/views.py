@@ -253,6 +253,7 @@ def archive_listing(request, listing_id):
     """Archive a listing"""
     listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
     listing.is_archived = True
+    listing.is_active = False
     listing.save()
     serializer = CarListingSerializer(listing)
     return Response(serializer.data, status=status.HTTP_200_OK)
@@ -264,6 +265,7 @@ def unarchive_listing(request, listing_id):
     """Unarchive a listing"""
     listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
     listing.is_archived = False
+    listing.is_active = True
     listing.save()
     serializer = CarListingSerializer(listing)
     return Response(serializer.data, status=status.HTTP_200_OK)
@@ -276,9 +278,10 @@ def delete_listing(request, listing_id):
     listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
     listing.delete()
     return Response(
-        {'message': 'Listing deleted successfully'},
-        status=status.HTTP_204_NO_CONTENT
-    )
+        {
+            'message': 'Listing deleted successfully'},
+            status=status.HTTP_204_NO_CONTENT
+        )
 
 
 @api_view(['POST'])

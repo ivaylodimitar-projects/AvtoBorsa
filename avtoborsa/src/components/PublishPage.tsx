@@ -7,6 +7,7 @@ import AdvancedImageUpload from "./AdvancedImageUpload";
 import FormFieldWithTooltip from "./FormFieldWithTooltip";
 import ListingPreview from "./ListingPreview";
 import ListingQualityIndicator from "./ListingQualityIndicator";
+import type { Scrollbar } from "swiper/modules";
 
 const BRANDS = [
   "Audi", "BMW", "Mercedes-Benz", "Volkswagen", "Opel", "Ford", "Toyota", 

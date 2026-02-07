@@ -279,51 +279,68 @@ export default function LandingPage() {
       `}</style>
 
       <main style={styles.main}>
-        {/* HERO */}
-        <section style={styles.hero}>
-          <div style={styles.heroGlow} />
-          <div style={styles.heroInner}>
-            <div style={styles.heroLeft}>
-              <h1 style={styles.h1}>
-                Търсене на автомобили и МПС
-              </h1>
-              <p style={styles.lead}>
-                Намерете перфектния автомобил от над 200 000 обяви
-              </p>
-            </div>
+        {/* HERO — gradient background with floating search card */}
+        <section className="landing-hero-section">
+          <style>{`
+            .landing-hero-section {
+              position: relative;
+              background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+              border-radius: 20px;
+              padding: 48px 24px 80px;
+              margin-bottom: -48px;
+              overflow: visible;
+              text-align: center;
+            }
+            .landing-hero-section::before {
+              content: '';
+              position: absolute;
+              inset: 0;
+              border-radius: 20px;
+              background: radial-gradient(ellipse at 50% 0%, rgba(59,130,246,0.15) 0%, transparent 70%);
+              pointer-events: none;
+            }
+            .landing-hero-title {
+              font-size: 32px;
+              font-weight: 800;
+              color: #fff;
+              margin: 0 0 10px;
+              line-height: 1.2;
+              letter-spacing: -0.02em;
+            }
+            .landing-hero-lead {
+              font-size: 15px;
+              color: rgba(255,255,255,0.65);
+              margin: 0 0 8px;
+            }
+            .landing-hero-card {
+              position: relative;
+              z-index: 2;
+              margin-top: 32px;
+            }
+            @media (max-width: 768px) {
+              .landing-hero-section {
+                padding: 32px 12px 64px;
+                border-radius: 14px;
+                margin-bottom: -36px;
+              }
+              .landing-hero-title { font-size: 24px; }
+            }
+          `}</style>
 
-            {/* SEARCH CARD */}
-            <div id="search" style={styles.searchCard}>
-              <div style={{ ...styles.searchHeader, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <div style={styles.searchTitle}>Търси обяви</div>
-                  <div style={styles.searchSubtitle}>Филтрирай умно — намери по-бързо</div>
-                </div>
-                <div style={{ minWidth: 250 }}>
-                  <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>Търсене в категория</label>
-                  <div style={{ position: "relative", zIndex: 1 }}>
-                    <select style={selectBase} value={category} onChange={(e) => setCategory(e.target.value)}>
-                      {CATEGORIES.map((cat) => (
-                        <option key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </option>
-                      ))}
-                    </select>
-                    <span style={styles.selectChevron}>▾</span>
-                  </div>
-                </div>
-              </div>
+          <h1 className="landing-hero-title">Търсене на автомобили и МПС</h1>
+          <p className="landing-hero-lead">Намерете перфектния автомобил от над 200 000 обяви</p>
 
-              <AdvancedSearch
-                onSearch={handleAdvancedSearch}
-                brands={BRANDS}
-                models={MODELS}
-                categories={CATEGORIES}
-              />
+          <div className="landing-hero-card" id="search">
+            <AdvancedSearch
+              onSearch={handleAdvancedSearch}
+              brands={BRANDS}
+              models={MODELS}
+              categories={CATEGORIES}
+            />
 
-              {/* OLD FORM - REPLACED WITH ADVANCEDSEARCH */}
-              {false && <form onSubmit={onSubmitSearch} style={styles.form}>
-                <div style={styles.grid} className="search-grid">
+            {/* OLD FORM - REPLACED WITH ADVANCEDSEARCH */}
+            {false && <form onSubmit={onSubmitSearch} style={styles.form}>
+              <div style={styles.grid} className="search-grid">
 
                   <Field label="Марка">
                     <Select
@@ -614,8 +631,7 @@ export default function LandingPage() {
                 <div style={styles.note}>
                   * Демо: резултатите филтрират примерни “топ обяви”. В реален проект тук се връзва API.
                 </div>
-              </form>}
-            </div>
+            </form>}
           </div>
         </section>
 
@@ -927,7 +943,7 @@ const styles: Record<string, React.CSSProperties> = {
   note: { marginTop: 12, fontSize: 12, color: "#999", fontStyle: "italic" },
 
   section: { padding: "30px 0 0" },
-  sectionHeader: { marginBottom: 16 },
+  sectionHeader: { marginBottom: 16 , marginTop: "3rem" },
   h2: { margin: 0, fontSize: 22, fontWeight: 700, color: "#333" },
   sectionLead: { margin: "6px 0 0", color: "#666", fontSize: 14, lineHeight: 1.5 },
 
