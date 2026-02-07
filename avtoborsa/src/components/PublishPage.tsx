@@ -1,5 +1,17 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  ClipboardList,
+  FileText,
+  Image,
+  Phone,
+  Settings2,
+  Sparkles,
+  Wallet,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { BULGARIAN_CITIES_BY_REGION } from "../constants/bulgarianCities";
 import ListingFormStepper from "./ListingFormStepper";
@@ -7,7 +19,6 @@ import AdvancedImageUpload from "./AdvancedImageUpload";
 import FormFieldWithTooltip from "./FormFieldWithTooltip";
 import ListingPreview from "./ListingPreview";
 import ListingQualityIndicator from "./ListingQualityIndicator";
-import type { Scrollbar } from "swiper/modules";
 
 const BRANDS = [
   "Audi", "BMW", "Mercedes-Benz", "Volkswagen", "Opel", "Ford", "Toyota", 
@@ -265,13 +276,15 @@ interface ImageItem {
 
 const PublishPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 30 }, (_, i) => currentYear - i);
 
   const [loading, setLoading] = useState(false);
+  const [loadingListing, setLoadingListing] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [successMessage, setSuccessMessage] = useState("");
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [userListingsCount, setUserListingsCount] = useState(0);
 
   // Check authentication on mount and fetch user's listings count
@@ -304,6 +317,12 @@ const PublishPage: React.FC = () => {
     }
   }, [isAuthenticated, authLoading, navigate]);
 
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
   const [formData, setFormData] = useState({
     mainCategory: "1",
     category: "",
@@ -330,11 +349,16 @@ const PublishPage: React.FC = () => {
     email: "",
     pictures: [] as File[],
     features: [] as string[],
+    listingType: "normal",
   });
 
   const [images, setImages] = useState<ImageItem[]>([]);
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 9;
+  const totalSteps = 8;
+  const formRef = useRef<HTMLFormElement>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingListingId, setEditingListingId] = useState<number | null>(null);
+  const [existingCoverImage, setExistingCoverImage] = useState<string | null>(null);
 
   // Car features/extras
   const CAR_FEATURES = [
@@ -423,15 +447,116 @@ const PublishPage: React.FC = () => {
   };
 
   const completionPercentage = calculateCompletion();
+  const priceSummary = {
+    price: formData.price ? `${formData.price} EUR` : "не е въведена",
+    region: formData.locationCountry ? formData.locationCountry : "не е избран",
+    city:
+      formData.locationCountry === "Извън страната"
+        ? "извън страната"
+        : formData.city
+          ? formData.city
+          : "не е избран",
+  };
+  const coverPreview =
+    images.find((img) => img.isCover)?.preview || existingCoverImage || undefined;
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  useEffect(() => {
+    const editIdParam = searchParams.get("edit");
+    if (!editIdParam) {
+      setIsEditMode(false);
+      setEditingListingId(null);
+      setExistingCoverImage(null);
+      return;
+    }
+
+    if (authLoading || !isAuthenticated) {
+      return;
+    }
+
+    const editId = Number(editIdParam);
+    if (Number.isNaN(editId) || editId <= 0) {
+      setErrors({ submit: "Невалиден идентификатор на обявата." });
+      setIsEditMode(false);
+      setEditingListingId(null);
+      setExistingCoverImage(null);
+      return;
+    }
+
+    setIsEditMode(true);
+    setEditingListingId(editId);
+
+    const fetchListing = async () => {
+      try {
+        setLoadingListing(true);
+        const token = localStorage.getItem("authToken");
+        if (!token) {
+          setErrors({ submit: "Не сте логнати. Моля, влезте отново." });
+          navigate("/auth");
+          return;
+        }
+
+        const response = await fetch(`http://localhost:8000/api/listings/${editId}/`, {
+          headers: {
+            Authorization: `Token ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          setErrors({ submit: "Неуспешно зареждане на обявата за редакция." });
+          return;
+        }
+
+        const data = await response.json();
+
+        setFormData({
+          mainCategory: data.main_category ?? "1",
+          category: data.category ?? "",
+          title: data.title ?? "",
+          brand: data.brand ?? "",
+          model: data.model ?? "",
+          yearFrom: data.year_from ? String(data.year_from) : "",
+          month: data.month ? String(data.month) : "",
+          vin: data.vin ?? "",
+          locationCountry: data.location_country ?? "",
+          locationRegion: data.location_region ?? "",
+          price: data.price ? String(data.price) : "",
+          city: data.city ?? "",
+          fuel: data.fuel ?? "",
+          gearbox: data.gearbox ?? "",
+          mileage: data.mileage ? String(data.mileage) : "",
+          color: data.color ?? "",
+          condition: data.condition ?? "0",
+          power: data.power ? String(data.power) : "",
+          displacement: data.displacement ? String(data.displacement) : "",
+          euroStandard: data.euro_standard ?? "",
+          description: data.description ?? "",
+          phone: data.phone ?? "",
+          email: data.email ?? "",
+          pictures: [],
+          features: Array.isArray(data.features) ? data.features : [],
+          listingType: data.listing_type ?? "normal",
+        });
+
+        setImages([]);
+        setExistingCoverImage(data.image_url || null);
+        setCurrentStep(1);
+      } catch (error) {
+        setErrors({ submit: "Грешка при зареждане на обявата." });
+        console.error("Error loading listing:", error);
+      } finally {
+        setLoadingListing(false);
+      }
+    };
+
+    fetchListing();
+  }, [searchParams, authLoading, isAuthenticated, navigate]);
+
+  const submitListing = async () => {
     setErrors({});
-    setSuccessMessage("");
     setLoading(true);
 
     // Check if user has reached the 3 advert limit
-    if (userListingsCount >= 3) {
+    if (!isEditMode && userListingsCount >= 3) {
       setErrors({
         submit: "Можете да публикувате максимум 3 активни обяви. Моля, изтрийте или архивирайте някоя от вашите обяви, за да добавите нова.",
       });
@@ -444,6 +569,7 @@ const PublishPage: React.FC = () => {
       const formDataToSend = new FormData();
       formDataToSend.append("main_category", formData.mainCategory);
       formDataToSend.append("category", formData.category);
+      formDataToSend.append("listing_type", formData.listingType);
       formDataToSend.append("title", formData.title);
       formDataToSend.append("brand", formData.brand);
       formDataToSend.append("model", formData.model);
@@ -491,13 +617,18 @@ const PublishPage: React.FC = () => {
       }
 
       // Submit to backend
-      const response = await fetch("http://localhost:8000/api/listings/", {
-        method: "POST",
-        headers: {
-          Authorization: `Token ${token}`,
-        },
-        body: formDataToSend,
-      });
+      const response = await fetch(
+        isEditMode && editingListingId
+          ? `http://localhost:8000/api/listings/${editingListingId}/`
+          : "http://localhost:8000/api/listings/",
+        {
+          method: isEditMode ? "PATCH" : "POST",
+          headers: {
+            Authorization: `Token ${token}`,
+          },
+          body: formDataToSend,
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -519,38 +650,64 @@ const PublishPage: React.FC = () => {
         return;
       }
 
-      await response.json();
-      setSuccessMessage("Обявата е успешно публикувана!");
+      const savedListing = await response.json();
 
-      // Reset form
-      setFormData({
-        mainCategory: "1",
-        category: "",
-        title: "",
-        brand: "",
-        model: "",
-        yearFrom: "",
-        month: "",
-        vin: "",
-        locationCountry: "",
-        locationRegion: "",
-        price: "",
-        city: "",
-        fuel: "",
-        gearbox: "",
-        mileage: "",
-        color: "",
-        condition: "0",
-        power: "",
-        displacement: "",
-        euroStandard: "",
-        description: "",
-        phone: "",
-        email: "",
-        pictures: [],
-        features: [],
+      if (isEditMode && editingListingId && images.length > 0) {
+        const imagesData = new FormData();
+        images.forEach((img) => {
+          imagesData.append("images", img.file);
+        });
+        await fetch(`http://localhost:8000/api/listings/${editingListingId}/upload-images/`, {
+          method: "POST",
+          headers: {
+            Authorization: `Token ${token}`,
+          },
+          body: imagesData,
+        });
+      }
+
+      setToast({
+        message: isEditMode
+          ? "Промените са запазени успешно!"
+          : "Обявата е успешно публикувана!",
+        type: "success",
       });
-      setImages([]);
+
+      // Reset form after create
+      if (!isEditMode) {
+        setFormData({
+          mainCategory: "1",
+          category: "",
+          title: "",
+          brand: "",
+          model: "",
+          yearFrom: "",
+          month: "",
+          vin: "",
+          locationCountry: "",
+          locationRegion: "",
+          price: "",
+          city: "",
+          fuel: "",
+          gearbox: "",
+          mileage: "",
+          color: "",
+          condition: "0",
+          power: "",
+          displacement: "",
+          euroStandard: "",
+          description: "",
+          phone: "",
+          email: "",
+          pictures: [],
+          features: [],
+          listingType: "normal",
+        });
+        setImages([]);
+      } else {
+        setImages([]);
+        setExistingCoverImage(savedListing.image_url || existingCoverImage);
+      }
 
       // Redirect to my ads after 2 seconds
       setTimeout(() => {
@@ -564,6 +721,21 @@ const PublishPage: React.FC = () => {
     }
   };
 
+  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (currentStep < totalSteps) {
+      setCurrentStep(Math.min(totalSteps, currentStep + 1));
+    }
+  };
+
+  const handlePublishClick = () => {
+    if (loadingListing) return;
+    const form = formRef.current;
+    if (!form) return;
+    if (!form.reportValidity()) return;
+    submitListing();
+  };
+
   const handleFeatureChange = (feature: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -574,182 +746,460 @@ const PublishPage: React.FC = () => {
   };
 
   const styles: Record<string, React.CSSProperties> = {
-    page: { minHeight: "100vh", background: "#f5f5f5", width: "100%", overflow: "visible" },
-    container: { width: "100%", maxWidth: 1200, margin: "0 auto", padding: "20px", boxSizing: "border-box" },
-    form: { width: "100%", background: "#fff", borderRadius: 8, padding: 24, boxShadow: "0 2px 8px rgba(0,0,0,0.08)", overflow: "visible", boxSizing: "border-box" },
-    title: { fontSize: 24, fontWeight: 700, color: "#333", marginBottom: 24, margin: 0 },
-    section: { marginBottom: 24 },
-    sectionTitle: { fontSize: 16, fontWeight: 600, color: "#333", marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid #e0e0e0", margin: 0 },
-    grid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 },
-    formGroup: { display: "flex", flexDirection: "column", gap: 6 },
-    label: { fontSize: 13, fontWeight: 500, color: "#555" },
-    input: { padding: "10px 12px", border: "1px solid #ccc", borderRadius: 4, fontSize: 14, fontFamily: "inherit", width: "100%", boxSizing: "border-box" },
-    textarea: { padding: "10px 12px", border: "1px solid #ccc", borderRadius: 4, fontSize: 14, fontFamily: "inherit", minHeight: 120, resize: "vertical", width: "100%", boxSizing: "border-box" },
-    fullWidth: { gridColumn: "1 / -1" },
-    button: { padding: "12px 24px", background: "#0066cc", color: "#fff", border: "none", borderRadius: 4, fontSize: 14, fontWeight: 600, cursor: "pointer", width: "100%", boxSizing: "border-box" },
-    note: { fontSize: 12, color: "#666", marginTop: 8, fontStyle: "italic" },
+    page: {
+      minHeight: "100vh",
+      background: "#f3f6fb",
+      width: "100%",
+      overflow: "visible",
+      textAlign: "left",
+      color: "#0f172a",
+    },
+    container: { width: "100%" },
+    form: {
+      width: "100%",
+      background: "#ffffff",
+      borderRadius: 16,
+      padding: 24,
+      border: "1px solid #e2e8f0",
+      boxShadow: "0 12px 30px rgba(15, 23, 42, 0.08)",
+      overflow: "visible",
+      boxSizing: "border-box",
+    },
+    title: { fontSize: 24, fontWeight: 800, color: "#0f172a", margin: 0 },
+    section: {
+      marginBottom: 20,
+      padding: 16,
+      borderRadius: 14,
+      border: "1px solid #e2e8f0",
+      background: "#f8fafc",
+    },
+    sectionTitle: {
+      fontSize: 15,
+      fontWeight: 700,
+      color: "#0f172a",
+      margin: 0,
+      marginBottom: 12,
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+    },
+    input: {
+      padding: "10px 14px",
+      border: "1px solid #e2e8f0",
+      borderRadius: 12,
+      fontSize: 14,
+      fontFamily: "inherit",
+      width: "100%",
+      boxSizing: "border-box",
+      background: "#fff",
+      color: "#0f172a",
+    },
+    textarea: {
+      padding: "10px 14px",
+      border: "1px solid #e2e8f0",
+      borderRadius: 12,
+      fontSize: 14,
+      fontFamily: "inherit",
+      minHeight: 120,
+      resize: "vertical",
+      width: "100%",
+      boxSizing: "border-box",
+      background: "#fff",
+      color: "#0f172a",
+    },
+    note: { fontSize: 12, color: "#64748b", marginTop: 8 },
   };
 
+  const css = `
+    .publish-page {
+      --bg: #f3f6fb;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --primary: #1d4ed8;
+      --primary-2: #0ea5e9;
+      --ring: rgba(59, 130, 246, 0.22);
+      font-family: "Manrope", "Segoe UI", -apple-system, system-ui, sans-serif;
+      color: var(--text);
+      text-align: left;
+    }
+
+    .publish-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 20px 48px;
+    }
+
+    .publish-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .publish-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+    }
+
+    .publish-form {
+      padding: 24px;
+    }
+
+    .publish-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .publish-title {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+    }
+
+    .publish-subtitle {
+      margin: 6px 0 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      margin: 0 0 12px;
+      color: var(--text);
+    }
+
+    .section-icon {
+      color: var(--primary);
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 12px;
+    }
+
+    .feature-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #fff;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+    }
+
+    .feature-card.is-selected {
+      border-color: #93c5fd;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+      background: #f0f7ff;
+    }
+
+    .feature-checkbox {
+      width: 18px;
+      height: 18px;
+      accent-color: #1d4ed8;
+    }
+
+    .feature-card span {
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    .listing-type-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    .listing-type-card {
+      position: relative;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      padding: 16px;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    .listing-type-card.is-selected {
+      border-color: #60a5fa;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
+    }
+
+    .listing-type-card:hover {
+      transform: translateY(-1px);
+    }
+
+    .listing-type-card input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .listing-type-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      margin: 0 0 6px;
+    }
+
+    .listing-type-desc {
+      font-size: 12px;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    .publish-form input:not([type="checkbox"]):not([type="file"]),
+    .publish-form select,
+    .publish-form textarea {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      font-size: 14px;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .publish-form input[type="number"]::-webkit-outer-spin-button,
+    .publish-form input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    .publish-form input[type="number"] {
+      -moz-appearance: textfield;
+      appearance: textfield;
+    }
+
+    .publish-form input:not([type="checkbox"]):not([type="file"]):focus,
+    .publish-form select:focus,
+    .publish-form textarea:focus {
+      outline: none;
+      border-color: #60a5fa !important;
+      box-shadow: 0 0 0 3px var(--ring) !important;
+    }
+
+    .price-summary {
+      margin-top: 8px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px dashed #dbeafe;
+      background: #f8fafc;
+      font-size: 12px;
+      color: #475569;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 12px;
+    }
+
+    .price-summary span {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .price-summary strong {
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    .publish-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+      justify-content: space-between;
+      flex-wrap: wrap;
+    }
+
+    .publish-btn {
+      height: 42px;
+      padding: 0 20px;
+      border-radius: 999px;
+      border: none;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+    }
+
+    .publish-btn.primary {
+      background: linear-gradient(135deg, #2563eb, #0ea5e9);
+      color: #fff;
+      box-shadow: 0 10px 20px rgba(37, 99, 235, 0.35);
+    }
+
+    .publish-btn.secondary {
+      background: #0f172a;
+      color: #fff;
+      box-shadow: 0 10px 20px rgba(15, 23, 42, 0.2);
+    }
+
+    .publish-btn.disabled {
+      background: #cbd5e1;
+      color: #475569;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
+    .publish-btn:hover:not(.disabled) {
+      transform: translateY(-1px);
+    }
+
+    .publish-btn:focus-visible {
+      outline: 3px solid var(--ring);
+      outline-offset: 2px;
+    }
+
+    .publish-alert {
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      border: 1px solid transparent;
+    }
+
+    .publish-alert.error {
+      background: #fef2f2;
+      border-color: #fecaca;
+      color: #b91c1c;
+    }
+
+    .publish-alert.success {
+      background: #ecfdf3;
+      border-color: #bbf7d0;
+      color: #15803d;
+    }
+
+    .publish-alert.info {
+      background: #eff6ff;
+      border-color: #bfdbfe;
+      color: #1d4ed8;
+    }
+
+    .publish-toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 18px;
+      border-radius: 10px;
+      background: #16a34a;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      box-shadow: 0 12px 24px rgba(15, 23, 42, 0.2);
+      z-index: 1400;
+      animation: toastSlide 0.2s ease-out;
+    }
+
+    .publish-toast.error {
+      background: #dc2626;
+    }
+
+    @keyframes toastSlide {
+      from {
+        transform: translateY(-6px);
+        opacity: 0.6;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .publish-aside {
+      position: sticky;
+      top: 88px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    @media (max-width: 960px) {
+      .publish-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .publish-aside {
+        position: static;
+      }
+
+      .publish-actions {
+        flex-direction: column;
+      }
+
+      .publish-btn {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .field-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  `;
+
   return (
-    <div style={styles.page}>
-      <style>{`
-        /* Tablet (768px - 1023px) */
-        @media (min-width: 768px) and (max-width: 1023px) {
-          .publish-container { padding: 16px !important; }
-          .publish-grid { grid-template-columns: 1fr !important; }
-          .publish-form { padding: 20px !important; }
-          .publish-form h1 { font-size: 20px !important; }
-        }
-
-        /* Mobile Large (640px - 767px) */
-        @media (min-width: 640px) and (max-width: 767px) {
-          .publish-container { padding: 12px !important; }
-          .publish-grid { grid-template-columns: 1fr !important; }
-          .publish-form { padding: 16px !important; }
-          .publish-form h1 { font-size: 18px !important; }
-          .publish-form h2 { font-size: 14px !important; }
-        }
-
-        /* Mobile Small (< 640px) */
-        @media (max-width: 639px) {
-          .publish-container { padding: 8px !important; }
-          .publish-grid { grid-template-columns: 1fr !important; }
-          .publish-form { padding: 12px !important; }
-          .publish-form h1 { font-size: 18px !important; margin-bottom: 16px !important; }
-          .publish-form h2 { font-size: 13px !important; }
-          .publish-form label { font-size: 12px !important; }
-          .publish-form input, .publish-form select, .publish-form textarea { font-size: 13px !important; padding: 8px 10px !important; }
-          .publish-form button { padding: 10px 16px !important; font-size: 13px !important; }
-        }
-      `}</style>
+    <div style={styles.page} className="publish-page">
+      <style>{css}</style>
+      {toast && (
+        <div className={`publish-toast ${toast.type}`}>{toast.message}</div>
+      )}
       <div style={styles.container} className="publish-container">
-        <style>{`
-          /* Features table responsive styles */
-          .features-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 10px auto;
-          }
-
-          .features-table td {
-            vertical-align: top;
-            padding-right: 20px;
-            border-right: 1px solid #e0e0e0;
-          }
-
-          /* Desktop (1201px+) - 4 columns */
-          @media (min-width: 1201px) {
-            .features-table td {
-              width: 25%;
-              padding-right: 20px;
-            }
-          }
-
-          /* Tablet Large (1024px - 1200px) - 2 columns */
-          @media (min-width: 1024px) and (max-width: 1200px) {
-            .features-table td {
-              width: 50%;
-              padding-right: 15px;
-              border-right: 1px solid #e0e0e0;
-            }
-            .features-table td:nth-child(odd) {
-              border-right: 1px solid #e0e0e0;
-            }
-            .features-table td:nth-child(even) {
-              border-right: none;
-            }
-          }
-
-          /* Tablet (768px - 1023px) - 2 columns */
-          @media (min-width: 768px) and (max-width: 1023px) {
-            .features-table td {
-              width: 50%;
-              padding-right: 15px;
-            }
-            .features-table td:nth-child(odd) {
-              border-right: 1px solid #e0e0e0;
-            }
-            .features-table td:nth-child(even) {
-              border-right: none;
-            }
-          }
-
-          /* Mobile Large (640px - 767px) - 1 column */
-          @media (min-width: 640px) and (max-width: 767px) {
-            .features-table {
-              display: block;
-            }
-            .features-table tbody {
-              display: block;
-            }
-            .features-table tr {
-              display: block;
-            }
-            .features-table td {
-              display: block;
-              width: 100% !important;
-              padding: 12px 0 !important;
-              border-right: none !important;
-              border-bottom: 1px solid #e0e0e0;
-            }
-            .features-table td:last-child {
-              border-bottom: none;
-            }
-          }
-
-          /* Mobile Small (< 640px) - 1 column */
-          @media (max-width: 639px) {
-            .features-table {
-              display: block;
-            }
-            .features-table tbody {
-              display: block;
-            }
-            .features-table tr {
-              display: block;
-            }
-            .features-table td {
-              display: block;
-              width: 100% !important;
-              padding: 12px 0 !important;
-              border-right: none !important;
-              border-bottom: 1px solid #e0e0e0;
-            }
-            .features-table td:last-child {
-              border-bottom: none;
-            }
-          }
-        `}</style>
-        <form style={styles.form} className="publish-form" onSubmit={handleSubmit}>
-          <h1 style={styles.title}>Публикуване на обява</h1>
+        <div className="publish-layout">
+          <form
+            style={styles.form}
+            className="publish-form publish-card"
+            onSubmit={handleFormSubmit}
+            ref={formRef}
+          >
+            <div className="publish-heading">
+              <div>
+                <h1 style={styles.title} className="publish-title">
+                  {isEditMode ? "Редактиране на обява" : "Публикуване на обява"}
+                </h1>
+                <p className="publish-subtitle">
+                  {isEditMode
+                    ? "Променете нужните полета и запазете обявата."
+                    : "Попълнете данните стъпка по стъпка за по-добра видимост."}
+                </p>
+              </div>
+            </div>
 
           {/* Error Message */}
           {errors.submit && (
-            <div style={{
-              color: "#d32f2f",
-              fontSize: 13,
-              marginBottom: 16,
-              padding: "10px 12px",
-              background: "#ffebee",
-              borderRadius: 4,
-              border: "1px solid #ffcdd2"
-            }}>
-              {errors.submit}
-            </div>
+            <div className="publish-alert error">{errors.submit}</div>
           )}
 
-          {/* Success Message */}
-          {successMessage && (
-            <div style={{
-              color: "#2e7d32",
-              fontSize: 13,
-              marginBottom: 16,
-              padding: "10px 12px",
-              background: "#e8f5e9",
-              borderRadius: 4,
-              border: "1px solid #a5d6a7"
-            }}>
-              {successMessage}
+          {/* Edit Mode */}
+          {isEditMode && (
+            <div className="publish-alert info">
+              Режим редакция: промените се запазват върху текущата обява.
             </div>
           )}
 
@@ -758,34 +1208,66 @@ const PublishPage: React.FC = () => {
             currentStep={currentStep}
             totalSteps={totalSteps}
             steps={[
-              { id: 1, label: "Основна информация", icon: "📋", description: "Марка, модел, година" },
-              { id: 2, label: "Детайли", icon: "⚙️", description: "Гориво, пробег" },
-              { id: 3, label: "Цена & Локация", icon: "💰", description: "Цена, град" },
-              { id: 4, label: "Снимки", icon: "📸", description: "Качи снимки" },
-              { id: 5, label: "Екстри", icon: "✨", description: "Опции и екстри" },
-              { id: 6, label: "Описание", icon: "📝", description: "Описание" },
-              { id: 7, label: "Контакт", icon: "📞", description: "Телефон" },
-              { id: 8, label: "Преглед", icon: "👁️", description: "Преглед" },
+              {
+                id: 1,
+                label: "Основна информация",
+                icon: <ClipboardList size={16} />,
+                description: "Марка, модел, година",
+              },
+              {
+                id: 2,
+                label: "Детайли",
+                icon: <Settings2 size={16} />,
+                description: "Гориво, пробег",
+              },
+              {
+                id: 3,
+                label: "Цена & Локация",
+                icon: <Wallet size={16} />,
+                description: "Цена, град",
+              },
+              {
+                id: 4,
+                label: "Снимки",
+                icon: <Image size={16} />,
+                description: "Качи снимки",
+              },
+              {
+                id: 5,
+                label: "Екстри",
+                icon: <Sparkles size={16} />,
+                description: "Опции и екстри",
+              },
+              {
+                id: 6,
+                label: "Описание",
+                icon: <FileText size={16} />,
+                description: "Описание",
+              },
+              {
+                id: 7,
+                label: "Контакт",
+                icon: <Phone size={16} />,
+                description: "Телефон",
+              },
+              {
+                id: 8,
+                label: "Тип обява",
+                icon: <Sparkles size={16} />,
+                description: "Топ или нормална",
+              },
             ]}
             onStepClick={setCurrentStep}
             completedSteps={Array.from({ length: currentStep - 1 }, (_, i) => i + 1)}
           />
 
-          {/* Quality Indicator */}
-          <ListingQualityIndicator
-            completionPercentage={completionPercentage}
-            tips={[
-              { id: "images", title: "Добри снимки", description: "Качи поне 3 снимки", icon: "📸", completed: images.length >= 3 },
-              { id: "description", title: "Подробно описание", description: "Напиши поне 50 символа", icon: "📝", completed: formData.description.length >= 50 },
-              { id: "price", title: "Конкурентна цена", description: "Задай реалистична цена", icon: "💰", completed: !!formData.price },
-              { id: "contact", title: "Контактна информация", description: "Добави телефон и имейл", icon: "📞", completed: !!formData.phone && !!formData.email },
-            ]}
-          />
-
           {/* Picture Upload */}
           {currentStep === 4 && (
             <div style={styles.section}>
-              <h2 style={styles.sectionTitle}>📸 Снимки на автомобила</h2>
+              <h2 style={styles.sectionTitle} className="section-title">
+                <Image size={18} className="section-icon" />
+                Снимки на автомобила
+              </h2>
               <AdvancedImageUpload images={images} onImagesChange={setImages} maxImages={15} />
             </div>
           )}
@@ -793,8 +1275,11 @@ const PublishPage: React.FC = () => {
           {/* Step 1: Basic Info */}
           {currentStep === 1 && (
             <div style={styles.section}>
-              <h2 style={styles.sectionTitle}>📋 Основна информация</h2>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <h2 style={styles.sectionTitle} className="section-title">
+                <ClipboardList size={18} className="section-icon" />
+                Основна информация
+              </h2>
+              <div className="field-grid">
                 <FormFieldWithTooltip label="Марка" required tooltip="Производител на автомобила" example="BMW, Mercedes">
                   <select style={styles.input} name="brand" value={formData.brand} onChange={handleChange} required>
                     <option value="">Избери марка</option>
@@ -843,8 +1328,11 @@ const PublishPage: React.FC = () => {
           {/* Step 2: Car Details */}
           {currentStep === 2 && (
             <div style={styles.section}>
-              <h2 style={styles.sectionTitle}>⚙️ Детайли на автомобила</h2>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <h2 style={styles.sectionTitle} className="section-title">
+                <Settings2 size={18} className="section-icon" />
+                Детайли на автомобила
+              </h2>
+              <div className="field-grid">
                 <FormFieldWithTooltip label="Гориво" required tooltip="Тип на горивото" example="Бензин, Дизел">
                   <select style={styles.input} name="fuel" value={formData.fuel} onChange={handleChange}>
                     <option value="">Избери гориво</option>
@@ -874,10 +1362,24 @@ const PublishPage: React.FC = () => {
           {/* Step 3: Price & Location */}
           {currentStep === 3 && (
             <div style={styles.section}>
-              <h2 style={styles.sectionTitle}>💰 Цена и локация</h2>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <h2 style={styles.sectionTitle} className="section-title">
+                <Wallet size={18} className="section-icon" />
+                Цена и локация
+              </h2>
+              <div className="field-grid">
                 <FormFieldWithTooltip label="Цена (EUR)" required tooltip="Цена на автомобила" example="5000, 10000">
                   <input style={styles.input} type="number" name="price" placeholder="Въведи цена" min="0" step="0.01" value={formData.price} onChange={handleChange} required />
+                  <div className="price-summary">
+                    <span>
+                      <strong>Цена:</strong> {priceSummary.price}
+                    </span>
+                    <span>
+                      <strong>Регион:</strong> {priceSummary.region}
+                    </span>
+                    <span>
+                      <strong>Град:</strong> {priceSummary.city}
+                    </span>
+                  </div>
                 </FormFieldWithTooltip>
 
                 <FormFieldWithTooltip label="Местоположение - Регион" required tooltip="Регион, където се намира автомобилът">
@@ -910,18 +1412,28 @@ const PublishPage: React.FC = () => {
           {/* Step 5: Features/Extras */}
           {currentStep === 5 && (
             <div style={styles.section}>
-              <h2 style={styles.sectionTitle}>✨ Екстри и опции</h2>
-              <p style={{ color: "#666", marginBottom: 16, fontSize: 14 }}>Избери всички екстри и опции, които има автомобилът</p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
+              <h2 style={styles.sectionTitle} className="section-title">
+                <Sparkles size={18} className="section-icon" />
+                Екстри и опции
+              </h2>
+              <p style={{ color: "#64748b", marginBottom: 16, fontSize: 14 }}>
+                Избери всички екстри и опции, които има автомобилът
+              </p>
+              <div className="feature-grid">
                 {CAR_FEATURES.map((feature) => (
-                  <label key={feature} style={{ display: "flex", alignItems: "center", cursor: "pointer", padding: "8px 12px", borderRadius: 6, border: "1px solid #e0e0e0", backgroundColor: formData.features.includes(feature) ? "#e3f2fd" : "#fff", transition: "all 0.2s" }}>
+                  <label
+                    key={feature}
+                    className={`feature-card ${
+                      formData.features.includes(feature) ? "is-selected" : ""
+                    }`}
+                  >
                     <input
                       type="checkbox"
                       checked={formData.features.includes(feature)}
                       onChange={() => handleFeatureChange(feature)}
-                      style={{ marginRight: 8, cursor: "pointer", width: 18, height: 18 }}
+                      className="feature-checkbox"
                     />
-                    <span style={{ fontSize: 14, color: "#333" }}>{feature}</span>
+                    <span>{feature}</span>
                   </label>
                 ))}
               </div>
@@ -931,7 +1443,10 @@ const PublishPage: React.FC = () => {
           {/* Step 6: Description */}
           {currentStep === 6 && (
             <div style={styles.section}>
-              <h2 style={styles.sectionTitle}>📝 Описание на обявата</h2>
+              <h2 style={styles.sectionTitle} className="section-title">
+                <FileText size={18} className="section-icon" />
+                Описание на обявата
+              </h2>
               <FormFieldWithTooltip
                 label="Описание"
                 required
@@ -954,8 +1469,11 @@ const PublishPage: React.FC = () => {
           {/* Step 7: Contact */}
           {currentStep === 7 && (
             <div style={styles.section}>
-              <h2 style={styles.sectionTitle}>📞 Контактна информация</h2>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <h2 style={styles.sectionTitle} className="section-title">
+                <Phone size={18} className="section-icon" />
+                Контактна информация
+              </h2>
+              <div className="field-grid">
                 <FormFieldWithTooltip
                   label="Телефон"
                   required
@@ -992,87 +1510,155 @@ const PublishPage: React.FC = () => {
             </div>
           )}
 
-          {/* Step 8: Preview */}
+          {/* Step 8: Listing Type */}
           {currentStep === 8 && (
             <div style={styles.section}>
-              <h2 style={styles.sectionTitle}>👁️ Преглед на обявата</h2>
-              <ListingPreview
-                title={`${formData.brand} ${formData.model}`}
-                brand={formData.brand}
-                model={formData.model}
-                year={formData.yearFrom}
-                price={formData.price}
-                city={formData.city}
-                mileage={formData.mileage}
-                fuel={formData.fuel}
-                gearbox={formData.gearbox}
-                coverImage={images.find((img) => img.isCover)?.preview}
-                description={formData.description}
-                completionPercentage={completionPercentage}
-              />
+              <h2 style={styles.sectionTitle} className="section-title">
+                <Sparkles size={18} className="section-icon" />
+                Тип обява
+              </h2>
+              <p style={{ color: "#64748b", marginBottom: 16, fontSize: 14 }}>
+                Избери дали обявата да е нормална или топ за по-голяма видимост.
+              </p>
+              <div className="listing-type-grid">
+                <label
+                  className={`listing-type-card ${
+                    formData.listingType === "normal" ? "is-selected" : ""
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="listingType"
+                    value="normal"
+                    checked={formData.listingType === "normal"}
+                    onChange={handleChange}
+                  />
+                  <h3 className="listing-type-title">Нормална обява</h3>
+                  <p className="listing-type-desc">
+                    Стандартно публикуване без допълнително позициониране.
+                  </p>
+                </label>
+
+                <label
+                  className={`listing-type-card ${
+                    formData.listingType === "top" ? "is-selected" : ""
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="listingType"
+                    value="top"
+                    checked={formData.listingType === "top"}
+                    onChange={handleChange}
+                  />
+                  <h3 className="listing-type-title">Топ обява</h3>
+                  <p className="listing-type-desc">
+                    Приоритетна видимост и изкарване по-напред в резултатите.
+                  </p>
+                </label>
+              </div>
             </div>
           )}
 
           {/* Navigation Buttons */}
-          <div style={{ display: "flex", gap: 12, marginTop: 24, justifyContent: "space-between" }}>
+          <div className="publish-actions">
             <button
               type="button"
               onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
               disabled={currentStep === 1}
-              style={{
-                padding: "12px 24px",
-                background: currentStep === 1 ? "#ccc" : "#666",
-                color: "#fff",
-                border: "none",
-                borderRadius: 6,
-                cursor: currentStep === 1 ? "not-allowed" : "pointer",
-                fontWeight: 600,
-                fontSize: 14,
-              }}
+              className={`publish-btn secondary ${
+                currentStep === 1 ? "disabled" : ""
+              }`}
             >
-              ← Назад
+              <ArrowLeft size={16} />
+              Назад
             </button>
 
             {currentStep === 8 ? (
               <button
-                type="submit"
-                disabled={loading}
-                style={{
-                  padding: "12px 24px",
-                  background: loading ? "#ccc" : "#0066cc",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 6,
-                  cursor: loading ? "not-allowed" : "pointer",
-                  fontWeight: 600,
-                  fontSize: 14,
-                }}
+                type="button"
+                onClick={handlePublishClick}
+                disabled={loading || loadingListing}
+                className={`publish-btn primary ${loading ? "disabled" : ""}`}
               >
-                {loading ? "Публикуване..." : "✓ Публикувай обява"}
+                {loading ? (
+                  isEditMode ? "Запазване..." : "Публикуване..."
+                ) : (
+                  <>
+                    <Check size={16} />
+                    {isEditMode ? "Запази промените" : "Публикувай обява"}
+                  </>
+                )}
               </button>
             ) : (
               <button
                 type="button"
-                onClick={() => setCurrentStep(Math.min(8, currentStep + 1))}
-                style={{
-                  padding: "12px 24px",
-                  background: "#0066cc",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  fontWeight: 600,
-                  fontSize: 14,
-                }}
+                onClick={() =>
+                  setCurrentStep(Math.min(totalSteps, currentStep + 1))
+                }
+                className="publish-btn primary"
               >
-                Напред →
+                Напред
+                <ArrowRight size={16} />
               </button>
             )}
           </div>
 
           <p style={styles.note}>* Задължителни полета</p>
         </form>
+        <aside className="publish-aside">
+          <ListingQualityIndicator
+            completionPercentage={completionPercentage}
+            tips={[
+              {
+                id: "images",
+                title: "Добри снимки",
+                description: "Качи поне 3 снимки",
+                icon: <Image size={16} />,
+                completed: images.length >= 3,
+              },
+              {
+                id: "description",
+                title: "Подробно описание",
+                description: "Напиши поне 50 символа",
+                icon: <FileText size={16} />,
+                completed: formData.description.length >= 50,
+              },
+              {
+                id: "price",
+                title: "Конкурентна цена",
+                description: "Задай реалистична цена",
+                icon: <Wallet size={16} />,
+                completed: !!formData.price,
+              },
+              {
+                id: "contact",
+                title: "Контактна информация",
+                description: "Добави телефон и имейл",
+                icon: <Phone size={16} />,
+                completed: !!formData.phone && !!formData.email,
+              },
+            ]}
+          />
+          <ListingPreview
+            variant="compact"
+            title={`${formData.brand} ${formData.model}`}
+            brand={formData.brand}
+            model={formData.model}
+            year={formData.yearFrom}
+            price={formData.price}
+            city={formData.city}
+            mileage={formData.mileage}
+            fuel={formData.fuel}
+            gearbox={formData.gearbox}
+            coverImage={coverPreview}
+            description={formData.description}
+            completionPercentage={completionPercentage}
+            listingType={formData.listingType}
+          />
+        </aside>
       </div>
+    </div>
     </div>
   );
 };

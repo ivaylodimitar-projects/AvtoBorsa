@@ -1,10 +1,17 @@
 import React from "react";
+import {
+  AlertTriangle,
+  BadgeCheck,
+  CheckCircle2,
+  CircleDot,
+  Sparkles,
+} from "lucide-react";
 
 interface QualityTip {
   id: string;
   title: string;
   description: string;
-  icon: string;
+  icon: React.ReactNode;
   completed: boolean;
 }
 
@@ -18,11 +25,19 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
   tips,
 }) => {
   const getQualityLevel = (percentage: number) => {
-    if (percentage < 25) return { label: "Начало", color: "#ff6b6b", emoji: "🔴" };
-    if (percentage < 50) return { label: "Добре", color: "#ffa500", emoji: "🟠" };
-    if (percentage < 75) return { label: "Много добре", color: "#ffd700", emoji: "🟡" };
-    if (percentage < 100) return { label: "Отлично", color: "#90ee90", emoji: "🟢" };
-    return { label: "Перфектно", color: "#00cc00", emoji: "✅" };
+    if (percentage < 25) {
+      return { label: "Начало", color: "#ef4444", icon: <AlertTriangle size={18} /> };
+    }
+    if (percentage < 50) {
+      return { label: "Добре", color: "#f59e0b", icon: <CircleDot size={18} /> };
+    }
+    if (percentage < 75) {
+      return { label: "Много добре", color: "#facc15", icon: <Sparkles size={18} /> };
+    }
+    if (percentage < 100) {
+      return { label: "Отлично", color: "#22c55e", icon: <CheckCircle2 size={18} /> };
+    }
+    return { label: "Перфектно", color: "#16a34a", icon: <BadgeCheck size={18} /> };
   };
 
   const quality = getQualityLevel(completionPercentage);
@@ -30,11 +45,11 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
 
   const styles: Record<string, React.CSSProperties> = {
     container: {
-      background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
-      borderRadius: 8,
+      background: "linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)",
+      borderRadius: 16,
       padding: "20px",
-      marginBottom: 24,
-      border: "1px solid #e0e0e0",
+      border: "1px solid #e2e8f0",
+      boxShadow: "0 12px 24px rgba(15, 23, 42, 0.08)",
     },
     header: {
       display: "flex",
@@ -43,8 +58,8 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
       marginBottom: 16,
     },
     qualityCircle: {
-      width: 80,
-      height: 80,
+      width: 84,
+      height: 84,
       borderRadius: "50%",
       background: quality.color,
       display: "flex",
@@ -53,15 +68,19 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
       justifyContent: "center",
       color: "#fff",
       fontWeight: 700,
-      boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+      boxShadow: "0 10px 18px rgba(15, 23, 42, 0.2)",
+      gap: 4,
     },
     percentage: {
-      fontSize: 28,
-      fontWeight: 700,
+      fontSize: 24,
+      fontWeight: 800,
+      lineHeight: 1,
     },
     label: {
       fontSize: 11,
-      fontWeight: 600,
+      fontWeight: 700,
+      textTransform: "uppercase",
+      letterSpacing: 0.4,
     },
     info: {
       flex: 1,
@@ -69,19 +88,22 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
     infoTitle: {
       fontSize: 16,
       fontWeight: 700,
-      color: "#333",
+      color: "#0f172a",
       marginBottom: 4,
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
     },
     infoText: {
       fontSize: 13,
-      color: "#666",
-      marginBottom: 8,
+      color: "#475569",
+      marginBottom: 10,
     },
     progressBar: {
       width: "100%",
       height: 8,
-      background: "#e0e0e0",
-      borderRadius: 4,
+      background: "#e2e8f0",
+      borderRadius: 999,
       overflow: "hidden",
     },
     progressFill: {
@@ -96,7 +118,7 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
     tipsTitle: {
       fontSize: 13,
       fontWeight: 700,
-      color: "#333",
+      color: "#0f172a",
       marginBottom: 12,
     },
     tipsList: {
@@ -107,32 +129,39 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
     tip: {
       padding: "12px",
       background: "#fff",
-      borderRadius: 6,
-      border: "1px solid #e0e0e0",
+      borderRadius: 12,
+      border: "1px solid #e2e8f0",
       display: "flex",
-      gap: 8,
+      gap: 10,
       alignItems: "flex-start",
     },
     tipCompleted: {
-      background: "#f1f8f4",
-      borderColor: "#a5d6a7",
+      background: "#f0fdf4",
+      borderColor: "#bbf7d0",
     },
     tipIcon: {
-      fontSize: 18,
-      minWidth: 24,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      width: 28,
+      height: 28,
+      borderRadius: 8,
+      background: "#eef2ff",
+      color: "#1d4ed8",
+      flexShrink: 0,
     },
     tipContent: {
       flex: 1,
     },
     tipTitle: {
       fontSize: 12,
-      fontWeight: 600,
-      color: "#333",
-      marginBottom: 2,
+      fontWeight: 700,
+      color: "#0f172a",
+      marginBottom: 4,
     },
     tipDescription: {
       fontSize: 11,
-      color: "#666",
+      color: "#64748b",
     },
   };
 
@@ -140,15 +169,16 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
     <div style={styles.container}>
       <div style={styles.header}>
         <div style={styles.qualityCircle}>
+          {quality.icon}
           <div style={styles.percentage}>{completionPercentage}%</div>
           <div style={styles.label}>{quality.label}</div>
         </div>
         <div style={styles.info}>
           <div style={styles.infoTitle}>
-            {quality.emoji} Качество на обявата
+            Качество на обявата
           </div>
           <div style={styles.infoText}>
-            Завършили сте {completedTips} от {tips.length} препоръки за подобрение
+            Завършени са {completedTips} от {tips.length} препоръки.
           </div>
           <div style={styles.progressBar}>
             <div style={styles.progressFill} />
@@ -158,7 +188,7 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
 
       {tips.length > 0 && (
         <div style={styles.tipsContainer}>
-          <div style={styles.tipsTitle}>💡 Съвети за подобрение:</div>
+          <div style={styles.tipsTitle}>Съвети за подобрение</div>
           <div style={styles.tipsList}>
             {tips.map((tip) => (
               <div
@@ -168,7 +198,7 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
                   ...(tip.completed ? styles.tipCompleted : {}),
                 }}
               >
-                <div style={styles.tipIcon}>{tip.completed ? "✓" : tip.icon}</div>
+                <div style={styles.tipIcon}>{tip.icon}</div>
                 <div style={styles.tipContent}>
                   <div style={styles.tipTitle}>{tip.title}</div>
                   <div style={styles.tipDescription}>{tip.description}</div>
@@ -183,4 +213,3 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
 };
 
 export default ListingQualityIndicator;
-

@@ -30,6 +30,23 @@ type CarListing = {
   created_at: string;
   seller_name?: string;
   seller_type?: string;
+  listing_type?: "top" | "normal" | string | number;
+  listing_type_display?: string;
+  is_top?: boolean;
+  is_top_listing?: boolean;
+  is_top_ad?: boolean;
+};
+
+const isTopListing = (listing: CarListing) => {
+  if (listing.is_top || listing.is_top_listing || listing.is_top_ad) return true;
+  const numericType = Number(listing.listing_type);
+  if (!Number.isNaN(numericType) && numericType === 1) return true;
+  const rawType = (listing.listing_type || "").toString().toLowerCase().trim();
+  if (["top", "top_ad", "top_listing", "topad", "toplisting"].includes(rawType)) {
+    return true;
+  }
+  const display = (listing.listing_type_display || "").toString().toLowerCase();
+  return display.includes("топ");
 };
 
 const SearchPage: React.FC = () => {
@@ -133,8 +150,12 @@ const SearchPage: React.FC = () => {
     }
   };
 
-  // Results are already filtered by backend, no need for client-side filtering
-  const results = listings;
+  // Results are already filtered by backend, but we keep "top" listings first
+  const results = useMemo(() => {
+    const topListings = listings.filter(isTopListing);
+    const normalListings = listings.filter((listing) => !isTopListing(listing));
+    return [...topListings, ...normalListings];
+  }, [listings]);
 
   // Build search criteria display
   const searchCriteriaDisplay = useMemo(() => {
@@ -207,7 +228,8 @@ const SearchPage: React.FC = () => {
     item: { background: "#fff", borderRadius: 8, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.08)", display: "flex", cursor: "pointer", transition: "all 0.3s", position: "relative" as const },
     itemPhoto: { width: 280, height: 210, background: "linear-gradient(135deg, #e0e0e0 0%, #d0d0d0 100%)", flexShrink: 0, position: "relative" as const, overflow: "hidden" },
     itemImage: { width: "100%", height: "100%", objectFit: "cover" },
-    itemPhotoOverlay: { position: "absolute" as const, top: 0, right: 0, bottom: 0, left: 0, display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 12, background: "linear-gradient(to top, rgba(0,0,0,0.4), transparent)" },
+    itemPhotoOverlay: { position: "absolute" as const, top: 0, right: 0, bottom: 0, left: 0, display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 12, background: "linear-gradient(to top, rgba(0,0,0,0.4), transparent)", zIndex: 1 },
+    topBadge: { position: "absolute" as const, top: 12, left: 12, background: "linear-gradient(135deg, #f59e0b, #f97316)", color: "#fff", padding: "6px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase" as const, boxShadow: "0 6px 14px rgba(249, 115, 22, 0.35)", zIndex: 2 },
     favoriteButton: { background: "rgba(255,255,255,0.95)", border: "none", borderRadius: "50%", width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s", padding: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" },
     itemText: { flex: 1, padding: 20, display: "flex", flexDirection: "column" as const, justifyContent: "space-between", position: "relative" as const },
     itemHeader: { marginBottom: 16, paddingTop: 36 },
@@ -271,6 +293,9 @@ const SearchPage: React.FC = () => {
                 }}
               >
                 <div style={styles.itemPhoto}>
+                  {isTopListing(listing) && (
+                    <div style={styles.topBadge}>Топ обява</div>
+                  )}
                   {listing.image_url ? (
                     <>
                       <img src={listing.image_url} alt={`${listing.brand} ${listing.model}`} style={styles.itemImage} />

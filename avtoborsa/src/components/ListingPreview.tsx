@@ -1,4 +1,5 @@
 import React from "react";
+import { CheckCircle2, ImageOff } from "lucide-react";
 
 interface ListingPreviewProps {
   title: string;
@@ -13,6 +14,8 @@ interface ListingPreviewProps {
   coverImage?: string;
   description: string;
   completionPercentage: number;
+  variant?: "full" | "compact";
+  listingType?: "top" | "normal" | string;
 }
 
 const ListingPreview: React.FC<ListingPreviewProps> = ({
@@ -28,118 +31,158 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
   coverImage,
   description,
   completionPercentage,
+  variant = "full",
+  listingType = "normal",
 }) => {
+  const isCompact = variant === "compact";
+
+  const baseTitle = title?.trim() || `${brand} ${model}`.trim();
+  const heading = year ? `${baseTitle} (${year})` : baseTitle;
+
+  const specs = [
+    { label: "Година", value: year },
+    { label: "Пробег", value: mileage ? `${mileage} км` : "" },
+    { label: "Гориво", value: fuel },
+    { label: "Скоростна кутия", value: gearbox },
+    { label: "Град", value: city },
+  ].filter((spec) => spec.value);
+
+  const visibleSpecs = isCompact ? specs.slice(0, 3) : specs;
+
   const styles: Record<string, React.CSSProperties> = {
     container: {
       background: "#fff",
-      borderRadius: 8,
-      border: "1px solid #e0e0e0",
+      borderRadius: 16,
+      border: "1px solid #e2e8f0",
       overflow: "hidden",
-      boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+      boxShadow: "0 12px 24px rgba(15, 23, 42, 0.08)",
     },
     header: {
-      background: "#f9f9f9",
-      padding: "16px",
-      borderBottom: "1px solid #e0e0e0",
+      background: "#f8fafc",
+      padding: isCompact ? "12px 14px" : "16px",
+      borderBottom: "1px solid #e2e8f0",
     },
     title: {
-      fontSize: 16,
+      fontSize: isCompact ? 14 : 16,
       fontWeight: 700,
-      color: "#333",
+      color: "#0f172a",
       marginBottom: 8,
+    },
+    completionRow: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      fontSize: 12,
+      color: "#64748b",
+      marginTop: 6,
     },
     completionBar: {
       width: "100%",
       height: 6,
-      background: "#e0e0e0",
-      borderRadius: 3,
+      background: "#e2e8f0",
+      borderRadius: 999,
       overflow: "hidden",
+      marginTop: 6,
     },
     completionFill: {
       height: "100%",
-      background: "linear-gradient(90deg, #0066cc, #0052a3)",
+      background: "linear-gradient(90deg, #1d4ed8, #0ea5e9)",
       width: `${completionPercentage}%`,
       transition: "width 0.3s ease",
     },
-    completionText: {
-      fontSize: 12,
-      color: "#666",
-      marginTop: 6,
-    },
     content: {
-      padding: "16px",
+      padding: isCompact ? "12px 14px" : "16px",
     },
     imageContainer: {
       width: "100%",
-      height: 200,
-      background: "#f5f5f5",
-      borderRadius: 6,
+      height: isCompact ? 150 : 220,
+      background: "#f1f5f9",
+      borderRadius: 12,
       overflow: "hidden",
       marginBottom: 16,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
+      position: "relative" as const,
     },
     image: {
       width: "100%",
       height: "100%",
       objectFit: "cover" as const,
     },
+    topBadge: {
+      position: "absolute" as const,
+      top: 12,
+      left: 12,
+      padding: "6px 10px",
+      borderRadius: 999,
+      background: "linear-gradient(135deg, #f59e0b, #f97316)",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: 0.4,
+      textTransform: "uppercase" as const,
+      boxShadow: "0 6px 14px rgba(249, 115, 22, 0.35)",
+    },
     noImage: {
-      fontSize: 40,
-      color: "#ccc",
+      color: "#94a3b8",
+      display: "flex",
+      flexDirection: "column" as const,
+      alignItems: "center",
+      gap: 8,
+      fontSize: 12,
     },
     specs: {
       display: "grid",
-      gridTemplateColumns: "1fr 1fr",
-      gap: 12,
+      gridTemplateColumns: isCompact ? "1fr" : "1fr 1fr",
+      gap: 10,
       marginBottom: 16,
     },
     spec: {
-      padding: "12px",
-      background: "#f9f9f9",
-      borderRadius: 6,
-      border: "1px solid #e0e0e0",
+      padding: "10px 12px",
+      background: "#f8fafc",
+      borderRadius: 10,
+      border: "1px solid #e2e8f0",
     },
     specLabel: {
       fontSize: 11,
-      color: "#999",
-      fontWeight: 600,
+      color: "#94a3b8",
+      fontWeight: 700,
       textTransform: "uppercase",
       marginBottom: 4,
     },
     specValue: {
       fontSize: 14,
       fontWeight: 600,
-      color: "#333",
+      color: "#0f172a",
     },
     price: {
-      fontSize: 20,
-      fontWeight: 700,
-      color: "#0066cc",
-      marginBottom: 16,
-      padding: "12px",
-      background: "#f0f7ff",
-      borderRadius: 6,
+      fontSize: isCompact ? 18 : 20,
+      fontWeight: 800,
+      color: "#1d4ed8",
+      marginBottom: 14,
+      padding: "10px",
+      background: "#eef2ff",
+      borderRadius: 10,
       textAlign: "center" as const,
     },
     description: {
       fontSize: 13,
-      color: "#666",
+      color: "#475569",
       lineHeight: 1.5,
       padding: "12px",
-      background: "#fafafa",
-      borderRadius: 6,
-      maxHeight: 120,
+      background: "#f8fafc",
+      borderRadius: 10,
+      maxHeight: isCompact ? 90 : 140,
       overflow: "hidden",
       textOverflow: "ellipsis",
     },
     footer: {
-      padding: "16px",
-      background: "#f9f9f9",
-      borderTop: "1px solid #e0e0e0",
+      padding: "12px 16px",
+      background: "#f8fafc",
+      borderTop: "1px solid #e2e8f0",
       fontSize: 12,
-      color: "#999",
+      color: "#94a3b8",
       textAlign: "center" as const,
     },
   };
@@ -147,80 +190,52 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <div style={styles.title}>
-          {brand} {model} {year && `(${year})`}
-        </div>
+        <div style={styles.title}>{heading}</div>
         <div style={styles.completionBar}>
-          <div
-            style={styles.completionFill}
-          />
+          <div style={styles.completionFill} />
         </div>
-        <div style={styles.completionText}>
-          ✓ Обявата е {completionPercentage}% завършена
+        <div style={styles.completionRow}>
+          <CheckCircle2 size={14} />
+          <span>Обявата е {completionPercentage}% завършена</span>
         </div>
       </div>
 
       <div style={styles.content}>
-        {coverImage ? (
-          <div style={styles.imageContainer}>
+        <div style={styles.imageContainer}>
+          {listingType === "top" && <div style={styles.topBadge}>Топ обява</div>}
+          {coverImage ? (
             <img src={coverImage} alt="Cover" style={styles.image} />
-          </div>
-        ) : (
-          <div style={styles.imageContainer}>
-            <div style={styles.noImage}>📸</div>
-          </div>
-        )}
-
-        <div style={styles.price}>
-          €{price || "0"}
+          ) : (
+            <div style={styles.noImage}>
+              <ImageOff size={32} />
+              <span>Няма снимка</span>
+            </div>
+          )}
         </div>
+
+        <div style={styles.price}>€{price || "0"}</div>
 
         <div style={styles.specs}>
-          {year && (
-            <div style={styles.spec}>
-              <div style={styles.specLabel}>Година</div>
-              <div style={styles.specValue}>{year}</div>
+          {visibleSpecs.map((spec) => (
+            <div key={spec.label} style={styles.spec}>
+              <div style={styles.specLabel}>{spec.label}</div>
+              <div style={styles.specValue}>{spec.value}</div>
             </div>
-          )}
-          {mileage && (
-            <div style={styles.spec}>
-              <div style={styles.specLabel}>Пробег</div>
-              <div style={styles.specValue}>{mileage} км</div>
-            </div>
-          )}
-          {fuel && (
-            <div style={styles.spec}>
-              <div style={styles.specLabel}>Гориво</div>
-              <div style={styles.specValue}>{fuel}</div>
-            </div>
-          )}
-          {gearbox && (
-            <div style={styles.spec}>
-              <div style={styles.specLabel}>Скоростна кутия</div>
-              <div style={styles.specValue}>{gearbox}</div>
-            </div>
-          )}
-          {city && (
-            <div style={styles.spec}>
-              <div style={styles.specLabel}>Град</div>
-              <div style={styles.specValue}>{city}</div>
-            </div>
-          )}
+          ))}
         </div>
 
-        {description && (
-          <div style={styles.description}>
-            {description}
-          </div>
+        {!isCompact && description && (
+          <div style={styles.description}>{description}</div>
         )}
       </div>
 
-      <div style={styles.footer}>
-        Това е как ще изглежда вашата обява за потребителите
-      </div>
+      {!isCompact && (
+        <div style={styles.footer}>
+          Това е как ще изглежда вашата обява за потребителите
+        </div>
+      )}
     </div>
   );
 };
 
 export default ListingPreview;
-

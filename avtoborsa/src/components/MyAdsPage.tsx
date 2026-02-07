@@ -44,6 +44,8 @@ interface CarListing {
   created_at: string;
   is_archived: boolean;
   is_draft: boolean;
+  listing_type?: "top" | "normal" | string;
+  listing_type_display?: string;
 }
 
 interface Favorite {
@@ -52,7 +54,7 @@ interface Favorite {
   created_at: string;
 }
 
-type TabType = "active" | "archived" | "drafts" | "liked";
+type TabType = "active" | "archived" | "drafts" | "liked" | "top";
 
 const MyAdsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -270,11 +272,18 @@ const MyAdsPage: React.FC = () => {
     marginBottom: 32,
     boxShadow: "0 4px 12px rgba(102, 126, 234, 0.15)", // Лека сянка
   },
+  headerRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+    flexWrap: "wrap",
+    marginBottom: 12,
+  },
   titleContainer: {
     display: "flex",
     alignItems: "center",
     gap: 16,
-    marginBottom: 12,
   },
   titleIcon: {
     color: "#fff",
@@ -339,6 +348,22 @@ const MyAdsPage: React.FC = () => {
     boxShadow: "0 4px 12px rgba(102, 126, 234, 0.3)",
     transition: "all 0.2s",
   },
+  addButton: {
+    padding: "12px 20px",
+    background: "rgba(255, 255, 255, 0.15)",
+    color: "#fff",
+    border: "1px solid rgba(255, 255, 255, 0.35)",
+    borderRadius: 999,
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    transition: "all 0.2s",
+    boxShadow: "0 6px 16px rgba(15, 23, 42, 0.15)",
+    backdropFilter: "blur(6px)",
+  },
   tabsContainer: {
     display: "flex",
     gap: 12,
@@ -394,6 +419,7 @@ const MyAdsPage: React.FC = () => {
     boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
     transition: "all 0.3s ease",
     cursor: "pointer",
+    position: "relative",
   },
   listingCardHover: {
     transform: "translateY(-8px)",
@@ -404,6 +430,21 @@ const MyAdsPage: React.FC = () => {
     height: "220px",
     objectFit: "cover",
     background: "#f5f5f5",
+  },
+  topBadge: {
+    position: "absolute" as const,
+    top: 12,
+    left: 12,
+    padding: "6px 10px",
+    borderRadius: 999,
+    background: "linear-gradient(135deg, #f59e0b, #f97316)",
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: 0.4,
+    textTransform: "uppercase" as const,
+    boxShadow: "0 6px 14px rgba(249, 115, 22, 0.35)",
+    zIndex: 2,
   },
   listingContent: {
     padding: "20px",
@@ -479,19 +520,43 @@ const MyAdsPage: React.FC = () => {
   },
 };
 
-
+  const renderHeader = (subtitleText: string, showAddButton: boolean) => (
+    <div style={styles.header}>
+      <div style={styles.headerRow}>
+        <div style={styles.titleContainer}>
+          <List size={32} style={styles.titleIcon} />
+          <h1 style={styles.title}>Моите Обяви</h1>
+        </div>
+        {showAddButton && (
+          <button
+            type="button"
+            style={styles.addButton}
+            onClick={() => navigate("/publish")}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow = "0 10px 22px rgba(15, 23, 42, 0.2)";
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.22)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "0 6px 16px rgba(15, 23, 42, 0.15)";
+              e.currentTarget.style.background = "rgba(255, 255, 255, 0.15)";
+            }}
+          >
+            <FileText size={18} />
+            Добави обява
+          </button>
+        )}
+      </div>
+      <p style={styles.subtitle}>{subtitleText}</p>
+    </div>
+  );
 
   if (!isAuthenticated) {
     return (
       <div style={styles.page}>
         <div style={styles.container}>
-          <div style={styles.header}>
-            <div style={styles.titleContainer}>
-              <List size={32} style={styles.titleIcon} />
-              <h1 style={styles.title}>Моите Обяви</h1>
-            </div>
-            <p style={styles.subtitle}>Твоите публикувани автомобили</p>
-          </div>
+          {renderHeader("Твоите публикувани автомобили", false)}
           <div style={styles.emptyState}>
             <div style={styles.emptyIconWrapper}>
               <Lock size={40} style={styles.emptyIcon} />
@@ -525,13 +590,7 @@ const MyAdsPage: React.FC = () => {
     return (
       <div style={styles.page}>
         <div style={styles.container}>
-          <div style={styles.header}>
-            <div style={styles.titleContainer}>
-              <List size={32} style={styles.titleIcon} />
-              <h1 style={styles.title}>Моите Обяви</h1>
-            </div>
-            <p style={styles.subtitle}>Твоите публикувани автомобили</p>
-          </div>
+          {renderHeader("Твоите публикувани автомобили", true)}
           <div style={styles.loadingState}>
             <p>Зареждане...</p>
           </div>
@@ -544,13 +603,7 @@ const MyAdsPage: React.FC = () => {
     return (
       <div style={styles.page}>
         <div style={styles.container}>
-          <div style={styles.header}>
-            <div style={styles.titleContainer}>
-              <List size={32} style={styles.titleIcon} />
-              <h1 style={styles.title}>Моите Обяви</h1>
-            </div>
-            <p style={styles.subtitle}>Твоите публикувани автомобили</p>
-          </div>
+          {renderHeader("Твоите публикувани автомобили", true)}
           <div style={styles.errorState}>
             <p>Грешка: {error}</p>
           </div>
@@ -564,6 +617,8 @@ const MyAdsPage: React.FC = () => {
     switch (activeTab) {
       case "active":
         return activeListings;
+      case "top":
+        return activeListings.filter((listing) => listing.listing_type === "top");
       case "archived":
         return archivedListings;
       case "drafts":
@@ -577,18 +632,13 @@ const MyAdsPage: React.FC = () => {
 
   const currentListings = getCurrentListings();
   const totalListings = activeListings.length + archivedListings.length + draftListings.length + likedListings.length;
+  const topListingsCount = activeListings.filter((listing) => listing.listing_type === "top").length;
 
   if (totalListings === 0) {
     return (
       <div style={styles.page}>
         <div style={styles.container}>
-          <div style={styles.header}>
-            <div style={styles.titleContainer}>
-              <List size={32} style={styles.titleIcon} />
-              <h1 style={styles.title}>Моите Обяви</h1>
-            </div>
-            <p style={styles.subtitle}>Твоите публикувани автомобили</p>
-          </div>
+          {renderHeader("Твоите публикувани автомобили", true)}
 
           <div style={styles.emptyState}>
             <div style={styles.emptyIconWrapper}>
@@ -622,15 +672,7 @@ const MyAdsPage: React.FC = () => {
   return (
     <div style={styles.page}>
       <div style={styles.container}>
-        <div style={styles.header}>
-          <div style={styles.titleContainer}>
-            <List size={32} style={styles.titleIcon} />
-            <h1 style={styles.title}>Моите Обяви</h1>
-          </div>
-          <p style={styles.subtitle}>
-            Твоите публикувани автомобили ({totalListings})
-          </p>
-        </div>
+        {renderHeader(`Твоите публикувани автомобили (${totalListings})`, true)}
 
         {/* Toast Notification */}
         {toast && (
@@ -654,6 +696,7 @@ const MyAdsPage: React.FC = () => {
         <div style={styles.tabsContainer}>
           {[
             { id: "active", label: "Активни", Icon: List, count: activeListings.length },
+            { id: "top", label: "Топ обяви", Icon: PackageOpen, count: topListingsCount },
             { id: "archived", label: "Архивирани", Icon: Archive, count: archivedListings.length },
             { id: "drafts", label: "Чернови", Icon: FileText, count: draftListings.length },
             { id: "liked", label: "Любими", Icon: Heart, count: likedListings.length },
@@ -696,23 +739,26 @@ const MyAdsPage: React.FC = () => {
           <div style={styles.emptyState}>
             <div style={styles.emptyIconWrapper}>
               {activeTab === "active" && <Inbox size={40} style={styles.emptyIcon} />}
+              {activeTab === "top" && <PackageOpen size={40} style={styles.emptyIcon} />}
               {activeTab === "archived" && <PackageOpen size={40} style={styles.emptyIcon} />}
               {activeTab === "drafts" && <FileText size={40} style={styles.emptyIcon} />}
               {activeTab === "liked" && <Heart size={40} style={styles.emptyIcon} />}
             </div>
             <p style={styles.emptyText}>
               {activeTab === "active" && "Нямаш активни обяви"}
+              {activeTab === "top" && "Нямаш топ обяви"}
               {activeTab === "archived" && "Нямаш архивирани обяви"}
               {activeTab === "drafts" && "Нямаш чернови обяви"}
               {activeTab === "liked" && "Нямаш любими обяви"}
             </p>
             <p style={styles.emptySubtext}>
               {activeTab === "active" && "Публикувай нова обява, за да я видиш тук"}
+              {activeTab === "top" && "Маркирай обява като топ, за да се появи тук"}
               {activeTab === "archived" && "Архивирани обяви ще се появят тук"}
               {activeTab === "drafts" && "Начни да пишеш нова обява"}
               {activeTab === "liked" && "Добави обяви в любими"}
             </p>
-            {activeTab === "active" && (
+            {(activeTab === "active" || activeTab === "top") && (
               <a
                 href="/publish"
                 style={styles.ctaButton}
@@ -746,6 +792,9 @@ const MyAdsPage: React.FC = () => {
                   "0 2px 8px rgba(0,0,0,0.08)";
               }}
             >
+              {listing.listing_type === "top" && (
+                <div style={styles.topBadge}>Топ обява</div>
+              )}
               {listing.image_url ? (
                 <img
                   src={listing.image_url}
@@ -790,10 +839,14 @@ const MyAdsPage: React.FC = () => {
 
                 <div style={styles.listingActions}>
                   {/* Active Tab Actions: Edit, Archive, Delete */}
-                  {activeTab === "active" && (
+                  {(activeTab === "active" || activeTab === "top") && (
                     <>
                       <button
                         style={{ ...styles.actionButton, ...styles.editButton }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/publish?edit=${listing.id}`);
+                        }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.transform = "translateY(-2px)";
                           e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.4)";
@@ -938,6 +991,10 @@ const MyAdsPage: React.FC = () => {
                     <>
                       <button
                         style={{ ...styles.actionButton, ...styles.editButton }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/publish?edit=${listing.id}`);
+                        }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.background = "#0052a3";
                         }}

@@ -48,6 +48,11 @@ class CarListing(models.Model):
         ('6', 'Евро 6'),
     ]
 
+    LISTING_TYPE_CHOICES = [
+        ('normal', 'Нормална'),
+        ('top', 'Топ'),
+    ]
+
     MAIN_CATEGORY_CHOICES = [
         ('1', 'Автомобили и Джипове'),
         ('w', 'Гуми и джанти'),
@@ -109,6 +114,7 @@ class CarListing(models.Model):
     is_draft = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     is_archived = models.BooleanField(default=False)
+    listing_type = models.CharField(max_length=10, choices=LISTING_TYPE_CHOICES, default='normal')
 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
