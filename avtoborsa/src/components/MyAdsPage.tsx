@@ -1,6 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Archive, Trash2, Edit2, ArchiveRestore, Heart } from "lucide-react";
+import {
+  Archive,
+  Trash2,
+  Edit2,
+  ArchiveRestore,
+  Heart,
+  List,
+  FileText,
+  Lock,
+  Inbox,
+  Car,
+  PackageOpen
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 interface CarListing {
@@ -248,128 +260,207 @@ const MyAdsPage: React.FC = () => {
     container: {
       maxWidth: 1200,
       margin: "0 auto",
-      padding: "20px",
+      padding: "32px 20px",
       boxSizing: "border-box",
     },
     header: {
-      background: "#fff",
-      padding: "20px",
-      borderRadius: 8,
-      marginBottom: 20,
-      boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+      padding: "32px",
+      borderRadius: 16,
+      marginBottom: 32,
+      boxShadow: "0 8px 24px rgba(102, 126, 234, 0.25)",
+    },
+    titleContainer: {
+      display: "flex",
+      alignItems: "center",
+      gap: 16,
+      marginBottom: 12,
+    },
+    titleIcon: {
+      color: "#fff",
     },
     title: {
-      fontSize: 28,
-      fontWeight: 700,
-      color: "#333",
+      fontSize: 32,
+      fontWeight: 800,
+      color: "#fff",
       margin: 0,
-      marginBottom: 8,
     },
     subtitle: {
-      fontSize: 14,
-      color: "#666",
+      fontSize: 15,
+      color: "rgba(255, 255, 255, 0.9)",
       margin: 0,
+      fontWeight: 500,
     },
     emptyState: {
       background: "#fff",
-      padding: "40px 20px",
-      borderRadius: 8,
+      padding: "64px 32px",
+      borderRadius: 16,
       textAlign: "center",
-      boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+      boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+    },
+    emptyIconWrapper: {
+      width: 80,
+      height: 80,
+      margin: "0 auto 24px",
+      borderRadius: "50%",
+      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
     },
     emptyIcon: {
-      fontSize: 48,
-      marginBottom: 16,
+      color: "#fff",
     },
     emptyText: {
-      fontSize: 16,
-      color: "#666",
-      marginBottom: 8,
+      fontSize: 20,
+      fontWeight: 700,
+      color: "#333",
+      marginBottom: 12,
     },
     emptySubtext: {
-      fontSize: 14,
-      color: "#999",
+      fontSize: 15,
+      color: "#666",
+      lineHeight: 1.6,
     },
     ctaButton: {
-      marginTop: 16,
-      padding: "12px 24px",
-      background: "#0066cc",
+      marginTop: 24,
+      padding: "14px 32px",
+      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
       color: "#fff",
       border: "none",
-      borderRadius: 6,
-      fontSize: 14,
-      fontWeight: 600,
+      borderRadius: 8,
+      fontSize: 15,
+      fontWeight: 700,
       cursor: "pointer",
       textDecoration: "none",
-      display: "inline-block",
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 8,
+      boxShadow: "0 4px 12px rgba(102, 126, 234, 0.3)",
+      transition: "all 0.2s",
+    },
+    tabsContainer: {
+      display: "flex",
+      gap: 12,
+      marginBottom: 32,
+      flexWrap: "wrap",
+    },
+    tab: {
+      padding: "12px 24px",
+      background: "#fff",
+      color: "#666",
+      border: "2px solid #e0e0e0",
+      borderRadius: 12,
+      fontSize: 15,
+      fontWeight: 600,
+      cursor: "pointer",
+      transition: "all 0.2s",
+      whiteSpace: "nowrap",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+    },
+    tabActive: {
+      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+      color: "#fff",
+      border: "2px solid transparent",
+      boxShadow: "0 4px 12px rgba(102, 126, 234, 0.3)",
+    },
+    tabBadge: {
+      background: "rgba(255, 255, 255, 0.3)",
+      color: "#fff",
+      padding: "2px 8px",
+      borderRadius: 10,
+      fontSize: 12,
+      fontWeight: 700,
+    },
+    tabBadgeInactive: {
+      background: "#f0f0f0",
+      color: "#666",
+      padding: "2px 8px",
+      borderRadius: 10,
+      fontSize: 12,
+      fontWeight: 700,
     },
     listingsGrid: {
       display: "grid",
-      gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-      gap: "20px",
+      gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+      gap: 24,
     },
     listingCard: {
       background: "#fff",
-      borderRadius: 8,
+      borderRadius: 16,
       overflow: "hidden",
-      boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-      transition: "transform 0.2s, box-shadow 0.2s",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+      transition: "all 0.3s ease",
       cursor: "pointer",
     },
     listingCardHover: {
-      transform: "translateY(-4px)",
-      boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+      transform: "translateY(-8px)",
+      boxShadow: "0 12px 32px rgba(102, 126, 234, 0.2)",
     },
     listingImage: {
       width: "100%",
-      height: "200px",
+      height: "220px",
       objectFit: "cover",
-      background: "#f0f0f0",
+      background: "#f5f5f5",
     },
     listingContent: {
-      padding: "16px",
+      padding: "20px",
     },
     listingTitle: {
-      fontSize: 16,
-      fontWeight: 600,
-      color: "#333",
-      margin: "0 0 8px 0",
-    },
-    listingPrice: {
       fontSize: 18,
       fontWeight: 700,
-      color: "#0066cc",
-      margin: "8px 0",
+      color: "#333",
+      margin: "0 0 12px 0",
+      lineHeight: 1.3,
+    },
+    listingPrice: {
+      fontSize: 22,
+      fontWeight: 800,
+      color: "#667eea",
+      margin: "12px 0",
     },
     listingDetails: {
-      fontSize: 13,
+      fontSize: 14,
       color: "#666",
-      margin: "4px 0",
+      margin: "8px 0",
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
     },
     listingActions: {
       display: "flex",
-      gap: "8px",
-      marginTop: "12px",
-      paddingTop: "12px",
-      borderTop: "1px solid #eee",
+      gap: 8,
+      marginTop: 16,
+      paddingTop: 16,
+      borderTop: "2px solid #f0f0f0",
+      flexWrap: "wrap",
     },
     actionButton: {
       flex: 1,
-      padding: "8px 12px",
+      padding: "10px 16px",
       border: "none",
-      borderRadius: 4,
-      fontSize: 12,
-      fontWeight: 600,
+      borderRadius: 8,
+      fontSize: 13,
+      fontWeight: 700,
       cursor: "pointer",
-      transition: "background-color 0.2s",
+      transition: "all 0.2s",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      minWidth: "fit-content",
     },
     editButton: {
-      background: "#0066cc",
+      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
       color: "#fff",
+      boxShadow: "0 2px 8px rgba(102, 126, 234, 0.3)",
     },
     deleteButton: {
-      background: "#f0f0f0",
+      background: "#f5f5f5",
       color: "#d32f2f",
+      border: "2px solid #ffcdd2",
     },
     loadingState: {
       background: "#fff",
@@ -393,16 +484,33 @@ const MyAdsPage: React.FC = () => {
       <div style={styles.page}>
         <div style={styles.container}>
           <div style={styles.header}>
-            <h1 style={styles.title}>📋 Моите Обяви</h1>
+            <div style={styles.titleContainer}>
+              <List size={32} style={styles.titleIcon} />
+              <h1 style={styles.title}>Моите Обяви</h1>
+            </div>
             <p style={styles.subtitle}>Твоите публикувани автомобили</p>
           </div>
           <div style={styles.emptyState}>
-            <div style={styles.emptyIcon}>🔐</div>
+            <div style={styles.emptyIconWrapper}>
+              <Lock size={40} style={styles.emptyIcon} />
+            </div>
             <p style={styles.emptyText}>Трябва да си логнат</p>
             <p style={styles.emptySubtext}>
               Логни се, за да видиш твоите обяви
             </p>
-            <a href="/auth" style={styles.ctaButton}>
+            <a
+              href="/auth"
+              style={styles.ctaButton}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 6px 20px rgba(102, 126, 234, 0.4)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.3)";
+              }}
+            >
+              <Lock size={18} />
               Логни се
             </a>
           </div>
@@ -416,7 +524,10 @@ const MyAdsPage: React.FC = () => {
       <div style={styles.page}>
         <div style={styles.container}>
           <div style={styles.header}>
-            <h1 style={styles.title}>📋 Моите Обяви</h1>
+            <div style={styles.titleContainer}>
+              <List size={32} style={styles.titleIcon} />
+              <h1 style={styles.title}>Моите Обяви</h1>
+            </div>
             <p style={styles.subtitle}>Твоите публикувани автомобили</p>
           </div>
           <div style={styles.loadingState}>
@@ -432,7 +543,10 @@ const MyAdsPage: React.FC = () => {
       <div style={styles.page}>
         <div style={styles.container}>
           <div style={styles.header}>
-            <h1 style={styles.title}>📋 Моите Обяви</h1>
+            <div style={styles.titleContainer}>
+              <List size={32} style={styles.titleIcon} />
+              <h1 style={styles.title}>Моите Обяви</h1>
+            </div>
             <p style={styles.subtitle}>Твоите публикувани автомобили</p>
           </div>
           <div style={styles.errorState}>
@@ -467,17 +581,34 @@ const MyAdsPage: React.FC = () => {
       <div style={styles.page}>
         <div style={styles.container}>
           <div style={styles.header}>
-            <h1 style={styles.title}>📋 Моите Обяви</h1>
+            <div style={styles.titleContainer}>
+              <List size={32} style={styles.titleIcon} />
+              <h1 style={styles.title}>Моите Обяви</h1>
+            </div>
             <p style={styles.subtitle}>Твоите публикувани автомобили</p>
           </div>
 
           <div style={styles.emptyState}>
-            <div style={styles.emptyIcon}>📭</div>
+            <div style={styles.emptyIconWrapper}>
+              <Inbox size={40} style={styles.emptyIcon} />
+            </div>
             <p style={styles.emptyText}>Нямаш публикувани обяви</p>
             <p style={styles.emptySubtext}>
               Публикувай първата си обява и я управлявай от тук
             </p>
-            <a href="/publish" style={styles.ctaButton}>
+            <a
+              href="/publish"
+              style={styles.ctaButton}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 6px 20px rgba(102, 126, 234, 0.4)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.3)";
+              }}
+            >
+              <FileText size={18} />
               Публикувай обява
             </a>
           </div>
@@ -490,7 +621,10 @@ const MyAdsPage: React.FC = () => {
     <div style={styles.page}>
       <div style={styles.container}>
         <div style={styles.header}>
-          <h1 style={styles.title}>📋 Моите Обяви</h1>
+          <div style={styles.titleContainer}>
+            <List size={32} style={styles.titleIcon} />
+            <h1 style={styles.title}>Моите Обяви</h1>
+          </div>
           <p style={styles.subtitle}>
             Твоите публикувани автомобили ({totalListings})
           </p>
@@ -515,57 +649,54 @@ const MyAdsPage: React.FC = () => {
         )}
 
         {/* Tabs */}
-        <div style={{
-          display: "flex",
-          gap: "0",
-          marginBottom: "20px",
-          borderBottom: "2px solid #e0e0e0",
-          overflowX: "auto",
-        }}>
+        <div style={styles.tabsContainer}>
           {[
-            { id: "active", label: "Активни", icon: "📋", count: activeListings.length },
-            { id: "archived", label: "Архивирани", icon: "📦", count: archivedListings.length },
-            { id: "drafts", label: "Чернови", icon: "📝", count: draftListings.length },
-            { id: "liked", label: "Любими", icon: "❤️", count: likedListings.length },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as TabType)}
-              style={{
-                padding: "12px 20px",
-                background: activeTab === tab.id ? "#0066cc" : "transparent",
-                color: activeTab === tab.id ? "#fff" : "#666",
-                border: "none",
-                borderBottom: activeTab === tab.id ? "3px solid #0066cc" : "none",
-                fontSize: "14px",
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "all 0.2s",
-                whiteSpace: "nowrap",
-              }}
-              onMouseEnter={(e) => {
-                if (activeTab !== tab.id) {
-                  e.currentTarget.style.color = "#0066cc";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (activeTab !== tab.id) {
-                  e.currentTarget.style.color = "#666";
-                }
-              }}
-            >
-              {tab.icon} {tab.label} ({tab.count})
-            </button>
-          ))}
+            { id: "active", label: "Активни", Icon: List, count: activeListings.length },
+            { id: "archived", label: "Архивирани", Icon: Archive, count: archivedListings.length },
+            { id: "drafts", label: "Чернови", Icon: FileText, count: draftListings.length },
+            { id: "liked", label: "Любими", Icon: Heart, count: likedListings.length },
+          ].map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as TabType)}
+                style={{
+                  ...styles.tab,
+                  ...(isActive ? styles.tabActive : {}),
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = "#f5f5f5";
+                    e.currentTarget.style.borderColor = "#667eea";
+                    e.currentTarget.style.color = "#667eea";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = "#fff";
+                    e.currentTarget.style.borderColor = "#e0e0e0";
+                    e.currentTarget.style.color = "#666";
+                  }
+                }}
+              >
+                <tab.Icon size={18} />
+                {tab.label}
+                <span style={isActive ? styles.tabBadge : styles.tabBadgeInactive}>
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {currentListings.length === 0 ? (
           <div style={styles.emptyState}>
-            <div style={styles.emptyIcon}>
-              {activeTab === "active" && "📭"}
-              {activeTab === "archived" && "📦"}
-              {activeTab === "drafts" && "📝"}
-              {activeTab === "liked" && "❤️"}
+            <div style={styles.emptyIconWrapper}>
+              {activeTab === "active" && <Inbox size={40} style={styles.emptyIcon} />}
+              {activeTab === "archived" && <PackageOpen size={40} style={styles.emptyIcon} />}
+              {activeTab === "drafts" && <FileText size={40} style={styles.emptyIcon} />}
+              {activeTab === "liked" && <Heart size={40} style={styles.emptyIcon} />}
             </div>
             <p style={styles.emptyText}>
               {activeTab === "active" && "Нямаш активни обяви"}
@@ -580,7 +711,19 @@ const MyAdsPage: React.FC = () => {
               {activeTab === "liked" && "Добави обяви в любими"}
             </p>
             {activeTab === "active" && (
-              <a href="/publish" style={styles.ctaButton}>
+              <a
+                href="/publish"
+                style={styles.ctaButton}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow = "0 6px 20px rgba(102, 126, 234, 0.4)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.3)";
+                }}
+              >
+                <FileText size={18} />
                 Публикувай обява
               </a>
             )}
@@ -614,11 +757,10 @@ const MyAdsPage: React.FC = () => {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    background: "#f0f0f0",
-                    fontSize: 48,
+                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                   }}
                 >
-                  🚗
+                  <Car size={60} color="#fff" />
                 </div>
               )}
 
@@ -651,13 +793,15 @@ const MyAdsPage: React.FC = () => {
                       <button
                         style={{ ...styles.actionButton, ...styles.editButton }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.background = "#0052a3";
+                          e.currentTarget.style.transform = "translateY(-2px)";
+                          e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.4)";
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.background = "#0066cc";
+                          e.currentTarget.style.transform = "translateY(0)";
+                          e.currentTarget.style.boxShadow = "0 2px 8px rgba(102, 126, 234, 0.3)";
                         }}
                       >
-                        <Edit2 size={14} style={{ marginRight: "4px" }} />
+                        <Edit2 size={14} />
                         Редактирай
                       </button>
 
@@ -670,19 +814,20 @@ const MyAdsPage: React.FC = () => {
                           color: "#fff",
                           opacity: actionLoading === listing.id ? 0.6 : 1,
                           cursor: actionLoading === listing.id ? "not-allowed" : "pointer",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "4px",
+                          boxShadow: "0 2px 8px rgba(245, 158, 11, 0.3)",
                         }}
                         onMouseEnter={(e) => {
                           if (actionLoading !== listing.id) {
                             e.currentTarget.style.background = "#d97706";
+                            e.currentTarget.style.transform = "translateY(-2px)";
+                            e.currentTarget.style.boxShadow = "0 4px 12px rgba(245, 158, 11, 0.4)";
                           }
                         }}
                         onMouseLeave={(e) => {
                           if (actionLoading !== listing.id) {
                             e.currentTarget.style.background = "#f59e0b";
+                            e.currentTarget.style.transform = "translateY(0)";
+                            e.currentTarget.style.boxShadow = "0 2px 8px rgba(245, 158, 11, 0.3)";
                           }
                         }}
                       >

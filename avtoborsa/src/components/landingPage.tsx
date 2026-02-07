@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { CAR_FEATURES } from "../constants/carFeatures";
 import { AdvancedSearch } from "./AdvancedSearch";
+import { useRecentSearches } from "../hooks/useRecentSearches";
+import { useSavedSearches } from "../hooks/useSavedSearches";
 
 type Fuel = "Бензин" | "Дизел" | "Газ/Бензин" | "Хибрид" | "Електро";
 type Gearbox = "Ръчна" | "Автоматик";
@@ -113,6 +115,9 @@ const selectBase: React.CSSProperties = {
 };
 
 export default function LandingPage() {
+  const { searches } = useRecentSearches();
+  const { savedSearches } = useSavedSearches();
+
   // filters
   const [category, setCategory] = useState<string>("1");
   const [brand, setBrand] = useState<string>("");
@@ -336,6 +341,8 @@ export default function LandingPage() {
               brands={BRANDS}
               models={MODELS}
               categories={CATEGORIES}
+              recentSearches={searches}
+              savedSearches={savedSearches}
             />
 
             {/* OLD FORM - REPLACED WITH ADVANCEDSEARCH */}
@@ -680,7 +687,7 @@ export default function LandingPage() {
       <footer style={styles.footer}>
         <div style={styles.footerInner} className="footer-grid">
           <div style={styles.footerCol}>
-            <div style={styles.footerBrand}>AvtoBorsa.bg</div>
+            <div style={styles.footerBrand}>Kar.bg</div>
             <div style={styles.footerText}>
               Модерен маркетплейс за авто обяви. Бързо търсене, лесно публикуване, удобен UX.
             </div>
@@ -701,7 +708,7 @@ export default function LandingPage() {
         </div>
 
         <div style={styles.footerBottom}>
-          © {new Date().getFullYear()} AvtoBorsa.bg — demo UI
+          © {new Date().getFullYear()} Kar.bg — demo UI
         </div>
       </footer>
     </div>
@@ -1096,6 +1103,7 @@ const globalCss = `
   select option { color: #333; background: #fff; }
   .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12) !important; }
   .categoryCard:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important; }
+  [role="button"]:focus-visible { outline: 2px solid #0066cc; outline-offset: 2px; }
 
   /* Desktop (1200px+) */
   @media (min-width: 1201px) {
