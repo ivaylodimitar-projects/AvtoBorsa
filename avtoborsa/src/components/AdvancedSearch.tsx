@@ -165,7 +165,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       border-radius: 16px;
       padding: 28px 24px 24px;
       box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1.5px 6px rgba(0,0,0,0.04);
-      max-width: 900px;
+      max-width: 95%;
       margin: 0 auto;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
@@ -267,6 +267,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       align-items: center;
       gap: 16px;
       margin-top: 2px;
+      justify-content: right;
     }
     .adv-search-btn {
       display: inline-flex;
@@ -284,6 +285,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       transition: transform 0.15s, box-shadow 0.2s;
       box-shadow: 0 2px 8px rgba(37,99,235,0.3);
       letter-spacing: 0.02em;
+      
     }
     .adv-search-btn:hover {
       transform: translateY(-1px);
@@ -541,10 +543,6 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
 
         {/* ACTION ROW — Search button + Detailed Search link */}
         <div className="adv-action-row">
-          <button type="submit" className="adv-search-btn">
-            <Search size={18} style={{ marginRight: 8 }} />
-            Търси обяви
-          </button>
           <button
             type="button"
             className="adv-detailed-link"
@@ -560,6 +558,12 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
             />
             Детайлно търсене
           </button>
+
+          <button type="submit" className="adv-search-btn">
+            <Search size={18} style={{ marginRight: 8 }} />
+            Търси обяви
+          </button>
+          
         </div>
 
         {/* ADVANCED / DETAILED FILTERS */}
