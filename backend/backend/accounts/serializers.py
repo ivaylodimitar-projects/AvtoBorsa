@@ -96,3 +96,52 @@ class UserBalanceSerializer(serializers.ModelSerializer):
         model = UserProfile
         fields = ['balance']
 
+
+class DealerListSerializer(serializers.ModelSerializer):
+    """Serializer for listing dealers on the dealers page"""
+    listing_count = serializers.SerializerMethodField()
+    profile_image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BusinessUser
+        fields = [
+            'id', 'dealer_name', 'city', 'phone', 'email',
+            'profile_image_url', 'listing_count', 'created_at',
+        ]
+
+    def get_listing_count(self, obj):
+        return obj.user.car_listings.filter(is_active=True, is_draft=False, is_archived=False).count()
+
+    def get_profile_image_url(self, obj):
+        if obj.profile_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.profile_image.url)
+            return obj.profile_image.url
+        return None
+
+
+class DealerDetailSerializer(serializers.ModelSerializer):
+    """Full dealer info for the detail page"""
+    listing_count = serializers.SerializerMethodField()
+    profile_image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BusinessUser
+        fields = [
+            'id', 'dealer_name', 'city', 'address', 'phone', 'email', 'website',
+            'company_name', 'description', 'about_text',
+            'profile_image_url', 'listing_count', 'created_at',
+        ]
+
+    def get_listing_count(self, obj):
+        return obj.user.car_listings.filter(is_active=True, is_draft=False, is_archived=False).count()
+
+    def get_profile_image_url(self, obj):
+        if obj.profile_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.profile_image.url)
+            return obj.profile_image.url
+        return None
+

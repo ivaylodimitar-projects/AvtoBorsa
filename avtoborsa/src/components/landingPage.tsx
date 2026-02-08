@@ -1,8 +1,43 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { CAR_FEATURES } from "../constants/carFeatures";
 import { AdvancedSearch } from "./AdvancedSearch";
 import { useRecentSearches } from "../hooks/useRecentSearches";
 import { useSavedSearches } from "../hooks/useSavedSearches";
+
+type CarListing = {
+  id: number;
+  slug: string;
+  brand: string;
+  model: string;
+  year_from: number;
+  price: number;
+  mileage: number;
+  fuel: string;
+  fuel_display: string;
+  gearbox: string;
+  gearbox_display: string;
+  power: number;
+  city: string;
+  image_url?: string;
+  is_active: boolean;
+  created_at: string;
+  listing_type?: "top" | "normal" | string | number;
+  listing_type_display?: string;
+  is_top?: boolean;
+  is_top_listing?: boolean;
+  is_top_ad?: boolean;
+};
+
+const isTopListing = (listing: CarListing) => {
+  if (listing.is_top || listing.is_top_listing || listing.is_top_ad) return true;
+  const numericType = Number(listing.listing_type);
+  if (!Number.isNaN(numericType) && numericType === 1) return true;
+  const rawType = (listing.listing_type || "").toString().toLowerCase().trim();
+  if (["top", "top_ad", "top_listing", "topad", "toplisting"].includes(rawType)) return true;
+  const display = (listing.listing_type_display || "").toString().toLowerCase();
+  return display.includes("топ");
+};
 
 type Fuel = "Бензин" | "Дизел" | "Газ/Бензин" | "Хибрид" | "Електро";
 type Gearbox = "Ръчна" | "Автоматик";
@@ -115,8 +150,37 @@ const selectBase: React.CSSProperties = {
 };
 
 export default function LandingPage() {
+  const navigate = useNavigate();
   const { searches } = useRecentSearches();
   const { savedSearches } = useSavedSearches();
+
+  // Latest listings
+  const [latestListings, setLatestListings] = useState<CarListing[]>([]);
+  const [listingsLoading, setListingsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLatest = async () => {
+      try {
+        const response = await fetch("http://localhost:8000/api/listings/?limit=16");
+        if (!response.ok) throw new Error("Failed to fetch");
+        const data = await response.json();
+        const all: CarListing[] = Array.isArray(data) ? data : (data.results || []);
+        // Sort: TOP first, then by created_at descending
+        const sorted = [...all].sort((a, b) => {
+          const aTop = isTopListing(a) ? 1 : 0;
+          const bTop = isTopListing(b) ? 1 : 0;
+          if (bTop !== aTop) return bTop - aTop;
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+        setLatestListings(sorted.slice(0, 16));
+      } catch (err) {
+        console.error("Error fetching latest listings:", err);
+      } finally {
+        setListingsLoading(false);
+      }
+    };
+    fetchLatest();
+  }, []);
 
   // filters
   const [category, setCategory] = useState<string>("1");
@@ -185,6 +249,20 @@ export default function LandingPage() {
     setSelectedFeatures((prev) =>
       prev.includes(feature) ? prev.filter((f) => f !== feature) : [...prev, feature]
     );
+  };
+
+  const getRelativeTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays > 30) return date.toLocaleDateString("bg-BG", { day: "numeric", month: "short" });
+    if (diffDays > 0) return `преди ${diffDays} ${diffDays === 1 ? "ден" : "дни"}`;
+    if (diffHours > 0) return `преди ${diffHours} ${diffHours === 1 ? "час" : "часа"}`;
+    if (diffMins > 0) return `преди ${diffMins} мин`;
+    return "току-що";
   };
 
   return (
@@ -642,6 +720,192 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* LATEST LISTINGS */}
+        <section id="latest" style={styles.section}>
+          <style>{`
+            .listing-card-hover {
+              transition: transform 0.25s ease, box-shadow 0.25s ease;
+            }
+            .listing-card-hover:hover {
+              transform: translateY(-4px);
+              box-shadow: 0 12px 32px rgba(15,23,42,0.12) !important;
+            }
+            .listing-top-badge {
+              position: absolute;
+              top: 10px;
+              left: 10px;
+              background: linear-gradient(135deg, #f59e0b, #f97316);
+              color: #fff;
+              padding: 4px 10px;
+              border-radius: 999px;
+              font-size: 11px;
+              font-weight: 700;
+              letter-spacing: 0.3px;
+              text-transform: uppercase;
+              box-shadow: 0 4px 10px rgba(249,115,22,0.3);
+              z-index: 2;
+            }
+            .latest-grid {
+              display: grid;
+              grid-template-columns: repeat(4, minmax(0, 1fr));
+              gap: 18px;
+            }
+            .view-more-btn {
+              transition: background 0.2s ease, box-shadow 0.2s ease;
+            }
+            .view-more-btn:hover {
+              box-shadow: 0 4px 14px rgba(0,102,204,0.35);
+            }
+
+            @media (min-width: 1024px) and (max-width: 1200px) {
+              .latest-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+            }
+            @media (min-width: 768px) and (max-width: 1023px) {
+              .latest-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+            }
+            @media (max-width: 767px) {
+              .latest-grid { grid-template-columns: 1fr !important; gap: 14px !important; }
+            }
+          `}</style>
+
+          <div style={styles.sectionHeader}>
+            <h2 style={styles.h2}>Последни обяви</h2>
+            <p style={styles.sectionLead}>
+              Най-новите публикувани обяви на пазара
+            </p>
+          </div>
+
+          {listingsLoading ? (
+            <div style={{ textAlign: "center", padding: 40, background: "#fff", borderRadius: 10, border: "1px solid #eef2f7" }}>
+              <p style={{ fontSize: 15, color: "#6b7280", margin: 0 }}>Зареждане на обяви...</p>
+            </div>
+          ) : latestListings.length > 0 ? (
+            <>
+              <div className="latest-grid">
+                {latestListings.map((listing) => (
+                  <div
+                    key={listing.id}
+                    className="listing-card-hover"
+                    style={{
+                      borderRadius: 10,
+                      overflow: "hidden",
+                      border: isTopListing(listing) ? "2px solid #f59e0b" : "1px solid #eef2f7",
+                      background: "#fff",
+                      boxShadow: "0 2px 8px rgba(15,23,42,0.06)",
+                      display: "flex",
+                      flexDirection: "column",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => navigate(`/details/${listing.slug}`)}
+                  >
+                    {/* Image */}
+                    <div style={{ position: "relative", height: 170, background: "#f0f0f0", overflow: "hidden" }}>
+                      {isTopListing(listing) && (
+                        <div className="listing-top-badge">TOP</div>
+                      )}
+                      {listing.image_url ? (
+                        <img
+                          src={listing.image_url}
+                          alt={`${listing.brand} ${listing.model}`}
+                          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                        />
+                      ) : (
+                        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>
+                          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                            <circle cx="8.5" cy="8.5" r="1.5" />
+                            <polyline points="21 15 16 10 5 21" />
+                          </svg>
+                        </div>
+                      )}
+                      {/* Price overlay */}
+                      <div style={{
+                        position: "absolute",
+                        bottom: 8,
+                        left: 8,
+                        background: "rgba(255,255,255,0.95)",
+                        padding: "5px 10px",
+                        borderRadius: 6,
+                        fontWeight: 700,
+                        fontSize: 14,
+                        color: "#0066cc",
+                        boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+                      }}>
+                        {listing.price.toLocaleString("bg-BG")} &euro;
+                      </div>
+                    </div>
+
+                    {/* Body */}
+                    <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", lineHeight: 1.3 }}>
+                        {listing.brand} {listing.model}
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, fontSize: 12, color: "#6b7280" }}>
+                        <span>{listing.year_from} г.</span>
+                        <span style={{ color: "#d1d5db" }}>|</span>
+                        <span>{listing.mileage.toLocaleString("bg-BG")} км</span>
+                        <span style={{ color: "#d1d5db" }}>|</span>
+                        <span>{listing.fuel_display}</span>
+                        <span style={{ color: "#d1d5db" }}>|</span>
+                        <span>{listing.power} к.с.</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12, color: "#9ca3af", marginTop: "auto" }}>
+                        <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                            <circle cx="12" cy="10" r="3" />
+                          </svg>
+                          {listing.city}
+                        </span>
+                        <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                          </svg>
+                          {getRelativeTime(listing.created_at)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* View more button */}
+              <div style={{ textAlign: "center", marginTop: 28 }}>
+                <button
+                  className="view-more-btn"
+                  type="button"
+                  onClick={() => navigate("/search")}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "13px 32px",
+                    background: "#0066cc",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 10,
+                    fontSize: 15,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  Разгледайте още обяви
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12h14" />
+                    <path d="m12 5 7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </>
+          ) : (
+            <div style={{ textAlign: "center", padding: 40, background: "#fff", borderRadius: 10, border: "1px solid #eef2f7" }}>
+              <p style={{ fontSize: 15, color: "#6b7280", margin: 0 }}>Няма налични обяви в момента</p>
+            </div>
+          )}
+        </section>
+
         {/* CATEGORIES */}
         <section id="categories" style={styles.section}>
           <div style={styles.sectionHeader}>
@@ -684,33 +948,6 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer style={styles.footer}>
-        <div style={styles.footerInner} className="footer-grid">
-          <div style={styles.footerCol}>
-            <div style={styles.footerBrand}>Kar.bg</div>
-            <div style={styles.footerText}>
-              Модерен маркетплейс за авто обяви. Бързо търсене, лесно публикуване, удобен UX.
-            </div>
-          </div>
-
-          <div style={styles.footerCol}>
-            <div style={styles.footerTitle}>Бързи връзки</div>
-            <a style={styles.footerLink} href="#search">Търсене</a>
-            <a style={styles.footerLink} href="#categories">Категории</a>
-          </div>
-
-          <div style={styles.footerCol}>
-            <div style={styles.footerTitle}>Политики</div>
-            <a style={styles.footerLink} href="#">Условия</a>
-            <a style={styles.footerLink} href="#">Поверителност</a>
-            <a style={styles.footerLink} href="#">Контакт</a>
-          </div>
-        </div>
-
-        <div style={styles.footerBottom}>
-          © {new Date().getFullYear()} Kar.bg — demo UI
-        </div>
-      </footer>
     </div>
   );
 }

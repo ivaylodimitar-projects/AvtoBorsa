@@ -18,7 +18,6 @@ const PrivateProfilePage: React.FC = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    // Clear error for this field when user starts typing
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
@@ -69,7 +68,6 @@ const PrivateProfilePage: React.FC = () => {
         if (response.ok) {
           const data = await response.json();
           setSuccessMessage(data.message);
-          // Store the auth token and set user
           if (data.token && data.user) {
             setUserFromToken(data.user, data.token);
           }
@@ -77,6 +75,7 @@ const PrivateProfilePage: React.FC = () => {
           navigate("/");
         } else {
           const errorData = await response.json();
+          console.error("Backend error response:", errorData);
           setErrors(errorData);
         }
       } catch (error) {
@@ -88,218 +87,425 @@ const PrivateProfilePage: React.FC = () => {
     }
   };
 
-  const styles: Record<string, React.CSSProperties> = {
-    page: { minHeight: "100vh", background: "#f5f5f5", width: "100%", overflow: "visible", boxSizing: "border-box" },
-    container: { width: "100%", maxWidth: 600, margin: "0 auto", padding: "20px", boxSizing: "border-box" },
-    form: { width: "100%", background: "#fff", borderRadius: 8, padding: 24, boxShadow: "0 2px 8px rgba(0,0,0,0.08)", boxSizing: "border-box" },
-    title: { fontSize: 28, fontWeight: 700, color: "#333", marginBottom: 8, margin: 0 },
-    subtitle: { fontSize: 14, color: "#666", marginBottom: 24, margin: 0 },
-    formGroup: { display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 },
-    label: { fontSize: 13, fontWeight: 500, color: "#555" },
-    input: { padding: "12px 14px", border: "1px solid #ccc", borderRadius: 6, fontSize: 14, fontFamily: "inherit", width: "100%", boxSizing: "border-box" },
-    button: { padding: "12px 24px", background: "#0066cc", color: "#fff", border: "none", borderRadius: 6, fontSize: 14, fontWeight: 600, cursor: "pointer", width: "100%", boxSizing: "border-box" },
-    note: { fontSize: 12, color: "#666", marginTop: 8, fontStyle: "italic" },
-  };
-
   return (
     <div style={styles.page}>
       <style>{`
-        .registration-container {
-          max-width: 980px;
-          margin: 0 auto;
-          padding: 20px;
+        .priv-input {
+          transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
-
-        .registration-title {
-          font-size: 28px;
-          font-weight: 700;
-          color: #333;
-          margin-bottom: 8px;
+        .priv-input:focus {
+          border-color: #0066cc !important;
+          box-shadow: 0 0 0 3px rgba(0,102,204,0.1);
+          outline: none;
         }
-
-        .registration-subtitle {
-          font-size: 14px;
-          color: #666;
-          margin-bottom: 20px;
+        .priv-submit-btn {
+          transition: background 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
         }
-
-        .form-section {
-          background: #fff;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          padding: 20px;
-          margin-bottom: 20px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        .priv-submit-btn:hover:not(:disabled) {
+          box-shadow: 0 4px 14px rgba(0,102,204,0.35);
         }
-
-        .section-title {
-          font-size: 16px;
-          font-weight: 700;
-          color: #333;
-          margin-bottom: 8px;
-          display: block;
-        }
-
-        .section-subtitle {
-          font-size: 13px;
-          color: #666;
-          margin-bottom: 16px;
-          display: block;
-        }
-
-        .form-group {
-          margin-bottom: 16px;
-        }
-
-        .form-label {
-          font-size: 13px;
-          font-weight: 500;
-          color: #0066cc;
-          margin-bottom: 6px;
-          display: block;
-        }
-
-        .form-input {
-          width: 100%;
-          padding: 10px 12px;
-          border: 1px solid #ccc;
-          border-radius: 4px;
-          font-size: 13px;
-          font-family: inherit;
-          box-sizing: border-box;
-        }
-
-        .form-input.error {
-          border-color: #d32f2f;
-        }
-
-        .error-message {
-          font-size: 12px;
-          color: #d32f2f;
-          margin-top: 4px;
-          display: block;
-        }
-
-        .form-note {
-          font-size: 12px;
-          color: #666;
-          margin-top: 6px;
-        }
-
-        .submit-button {
-          background: #0066cc;
-          color: #fff;
-          border: none;
-          padding: 12px 24px;
-          border-radius: 4px;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          width: 100%;
-          transition: background 0.3s ease;
-        }
-
-        .submit-button:hover {
-          background: #0052a3;
-        }
-
-        .submit-button:disabled {
-          background: #ccc;
+        .priv-submit-btn:disabled {
+          opacity: 0.6;
           cursor: not-allowed;
+        }
+        .priv-ghost-btn {
+          transition: border-color 0.15s ease, color 0.15s ease;
+        }
+        .priv-ghost-btn:hover {
+          border-color: #0066cc !important;
+          color: #004a99 !important;
         }
 
         /* Tablet (768px - 1023px) */
         @media (min-width: 768px) and (max-width: 1023px) {
-          .registration-container { padding: 16px !important; }
-          .registration-title { font-size: 24px !important; }
+          .priv-outer { padding: 24px 16px !important; }
+          .priv-hero { padding: 24px !important; }
+          .priv-hero-title { font-size: 24px !important; }
+          .priv-password-grid { grid-template-columns: 1fr 1fr !important; }
         }
 
         /* Mobile Large (640px - 767px) */
         @media (min-width: 640px) and (max-width: 767px) {
-          .registration-container { padding: 12px !important; }
-          .form-section { padding: 16px !important; }
-          .registration-title { font-size: 22px !important; }
-          .registration-subtitle { font-size: 13px !important; }
+          .priv-outer { padding: 20px 12px !important; }
+          .priv-hero { padding: 22px 18px !important; margin-bottom: 20px !important; }
+          .priv-hero-title { font-size: 22px !important; }
+          .priv-hero-subtitle { font-size: 13px !important; }
+          .priv-form-card { padding: 24px !important; }
+          .priv-password-grid { grid-template-columns: 1fr !important; }
         }
 
         /* Mobile Small (< 640px) */
         @media (max-width: 639px) {
-          .registration-container { padding: 8px !important; }
-          .form-section { padding: 12px !important; margin-bottom: 12px !important; }
-          .registration-title { font-size: 20px !important; margin-bottom: 6px !important; }
-          .registration-subtitle { font-size: 12px !important; margin-bottom: 12px !important; }
-          .section-title { font-size: 14px !important; }
-          .section-subtitle { font-size: 12px !important; }
-          .form-label { font-size: 12px !important; }
-          .form-input { font-size: 13px !important; padding: 8px 10px !important; }
-          .submit-button { font-size: 13px !important; padding: 10px 16px !important; }
+          .priv-outer { padding: 16px 8px !important; }
+          .priv-hero { padding: 20px 16px !important; margin-bottom: 18px !important; }
+          .priv-hero-title { font-size: 20px !important; }
+          .priv-hero-subtitle { font-size: 12px !important; }
+          .priv-hero-icon { width: 44px !important; height: 44px !important; }
+          .priv-hero-icon svg { width: 18px !important; height: 18px !important; }
+          .priv-form-card { padding: 20px !important; }
+          .priv-section-title { font-size: 14px !important; }
+          .priv-label { font-size: 12px !important; }
+          .priv-input { font-size: 13px !important; padding: 10px 12px !important; }
+          .priv-submit-btn { font-size: 14px !important; padding: 11px 20px !important; }
+          .priv-password-grid { grid-template-columns: 1fr !important; }
+          .priv-actions { flex-direction: column !important; }
+          .priv-actions button { width: 100% !important; }
         }
       `}</style>
-      <div className="registration-container">
-        <h1 className="registration-title">Регистрация в AvtoBorsa</h1>
-        <p className="registration-subtitle">Създай профил, за да публикуваш обяви</p>
 
-        <form onSubmit={handleSubmit}>
-          {/* Потребителско име и парола */}
-          <div className="form-section">
-            <span className="section-title">Потребителско име и парола</span>
-            <span className="section-subtitle">Данни за вход в твоя профил</span>
+      <div style={styles.outer} className="priv-outer">
+        {/* Hero Header */}
+        <div style={styles.hero} className="priv-hero">
+          <div style={styles.heroContent}>
+            <div style={styles.heroIcon} className="priv-hero-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            </div>
+            <div>
+              <h1 style={styles.heroTitle} className="priv-hero-title">Частен профил</h1>
+              <p style={styles.heroSubtitle} className="priv-hero-subtitle">
+                Създай акаунт, за да публикуваш и управляваш обяви
+              </p>
+            </div>
+          </div>
+        </div>
 
-            <div className="form-group">
-              <label className="form-label">Email *</label>
+        {/* Form Card */}
+        <form style={styles.formCard} className="priv-form-card" onSubmit={handleSubmit}>
+          {/* Email Section */}
+          <div style={styles.section}>
+            <h2 style={styles.sectionTitle} className="priv-section-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0066cc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8, verticalAlign: "middle" }}>
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                <polyline points="22,6 12,13 2,6" />
+              </svg>
+              Email адрес
+            </h2>
+
+            {errors.submit && (
+              <div style={styles.errorBanner}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="15" y1="9" x2="9" y2="15" />
+                  <line x1="9" y1="9" x2="15" y2="15" />
+                </svg>
+                <span>{errors.submit}</span>
+              </div>
+            )}
+
+            <div style={styles.formRow}>
+              <label style={styles.label} className="priv-label">Email *</label>
               <input
-                className={`form-input ${errors.email ? "error" : ""}`}
+                className="priv-input"
+                style={{
+                  ...styles.input,
+                  borderColor: errors.email ? "#fca5a5" : "#e6e9ef",
+                }}
                 type="email"
                 name="email"
                 placeholder="your@email.com"
                 value={formData.email}
                 onChange={handleChange}
               />
-              {errors.email && (
-                <span className="error-message">{errors.email}</span>
-              )}
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Парола *</label>
-              <input
-                className={`form-input ${errors.password ? "error" : ""}`}
-                type="password"
-                name="password"
-                placeholder="Въведи парола"
-                value={formData.password}
-                onChange={handleChange}
-              />
-              {errors.password && (
-                <span className="error-message">{errors.password}</span>
-              )}
-              <span className="form-note">Паролата трябва да е поне 6 символа</span>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Потвърди парола *</label>
-              <input
-                className={`form-input ${errors.confirmPassword ? "error" : ""}`}
-                type="password"
-                name="confirmPassword"
-                placeholder="Потвърди паролата"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-              />
-              {errors.confirmPassword && (
-                <span className="error-message">{errors.confirmPassword}</span>
-              )}
+              {errors.email && <span style={styles.errorText}>{errors.email}</span>}
             </div>
           </div>
 
-          <button className="submit-button" type="submit">
-            Създай профил
-          </button>
+          {/* Password Section */}
+          <div style={styles.section}>
+            <h2 style={styles.sectionTitle} className="priv-section-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0066cc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8, verticalAlign: "middle" }}>
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              Парола
+            </h2>
+
+            <div style={styles.passwordGrid} className="priv-password-grid">
+              <div style={styles.formRow}>
+                <label style={styles.label} className="priv-label">Парола *</label>
+                <input
+                  className="priv-input"
+                  style={{
+                    ...styles.input,
+                    borderColor: errors.password ? "#fca5a5" : "#e6e9ef",
+                  }}
+                  type="password"
+                  name="password"
+                  placeholder="Въведи парола"
+                  value={formData.password}
+                  onChange={handleChange}
+                />
+                {errors.password && <span style={styles.errorText}>{errors.password}</span>}
+              </div>
+
+              <div style={styles.formRow}>
+                <label style={styles.label} className="priv-label">Потвърди парола *</label>
+                <input
+                  className="priv-input"
+                  style={{
+                    ...styles.input,
+                    borderColor: errors.confirmPassword ? "#fca5a5" : "#e6e9ef",
+                  }}
+                  type="password"
+                  name="confirmPassword"
+                  placeholder="Потвърди паролата"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                />
+                {errors.confirmPassword && <span style={styles.errorText}>{errors.confirmPassword}</span>}
+              </div>
+            </div>
+
+            <p style={styles.hint}>Паролата трябва да е поне 6 символа</p>
+          </div>
+
+          {/* Actions */}
+          <div style={styles.actions} className="priv-actions">
+            <button
+              className="priv-submit-btn"
+              style={styles.submitBtn}
+              type="submit"
+              disabled={loading}
+            >
+              {loading ? "Създавам..." : (
+                <>
+                  Създай профил
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 8 }}>
+                    <path d="M5 12h14" />
+                    <path d="m12 5 7 7-7 7" />
+                  </svg>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              className="priv-ghost-btn"
+              style={styles.ghostBtn}
+              onClick={() => navigate("/profile")}
+            >
+              Назад
+            </button>
+          </div>
+
+          <p style={styles.requiredNote}>* Задължителни полета</p>
+
+          {/* Login link */}
+          <div style={styles.footerNote}>
+            <span style={{ color: "#6b7280" }}>Вече имаш акаунт?</span>{" "}
+            <span
+              style={styles.loginLink}
+              role="button"
+              tabIndex={0}
+              onClick={() => navigate("/auth")}
+              onKeyDown={(e) => e.key === "Enter" && navigate("/auth")}
+            >
+              Влез тук
+            </span>
+          </div>
         </form>
       </div>
     </div>
   );
 };
 
-export default PrivateProfilePage;
+const styles: Record<string, React.CSSProperties> = {
+  page: {
+    minHeight: "100vh",
+    background: "#f5f5f5",
+    width: "100%",
+    boxSizing: "border-box",
+  },
+  outer: {
+    maxWidth: 620,
+    margin: "0 auto",
+    padding: "32px 20px",
+    boxSizing: "border-box",
+  },
 
+  // Hero
+  hero: {
+    background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)",
+    borderRadius: 14,
+    padding: "28px",
+    marginBottom: 24,
+    boxShadow: "0 6px 20px rgba(15,23,42,0.15)",
+    position: "relative",
+    overflow: "hidden",
+  },
+  heroContent: {
+    display: "flex",
+    alignItems: "center",
+    gap: 16,
+    position: "relative",
+    zIndex: 1,
+  },
+  heroIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
+    background: "rgba(255,255,255,0.1)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#fff",
+    flexShrink: 0,
+  },
+  heroTitle: {
+    fontSize: 26,
+    fontWeight: 800,
+    color: "#fff",
+    margin: 0,
+    lineHeight: 1.2,
+  },
+  heroSubtitle: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.65)",
+    margin: "4px 0 0",
+  },
+
+  // Form card
+  formCard: {
+    background: "#fff",
+    borderRadius: 14,
+    padding: 32,
+    boxShadow: "0 4px 16px rgba(15,23,42,0.06)",
+    border: "1px solid #eef2f7",
+    boxSizing: "border-box",
+  },
+
+  // Section
+  section: {
+    marginBottom: 24,
+    paddingBottom: 24,
+    borderBottom: "1px solid #eef2f7",
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: 700,
+    color: "#111827",
+    marginTop: 0,
+    marginBottom: 16,
+    display: "flex",
+    alignItems: "center",
+  },
+
+  // Error
+  errorBanner: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "12px 14px",
+    background: "#fef2f2",
+    border: "1px solid #fecaca",
+    borderRadius: 10,
+    fontSize: 13,
+    color: "#991b1b",
+    marginBottom: 18,
+  },
+
+  // Form fields
+  formRow: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+    marginBottom: 0,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: "#374151",
+  },
+  input: {
+    padding: "12px 14px",
+    border: "1px solid #e6e9ef",
+    borderRadius: 10,
+    fontSize: 14,
+    fontFamily: "inherit",
+    width: "100%",
+    boxSizing: "border-box",
+    background: "#fff",
+    color: "#111827",
+  },
+  errorText: {
+    fontSize: 12,
+    color: "#ef4444",
+    marginTop: 4,
+  },
+
+  // Password grid
+  passwordGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: 14,
+  },
+
+  hint: {
+    fontSize: 12,
+    color: "#9ca3af",
+    marginTop: 10,
+    marginBottom: 0,
+  },
+
+  // Actions
+  actions: {
+    display: "flex",
+    gap: 12,
+    alignItems: "center",
+  },
+  submitBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "13px 28px",
+    background: "#0066cc",
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    fontSize: 15,
+    fontWeight: 700,
+    cursor: "pointer",
+    boxSizing: "border-box",
+    flex: 1,
+  },
+  ghostBtn: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "12px 22px",
+    background: "transparent",
+    border: "1px solid #e6e9ef",
+    borderRadius: 10,
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer",
+    color: "#374151",
+    fontFamily: "inherit",
+  },
+
+  requiredNote: {
+    fontSize: 12,
+    color: "#9ca3af",
+    marginTop: 14,
+    marginBottom: 0,
+  },
+
+  // Footer note
+  footerNote: {
+    textAlign: "center",
+    marginTop: 24,
+    paddingTop: 20,
+    borderTop: "1px solid #eef2f7",
+    fontSize: 14,
+  },
+  loginLink: {
+    color: "#0066cc",
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+};
+
+export default PrivateProfilePage;

@@ -5,7 +5,11 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
-from .serializers import PrivateUserSerializer, BusinessUserSerializer, UserProfileSerializer, UserBalanceSerializer
+from rest_framework.parsers import MultiPartParser, FormParser
+from .serializers import (
+    PrivateUserSerializer, BusinessUserSerializer, UserProfileSerializer,
+    UserBalanceSerializer, DealerListSerializer, DealerDetailSerializer
+)
 from .models import PrivateUser, BusinessUser, UserProfile
 
 
@@ -225,3 +229,86 @@ def topup_balance(request):
             {'error': str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def list_dealers(request):
+    """List all business users / dealers"""
+    dealers = BusinessUser.objects.all().order_by('-created_at')
+    serializer = DealerListSerializer(dealers, many=True, context={'request': request})
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def dealer_detail(request, pk):
+    """Get a single dealer's full info + their listings"""
+    try:
+        dealer = BusinessUser.objects.get(pk=pk)
+    except BusinessUser.DoesNotExist:
+        return Response({'error': 'Dealer not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = DealerDetailSerializer(dealer, context={'request': request})
+    data = serializer.data
+
+    # Include dealer's active listings
+    from backend.listings.serializers import CarListingSerializer
+    listings = dealer.user.car_listings.filter(
+        is_active=True, is_draft=False, is_archived=False
+    ).order_by('-created_at')
+    listings_data = CarListingSerializer(listings, many=True, context={'request': request}).data
+    data['listings'] = listings_data
+
+    return Response(data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_profile_photo(request):
+    """Upload profile photo for business users (downscaled to 160x160)"""
+    user = request.user
+    if not hasattr(user, 'business_profile'):
+        return Response(
+            {'error': 'Only business users can upload a profile photo'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    image = request.FILES.get('image')
+    if not image:
+        return Response({'error': 'No image provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        business = user.business_profile
+        # Delete old image if exists
+        if business.profile_image:
+            business.profile_image.delete(save=False)
+        business.profile_image = image
+        business.save()  # save() handles downscaling
+
+        image_url = request.build_absolute_uri(business.profile_image.url) if business.profile_image else None
+        return Response({'profile_image_url': image_url}, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to upload image: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_about(request):
+    """Update the about_text for business users"""
+    user = request.user
+    if not hasattr(user, 'business_profile'):
+        return Response(
+            {'error': 'Only business users can update about text'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    about_text = request.data.get('about_text', '')
+    business = user.business_profile
+    business.about_text = about_text
+    business.save()
+
+    return Response({'about_text': business.about_text}, status=status.HTTP_200_OK)

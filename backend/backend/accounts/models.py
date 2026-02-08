@@ -1,6 +1,9 @@
+import io
+from PIL import Image as PILImage
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import EmailValidator
+from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -76,11 +79,27 @@ class BusinessUser(models.Model):
     # Description
     description = models.TextField(blank=True, null=True)
 
+    # Profile image & about
+    profile_image = models.ImageField(upload_to='dealer_photos/', blank=True, null=True)
+    about_text = models.TextField(blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"Business User: {self.dealer_name}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.profile_image:
+            try:
+                img = PILImage.open(self.profile_image.path)
+                if img.width > 160 or img.height > 160:
+                    img = img.convert('RGB')
+                    img.thumbnail((160, 160), PILImage.LANCZOS)
+                    img.save(self.profile_image.path, quality=90)
+            except Exception:
+                pass
 
     class Meta:
         verbose_name = "Business User"
