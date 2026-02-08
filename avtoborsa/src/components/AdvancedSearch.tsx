@@ -208,12 +208,19 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       background: #ffffff;
       border-radius: 16px;
       padding: 28px 24px 24px;
-      box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(59, 130, 246, 0.06);
+      box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15,118,110,0.06);
       border: 1px solid #e2e8f0;
       width: 100%;
       max-width: 100%;
       margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: "Manrope", "Segoe UI", sans-serif;
+    }
+    .adv-search-title {
+      font-size: 26px;
+      font-weight: 700;
+      color: #333;
+      margin-bottom: 12px;
+      font-family: "Space Grotesk", "Manrope", "Segoe UI", sans-serif;
     }
     .adv-search-form {
       display: flex;
@@ -265,9 +272,9 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     }
     .adv-select:focus,
     .adv-input:focus {
-      border-color: #2563eb;
+      border-color: #115e59;
       background: #ffffff;
-      box-shadow: 0 0 0 3px rgba(37,99,235,0.18);
+      box-shadow: 0 0 0 3px rgba(15,118,110,0.2);
     }
     .adv-select--disabled {
       background: #f3f4f6;
@@ -303,9 +310,9 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       user-select: none;
     }
     .adv-chip--active {
-      background: #e0f2fe;
-      border-color: #3b82f6;
-      color: #1d4ed8;
+      background: #ecfdf5;
+      border-color: #0f766e;
+      color: #115e59;
       font-weight: 600;
     }
     .adv-action-row {
@@ -323,13 +330,13 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       height: 48px;
       border: none;
       border-radius: 14px;
-      background: #2563eb;
+      background: #115e59;
       color: #fff;
       font-size: 16px;
       font-weight: 700;
       cursor: pointer;
       transition: transform 0.15s, box-shadow 0.2s;
-      box-shadow: 0 2px 8px rgba(37,99,235,0.3);
+      box-shadow: 0 2px 8px rgba(15,118,110,0.3);
       letter-spacing: 0.02em;
       
     }
@@ -348,7 +355,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       transition: color 0.2s;
     }
     .adv-detailed-section {
-      border-top: 1px solid #dbeafe;
+      border-top: 1px solid #ccfbf1;
       padding-top: 18px;
       animation: advSlideDown 0.25s ease;
     }
@@ -383,7 +390,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     .adv-recent-search-label {
       font-size: 12px;
       font-weight: 600;
-      color: #6b7280;
+      color: #0f766e;
       text-transform: uppercase;
       letter-spacing: 0.08em;
     }
@@ -391,10 +398,10 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       display: inline-block;
       padding: 6px 12px;
       border-radius: 20px;
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
+      background: #ecfdf5;
+      border: 1px solid #99f6e4;
       font-size: 13px;
-      color: #475569;
+      color: #0f766e;
       cursor: pointer;
       transition: all 0.2s;
       white-space: nowrap;
@@ -402,18 +409,52 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       text-overflow: ellipsis;
       max-width: 200px;
     }
+    .adv-recent-search-pill:hover {
+      background: #d1fae5;
+      border-color: #5eead4;
+    }
+    .adv-saved-search-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #d97706;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .adv-saved-search-pill {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 20px;
+      background: #d97706;
+      border: 1px solid #d97706;
+      font-size: 13px;
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 200px;
+    }
+    .adv-saved-search-pill:hover {
+      background: #ea580c;
+      border-color: #ea580c;
+    }
     .adv-save-btn {
       display: inline-flex;
       align-items: center;
-      background: #ecfeff;
-      border: 1.5px solid #67e8f9;
+      background: #d97706;
+      border: 1.5px solid #d97706;
       border-radius: 10px;
-      color: #0f766e;
+      color: #fff;
       font-size: 13px;
       padding: 8px 20px;
       cursor: pointer;
       transition: all 0.2s;
       height: 48px;
+    }
+    .adv-save-btn:hover {
+      background: #ea580c;
+      border-color: #ea580c;
     }
     .adv-modal-overlay {
       position: fixed;
@@ -452,7 +493,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       transition: border-color 0.2s;
     }
     .adv-modal-input:focus {
-      border-color: #3b82f6;
+      border-color: #0f766e;
     }
     .adv-modal-actions {
       display: flex;
@@ -476,12 +517,12 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       background: #e5e7eb;
     }
     .adv-modal-btn-save {
-      background: #3b82f6;
+      background: #d97706;
       border: none;
       color: #fff;
     }
     .adv-modal-btn-save:hover {
-      background: #2563eb;
+      background: #ea580c;
     }
 
     /* ── Responsive ── */
@@ -514,6 +555,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   return (
     <div className="adv-search-root">
       <style>{advancedSearchCSS}</style>
+      <div className="adv-search-title">Търсене</div>
       <form onSubmit={handleSearch} className="adv-search-form">
         {/* PRIMARY GRID — 3 columns on desktop, stacks on mobile */}
         <div className="adv-search-grid">
@@ -746,12 +788,12 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         {/* SAVED SEARCHES */}
         {savedSearches.length > 0 && (
           <div className="adv-recent-searches" style={{ borderTop: "1px solid #e5e7eb", paddingTop: 14 }}>
-            <div className="adv-recent-search-label">Запазени търсения:</div>
+            <div className="adv-saved-search-label">Запазени търсения:</div>
             {savedSearches.map((search) => (
               <button
                 key={search.id}
                 type="button"
-                className="adv-recent-search-pill"
+                className="adv-saved-search-pill"
                 onClick={(e) => {
                   e.preventDefault();
                   const queryString = new URLSearchParams(search.criteria).toString();

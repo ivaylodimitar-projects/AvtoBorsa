@@ -108,25 +108,26 @@ const ProfileMenu: React.FC = () => {
       position: "relative",
     },
     profileIcon: {
-      color: "#1f2937",
+      color: "#333",
       textDecoration: "none",
-      fontSize: 15,
-      padding: "10px 16px",
-      borderRadius: 8,
+      fontSize: 14,
+      padding: "0 16px",
+      height: 40,
+      borderRadius: 999,
       fontWeight: 600,
       transition: "all 0.3s ease",
       whiteSpace: "nowrap",
       display: "flex",
       alignItems: "center",
       gap: 8,
-      background: "#f0f4ff",
-      border: "1px solid #c7dcff",
+      background: "#ecfdf5",
+      border: "1px solid #99f6e4",
       cursor: "pointer",
     },
     profileIconHover: {
-      background: "#0066cc",
+      background: "#0f766e",
       color: "#fff",
-      border: "1px solid #0066cc",
+      border: "1px solid #0f766e",
     },
     dropdown: {
       position: "absolute",
@@ -134,7 +135,8 @@ const ProfileMenu: React.FC = () => {
       right: 0,
       background: "#fff",
       borderRadius: 12,
-      boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+      border: "1px solid #e0e0e0",
+      boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
       minWidth: 320,
       marginTop: 12,
       zIndex: 1000,
@@ -142,7 +144,7 @@ const ProfileMenu: React.FC = () => {
     },
     balanceSection: {
       padding: "20px",
-      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+      background: "linear-gradient(135deg, #0f766e 0%, #0d9488 100%)",
       color: "#fff",
     },
     balanceHeader: {
@@ -191,7 +193,7 @@ const ProfileMenu: React.FC = () => {
     topupButton: {
       padding: "10px 18px",
       background: "#fff",
-      color: "#667eea",
+      color: "#0f766e",
       border: "none",
       borderRadius: 8,
       cursor: "pointer",
@@ -255,7 +257,7 @@ const ProfileMenu: React.FC = () => {
     avatarFallback: {
       width: "100%",
       height: "100%",
-      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+      background: "linear-gradient(135deg, #0f766e 0%, #0d9488 100%)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -407,11 +409,11 @@ const ProfileMenu: React.FC = () => {
                   style={styles.topupButton}
                   onMouseEnter={(e) => {
                     (e.target as HTMLElement).style.transform = "translateY(-2px)";
-                    (e.target as HTMLElement).style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+                    (e.target as HTMLElement).style.boxShadow = "0 4px 12px rgba(15,118,110,0.25)";
                   }}
                   onMouseLeave={(e) => {
                     (e.target as HTMLElement).style.transform = "translateY(0)";
-                    (e.target as HTMLElement).style.boxShadow = "0 2px 8px rgba(0,0,0,0.1)";
+                    (e.target as HTMLElement).style.boxShadow = "0 2px 8px rgba(15,118,110,0.18)";
                   }}
                   onClick={() => {
                     setIsTopUpModalOpen(true);
@@ -429,8 +431,8 @@ const ProfileMenu: React.FC = () => {
                   to="/my-ads"
                   style={styles.menuItem}
                   onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = "#f5f5f5";
-                    (e.currentTarget as HTMLElement).style.color = "#667eea";
+                    (e.currentTarget as HTMLElement).style.background = "#ecfdf5";
+                    (e.currentTarget as HTMLElement).style.color = "#0f766e";
                   }}
                   onMouseLeave={(e) => {
                     (e.currentTarget as HTMLElement).style.background = "none";
@@ -447,8 +449,8 @@ const ProfileMenu: React.FC = () => {
                 <button
                   style={styles.menuItem}
                   onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = "#f5f5f5";
-                    (e.currentTarget as HTMLElement).style.color = "#667eea";
+                    (e.currentTarget as HTMLElement).style.background = "#ecfdf5";
+                    (e.currentTarget as HTMLElement).style.color = "#0f766e";
                   }}
                   onMouseLeave={(e) => {
                     (e.currentTarget as HTMLElement).style.background = "none";
@@ -466,8 +468,8 @@ const ProfileMenu: React.FC = () => {
                 <button
                   style={styles.menuItem}
                   onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = "#f5f5f5";
-                    (e.currentTarget as HTMLElement).style.color = "#667eea";
+                    (e.currentTarget as HTMLElement).style.background = "#ecfdf5";
+                    (e.currentTarget as HTMLElement).style.color = "#0f766e";
                   }}
                   onMouseLeave={(e) => {
                     (e.currentTarget as HTMLElement).style.background = "none";

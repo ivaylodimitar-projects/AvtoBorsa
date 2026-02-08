@@ -13,7 +13,8 @@ import {
   Car,
   PackageOpen,
   Clock,
-  X
+  X,
+  Euro,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -86,6 +87,9 @@ const MyAdsPage: React.FC = () => {
     mode: "republish",
     selectedType: "normal",
   });
+  const [previewListing, setPreviewListing] = useState<CarListing | null>(null);
+  const [previewTab, setPreviewTab] = useState<TabType | null>(null);
+  const [previewImageIndex, setPreviewImageIndex] = useState(0);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -159,6 +163,60 @@ const MyAdsPage: React.FC = () => {
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
+  };
+
+  const goToEdit = (listing: CarListing) => {
+    navigate(`/publish?edit=${listing.id}`, { state: { listing } });
+  };
+
+  const openPreview = (listing: CarListing) => {
+    setPreviewListing(listing);
+    setPreviewTab(activeTab);
+    setPreviewImageIndex(0);
+  };
+
+  const closePreview = () => {
+    setPreviewListing(null);
+    setPreviewTab(null);
+  };
+
+  const getPreviewImages = (listing: CarListing) => {
+    const images = (listing.images || [])
+      .map((img) => img.image)
+      .filter((img) => !!img);
+    const cover = listing.image_url ? [listing.image_url] : [];
+    return Array.from(new Set([...cover, ...images]));
+  };
+
+  const getPreviewStatusLabel = (tab: TabType | null) => {
+    switch (tab) {
+      case "archived":
+        return "Архивирана";
+      case "expired":
+        return "Изтекла";
+      case "drafts":
+        return "Чернова";
+      default:
+        return "";
+    }
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleDateString("bg-BG", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const getShortDescription = (text?: string, maxLength = 140) => {
+    if (!text) return "";
+    const clean = text.replace(/\s+/g, " ").trim();
+    if (clean.length <= maxLength) return clean;
+    return `${clean.slice(0, maxLength).trim()}…`;
   };
 
   const openListingTypeModal = (
@@ -673,6 +731,167 @@ const MyAdsPage: React.FC = () => {
     color: "#94a3b8",
     margin: 0,
   },
+  previewModal: {
+    width: "min(980px, 96vw)",
+    background: "#fff",
+    borderRadius: 18,
+    padding: "22px",
+    boxShadow: "0 30px 60px rgba(15, 23, 42, 0.35)",
+    display: "flex",
+    flexDirection: "column",
+    gap: 16,
+  },
+  previewHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  previewTitle: {
+    fontSize: 22,
+    fontWeight: 700,
+    color: "#0f172a",
+    margin: 0,
+  },
+  previewMetaRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 6,
+  },
+  previewMetaText: {
+    fontSize: 13,
+    color: "#64748b",
+  },
+  previewStatusPill: {
+    fontSize: 11,
+    fontWeight: 700,
+    padding: "4px 8px",
+    borderRadius: 999,
+    background: "#f1f5f9",
+    color: "#475569",
+    border: "1px solid #e2e8f0",
+  },
+  previewStatusPillExpired: {
+    background: "#fee2e2",
+    color: "#b91c1c",
+    border: "1px solid #fecaca",
+  },
+  previewGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+    gap: 20,
+  },
+  previewMedia: {
+    position: "relative" as const,
+    borderRadius: 14,
+    overflow: "hidden",
+    background: "#f1f5f9",
+    minHeight: 260,
+  },
+  previewImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover" as const,
+    display: "block",
+  },
+  previewPlaceholder: {
+    height: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#94a3b8",
+    fontSize: 14,
+    gap: 8,
+  },
+  previewThumbs: {
+    display: "flex",
+    gap: 8,
+    flexWrap: "wrap",
+    marginTop: 10,
+  },
+  previewThumbButton: {
+    width: 64,
+    height: 48,
+    borderRadius: 8,
+    border: "1px solid #e2e8f0",
+    background: "#fff",
+    padding: 0,
+    overflow: "hidden",
+    cursor: "pointer",
+  },
+  previewThumbButtonActive: {
+    borderColor: "#f59e0b",
+    boxShadow: "0 0 0 2px rgba(249, 115, 22, 0.2)",
+  },
+  previewThumb: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover" as const,
+    display: "block",
+  },
+  previewInfo: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+  },
+  previewPrice: {
+    fontSize: 22,
+    fontWeight: 800,
+    color: "#667eea",
+    background: "#eef2ff",
+    borderRadius: 10,
+    padding: "10px 12px",
+    textAlign: "center" as const,
+  },
+  previewSpecs: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+    gap: 10,
+  },
+  previewSpec: {
+    padding: "10px 12px",
+    background: "#f8fafc",
+    borderRadius: 10,
+    border: "1px solid #e2e8f0",
+  },
+  previewSpecLabel: {
+    fontSize: 11,
+    color: "#94a3b8",
+    fontWeight: 700,
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  previewSpecValue: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: "#0f172a",
+  },
+  previewDescription: {
+    fontSize: 13,
+    color: "#475569",
+    lineHeight: 1.6,
+    padding: "12px",
+    background: "#f8fafc",
+    borderRadius: 10,
+    border: "1px solid #e2e8f0",
+    maxHeight: 160,
+    overflow: "auto",
+    whiteSpace: "pre-line" as const,
+  },
+  previewActions: {
+    display: "flex",
+    gap: 10,
+    justifyContent: "flex-end",
+    flexWrap: "wrap",
+    marginTop: 4,
+  },
+  previewButton: {
+    background: "#f1f5f9",
+    color: "#475569",
+    border: "1px solid #e2e8f0",
+  },
   listingsGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
@@ -680,22 +899,46 @@ const MyAdsPage: React.FC = () => {
   },
   listingCard: {
     background: "#fff",
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: "hidden",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-    transition: "all 0.3s ease",
+    border: "1px solid #e5e7eb",
+    boxShadow: "0 10px 24px rgba(15, 23, 42, 0.08)",
+    transition: "transform 0.25s ease, box-shadow 0.25s ease",
     cursor: "pointer",
     position: "relative",
+    display: "flex",
+    flexDirection: "column",
+    minHeight: "100%",
   },
   listingCardHover: {
-    transform: "translateY(-8px)",
-    boxShadow: "0 12px 32px rgba(102, 126, 234, 0.2)",
+    transform: "translateY(-6px)",
+    boxShadow: "0 18px 36px rgba(15, 23, 42, 0.15)",
+  },
+  listingMedia: {
+    position: "relative" as const,
+    height: 220,
+    background: "#f1f5f9",
   },
   listingImage: {
     width: "100%",
-    height: "220px",
+    height: "100%",
     objectFit: "cover",
-    background: "#f5f5f5",
+    display: "block",
+  },
+  listingMediaOverlay: {
+    position: "absolute" as const,
+    inset: 0,
+    background: "linear-gradient(180deg, rgba(15,23,42,0) 40%, rgba(15,23,42,0.5) 100%)",
+    pointerEvents: "none",
+  },
+  listingPlaceholder: {
+    height: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#94a3b8",
+    fontSize: 14,
+    gap: 8,
   },
   topBadge: {
     position: "absolute" as const,
@@ -712,36 +955,96 @@ const MyAdsPage: React.FC = () => {
     boxShadow: "0 6px 14px rgba(249, 115, 22, 0.35)",
     zIndex: 2,
   },
+  statusBadge: {
+    position: "absolute" as const,
+    top: 12,
+    right: 12,
+    padding: "6px 10px",
+    borderRadius: 999,
+    background: "rgba(15, 23, 42, 0.75)",
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: 0.3,
+    textTransform: "uppercase" as const,
+    zIndex: 2,
+  },
+  statusBadgeExpired: {
+    background: "#dc2626",
+    boxShadow: "0 6px 16px rgba(220, 38, 38, 0.35)",
+  },
+  listingPricePill: {
+    position: "absolute" as const,
+    right: 12,
+    bottom: 12,
+    padding: "6px 12px",
+    borderRadius: 999,
+    background: "#fff",
+    color: "#0f172a",
+    fontSize: 13,
+    fontWeight: 800,
+    border: "1px solid #e5e7eb",
+    boxShadow: "0 6px 16px rgba(15, 23, 42, 0.2)",
+    zIndex: 2,
+  },
   listingContent: {
-    padding: "20px",
+    padding: "18px",
+    display: "flex",
+    flexDirection: "column",
+    gap: 12,
+    flex: 1,
+  },
+  listingTitleRow: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
   },
   listingTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: 700,
-    color: "#333",
-    margin: "0 0 12px 0",
+    color: "#0f172a",
+    margin: 0,
     lineHeight: 1.3,
   },
-  listingPrice: {
-    fontSize: 22,
-    fontWeight: 800,
-    color: "#667eea",
-    margin: "12px 0",
+  listingMeta: {
+    fontSize: 12,
+    color: "#64748b",
+    whiteSpace: "nowrap",
   },
-  listingDetails: {
-    fontSize: 14,
-    color: "#666",
-    margin: "8px 0",
+  listingSubtitle: {
+    fontSize: 13,
+    color: "#475569",
+  },
+  listingDescription: {
+    fontSize: 13,
+    color: "#475569",
+    lineHeight: 1.6,
+    display: "-webkit-box",
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: "vertical" as const,
+    overflow: "hidden",
+  },
+  listingChips: {
     display: "flex",
-    alignItems: "center",
-    gap: 6,
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  listingChip: {
+    fontSize: 12,
+    color: "#0f172a",
+    background: "#f8fafc",
+    border: "1px solid #e2e8f0",
+    padding: "4px 8px",
+    borderRadius: 999,
+    fontWeight: 600,
   },
   listingActions: {
     display: "flex",
     gap: 8,
-    marginTop: 16,
+    marginTop: "auto",
     paddingTop: 16,
-    borderTop: "2px solid #f0f0f0",
+    borderTop: "1px solid #e5e7eb",
     flexWrap: "wrap",
   },
   actionButton: {
@@ -919,6 +1222,48 @@ const MyAdsPage: React.FC = () => {
     listingTypeModal.mode === "republish"
       ? "Обявата ще бъде активна за 30 минути от момента на публикуване."
       : "Можеш да промениш типа по всяко време.";
+  const isPreviewTab = activeTab === "archived" || activeTab === "expired" || activeTab === "drafts";
+  const previewImages = previewListing ? getPreviewImages(previewListing) : [];
+  const previewImage = previewImages[previewImageIndex] || "";
+  const previewPriceValue = previewListing ? Number(previewListing.price) : Number.NaN;
+  const previewPriceLabel =
+    Number.isFinite(previewPriceValue) && previewPriceValue > 0
+      ? `€${previewPriceValue.toLocaleString("bg-BG")}`
+      : "Цена не е зададена";
+  const previewSpecs = previewListing
+    ? [
+        { label: "Година", value: previewListing.year_from ? String(previewListing.year_from) : "" },
+        { label: "Град", value: previewListing.city },
+        { label: "Гориво", value: previewListing.fuel },
+        { label: "Скоростна кутия", value: previewListing.gearbox },
+        {
+          label: "Пробег",
+          value: Number.isFinite(previewListing.mileage)
+            ? `${previewListing.mileage.toLocaleString("bg-BG")} км`
+            : "",
+        },
+        {
+          label: "Мощност",
+          value: Number.isFinite(previewListing.power)
+            ? `${previewListing.power} к.с.`
+            : "",
+        },
+        {
+          label: "Кубатура",
+          value: Number.isFinite(previewListing.displacement)
+            ? `${previewListing.displacement} cc`
+            : "",
+        },
+        { label: "Състояние", value: previewListing.condition },
+        { label: "Еко стандарт", value: previewListing.euro_standard },
+        { label: "Цвят", value: previewListing.color },
+      ].filter((spec) => spec.value)
+    : [];
+  const previewStatusLabel = getPreviewStatusLabel(previewTab);
+  const previewStatusStyle =
+    previewStatusLabel === "Изтекла"
+      ? { ...styles.previewStatusPill, ...styles.previewStatusPillExpired }
+      : styles.previewStatusPill;
 
   if (totalListings === 0) {
     return (
@@ -1062,6 +1407,130 @@ const MyAdsPage: React.FC = () => {
           </div>
         )}
 
+        {previewListing && (
+          <div style={styles.modalOverlay} onClick={closePreview}>
+            <div
+              style={styles.previewModal}
+              role="dialog"
+              aria-modal="true"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={styles.previewHeader}>
+                <div>
+                  <h2 style={styles.previewTitle}>
+                    {previewListing.brand} {previewListing.model}
+                  </h2>
+                  <div style={styles.previewMetaRow}>
+                    {previewStatusLabel && (
+                      <span style={previewStatusStyle}>{previewStatusLabel}</span>
+                    )}
+                    {previewListing.year_from ? (
+                      <span style={styles.previewMetaText}>Година {previewListing.year_from}</span>
+                    ) : (
+                      <span style={styles.previewMetaText}>Без година</span>
+                    )}
+                    {previewListing.city && (
+                      <span style={styles.previewMetaText}>{previewListing.city}</span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closePreview}
+                  style={styles.modalClose}
+                  aria-label="Затвори"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div style={styles.previewGrid}>
+                <div>
+                  <div style={styles.previewMedia}>
+                    {previewListing.listing_type === "top" && (
+                      <div style={styles.topBadge}>Топ обява</div>
+                    )}
+                    {previewImage ? (
+                      <img
+                        src={previewImage}
+                        alt={previewListing.title || `${previewListing.brand} ${previewListing.model}`}
+                        style={styles.previewImage}
+                      />
+                    ) : (
+                      <div style={styles.previewPlaceholder}>
+                        <Car size={28} />
+                        Няма снимка
+                      </div>
+                    )}
+                  </div>
+
+                  {previewImages.length > 1 && (
+                    <div style={styles.previewThumbs}>
+                      {previewImages.map((src, idx) => (
+                        <button
+                          key={`${src}-${idx}`}
+                          type="button"
+                          style={{
+                            ...styles.previewThumbButton,
+                            ...(idx === previewImageIndex ? styles.previewThumbButtonActive : {}),
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewImageIndex(idx);
+                          }}
+                          aria-label={`Снимка ${idx + 1}`}
+                        >
+                          <img src={src} alt={`Снимка ${idx + 1}`} style={styles.previewThumb} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div style={styles.previewInfo}>
+                  <div style={styles.previewPrice}>{previewPriceLabel}</div>
+
+                  {previewSpecs.length > 0 && (
+                    <div style={styles.previewSpecs}>
+                      {previewSpecs.map((spec) => (
+                        <div key={spec.label} style={styles.previewSpec}>
+                          <div style={styles.previewSpecLabel}>{spec.label}</div>
+                          <div style={styles.previewSpecValue}>{spec.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div style={styles.previewDescription}>
+                    {previewListing.description || "Няма описание към обявата."}
+                  </div>
+
+                  <div style={styles.previewActions}>
+                    <button
+                      type="button"
+                      style={{ ...styles.actionButton, ...styles.editButton, flex: "0 0 auto" }}
+                      onClick={() => {
+                        closePreview();
+                        goToEdit(previewListing);
+                      }}
+                    >
+                      <Edit2 size={14} />
+                      Редактирай
+                    </button>
+                    <button
+                      type="button"
+                      style={{ ...styles.modalButton, ...styles.modalButtonSecondary }}
+                      onClick={closePreview}
+                    >
+                      Затвори
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Tabs */}
         <div style={styles.tabsContainer}>
           {[
@@ -1152,72 +1621,119 @@ const MyAdsPage: React.FC = () => {
           </div>
         ) : (
           <div style={styles.listingsGrid}>
-            {currentListings.map((listing) => (
+            {currentListings.map((listing) => {
+            const statusLabel = getPreviewStatusLabel(activeTab);
+            const fallbackTitle = `${listing.brand || ""} ${listing.model || ""}`.trim();
+            const listingTitle = (listing.title || fallbackTitle || "Без заглавие").trim();
+            const subtitleParts = [
+              listing.year_from ? `${listing.year_from} г.` : "",
+              listing.city || "",
+              listing.condition && listing.condition !== "0" ? listing.condition : "",
+            ].filter(Boolean);
+            const subtitle = subtitleParts.join(" · ");
+            const createdLabel = formatDate(listing.created_at);
+            const descriptionSnippet = getShortDescription(listing.description);
+            const priceValue = Number(listing.price);
+            const priceLabel =
+              Number.isFinite(priceValue) && priceValue > 0
+                ? `${priceValue.toLocaleString("bg-BG")} €`
+                : "Цена не е зададена";
+            const statusBadgeStyle =
+              statusLabel === "Изтекла"
+                ? { ...styles.statusBadge, ...styles.statusBadgeExpired }
+                : styles.statusBadge;
+            const chips = [
+              listing.fuel ? `Гориво: ${listing.fuel}` : "",
+              listing.gearbox ? `Кутия: ${listing.gearbox}` : "",
+              Number.isFinite(listing.mileage) && listing.mileage > 0
+                ? `Пробег: ${listing.mileage.toLocaleString("bg-BG")} км`
+                : "",
+              Number.isFinite(listing.power) && listing.power > 0
+                ? `Мощност: ${listing.power} к.с.`
+                : "",
+              Number.isFinite(listing.displacement) && listing.displacement > 0
+                ? `Кубатура: ${listing.displacement} cc`
+                : "",
+              listing.euro_standard && listing.euro_standard !== "0"
+                ? `Еко: ${listing.euro_standard}`
+                : "",
+              listing.color ? `Цвят: ${listing.color}` : "",
+            ].filter(Boolean) as string[];
+            const visibleChips = chips.slice(0, 6);
+
+            return (
             <div
               key={listing.id}
               style={{
                 ...styles.listingCard,
-                ...(activeTab === "expired" ? { cursor: "default" } : {}),
               }}
               onClick={() => {
-                if (activeTab === "expired") return;
+                if (isPreviewTab) {
+                  openPreview(listing);
+                  return;
+                }
                 navigate(`/details/${listing.slug}`);
               }}
               onMouseEnter={(e) => {
-                if (activeTab === "expired") return;
                 Object.assign(e.currentTarget.style, styles.listingCardHover);
               }}
               onMouseLeave={(e) => {
-                if (activeTab === "expired") return;
                 e.currentTarget.style.transform = "";
                 e.currentTarget.style.boxShadow =
-                  "0 2px 8px rgba(0,0,0,0.08)";
+                  "0 10px 24px rgba(15, 23, 42, 0.08)";
               }}
             >
-              {listing.listing_type === "top" && (
-                <div style={styles.topBadge}>Топ обява</div>
-              )}
-              {listing.image_url ? (
-                <img
-                  src={listing.image_url}
-                  alt={listing.title}
-                  style={styles.listingImage}
-                />
-              ) : (
-                <div
-                  style={{
-                    ...styles.listingImage,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                  }}
-                >
-                  <Car size={60} color="#fff" />
-                </div>
-              )}
+              <div style={styles.listingMedia}>
+                {listing.listing_type === "top" && (
+                  <div style={styles.topBadge}>Топ обява</div>
+                )}
+                {statusLabel && (
+                  <div style={statusBadgeStyle}>{statusLabel}</div>
+                )}
+                {listing.image_url ? (
+                  <img
+                    src={listing.image_url}
+                    alt={listingTitle}
+                    style={styles.listingImage}
+                  />
+                ) : (
+                  <div style={styles.listingPlaceholder}>
+                    <Car size={34} />
+                    Няма снимка
+                  </div>
+                )}
+                <div style={styles.listingMediaOverlay} />
+                <div style={styles.listingPricePill}>{priceLabel}</div>
+              </div>
 
               <div style={styles.listingContent}>
-                <h3 style={styles.listingTitle}>
-                  {listing.brand} {listing.model}
-                </h3>
-                <div style={styles.listingPrice}>
-                  {listing.price.toLocaleString("bg-BG")} лв.
+                <div style={styles.listingTitleRow}>
+                  <h3 style={styles.listingTitle}>{listingTitle}</h3>
+                  {createdLabel && (
+                    <span style={styles.listingMeta}>Създадена: {createdLabel}</span>
+                  )}
                 </div>
 
-                <div style={styles.listingDetails}>
-                  <strong>Година:</strong> {listing.year_from}
-                </div>
-                <div style={styles.listingDetails}>
-                  <strong>Град:</strong> {listing.city}
-                </div>
-                <div style={styles.listingDetails}>
-                  <strong>Гориво:</strong> {listing.fuel}
-                </div>
-                <div style={styles.listingDetails}>
-                  <strong>Пробег:</strong>{" "}
-                  {listing.mileage.toLocaleString("bg-BG")} км
-                </div>
+                {subtitle && (
+                  <div style={styles.listingSubtitle}>{subtitle}</div>
+                )}
+
+                {descriptionSnippet && (
+                  <div style={styles.listingDescription}>{descriptionSnippet}</div>
+                )}
+
+                {visibleChips.length > 0 && (
+                  <div style={styles.listingChips}>
+                    {visibleChips.map((chip, index) => (
+                      <span
+                        key={`${listing.id}-chip-${index}`}
+                        style={styles.listingChip}
+                      >
+                        {chip}
+                      </span>
+                    ))}
+                  </div>
+                )}
 
                 <div style={styles.listingActions}>
                   {/* Active Tab Actions: Edit, Archive, Delete */}
@@ -1227,7 +1743,7 @@ const MyAdsPage: React.FC = () => {
                         style={{ ...styles.actionButton, ...styles.editButton }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigate(`/publish?edit=${listing.id}`);
+                          goToEdit(listing);
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.transform = "translateY(-2px)";
@@ -1341,6 +1857,44 @@ const MyAdsPage: React.FC = () => {
                   {activeTab === "archived" && (
                     <>
                       <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openPreview(listing);
+                        }}
+                        style={{ ...styles.actionButton, ...styles.previewButton }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = "translateY(-2px)";
+                          e.currentTarget.style.boxShadow = "0 4px 12px rgba(15, 23, 42, 0.12)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = "translateY(0)";
+                          e.currentTarget.style.boxShadow = "none";
+                        }}
+                      >
+                        <Eye size={14} />
+                        Преглед
+                      </button>
+
+                      <button
+                        style={{ ...styles.actionButton, ...styles.editButton }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          goToEdit(listing);
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = "translateY(-2px)";
+                          e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.4)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = "translateY(0)";
+                          e.currentTarget.style.boxShadow = "0 2px 8px rgba(102, 126, 234, 0.3)";
+                        }}
+                      >
+                        <Edit2 size={14} />
+                        Редактирай
+                      </button>
+
+                      <button
                         onClick={(e) => handleUnarchive(listing.id, e)}
                         disabled={actionLoading === listing.id}
                         style={{
@@ -1404,6 +1958,44 @@ const MyAdsPage: React.FC = () => {
                   {/* Expired Tab Actions: Republish, Delete */}
                   {activeTab === "expired" && (
                     <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openPreview(listing);
+                        }}
+                        style={{ ...styles.actionButton, ...styles.previewButton }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = "translateY(-2px)";
+                          e.currentTarget.style.boxShadow = "0 4px 12px rgba(15, 23, 42, 0.12)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = "translateY(0)";
+                          e.currentTarget.style.boxShadow = "none";
+                        }}
+                      >
+                        <Eye size={14} />
+                        Преглед
+                      </button>
+
+                      <button
+                        style={{ ...styles.actionButton, ...styles.editButton }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          goToEdit(listing);
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = "translateY(-2px)";
+                          e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.4)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = "translateY(0)";
+                          e.currentTarget.style.boxShadow = "0 2px 8px rgba(102, 126, 234, 0.3)";
+                        }}
+                      >
+                        <Edit2 size={14} />
+                        Редактирай
+                      </button>
+
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1474,10 +2066,29 @@ const MyAdsPage: React.FC = () => {
                   {activeTab === "drafts" && (
                     <>
                       <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openPreview(listing);
+                        }}
+                        style={{ ...styles.actionButton, ...styles.previewButton }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = "translateY(-2px)";
+                          e.currentTarget.style.boxShadow = "0 4px 12px rgba(15, 23, 42, 0.12)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = "translateY(0)";
+                          e.currentTarget.style.boxShadow = "none";
+                        }}
+                      >
+                        <Eye size={14} />
+                        Преглед
+                      </button>
+
+                      <button
                         style={{ ...styles.actionButton, ...styles.editButton }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigate(`/publish?edit=${listing.id}`);
+                          goToEdit(listing);
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.background = "#0052a3";
@@ -1570,7 +2181,7 @@ const MyAdsPage: React.FC = () => {
                 )}
               </div>
             </div>
-          ))}
+          )})}
           </div>
         )}
       </div>

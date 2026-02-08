@@ -26,31 +26,30 @@ const SavedSearchesMenu: React.FC = () => {
       position: "relative",
     },
     navLink: {
-      color: "#1f2937", // Използваме по-тъмен текст за по-стилен вид
       textDecoration: "none",
-      fontSize: 15,
-      padding: "10px 16px",
-      borderRadius: 8,
+      fontSize: 14,
+      padding: "0 16px",
+      height: 40,
+      borderRadius: 999,
       fontWeight: 600,
-      transition: "all 0.3s ease", // По-плавен преход
+      transition: "all 0.2s ease",
       display: "flex",
       alignItems: "center",
       gap: 8,
-      background: "#f0f4ff", // Лек фон за плавност
-      border: "1px solid #c7dcff", // Граница с леко синкав оттенък
       cursor: "pointer",
       position: "relative",
     },
     navLinkActive: {
-      background: "#0066cc", // По-силно изразен активен фон
+      background: "#0f766e",
       color: "#fff",
-      border: "1px solid #0066cc",
+      border: "1px solid #0f766e",
+      boxShadow: "0 6px 16px rgba(15,118,110,0.28)",
     },
     badge: {
       position: "absolute",
       top: -4,
       right: -4,
-      background: "#0066cc", // Същия син оттенък
+      background: "#0f766e",
       color: "#fff",
       borderRadius: "50%",
       width: 18,
@@ -69,7 +68,7 @@ const SavedSearchesMenu: React.FC = () => {
       background: "#fff",
       border: "1px solid #e0e0e0",
       borderRadius: 8,
-      boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+      boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
       minWidth: 320,
       maxWidth: 400,
       marginTop: 8,

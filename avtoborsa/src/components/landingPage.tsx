@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { CAR_FEATURES } from "../constants/carFeatures";
 import { AdvancedSearch } from "./AdvancedSearch";
@@ -362,7 +362,7 @@ export default function LandingPage() {
       `}</style>
 
       <main style={styles.main}>
-        <div id="search">
+        <div id="search" style={styles.searchBlock}>
           <AdvancedSearch
             onSearch={handleAdvancedSearch}
             brands={BRANDS}
@@ -506,7 +506,7 @@ export default function LandingPage() {
                         transition: "all 0.2s ease",
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = "#0066cc";
+                        e.currentTarget.style.borderColor = "#0f766e";
                         e.currentTarget.style.boxShadow = "0 0 0 2px rgba(0, 102, 204, 0.1)";
                       }}
                       onMouseLeave={(e) => {
@@ -577,7 +577,7 @@ export default function LandingPage() {
                               <tr>
                                 {Object.entries(CAR_FEATURES).map(([category, features]) => (
                                   <td key={category}>
-                                    <label style={{ fontSize: 12, fontWeight: 700, color: "#333", marginBottom: 12, display: "block", textTransform: "capitalize", paddingBottom: 8, borderBottom: "2px solid #0066cc" }}>
+                                    <label style={{ fontSize: 12, fontWeight: 700, color: "#333", marginBottom: 12, display: "block", textTransform: "capitalize", paddingBottom: 8, borderBottom: "2px solid #0f766e" }}>
                                       {category.charAt(0).toUpperCase() + category.slice(1)}
                                     </label>
                                     {features.map((feature) => (
@@ -621,7 +621,7 @@ export default function LandingPage() {
                               onClick={() => setShowFeaturesDropdown(false)}
                               style={{
                                 padding: "10px 20px",
-                                background: "#0066cc",
+                                background: "#0f766e",
                                 border: "none",
                                 borderRadius: 4,
                                 fontSize: 14,
@@ -669,7 +669,7 @@ export default function LandingPage() {
           </div>
 
         {/* LATEST LISTINGS */}
-        <section id="latest" style={styles.section}>
+        <section id="latest" style={{ ...styles.section, ...styles.latestSection }}>
           <style>{`
             .listing-card-hover {
               transition: transform 0.25s ease, box-shadow 0.25s ease;
@@ -682,7 +682,7 @@ export default function LandingPage() {
               position: absolute;
               top: 10px;
               left: 10px;
-              background: linear-gradient(135deg, #f59e0b, #f97316);
+              background: linear-gradient(135deg, #ef4444, #dc2626);
               color: #fff;
               padding: 4px 10px;
               border-radius: 999px;
@@ -690,7 +690,7 @@ export default function LandingPage() {
               font-weight: 700;
               letter-spacing: 0.3px;
               text-transform: uppercase;
-              box-shadow: 0 4px 10px rgba(249,115,22,0.3);
+              box-shadow: 0 4px 10px rgba(220,38,38,0.3);
               z-index: 2;
             }
             .latest-grid {
@@ -702,7 +702,7 @@ export default function LandingPage() {
               transition: background 0.2s ease, box-shadow 0.2s ease;
             }
             .view-more-btn:hover {
-              box-shadow: 0 4px 14px rgba(0,102,204,0.35);
+              box-shadow: 0 4px 14px rgba(15,118,110,0.35);
             }
 
             @media (min-width: 1024px) and (max-width: 1200px) {
@@ -716,20 +716,21 @@ export default function LandingPage() {
             }
           `}</style>
 
-          <div style={styles.sectionHeader}>
-            <h2 style={styles.h2}>Последни обяви</h2>
-            <p style={styles.sectionLead}>
-              Най-новите публикувани обяви на пазара
-            </p>
-          </div>
-
-          {listingsLoading ? (
-            <div style={{ textAlign: "center", padding: 40, background: "#fff", borderRadius: 10, border: "1px solid #eef2f7" }}>
-              <p style={{ fontSize: 15, color: "#6b7280", margin: 0 }}>Зареждане на обяви...</p>
+          <div style={styles.latestContainer}>
+            <div style={{ ...styles.sectionHeader, ...styles.containerHeader }}>
+              <h2 style={styles.h2}>Последни обяви</h2>
+              <p style={styles.sectionLead}>
+                Най-новите публикувани обяви на пазара
+              </p>
             </div>
-          ) : latestListings.length > 0 ? (
-            <>
-              <div className="latest-grid">
+
+            {listingsLoading ? (
+              <div style={{ textAlign: "center", padding: 40, background: "#f8fafc", borderRadius: 10, border: "1px solid #eef2f7" }}>
+                <p style={{ fontSize: 15, color: "#6b7280", margin: 0 }}>Зареждане на обяви...</p>
+              </div>
+            ) : latestListings.length > 0 ? (
+              <>
+                <div className="latest-grid">
                 {latestListings.map((listing) => (
                   <div
                     key={listing.id}
@@ -737,7 +738,7 @@ export default function LandingPage() {
                     style={{
                       borderRadius: 10,
                       overflow: "hidden",
-                      border: isTopListing(listing) ? "2px solid #f59e0b" : "1px solid #eef2f7",
+                        border: isTopListing(listing) ? "2px solid #dc2626" : "1px solid #eef2f7",
                       background: "#fff",
                       boxShadow: "0 2px 8px rgba(15,23,42,0.06)",
                       display: "flex",
@@ -776,7 +777,7 @@ export default function LandingPage() {
                         borderRadius: 6,
                         fontWeight: 700,
                         fontSize: 14,
-                        color: "#0066cc",
+                        color: "#0f766e",
                         boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
                       }}>
                         {listing.price.toLocaleString("bg-BG")} &euro;
@@ -805,7 +806,7 @@ export default function LandingPage() {
                           </svg>
                           {listing.city}
                         </span>
-                        <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <span style={{ display: "flex", alignItems: "center", gap: 4, color: "#d97706" }}>
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <circle cx="12" cy="12" r="10" />
                             <polyline points="12 6 12 12 16 14" />
@@ -816,10 +817,10 @@ export default function LandingPage() {
                     </div>
                   </div>
                 ))}
-              </div>
+                </div>
 
-              {/* View more button */}
-              <div style={{ textAlign: "center", marginTop: 28 }}>
+                {/* View more button */}
+                <div style={{ textAlign: "center", marginTop: 28 }}>
                 <button
                   className="view-more-btn"
                   type="button"
@@ -829,7 +830,7 @@ export default function LandingPage() {
                     alignItems: "center",
                     gap: 8,
                     padding: "13px 32px",
-                    background: "#0066cc",
+                    background: "#0f766e",
                     color: "#fff",
                     border: "none",
                     borderRadius: 10,
@@ -845,33 +846,77 @@ export default function LandingPage() {
                     <path d="m12 5 7 7-7 7" />
                   </svg>
                 </button>
+                </div>
+              </>
+            ) : (
+              <div style={{ textAlign: "center", padding: 40, background: "#f8fafc", borderRadius: 10, border: "1px solid #eef2f7" }}>
+                <p style={{ fontSize: 15, color: "#6b7280", margin: 0 }}>Няма налични обяви в момента</p>
               </div>
-            </>
-          ) : (
-            <div style={{ textAlign: "center", padding: 40, background: "#fff", borderRadius: 10, border: "1px solid #eef2f7" }}>
-              <p style={{ fontSize: 15, color: "#6b7280", margin: 0 }}>Няма налични обяви в момента</p>
-            </div>
-          )}
+            )}
+          </div>
         </section>
 
-        {/* CATEGORIES */}
-        <section id="categories" style={styles.section}>
-          <div style={styles.sectionHeader}>
-            <h2 style={styles.h2}>Категории</h2>
-            <p style={styles.sectionLead}>
-              Бързи входове за масовия пазар (силни за SEO и UX).
-            </p>
-          </div>
+        {/* ABOUT */}
+        <section id="about" style={styles.section}>
+          <div style={styles.infoContainer}>
+            <div style={{ ...styles.sectionHeader, ...styles.containerHeader }}>
+              <h2 style={styles.h2}>За Kar.bg</h2>
+              <p style={styles.sectionLead}>
+                Ясна платформа за купувачи и продавачи — бързо търсене, честни обяви и лесен контакт.
+              </p>
+            </div>
 
-          <div style={styles.categoriesGrid} className="categories-grid">
-            <Category title="До 5 000 лв" subtitle="най-търсени бюджетни" />
-            <Category title="До 10 000 лв" subtitle="най-доброто за цена/качество" />
-            <Category title="Нов внос" subtitle="свежи предложения" />
-            <Category title="От собственик" subtitle="без посредници" />
-            <Category title="Автоматик" subtitle="комфорт в града" />
-            <Category title="4x4 / SUV" subtitle="за зима и път" />
-            <Category title="На части" subtitle="обяви за части" />
-            <Category title="На изплащане" subtitle="гъвкави оферти" />
+            <div style={styles.infoGrid} className="info-grid">
+              <div style={styles.infoCard} className="info-card">
+                <div style={styles.infoTitle}>Какво представлява</div>
+                <p style={styles.infoText}>
+                  AvtoBorsa е{" "}
+                  <span style={styles.infoHighlight}>специализирана платформа</span> за покупко‑продажба на
+                  автомобили с{" "}
+                  <span style={styles.infoHighlight}>умно търсене</span>, ясни параметри и
+                  <span style={styles.infoHighlight}> реални снимки</span>.
+                </p>
+                <p style={styles.infoText}>
+                  Събираме оферти от частни лица и автокъщи на едно място, за да спестим време и да дадем
+                  <span style={styles.infoHighlight}> прозрачност</span> във всеки избор.
+                </p>
+              </div>
+
+              <div style={styles.infoCard} className="info-card">
+                <div style={styles.infoTitle}>С какво сме по‑добри</div>
+                <ul style={styles.infoList}>
+                  <li style={styles.infoListItem}>
+                    <span style={styles.infoHighlight}>Бързо търсене</span> по марка, модел, цена и регион.
+                  </li>
+                  <li style={styles.infoListItem}>
+                    <span style={styles.infoHighlight}>Чист дизайн</span> — без излишен шум, само важното.
+                  </li>
+                  <li style={styles.infoListItem}>
+                    <span style={styles.infoHighlight}>По‑лесна комуникация</span> между купувач и продавач.
+                  </li>
+                  <li style={styles.infoListItem}>
+                    <span style={styles.infoHighlight}>Свежи обяви</span> с приоритет на актуалните оферти.
+                  </li>
+                </ul>
+              </div>
+
+              <div style={styles.infoCard} className="info-card">
+                <div style={styles.infoTitle}>Свържете се с нас</div>
+                <p style={styles.infoText}>
+                  Имате въпрос или нужда от съдействие? Пишете ни през{" "}
+                  <span style={styles.infoHighlight}>контактната форма</span> или използвайте{" "}
+                  <span style={styles.infoHighlight}>чат в сайта</span>.
+                </p>
+                <p style={{ ...styles.infoText, marginBottom: 0 }}>
+                  Работим бързо и отговаряме в рамките на{" "}
+                  <span style={styles.infoHighlight}>работния ден</span>.
+                </p>
+                <div style={styles.infoContactRow}>
+                  <div style={styles.infoContactPill}>Поддръжка</div>
+                  <div style={styles.infoContactText}>Пон‑Пет · 09:00–18:00</div>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -938,16 +983,6 @@ function Select({
 
 
 
-function Category({ title, subtitle }: { title: string; subtitle: string }) {
-  return (
-    <div style={styles.categoryCard} className="categoryCard" role="button" tabIndex={0}>
-      <div style={styles.categoryTitle}>{title}</div>
-      <div style={styles.categorySub}>{subtitle}</div>
-      <div style={styles.categoryCta}>Разгледай →</div>
-    </div>
-  );
-}
-
 /* ---------- Styles (inline, без Tailwind) ---------- */
 
 const styles: Record<string, React.CSSProperties> = {
@@ -982,12 +1017,18 @@ const styles: Record<string, React.CSSProperties> = {
     placeItems: "center",
     fontWeight: 800,
     letterSpacing: 0.5,
-    background: "#0066cc",
+    background: "#0f766e",
     color: "#fff",
     fontSize: 14,
   },
-  brandName: { fontSize: 18, fontWeight: 700, lineHeight: 1.1, color: "#0066cc" },
-  brandTag: { fontSize: 11, color: "#666", marginTop: 2 },
+  brandName: {
+    fontSize: 19,
+    fontWeight: 700,
+    lineHeight: 1.1,
+    color: "#0f766e",
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+  },
+  brandTag: { fontSize: 12, color: "#666", marginTop: 2 },
   nav: {
     display: "flex",
     alignItems: "center",
@@ -998,7 +1039,7 @@ const styles: Record<string, React.CSSProperties> = {
   navLink: {
     color: "#333",
     textDecoration: "none",
-    fontSize: 14,
+    fontSize: 15,
     padding: "6px 12px",
     borderRadius: 4,
     fontWeight: 500,
@@ -1019,13 +1060,14 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 24,
   },
   h1: {
-    fontSize: 28,
-    lineHeight: 1.3,
+    fontSize: 32,
+    lineHeight: 1.2,
     margin: "0 0 12px",
     fontWeight: 700,
     color: "#333",
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
   },
-  lead: { margin: 0, color: "#666", fontSize: 14, lineHeight: 1.5, maxWidth: "100%" },
+  lead: { margin: 0, color: "#666", fontSize: 15, lineHeight: 1.6, maxWidth: "100%" },
 
   searchCard: {
     borderRadius: 8,
@@ -1042,15 +1084,21 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: "1px solid #e0e0e0",
     background: "#fafafa",
   },
-  searchTitle: { fontWeight: 700, fontSize: 16, color: "#333" },
-  searchSubtitle: { fontSize: 12, color: "#666", marginTop: 2 },
+  searchBlock: { marginBottom: 32 },
+  searchTitle: {
+    fontWeight: 700,
+    fontSize: 17,
+    color: "#333",
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+  },
+  searchSubtitle: { fontSize: 13, color: "#666", marginTop: 2 },
   form: { padding: "16px" },
   grid: {
     display: "grid",
     gridTemplateColumns: "repeat(4, minmax(0,1fr))",
     gap: 12,
   },
-  label: { fontSize: 13, color: "#555", fontWeight: 500, marginBottom: 4 },
+  label: { fontSize: 14, color: "#555", fontWeight: 600, marginBottom: 4 },
   selectChevron: {
     position: "absolute",
     right: 12,
@@ -1080,10 +1128,10 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "0 20px",
     borderRadius: 4,
     border: "none",
-    background: "#0066cc",
+    background: "#0f766e",
     color: "#fff",
     fontWeight: 600,
-    fontSize: 14,
+    fontSize: 15,
     cursor: "pointer",
   },
   primaryBtnWide: {
@@ -1091,10 +1139,10 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "0 24px",
     borderRadius: 4,
     border: "none",
-    background: "#0066cc",
+    background: "#0f766e",
     color: "#fff",
     fontWeight: 600,
-    fontSize: 15,
+    fontSize: 16,
     cursor: "pointer",
   },
   secondaryBtn: {
@@ -1105,7 +1153,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#fff",
     color: "#333",
     fontWeight: 600,
-    fontSize: 14,
+    fontSize: 15,
     cursor: "pointer",
   },
   secondaryBtnSmall: {
@@ -1116,7 +1164,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#fff",
     color: "#333",
     fontWeight: 500,
-    fontSize: 13,
+    fontSize: 14,
     cursor: "pointer",
   },
   primaryBtnSmall: {
@@ -1124,19 +1172,34 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "0 16px",
     borderRadius: 4,
     border: "none",
-    background: "#0066cc",
+    background: "#0f766e",
     color: "#fff",
     fontWeight: 600,
-    fontSize: 13,
+    fontSize: 14,
     cursor: "pointer",
   },
 
-  note: { marginTop: 12, fontSize: 12, color: "#999", fontStyle: "italic" },
+  note: { marginTop: 12, fontSize: 13, color: "#999", fontStyle: "italic" },
 
   section: { padding: "0.1rem 0 0" },
-  sectionHeader: { marginBottom: 16 , marginTop: "3rem" },
-  h2: { margin: 0, fontSize: 22, fontWeight: 700, color: "#333" },
-  sectionLead: { margin: "6px 0 0", color: "#666", fontSize: 14, lineHeight: 1.5 },
+  sectionHeader: { marginBottom: 16, marginTop: "3rem" },
+  latestSection: { marginBottom: 32 },
+  latestContainer: {
+    background: "#fff",
+    border: "1px solid #e5e7eb",
+    borderRadius: 12,
+    padding: 22,
+    boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
+  },
+  containerHeader: { marginTop: 0 },
+  h2: {
+    margin: 0,
+    fontSize: 26,
+    fontWeight: 700,
+    color: "#333",
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+  },
+  sectionLead: { margin: "6px 0 0", color: "#666", fontSize: 15, lineHeight: 1.6 },
 
   cardsGrid: {
     display: "grid",
@@ -1163,16 +1226,22 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "6px 12px",
     borderRadius: 4,
     fontWeight: 700,
-    fontSize: 15,
+    fontSize: 16,
     background: "#fff",
-    color: "#0066cc",
+    color: "#0f766e",
     border: "1px solid #e0e0e0",
   },
   cardBody: { padding: 14, display: "flex", flexDirection: "column", gap: 10, flex: 1 },
   cardTitleRow: { display: "flex", alignItems: "start", justifyContent: "space-between", gap: 10 },
-  cardTitle: { fontWeight: 700, fontSize: 15, lineHeight: 1.3, color: "#333" },
+  cardTitle: {
+    fontWeight: 700,
+    fontSize: 16,
+    lineHeight: 1.3,
+    color: "#333",
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+  },
   cityPill: {
-    fontSize: 12,
+    fontSize: 13,
     padding: "4px 8px",
     borderRadius: 3,
     border: "1px solid #e0e0e0",
@@ -1180,16 +1249,16 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#666",
     whiteSpace: "nowrap",
   },
-  metaRow: { display: "flex", flexWrap: "wrap", gap: 8, color: "#666", fontSize: 13, lineHeight: 1.4 },
+  metaRow: { display: "flex", flexWrap: "wrap", gap: 8, color: "#666", fontSize: 14, lineHeight: 1.5 },
   meta: { whiteSpace: "nowrap" },
   tagsRow: { display: "flex", gap: 6, flexWrap: "wrap" },
   tag: {
-    fontSize: 11,
+    fontSize: 12,
     padding: "4px 8px",
     borderRadius: 3,
-    border: "1px solid #d0e8ff",
-    background: "#e6f2ff",
-    color: "#0066cc",
+    border: "1px solid #99f6e4",
+    background: "#ecfdf5",
+    color: "#0f766e",
   },
   cardActions: { display: "flex", justifyContent: "space-between", gap: 10, marginTop: "auto" },
 
@@ -1201,26 +1270,59 @@ const styles: Record<string, React.CSSProperties> = {
     padding: 30,
     textAlign: "center",
   },
-  emptyTitle: { fontWeight: 700, fontSize: 18, color: "#333" },
-  emptyText: { color: "#666", margin: "8px 0 16px", fontSize: 14 },
+  emptyTitle: {
+    fontWeight: 700,
+    fontSize: 19,
+    color: "#333",
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+  },
+  emptyText: { color: "#666", margin: "8px 0 16px", fontSize: 15 },
 
-  categoriesGrid: {
+  infoContainer: {
+    background: "#fff",
+    border: "1px solid #e5e7eb",
+    borderRadius: 10,
+    padding: 20,
+    boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
+  },
+  infoGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(4, minmax(0,1fr))",
+    gridTemplateColumns: "repeat(3, minmax(0,1fr))",
     gap: 16,
   },
-  categoryCard: {
-    borderRadius: 6,
-    border: "1px solid #e0e0e0",
-    background: "#fff",
-    padding: 16,
-    cursor: "pointer",
-    boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
-    transition: "box-shadow 0.2s",
+  infoCard: {
+    borderRadius: 8,
+    border: "1px solid #e3e7ee",
+    background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)",
+    padding: 18,
+    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+    minHeight: 200,
+    transition: "box-shadow 0.2s, transform 0.2s",
   },
-  categoryTitle: { fontWeight: 700, fontSize: 15, color: "#333" },
-  categorySub: { marginTop: 6, color: "#666", fontSize: 13, lineHeight: 1.4 },
-  categoryCta: { marginTop: 10, fontSize: 13, fontWeight: 600, color: "#0066cc" },
+  infoTitle: {
+    fontWeight: 700,
+    fontSize: 18,
+    color: "#1f2937",
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+  },
+  infoText: { margin: 0, color: "#4b5563", fontSize: 15, lineHeight: 1.7 },
+  infoHighlight: { color: "#0f766e", fontWeight: 700 },
+  infoList: { margin: 0, paddingLeft: 18, color: "#4b5563", fontSize: 15, lineHeight: 1.7 },
+  infoListItem: { marginBottom: 6 },
+  infoContactRow: { marginTop: 6, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" },
+  infoContactPill: {
+    fontSize: 12,
+    padding: "4px 10px",
+    borderRadius: 999,
+    background: "#ecfdf5",
+    color: "#0f766e",
+    border: "1px solid #99f6e4",
+    fontWeight: 600,
+  },
+  infoContactText: { fontSize: 14, color: "#4b5563" },
 
   cta: {
     marginTop: 30,
@@ -1237,8 +1339,14 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 20,
     flexWrap: "wrap",
   },
-  h3: { margin: 0, fontSize: 20, fontWeight: 700, color: "#333" },
-  ctaText: { margin: "6px 0 0", color: "#666", fontSize: 14, lineHeight: 1.5, maxWidth: 600 },
+  h3: {
+    margin: 0,
+    fontSize: 22,
+    fontWeight: 700,
+    color: "#333",
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+  },
+  ctaText: { margin: "6px 0 0", color: "#666", fontSize: 15, lineHeight: 1.6, maxWidth: 600 },
 
   footer: {
     marginTop: 50,
@@ -1254,13 +1362,23 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 30,
   } as React.CSSProperties & { className?: string },
   footerCol: { display: "flex", flexDirection: "column", gap: 10 },
-  footerBrand: { fontWeight: 700, fontSize: 16, color: "#0066cc" },
-  footerText: { color: "#666", fontSize: 13, lineHeight: 1.6, maxWidth: 400 },
-  footerTitle: { fontWeight: 700, fontSize: 14, color: "#333" },
+  footerBrand: {
+    fontWeight: 700,
+    fontSize: 17,
+    color: "#0f766e",
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+  },
+  footerText: { color: "#666", fontSize: 14, lineHeight: 1.7, maxWidth: 400 },
+  footerTitle: {
+    fontWeight: 700,
+    fontSize: 15,
+    color: "#333",
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+  },
   footerLink: {
     color: "#666",
     textDecoration: "none",
-    fontSize: 13,
+    fontSize: 14,
     padding: "4px 0",
   },
   footerBottom: {
@@ -1274,61 +1392,65 @@ const styles: Record<string, React.CSSProperties> = {
 };
 
 const globalCss = `
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
   * { box-sizing: border-box; }
   html, body {  width: 100%; margin: 0; padding: 0; }
-  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+  body { margin: 0; font-family: "Manrope", "Segoe UI", sans-serif; font-size: 15px; }
   #root { width: 100%; }
   a:hover { text-decoration: underline; }
   input::placeholder { color: #999; }
   input, select, button { font-family: inherit; }
-  input:focus, select:focus { border-color: #0066cc; outline: none; }
+  input:focus, select:focus { border-color: #0f766e; outline: none; }
   button:hover { opacity: 0.9; }
   button:active { opacity: 0.8; }
   select option { color: #333; background: #fff; }
   .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.12) !important; }
-  .categoryCard:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important; }
-  [role="button"]:focus-visible { outline: 2px solid #0066cc; outline-offset: 2px; }
+  .info-card:hover {
+    box-shadow: 0 6px 16px rgba(0,0,0,0.12) !important;
+    transform: translateY(-2px);
+  }
+  [role="button"]:focus-visible { outline: 2px solid #0f766e; outline-offset: 2px; }
 
   /* Desktop (1200px+) */
   @media (min-width: 1201px) {
-    body { font-size: 15px; }
+    body { font-size: 16px; }
     .search-grid { grid-template-columns: repeat(4, minmax(0,1fr)) !important; }
     .cards-grid { grid-template-columns: repeat(4, minmax(0,1fr)) !important; }
-    .categories-grid { grid-template-columns: repeat(4, minmax(0,1fr)) !important; }
+    .info-grid { grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
   }
 
   /* Tablet Large (1024px - 1200px) */
   @media (min-width: 1024px) and (max-width: 1200px) {
-    body { font-size: 14px; }
+    body { font-size: 15px; }
     .search-grid { grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
     .cards-grid { grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
-    .categories-grid { grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
+    .info-grid { grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
   }
 
   /* Tablet (768px - 1023px) */
   @media (min-width: 768px) and (max-width: 1023px) {
-    body { font-size: 14px; }
+    body { font-size: 15px; }
     .search-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
     .cards-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
-    .categories-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+    .info-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
     .footer-grid { grid-template-columns: 1fr !important; }
   }
 
   /* Mobile Large (640px - 767px) */
   @media (min-width: 640px) and (max-width: 767px) {
-    body { font-size: 13px; }
+    body { font-size: 14px; }
     .search-grid { grid-template-columns: 1fr !important; }
     .cards-grid { grid-template-columns: 1fr !important; }
-    .categories-grid { grid-template-columns: 1fr !important; }
+    .info-grid { grid-template-columns: 1fr !important; }
     .footer-grid { grid-template-columns: 1fr !important; }
   }
 
   /* Mobile Small (< 640px) */
   @media (max-width: 639px) {
-    body { font-size: 13px; }
+    body { font-size: 14px; }
     .search-grid { grid-template-columns: 1fr !important; }
     .cards-grid { grid-template-columns: 1fr !important; }
-    .categories-grid { grid-template-columns: 1fr !important; }
+    .info-grid { grid-template-columns: 1fr !important; }
     .footer-grid { grid-template-columns: 1fr !important; }
     .form-bottom {
       flex-direction: column;

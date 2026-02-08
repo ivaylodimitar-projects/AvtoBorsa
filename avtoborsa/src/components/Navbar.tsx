@@ -163,9 +163,9 @@ export default Navbar;
 
 const styles: Record<string, React.CSSProperties> = {
   header: {
-    background: "linear-gradient(180deg, #ffffff 0%, #f7f9fc 100%)",
-    borderBottom: "1px solid #e5e7eb",
-    boxShadow: "0 8px 24px rgba(15, 23, 42, 0.06)",
+    background: "#fff",
+    borderBottom: "1px solid #e0e0e0",
+    boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
     position: "sticky",
     top: 0,
     zIndex: 100,
@@ -195,21 +195,22 @@ const styles: Record<string, React.CSSProperties> = {
   logo: {
     width: 40,
     height: 40,
-    borderRadius: 10,
-    background: "linear-gradient(135deg, #1d4ed8, #0ea5e9)",
+    borderRadius: 6,
+    background: "#0f766e",
     color: "#fff",
     fontWeight: 800,
     display: "grid",
     placeItems: "center",
     fontSize: 14,
     letterSpacing: 0.8,
-    boxShadow: "0 8px 16px rgba(14, 165, 233, 0.35)",
+    boxShadow: "0 6px 12px rgba(15, 118, 110, 0.25)",
   },
   brandText: {
-    fontSize: 18,
-    fontWeight: 800,
-    color: "#0f172a",
+    fontSize: 19,
+    fontWeight: 700,
+    color: "#0f766e",
     letterSpacing: 0.2,
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
   },
   nav: {
     display: "flex",
@@ -241,8 +242,8 @@ const styles: Record<string, React.CSSProperties> = {
     width: 36,
     height: 36,
     borderRadius: 10,
-    background: "#eff6ff",
-    color: "#1d4ed8",
+    background: "#ecfdf5",
+    color: "#0f766e",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -252,14 +253,14 @@ const styles: Record<string, React.CSSProperties> = {
     margin: "0 0 8px 0",
     fontSize: 19,
     lineHeight: 1.25,
-    color: "#0f172a",
+    color: "#333",
     fontWeight: 800,
   },
   logoutText: {
     margin: "0 0 18px 0",
     fontSize: 14,
     lineHeight: 1.45,
-    color: "#475569",
+    color: "#666",
   },
   logoutActions: {
     display: "flex",
@@ -270,9 +271,9 @@ const styles: Record<string, React.CSSProperties> = {
     height: 40,
     padding: "0 16px",
     borderRadius: 10,
-    border: "1px solid #cbd5e1",
+    border: "1px solid #ccc",
     background: "#fff",
-    color: "#334155",
+    color: "#333",
     fontSize: 14,
     fontWeight: 700,
     cursor: "pointer",
@@ -281,8 +282,8 @@ const styles: Record<string, React.CSSProperties> = {
     height: 40,
     padding: "0 16px",
     borderRadius: 10,
-    border: "1px solid #1d4ed8",
-    background: "#1d4ed8",
+    border: "1px solid #0f766e",
+    background: "#0f766e",
     color: "#fff",
     fontSize: 14,
     fontWeight: 700,
@@ -325,7 +326,7 @@ const css = `
   text-decoration: none;
   font-size: 14px;
   font-weight: 600;
-  color: #0f172a;
+  color: #333;
   border: 1px solid transparent;
   background: transparent;
   transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease,
@@ -334,22 +335,23 @@ const css = `
 }
 
 .nav-link:hover {
-  background: #eef2ff;
-  border-color: #c7d2fe;
+  background: #ecfdf5;
+  border-color: #99f6e4;
+  color: #0f766e;
   transform: translateY(-1px);
 }
 
 .nav-link.active {
-  background: #1d4ed8;
+  background: #0f766e;
   color: #fff;
-  border-color: #1d4ed8;
-  box-shadow: 0 6px 16px rgba(29, 78, 216, 0.35);
+  border-color: #0f766e;
+  box-shadow: 0 6px 16px rgba(15, 118, 110, 0.28);
 }
 
 .nav-link:focus-visible,
 .btn-primary:focus-visible,
 .btn-ghost:focus-visible {
-  outline: 3px solid rgba(59, 130, 246, 0.45);
+  outline: 3px solid rgba(15, 118, 110, 0.35);
   outline-offset: 2px;
 }
 
@@ -358,7 +360,7 @@ const css = `
   height: 40px;
   padding: 0 18px;
   border-radius: 999px;
-  background: linear-gradient(135deg, #2563eb, #0ea5e9);
+  background: #0f766e;
   color: #fff;
   font-weight: 700;
   border: none;
@@ -367,15 +369,14 @@ const css = `
   align-items: center;
   gap: 8px;
   text-decoration: none;
-  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 8px 18px rgba(15, 118, 110, 0.28);
   transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
   white-space: nowrap;
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.45);
-  filter: brightness(1.02);
+  box-shadow: 0 10px 22px rgba(15, 118, 110, 0.35);
 }
 
 /* GHOST BUTTON */
@@ -384,8 +385,8 @@ const css = `
   padding: 0 16px;
   border-radius: 999px;
   background: #fff;
-  border: 1px solid #c7d2fe;
-  color: #1d4ed8;
+  border: 1px solid #ccc;
+  color: #333;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -397,14 +398,14 @@ const css = `
 }
 
 .btn-ghost:hover {
-  background: #eef2ff;
-  border-color: #93c5fd;
+  background: #f5f5f5;
+  border-color: #bbb;
 }
 
 /* BURGER */
 .burger {
   display: none;
-  background: #0f172a;
+  background: #0f766e;
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -427,11 +428,11 @@ const css = `
     left: 0;
     right: 0;
     background: #ffffff;
-    border-top: 1px solid #e2e8f0;
+    border-top: 1px solid #e0e0e0;
     padding: 14px 16px 18px;
     flex-direction: column;
     gap: 14px;
-    box-shadow: 0 18px 32px rgba(15, 23, 42, 0.12);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.1);
   }
 
   .nav.open {

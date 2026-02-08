@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
@@ -277,6 +277,7 @@ interface ImageItem {
 const PublishPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 30 }, (_, i) => currentYear - i);
@@ -483,6 +484,42 @@ const PublishPage: React.FC = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const applyListingToForm = (data: any) => {
+    setFormData({
+      mainCategory: data.main_category ?? data.mainCategory ?? "1",
+      category: data.category ?? "",
+      title: data.title ?? "",
+      brand: data.brand ?? "",
+      model: data.model ?? "",
+      yearFrom: data.year_from ? String(data.year_from) : data.yearFrom ?? "",
+      month: data.month ? String(data.month) : data.month ?? "",
+      vin: data.vin ?? "",
+      locationCountry: data.location_country ?? data.locationCountry ?? "",
+      locationRegion: data.location_region ?? data.locationRegion ?? "",
+      price: data.price != null && data.price !== "" ? String(data.price) : "",
+      city: data.city ?? "",
+      fuel: data.fuel ?? "",
+      gearbox: data.gearbox ?? "",
+      mileage: data.mileage != null && data.mileage !== "" ? String(data.mileage) : "",
+      color: data.color ?? "",
+      condition: data.condition ?? "0",
+      power: data.power != null && data.power !== "" ? String(data.power) : "",
+      displacement: data.displacement != null && data.displacement !== "" ? String(data.displacement) : "",
+      euroStandard: data.euro_standard ?? data.euroStandard ?? "",
+      description: data.description ?? "",
+      phone: data.phone ?? "",
+      email: data.email ?? "",
+      pictures: [],
+      features: Array.isArray(data.features) ? data.features : [],
+      listingType: data.listing_type ?? data.listingType ?? "normal",
+    });
+
+    setImages([]);
+    setExistingCoverImage(data.image_url || data.coverImage || null);
+    setCurrentStep(1);
+    setErrors({});
+  };
+
   const calculateCompletion = (): number => {
     const fields = [
       formData.brand,
@@ -540,6 +577,9 @@ const PublishPage: React.FC = () => {
 
     setIsEditMode(true);
     setEditingListingId(editId);
+    const stateListing = (location.state as { listing?: any } | null)?.listing;
+    const fallbackListing =
+      stateListing && String(stateListing.id) === String(editId) ? stateListing : null;
 
     const fetchListing = async () => {
       try {
@@ -558,45 +598,21 @@ const PublishPage: React.FC = () => {
         });
 
         if (!response.ok) {
+          if (fallbackListing) {
+            applyListingToForm(fallbackListing);
+            return;
+          }
           setErrors({ submit: "Неуспешно зареждане на обявата за редакция." });
           return;
         }
 
         const data = await response.json();
-
-        setFormData({
-          mainCategory: data.main_category ?? "1",
-          category: data.category ?? "",
-          title: data.title ?? "",
-          brand: data.brand ?? "",
-          model: data.model ?? "",
-          yearFrom: data.year_from ? String(data.year_from) : "",
-          month: data.month ? String(data.month) : "",
-          vin: data.vin ?? "",
-          locationCountry: data.location_country ?? "",
-          locationRegion: data.location_region ?? "",
-          price: data.price ? String(data.price) : "",
-          city: data.city ?? "",
-          fuel: data.fuel ?? "",
-          gearbox: data.gearbox ?? "",
-          mileage: data.mileage ? String(data.mileage) : "",
-          color: data.color ?? "",
-          condition: data.condition ?? "0",
-          power: data.power ? String(data.power) : "",
-          displacement: data.displacement ? String(data.displacement) : "",
-          euroStandard: data.euro_standard ?? "",
-          description: data.description ?? "",
-          phone: data.phone ?? "",
-          email: data.email ?? "",
-          pictures: [],
-          features: Array.isArray(data.features) ? data.features : [],
-          listingType: data.listing_type ?? "normal",
-        });
-
-        setImages([]);
-        setExistingCoverImage(data.image_url || null);
-        setCurrentStep(1);
+        applyListingToForm(data);
       } catch (error) {
+        if (fallbackListing) {
+          applyListingToForm(fallbackListing);
+          return;
+        }
         setErrors({ submit: "Грешка при зареждане на обявата." });
         console.error("Error loading listing:", error);
       } finally {
@@ -605,7 +621,7 @@ const PublishPage: React.FC = () => {
     };
 
     fetchListing();
-  }, [searchParams, authLoading, isAuthenticated, navigate]);
+  }, [searchParams, authLoading, isAuthenticated, navigate, location.state]);
 
   const submitListing = async () => {
     setErrors({});

@@ -126,7 +126,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
       transition: "border-color 0.2s",
     },
     inputFocus: {
-      borderColor: "#0066cc",
+      borderColor: "#0f766e",
       outline: "none",
     },
     error: {
@@ -135,10 +135,10 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
       marginTop: 4,
     },
     success: {
-      color: "#2e7d32",
+      color: "#0f766e",
       fontSize: 13,
       padding: "10px 12px",
-      background: "#f1f8f4",
+      background: "#ecfdf5",
       borderRadius: 4,
       marginBottom: 8,
     },
@@ -158,20 +158,20 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
       transition: "background-color 0.2s",
     },
     submitButton: {
-      background: "#0066cc",
+      background: "#0f766e",
       color: "#fff",
     },
     submitButtonHover: {
-      background: "#0052a3",
+      background: "#0d9488",
     },
     submitButtonDisabled: {
       background: "#ccc",
       cursor: "not-allowed",
     },
     cancelButton: {
-      background: "#f0f0f0",
+      background: "#f5f5f5",
       color: "#333",
-      border: "1px solid #ddd",
+      border: "1px solid #ccc",
     },
     cancelButtonHover: {
       background: "#e8e8e8",
@@ -236,4 +236,3 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
 };
 
 export default TopUpModal;
-
