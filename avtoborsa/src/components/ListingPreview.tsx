@@ -16,6 +16,7 @@ interface ListingPreviewProps {
   completionPercentage: number;
   variant?: "full" | "compact";
   listingType?: "top" | "normal" | string;
+  dealershipAbout?: string;
 }
 
 const ListingPreview: React.FC<ListingPreviewProps> = ({
@@ -33,6 +34,7 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
   completionPercentage,
   variant = "full",
   listingType = "normal",
+  dealershipAbout,
 }) => {
   const isCompact = variant === "compact";
 
@@ -185,6 +187,28 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
       color: "#94a3b8",
       textAlign: "center" as const,
     },
+    dealershipSection: {
+      padding: isCompact ? "12px 14px" : "16px",
+      background: "#f8fafc",
+      borderTop: "1px solid #e2e8f0",
+      borderBottom: "1px solid #e2e8f0",
+    },
+    dealershipTitle: {
+      fontSize: 14,
+      fontWeight: 700,
+      color: "#0f172a",
+      marginBottom: 10,
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+    },
+    dealershipAboutText: {
+      fontSize: 13,
+      color: "#475569",
+      lineHeight: 1.6,
+      whiteSpace: "pre-wrap" as const,
+      wordWrap: "break-word" as const,
+    },
   };
 
   return (
@@ -228,6 +252,19 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
           <div style={styles.description}>{description}</div>
         )}
       </div>
+
+      {!isCompact && dealershipAbout && (
+        <div style={styles.dealershipSection}>
+          <div style={styles.dealershipTitle}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
+            </svg>
+            За автокъщата
+          </div>
+          <div style={styles.dealershipAboutText}>{dealershipAbout}</div>
+        </div>
+      )}
 
       {!isCompact && (
         <div style={styles.footer}>

@@ -253,11 +253,6 @@ const VehicleDetailsPage: React.FC = () => {
         <div style={styles.mainContent}>
           <RezonGallery images={listing.images} title={title} isMobile={isMobile} />
 
-          <div style={styles.heroSection}>
-            <h1 style={styles.title}>{title}</h1>
-            <p style={styles.location}>📍 {listing.city}</p>
-          </div>
-
           <TechnicalDataSection
             year={listing.year_from}
             month={listing.month}
@@ -300,6 +295,8 @@ const VehicleDetailsPage: React.FC = () => {
             phone={listing.phone}
             listingId={listing.id}
             isMobile={false}
+            title={title}
+            city={listing.city}
           />
         )}
       </div>
@@ -312,6 +309,8 @@ const VehicleDetailsPage: React.FC = () => {
           phone={listing.phone}
           listingId={listing.id}
           isMobile={true}
+          title={title}
+          city={listing.city}
         />
       )}
     </div>
