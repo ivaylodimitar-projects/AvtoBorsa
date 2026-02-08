@@ -42,7 +42,27 @@ interface CarListing {
   features: string[];
   images: CarImage[];
   user_email: string;
+  listing_type?: 'top' | 'normal' | string | number;
+  listing_type_display?: string;
+  is_top?: boolean;
+  is_top_listing?: boolean;
+  is_top_ad?: boolean;
 }
+
+const isTopListing = (listing: CarListing) => {
+  if (listing.is_top || listing.is_top_listing || listing.is_top_ad) return true;
+
+  const numericType = Number(listing.listing_type);
+  if (!Number.isNaN(numericType) && numericType === 1) return true;
+
+  const rawType = (listing.listing_type || '').toString().toLowerCase().trim();
+  if (['top', 'top_ad', 'top_listing', 'topad', 'toplisting'].includes(rawType)) {
+    return true;
+  }
+
+  const display = (listing.listing_type_display || '').toString().toLowerCase();
+  return display.includes('топ');
+};
 
 const VehicleDetailsPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -152,7 +172,8 @@ const VehicleDetailsPage: React.FC = () => {
       margin: '0 auto',
       padding: isMobile ? '12px 12px' : '24px 16px',
       display: 'grid',
-      gridTemplateColumns: isMobile ? '1fr' : window.innerWidth < 1024 ? '1fr' : '1fr 340px',
+      gridTemplateColumns: isMobile ? '1fr' : window.innerWidth < 1024 ? '1fr' : '660px 340px',
+      justifyContent: isMobile || window.innerWidth < 1024 ? 'stretch' : 'center',
       gap: isMobile ? 12 : 24,
       width: '100%',
       boxSizing: 'border-box',
@@ -251,7 +272,12 @@ const VehicleDetailsPage: React.FC = () => {
 
       <div style={styles.content}>
         <div style={styles.mainContent}>
-          <RezonGallery images={listing.images} title={title} isMobile={isMobile} />
+          <RezonGallery
+            images={listing.images}
+            title={title}
+            isMobile={isMobile}
+            showTopBadge={isTopListing(listing)}
+          />
 
           <TechnicalDataSection
             year={listing.year_from}
@@ -268,15 +294,13 @@ const VehicleDetailsPage: React.FC = () => {
             euroStandard={listing.euro_standard}
             isMobile={isMobile}
           />
-
-          {listing.features && listing.features.length > 0 && (
-            <EquipmentSection features={listing.features} />
-          )}
-
           <div style={styles.descriptionSection}>
             <h2 style={styles.descriptionTitle}>Описание</h2>
             <p style={styles.description}>{listing.description}</p>
           </div>
+          {listing.features && listing.features.length > 0 && (
+            <EquipmentSection features={listing.features} />
+          )}
 
           {isMobile && (
             <SellerCard

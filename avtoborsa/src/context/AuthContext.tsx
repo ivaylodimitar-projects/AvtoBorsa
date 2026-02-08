@@ -60,10 +60,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     if (!response.ok) {
-      throw new Error("Login failed");
+      try {
+        const errorData = await response.json();
+        throw new Error(errorData?.error || "Невалиден email или парола");
+      } catch {
+        throw new Error("Невалиден email или парола");
+      }
     }
 
     const data = await response.json();
+    if (!data?.token || !data?.user) {
+      throw new Error("Непълен отговор от сървъра при вход");
+    }
     localStorage.setItem("authToken", data.token);
     setUser(data.user);
   };

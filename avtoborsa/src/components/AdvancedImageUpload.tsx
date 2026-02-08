@@ -234,10 +234,6 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <h3 style={styles.title}>
-          <Image size={18} />
-          Снимки на автомобила
-        </h3>
         <div style={styles.counter}>
           {images.length}/{maxImages}
         </div>

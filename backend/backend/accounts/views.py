@@ -6,6 +6,7 @@ from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from rest_framework.parsers import MultiPartParser, FormParser
+from backend.listings.models import get_expiry_cutoff
 from .serializers import (
     PrivateUserSerializer, BusinessUserSerializer, UserProfileSerializer,
     UserBalanceSerializer, DealerListSerializer, DealerDetailSerializer
@@ -254,8 +255,12 @@ def dealer_detail(request, pk):
 
     # Include dealer's active listings
     from backend.listings.serializers import CarListingSerializer
+    cutoff = get_expiry_cutoff()
     listings = dealer.user.car_listings.filter(
-        is_active=True, is_draft=False, is_archived=False
+        is_active=True,
+        is_draft=False,
+        is_archived=False,
+        created_at__gte=cutoff
     ).order_by('-created_at')
     listings_data = CarListingSerializer(listings, many=True, context={'request': request}).data
     data['listings'] = listings_data

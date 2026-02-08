@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 
 const AuthPage: React.FC = () => {
   const navigate = useNavigate();
-  const { login, setUserFromToken } = useAuth();
+  const { login } = useAuth();
+  const { showToast } = useToast();
   const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     email: "",
@@ -28,31 +30,18 @@ const AuthPage: React.FC = () => {
 
     try {
       if (isLogin) {
-        const response = await fetch("http://localhost:8000/api/auth/login/", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: formData.email,
-            password: formData.password,
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.token && data.user) {
-            setUserFromToken(data.user, data.token);
-          }
-          alert("Влизане успешно!");
-          navigate("/");
-        } else {
-          const errorData = await response.json();
-          setErrors({ submit: errorData.error || "Невалиден email или парола" });
-        }
+        await login(formData.email, formData.password);
+        showToast("Влизането е успешно.", { type: "success" });
+        navigate("/");
       } else {
         navigate("/profile");
       }
     } catch (error) {
-      setErrors({ submit: "Грешка при свързване със сървъра" });
+      const message =
+        error instanceof Error
+          ? error.message || "Грешка при свързване със сървъра"
+          : "Грешка при свързване със сървъра";
+      setErrors({ submit: message });
       console.error("Error:", error);
     } finally {
       setLoading(false);

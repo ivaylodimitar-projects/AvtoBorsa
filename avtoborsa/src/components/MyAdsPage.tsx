@@ -11,7 +11,9 @@ import {
   Lock,
   Inbox,
   Car,
-  PackageOpen
+  PackageOpen,
+  Clock,
+  X
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -54,7 +56,8 @@ interface Favorite {
   created_at: string;
 }
 
-type TabType = "active" | "archived" | "drafts" | "liked" | "top";
+type TabType = "active" | "archived" | "drafts" | "liked" | "top" | "expired";
+type ListingType = "normal" | "top";
 
 const MyAdsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -62,6 +65,7 @@ const MyAdsPage: React.FC = () => {
   const [activeListings, setActiveListings] = useState<CarListing[]>([]);
   const [archivedListings, setArchivedListings] = useState<CarListing[]>([]);
   const [draftListings, setDraftListings] = useState<CarListing[]>([]);
+  const [expiredListings, setExpiredListings] = useState<CarListing[]>([]);
   const [likedListings, setLikedListings] = useState<CarListing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +73,19 @@ const MyAdsPage: React.FC = () => {
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [listingTypeModal, setListingTypeModal] = useState<{
+    isOpen: boolean;
+    listingId: number | null;
+    listingTitle: string;
+    mode: "republish" | "promote";
+    selectedType: ListingType;
+  }>({
+    isOpen: false,
+    listingId: null,
+    listingTitle: "",
+    mode: "republish",
+    selectedType: "normal",
+  });
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -81,7 +98,7 @@ const MyAdsPage: React.FC = () => {
         const token = localStorage.getItem("authToken");
 
         // Fetch all listing types in parallel
-        const [activeRes, archivedRes, draftsRes, favoritesRes] = await Promise.all([
+        const [activeRes, archivedRes, draftsRes, expiredRes, favoritesRes] = await Promise.all([
           fetch("http://localhost:8000/api/my-listings/", {
             headers: { Authorization: `Token ${token}` },
           }),
@@ -91,23 +108,28 @@ const MyAdsPage: React.FC = () => {
           fetch("http://localhost:8000/api/my-drafts/", {
             headers: { Authorization: `Token ${token}` },
           }),
+          fetch("http://localhost:8000/api/my-expired/", {
+            headers: { Authorization: `Token ${token}` },
+          }),
           fetch("http://localhost:8000/api/my-favorites/", {
             headers: { Authorization: `Token ${token}` },
           }),
         ]);
 
-        if (!activeRes.ok || !archivedRes.ok || !draftsRes.ok || !favoritesRes.ok) {
+        if (!activeRes.ok || !archivedRes.ok || !draftsRes.ok || !expiredRes.ok || !favoritesRes.ok) {
           throw new Error("Failed to fetch listings");
         }
 
         const activeData = await activeRes.json();
         const archivedData = await archivedRes.json();
         const draftsData = await draftsRes.json();
+        const expiredData = await expiredRes.json();
         const favoritesData = await favoritesRes.json();
 
         setActiveListings(activeData);
         setArchivedListings(archivedData);
         setDraftListings(draftsData);
+        setExpiredListings(expiredData);
         // Extract listings from favorites (which have a nested listing property)
         setLikedListings(favoritesData.map((fav: Favorite) => fav.listing));
         setError(null);
@@ -117,6 +139,7 @@ const MyAdsPage: React.FC = () => {
         setActiveListings([]);
         setArchivedListings([]);
         setDraftListings([]);
+        setExpiredListings([]);
         setLikedListings([]);
       } finally {
         setIsLoading(false);
@@ -136,6 +159,134 @@ const MyAdsPage: React.FC = () => {
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
+  };
+
+  const openListingTypeModal = (
+    listing: CarListing,
+    mode: "republish" | "promote",
+    defaultType: ListingType
+  ) => {
+    setListingTypeModal({
+      isOpen: true,
+      listingId: listing.id,
+      listingTitle: `${listing.brand} ${listing.model}`,
+      mode,
+      selectedType: defaultType,
+    });
+  };
+
+  const closeListingTypeModal = () => {
+    setListingTypeModal((prev) => ({
+      ...prev,
+      isOpen: false,
+      listingId: null,
+    }));
+  };
+
+  const submitRepublish = async (listingId: number, listingType: ListingType) => {
+    setActionLoading(listingId);
+
+    try {
+      const token = localStorage.getItem("authToken");
+      if (!token) throw new Error("Не сте логнати. Моля, влезте отново.");
+
+      const response = await fetch(`http://localhost:8000/api/listings/${listingId}/republish/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Token ${token}`,
+        },
+        body: JSON.stringify({ listing_type: listingType }),
+      });
+
+      if (!response.ok) {
+        let errorMessage = "Неуспешно повторно публикуване на обявата";
+        try {
+          const errorData = await response.json();
+          if (errorData?.detail) errorMessage = errorData.detail;
+        } catch {
+          // ignore JSON parse errors
+        }
+        throw new Error(errorMessage);
+      }
+
+      const updatedListing = await response.json();
+
+      setExpiredListings((prev) => prev.filter((l) => l.id !== listingId));
+      setActiveListings((prev) => [
+        updatedListing,
+        ...prev.filter((l) => l.id !== listingId),
+      ]);
+      showToast(
+        listingType === "top"
+          ? "Обявата е публикувана отново като ТОП!"
+          : "Обявата е публикувана отново като нормална."
+      );
+      return true;
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Грешка при повторно публикуване";
+      showToast(errorMsg, "error");
+      return false;
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const submitListingTypeUpdate = async (listingId: number, listingType: ListingType) => {
+    setActionLoading(listingId);
+    try {
+      const token = localStorage.getItem("authToken");
+      if (!token) throw new Error("Не сте логнати. Моля, влезте отново.");
+
+      const response = await fetch(`http://localhost:8000/api/listings/${listingId}/listing-type/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Token ${token}`,
+        },
+        body: JSON.stringify({ listing_type: listingType }),
+      });
+
+      if (!response.ok) {
+        let errorMessage = "Неуспешна промяна на типа на обявата";
+        try {
+          const errorData = await response.json();
+          if (errorData?.detail) errorMessage = errorData.detail;
+        } catch {
+          // ignore JSON parse errors
+        }
+        throw new Error(errorMessage);
+      }
+
+      const updatedListing = await response.json();
+      setActiveListings((prev) =>
+        prev.map((l) => (l.id === listingId ? updatedListing : l))
+      );
+      showToast(
+        listingType === "top"
+          ? "Обявата е промотирана до ТОП!"
+          : "Типът на обявата е обновен."
+      );
+      return true;
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Грешка при промяна на типа";
+      showToast(errorMsg, "error");
+      return false;
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleListingTypeConfirm = async () => {
+    if (!listingTypeModal.listingId) return;
+    const { listingId, selectedType, mode } = listingTypeModal;
+    const success =
+      mode === "republish"
+        ? await submitRepublish(listingId, selectedType)
+        : await submitListingTypeUpdate(listingId, selectedType);
+    if (success) {
+      closeListingTypeModal();
+    }
   };
 
   const handleArchive = async (listingId: number, e: React.MouseEvent) => {
@@ -177,7 +328,16 @@ const MyAdsPage: React.FC = () => {
         headers: { Authorization: `Token ${token}` },
       });
 
-      if (!response.ok) throw new Error("Failed to unarchive listing");
+      if (!response.ok) {
+        let errorMessage = "Failed to unarchive listing";
+        try {
+          const errorData = await response.json();
+          if (errorData?.detail) errorMessage = errorData.detail;
+        } catch {
+          // ignore JSON parse errors
+        }
+        throw new Error(errorMessage);
+      }
 
       // Optimistic UI update
       const listing = archivedListings.find((l) => l.id === listingId);
@@ -217,6 +377,7 @@ const MyAdsPage: React.FC = () => {
       setActiveListings((prev) => prev.filter((l) => l.id !== listingId));
       setArchivedListings((prev) => prev.filter((l) => l.id !== listingId));
       setDraftListings((prev) => prev.filter((l) => l.id !== listingId));
+      setExpiredListings((prev) => prev.filter((l) => l.id !== listingId));
       setLikedListings((prev) => prev.filter((l) => l.id !== listingId));
       setDeleteConfirm(null);
       showToast("Обявата е изтрита успешно!");
@@ -406,6 +567,111 @@ const MyAdsPage: React.FC = () => {
     borderRadius: 10,
     fontSize: 12,
     fontWeight: 700,
+  },
+  modalOverlay: {
+    position: "fixed" as const,
+    inset: 0,
+    background: "rgba(15, 23, 42, 0.55)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1200,
+    padding: "24px",
+  },
+  modal: {
+    width: "min(560px, 92vw)",
+    background: "#fff",
+    borderRadius: 18,
+    padding: "22px",
+    boxShadow: "0 30px 60px rgba(15, 23, 42, 0.35)",
+    display: "flex",
+    flexDirection: "column",
+    gap: 16,
+  },
+  modalHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 700,
+    color: "#0f172a",
+    margin: 0,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: "#64748b",
+    margin: "6px 0 0 0",
+    lineHeight: 1.5,
+  },
+  modalClose: {
+    border: "none",
+    background: "transparent",
+    color: "#64748b",
+    cursor: "pointer",
+    padding: 4,
+  },
+  listingTypeGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: 14,
+  },
+  listingTypeCard: {
+    position: "relative" as const,
+    borderRadius: 14,
+    border: "1px solid #e2e8f0",
+    padding: "16px",
+    background: "#fff",
+    cursor: "pointer",
+    textAlign: "left" as const,
+    transition: "border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease",
+  },
+  listingTypeCardSelected: {
+    borderColor: "#60a5fa",
+    boxShadow: "0 0 0 3px rgba(59, 130, 246, 0.16)",
+  },
+  listingTypeTitle: {
+    fontSize: 14,
+    fontWeight: 700,
+    color: "#0f172a",
+    margin: "0 0 6px",
+  },
+  listingTypeDesc: {
+    fontSize: 12,
+    color: "#64748b",
+    margin: 0,
+  },
+  modalActions: {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: 12,
+    marginTop: 4,
+  },
+  modalButton: {
+    padding: "10px 16px",
+    borderRadius: 10,
+    fontSize: 13,
+    fontWeight: 700,
+    border: "1px solid transparent",
+    cursor: "pointer",
+    transition: "transform 0.2s ease, box-shadow 0.2s ease",
+  },
+  modalButtonSecondary: {
+    background: "#f1f5f9",
+    color: "#475569",
+    borderColor: "#e2e8f0",
+  },
+  modalButtonPrimary: {
+    background: "linear-gradient(135deg, #667eea 0%, #4f5f89 100%)",
+    color: "#fff",
+    boxShadow: "0 6px 16px rgba(102, 126, 234, 0.3)",
+  },
+  modalHint: {
+    fontSize: 12,
+    color: "#94a3b8",
+    margin: 0,
   },
   listingsGrid: {
     display: "grid",
@@ -623,6 +889,8 @@ const MyAdsPage: React.FC = () => {
         return archivedListings;
       case "drafts":
         return draftListings;
+      case "expired":
+        return expiredListings;
       case "liked":
         return likedListings;
       default:
@@ -631,8 +899,26 @@ const MyAdsPage: React.FC = () => {
   };
 
   const currentListings = getCurrentListings();
-  const totalListings = activeListings.length + archivedListings.length + draftListings.length + likedListings.length;
+  const totalListings =
+    activeListings.length +
+    archivedListings.length +
+    draftListings.length +
+    expiredListings.length +
+    likedListings.length;
   const topListingsCount = activeListings.filter((listing) => listing.listing_type === "top").length;
+  const isModalBusy =
+    listingTypeModal.isOpen && actionLoading === listingTypeModal.listingId;
+  const modalTitle =
+    listingTypeModal.mode === "republish" ? "Пусни обявата отново" : "Промотирай обявата";
+  const modalSubtitle = listingTypeModal.listingTitle
+    ? `Избери тип за "${listingTypeModal.listingTitle}".`
+    : "Избери тип на обявата.";
+  const modalPrimaryLabel =
+    listingTypeModal.mode === "republish" ? "Пусни обявата" : "Запази избора";
+  const modalHint =
+    listingTypeModal.mode === "republish"
+      ? "Обявата ще бъде активна за 30 минути от момента на публикуване."
+      : "Можеш да промениш типа по всяко време.";
 
   if (totalListings === 0) {
     return (
@@ -692,15 +978,100 @@ const MyAdsPage: React.FC = () => {
           </div>
         )}
 
+        {listingTypeModal.isOpen && (
+          <div style={styles.modalOverlay} onClick={closeListingTypeModal}>
+            <div
+              style={styles.modal}
+              role="dialog"
+              aria-modal="true"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={styles.modalHeader}>
+                <div>
+                  <h2 style={styles.modalTitle}>{modalTitle}</h2>
+                  <p style={styles.modalSubtitle}>{modalSubtitle}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeListingTypeModal}
+                  style={styles.modalClose}
+                  aria-label="Затвори"
+                  disabled={isModalBusy}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div style={styles.listingTypeGrid}>
+                <button
+                  type="button"
+                  style={{
+                    ...styles.listingTypeCard,
+                    ...(listingTypeModal.selectedType === "normal" ? styles.listingTypeCardSelected : {}),
+                  }}
+                  onClick={() =>
+                    setListingTypeModal((prev) => ({ ...prev, selectedType: "normal" }))
+                  }
+                  disabled={isModalBusy}
+                >
+                  <h3 style={styles.listingTypeTitle}>Нормална обява</h3>
+                  <p style={styles.listingTypeDesc}>
+                    Стандартно публикуване без допълнително позициониране.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  style={{
+                    ...styles.listingTypeCard,
+                    ...(listingTypeModal.selectedType === "top" ? styles.listingTypeCardSelected : {}),
+                  }}
+                  onClick={() =>
+                    setListingTypeModal((prev) => ({ ...prev, selectedType: "top" }))
+                  }
+                  disabled={isModalBusy}
+                >
+                  <h3 style={styles.listingTypeTitle}>Топ обява</h3>
+                  <p style={styles.listingTypeDesc}>
+                    Приоритетна видимост и изкарване по-напред в резултатите.
+                  </p>
+                </button>
+              </div>
+
+              <div style={styles.modalActions}>
+                <button
+                  type="button"
+                  style={{ ...styles.modalButton, ...styles.modalButtonSecondary }}
+                  onClick={closeListingTypeModal}
+                  disabled={isModalBusy}
+                >
+                  Отказ
+                </button>
+                <button
+                  type="button"
+                  style={{ ...styles.modalButton, ...styles.modalButtonPrimary }}
+                  onClick={handleListingTypeConfirm}
+                  disabled={isModalBusy}
+                >
+                  {isModalBusy ? "Запазване..." : modalPrimaryLabel}
+                </button>
+              </div>
+
+              <p style={styles.modalHint}>{modalHint}</p>
+            </div>
+          </div>
+        )}
+
         {/* Tabs */}
         <div style={styles.tabsContainer}>
           {[
-            { id: "active", label: "Активни", Icon: List, count: activeListings.length },
-            { id: "top", label: "Топ обяви", Icon: PackageOpen, count: topListingsCount },
-            { id: "archived", label: "Архивирани", Icon: Archive, count: archivedListings.length },
-            { id: "drafts", label: "Чернови", Icon: FileText, count: draftListings.length },
-            { id: "liked", label: "Любими", Icon: Heart, count: likedListings.length },
-          ].map((tab) => {
+          { id: "active", label: "Активни", Icon: List, count: activeListings.length },
+          { id: "top", label: "Топ обяви", Icon: PackageOpen, count: topListingsCount },
+          { id: "archived", label: "Архивирани", Icon: Archive, count: archivedListings.length },
+          { id: "expired", label: "Изтекли", Icon: Clock, count: expiredListings.length },
+          { id: "drafts", label: "Чернови", Icon: FileText, count: draftListings.length },
+          { id: "liked", label: "Любими", Icon: Heart, count: likedListings.length },
+        ].map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
@@ -741,6 +1112,7 @@ const MyAdsPage: React.FC = () => {
               {activeTab === "active" && <Inbox size={40} style={styles.emptyIcon} />}
               {activeTab === "top" && <PackageOpen size={40} style={styles.emptyIcon} />}
               {activeTab === "archived" && <PackageOpen size={40} style={styles.emptyIcon} />}
+              {activeTab === "expired" && <Clock size={40} style={styles.emptyIcon} />}
               {activeTab === "drafts" && <FileText size={40} style={styles.emptyIcon} />}
               {activeTab === "liked" && <Heart size={40} style={styles.emptyIcon} />}
             </div>
@@ -748,6 +1120,7 @@ const MyAdsPage: React.FC = () => {
               {activeTab === "active" && "Нямаш активни обяви"}
               {activeTab === "top" && "Нямаш топ обяви"}
               {activeTab === "archived" && "Нямаш архивирани обяви"}
+              {activeTab === "expired" && "Нямаш изтекли обяви"}
               {activeTab === "drafts" && "Нямаш чернови обяви"}
               {activeTab === "liked" && "Нямаш любими обяви"}
             </p>
@@ -755,6 +1128,7 @@ const MyAdsPage: React.FC = () => {
               {activeTab === "active" && "Публикувай нова обява, за да я видиш тук"}
               {activeTab === "top" && "Маркирай обява като топ, за да се появи тук"}
               {activeTab === "archived" && "Архивирани обяви ще се появят тук"}
+              {activeTab === "expired" && "Изтеклите обяви ще се появят тук"}
               {activeTab === "drafts" && "Начни да пишеш нова обява"}
               {activeTab === "liked" && "Добави обяви в любими"}
             </p>
@@ -781,12 +1155,20 @@ const MyAdsPage: React.FC = () => {
             {currentListings.map((listing) => (
             <div
               key={listing.id}
-              style={styles.listingCard}
-              onClick={() => navigate(`/details/${listing.slug}`)}
+              style={{
+                ...styles.listingCard,
+                ...(activeTab === "expired" ? { cursor: "default" } : {}),
+              }}
+              onClick={() => {
+                if (activeTab === "expired") return;
+                navigate(`/details/${listing.slug}`);
+              }}
               onMouseEnter={(e) => {
+                if (activeTab === "expired") return;
                 Object.assign(e.currentTarget.style, styles.listingCardHover);
               }}
               onMouseLeave={(e) => {
+                if (activeTab === "expired") return;
                 e.currentTarget.style.transform = "";
                 e.currentTarget.style.boxShadow =
                   "0 2px 8px rgba(0,0,0,0.08)";
@@ -859,6 +1241,39 @@ const MyAdsPage: React.FC = () => {
                         <Edit2 size={14} />
                         Редактирай
                       </button>
+
+                      {activeTab === "active" && listing.listing_type !== "top" && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openListingTypeModal(listing, "promote", "top");
+                          }}
+                          disabled={actionLoading === listing.id}
+                          style={{
+                            ...styles.actionButton,
+                            background: "linear-gradient(135deg, #f59e0b 0%, #f97316 100%)",
+                            color: "#fff",
+                            opacity: actionLoading === listing.id ? 0.6 : 1,
+                            cursor: actionLoading === listing.id ? "not-allowed" : "pointer",
+                            boxShadow: "0 2px 8px rgba(249, 115, 22, 0.35)",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (actionLoading !== listing.id) {
+                              e.currentTarget.style.transform = "translateY(-2px)";
+                              e.currentTarget.style.boxShadow = "0 4px 12px rgba(249, 115, 22, 0.45)";
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (actionLoading !== listing.id) {
+                              e.currentTarget.style.transform = "translateY(0)";
+                              e.currentTarget.style.boxShadow = "0 2px 8px rgba(249, 115, 22, 0.35)";
+                            }
+                          }}
+                        >
+                          <PackageOpen size={14} />
+                          Промотирай
+                        </button>
+                      )}
 
                       <button
                         onClick={(e) => handleArchive(listing.id, e)}
@@ -952,6 +1367,75 @@ const MyAdsPage: React.FC = () => {
                       >
                         <ArchiveRestore size={14} />
                         {actionLoading === listing.id ? "..." : "Върни в активни"}
+                      </button>
+
+                      <button
+                        onClick={(e) => handleDelete(listing.id, e)}
+                        disabled={actionLoading === listing.id}
+                        style={{
+                          ...styles.actionButton,
+                          background: deleteConfirm === listing.id ? "#d32f2f" : "#f0f0f0",
+                          color: deleteConfirm === listing.id ? "#fff" : "#d32f2f",
+                          opacity: actionLoading === listing.id ? 0.6 : 1,
+                          cursor: actionLoading === listing.id ? "not-allowed" : "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "4px",
+                          fontWeight: deleteConfirm === listing.id ? 700 : 600,
+                        }}
+                        onMouseEnter={(e) => {
+                          if (actionLoading !== listing.id) {
+                            e.currentTarget.style.background = deleteConfirm === listing.id ? "#b71c1c" : "#e0e0e0";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (actionLoading !== listing.id) {
+                            e.currentTarget.style.background = deleteConfirm === listing.id ? "#d32f2f" : "#f0f0f0";
+                          }
+                        }}
+                      >
+                        <Trash2 size={14} />
+                        {deleteConfirm === listing.id ? "Потвърди" : "Изтрий"}
+                      </button>
+                    </>
+                  )}
+
+                  {/* Expired Tab Actions: Republish, Delete */}
+                  {activeTab === "expired" && (
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const defaultType: ListingType =
+                            listing.listing_type === "top" ? "top" : "normal";
+                          openListingTypeModal(listing, "republish", defaultType);
+                        }}
+                        disabled={actionLoading === listing.id}
+                        style={{
+                          ...styles.actionButton,
+                          background: "#4caf50",
+                          color: "#fff",
+                          opacity: actionLoading === listing.id ? 0.6 : 1,
+                          cursor: actionLoading === listing.id ? "not-allowed" : "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "4px",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (actionLoading !== listing.id) {
+                            e.currentTarget.style.background = "#388e3c";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (actionLoading !== listing.id) {
+                            e.currentTarget.style.background = "#4caf50";
+                          }
+                        }}
+                      >
+                        <ArchiveRestore size={14} />
+                        {actionLoading === listing.id ? "..." : "Пусни пак"}
                       </button>
 
                       <button

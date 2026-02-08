@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
+from backend.listings.models import get_expiry_cutoff
 from .models import PrivateUser, BusinessUser, UserProfile
 
 
@@ -110,7 +111,13 @@ class DealerListSerializer(serializers.ModelSerializer):
         ]
 
     def get_listing_count(self, obj):
-        return obj.user.car_listings.filter(is_active=True, is_draft=False, is_archived=False).count()
+        cutoff = get_expiry_cutoff()
+        return obj.user.car_listings.filter(
+            is_active=True,
+            is_draft=False,
+            is_archived=False,
+            created_at__gte=cutoff
+        ).count()
 
     def get_profile_image_url(self, obj):
         if obj.profile_image:
@@ -135,7 +142,13 @@ class DealerDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_listing_count(self, obj):
-        return obj.user.car_listings.filter(is_active=True, is_draft=False, is_archived=False).count()
+        cutoff = get_expiry_cutoff()
+        return obj.user.car_listings.filter(
+            is_active=True,
+            is_draft=False,
+            is_archived=False,
+            created_at__gte=cutoff
+        ).count()
 
     def get_profile_image_url(self, obj):
         if obj.profile_image:

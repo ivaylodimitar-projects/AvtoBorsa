@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, Search, Bookmark } from "lucide-react";
+import { ChevronDown, Search, Bookmark, Lock } from "lucide-react";
 import { BrandSelector } from "./BrandSelector";
 import { BULGARIAN_CITIES_BY_REGION } from "../constants/bulgarianCities";
 import { useRecentSearches } from "../hooks/useRecentSearches";
@@ -204,12 +204,15 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
 
   const advancedSearchCSS = `
     .adv-search-root {
-      background: #f9fafb;
+      position: relative;
+      background: #ffffff;
       border-radius: 16px;
       padding: 28px 24px 24px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 1.5px 6px rgba(0,0,0,0.04);
-      max-width: 95%;
-      margin: 0 auto;
+      box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(59, 130, 246, 0.06);
+      border: 1px solid #e2e8f0;
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
     .adv-search-form {
@@ -231,7 +234,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       font-size: 10.5px;
       font-weight: 700;
       letter-spacing: 0.08em;
-      color: #6b7280;
+      color: #475569;
       text-transform: uppercase;
       padding-left: 2px;
     }
@@ -240,16 +243,19 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       width: 100%;
       height: 42px;
       padding: 0 12px;
-      border: 1.5px solid #e5e7eb;
+      border: 1.5px solid #e2e8f0;
       border-radius: 10px;
-      background: #fff;
+      background: #f5f7fb;
       font-size: 14px;
       color: #1f2937;
       outline: none;
-      transition: border-color 0.2s, box-shadow 0.2s;
+      transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
       appearance: none;
       -webkit-appearance: none;
       box-sizing: border-box;
+    }
+    .adv-input::placeholder {
+      color: #9aa3b2;
     }
     .adv-select {
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236b7280' viewBox='0 0 16 16'%3E%3Cpath d='M1.5 5.5l6.5 6 6.5-6' stroke='%236b7280' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -259,8 +265,9 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     }
     .adv-select:focus,
     .adv-input:focus {
-      border-color: #3b82f6;
-      box-shadow: 0 0 0 3px rgba(59,130,246,0.10);
+      border-color: #2563eb;
+      background: #ffffff;
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.18);
     }
     .adv-select--disabled {
       background: #f3f4f6;
@@ -287,22 +294,18 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       align-items: center;
       padding: 6px 16px;
       border-radius: 20px;
-      border: 1.5px solid #e5e7eb;
-      background: #fff;
+      border: 1.5px solid #d9e2f1;
+      background: #ffffff;
       font-size: 13px;
       color: #4b5563;
       cursor: pointer;
       transition: all 0.2s;
       user-select: none;
     }
-    .adv-chip:hover {
-      border-color: #3b82f6;
-      color: #3b82f6;
-    }
     .adv-chip--active {
-      background: #eff6ff;
+      background: #e0f2fe;
       border-color: #3b82f6;
-      color: #2563eb;
+      color: #1d4ed8;
       font-weight: 600;
     }
     .adv-action-row {
@@ -320,7 +323,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       height: 48px;
       border: none;
       border-radius: 14px;
-      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      background: #2563eb;
       color: #fff;
       font-size: 16px;
       font-weight: 700;
@@ -329,10 +332,6 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       box-shadow: 0 2px 8px rgba(37,99,235,0.3);
       letter-spacing: 0.02em;
       
-    }
-    .adv-search-btn:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 16px rgba(37,99,235,0.35);
     }
     .adv-search-btn:active {
       transform: translateY(0);
@@ -348,11 +347,8 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       padding: 4px 0;
       transition: color 0.2s;
     }
-    .adv-detailed-link:hover {
-      color: #2563eb;
-    }
     .adv-detailed-section {
-      border-top: 1px solid #e5e7eb;
+      border-top: 1px solid #dbeafe;
       padding-top: 18px;
       animation: advSlideDown 0.25s ease;
     }
@@ -369,18 +365,14 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     .adv-clear-btn {
       display: inline-flex;
       align-items: center;
-      background: none;
-      border: 1.5px solid #e5e7eb;
+      background: #fff;
+      border: 1.5px solid #e2e8f0;
       border-radius: 10px;
       color: #6b7280;
       font-size: 13px;
       padding: 8px 20px;
       cursor: pointer;
       transition: all 0.2s;
-    }
-    .adv-clear-btn:hover {
-      border-color: #ef4444;
-      color: #ef4444;
     }
     .adv-recent-searches {
       display: flex;
@@ -399,10 +391,10 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       display: inline-block;
       padding: 6px 12px;
       border-radius: 20px;
-      background: #f0f4f9;
-      border: 1px solid #d1d5db;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
       font-size: 13px;
-      color: #374151;
+      color: #475569;
       cursor: pointer;
       transition: all 0.2s;
       white-space: nowrap;
@@ -410,28 +402,18 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       text-overflow: ellipsis;
       max-width: 200px;
     }
-    .adv-recent-search-pill:hover {
-      background: #3b82f6;
-      border-color: #3b82f6;
-      color: #fff;
-    }
     .adv-save-btn {
       display: inline-flex;
       align-items: center;
-      background: #fff;
-      border: 1.5px solid #e5e7eb;
+      background: #ecfeff;
+      border: 1.5px solid #67e8f9;
       border-radius: 10px;
-      color: #6b7280;
+      color: #0f766e;
       font-size: 13px;
       padding: 8px 20px;
       cursor: pointer;
       transition: all 0.2s;
       height: 48px;
-    }
-    .adv-save-btn:hover {
-      border-color: #3b82f6;
-      color: #3b82f6;
-      background: #eff6ff;
     }
     .adv-modal-overlay {
       position: fixed;
@@ -565,7 +547,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                 ))}
               </select>
               {!searchCriteria.brand && (
-                <span className="adv-lock-icon" title="Избери марка първо">🔒</span>
+                <span className="adv-lock-icon" title="Избери марка първо"><Lock size={14} /></span>
               )}
             </div>
           </div>
@@ -776,7 +758,6 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                   navigate(`/search?${queryString}`);
                 }}
                 title={search.name}
-                style={{ background: "#eff6ff", borderColor: "#3b82f6" }}
               >
                 {search.name}
               </button>

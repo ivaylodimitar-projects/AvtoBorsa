@@ -6,7 +6,8 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
-from .models import CarListing, CarImage, Favorite
+from django.utils import timezone
+from .models import CarListing, CarImage, Favorite, get_expiry_cutoff
 from .serializers import CarListingSerializer, CarImageSerializer, FavoriteSerializer
 
 
@@ -17,7 +18,13 @@ class CarListingViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Get listings based on user and filters"""
-        queryset = CarListing.objects.filter(is_active=True, is_draft=False, is_archived=False)
+        cutoff = get_expiry_cutoff()
+        queryset = CarListing.objects.filter(
+            is_active=True,
+            is_draft=False,
+            is_archived=False,
+            created_at__gte=cutoff
+        )
 
         # Filter by user if requested
         user_id = self.request.query_params.get('user_id')
@@ -192,10 +199,13 @@ class CarListingViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Create listing and associate with current user"""
         # Check if user has reached the 3 advert limit
+        cutoff = get_expiry_cutoff()
         active_listings_count = CarListing.objects.filter(
             user=self.request.user,
             is_active=True,
-            is_draft=False
+            is_draft=False,
+            is_archived=False,
+            created_at__gte=cutoff
         ).count()
 
         if active_listings_count >= 3:
@@ -224,7 +234,14 @@ class CarListingViewSet(viewsets.ModelViewSet):
 @permission_classes([IsAuthenticated])
 def get_user_listings(request):
     """Get current user's active listings"""
-    listings = CarListing.objects.filter(user=request.user, is_active=True, is_draft=False).prefetch_related('images')
+    cutoff = get_expiry_cutoff()
+    listings = CarListing.objects.filter(
+        user=request.user,
+        is_active=True,
+        is_draft=False,
+        is_archived=False,
+        created_at__gte=cutoff
+    ).prefetch_related('images')
     serializer = CarListingSerializer(listings, many=True, context={'request': request})
     return Response(serializer.data)
 
@@ -247,6 +264,21 @@ def get_user_archived(request):
     return Response(serializer.data)
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user_expired(request):
+    """Get current user's expired listings"""
+    cutoff = get_expiry_cutoff()
+    expired = CarListing.objects.filter(
+        user=request.user,
+        is_draft=False,
+        is_archived=False,
+        created_at__lt=cutoff
+    ).prefetch_related('images')
+    serializer = CarListingSerializer(expired, many=True, context={'request': request})
+    return Response(serializer.data)
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def archive_listing(request, listing_id):
@@ -264,8 +296,27 @@ def archive_listing(request, listing_id):
 def unarchive_listing(request, listing_id):
     """Unarchive a listing"""
     listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
+    cutoff = get_expiry_cutoff()
+    active_count = CarListing.objects.filter(
+        user=request.user,
+        is_active=True,
+        is_draft=False,
+        is_archived=False,
+        created_at__gte=cutoff
+    ).exclude(id=listing.id).count()
+
+    if active_count >= 3:
+        return Response(
+            {
+                "detail": "Можете да имате максимум 3 активни обяви. "
+                          "Моля, архивирайте или изтрийте някоя от активните."
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
     listing.is_archived = False
     listing.is_active = True
+    listing.created_at = timezone.now()
     listing.save()
     serializer = CarListingSerializer(listing)
     return Response(serializer.data, status=status.HTTP_200_OK)
@@ -282,6 +333,65 @@ def delete_listing(request, listing_id):
             'message': 'Listing deleted successfully'},
             status=status.HTTP_204_NO_CONTENT
         )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def republish_listing(request, listing_id):
+    """Republish a listing for another 30 minutes."""
+    listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
+    listing_type = request.data.get('listing_type')
+
+    # Enforce active listings limit (exclude the current listing)
+    cutoff = get_expiry_cutoff()
+    active_count = CarListing.objects.filter(
+        user=request.user,
+        is_active=True,
+        is_draft=False,
+        is_archived=False,
+        created_at__gte=cutoff
+    ).exclude(id=listing.id).count()
+
+    if active_count >= 3:
+        return Response(
+            {
+                "detail": "Можете да имате максимум 3 активни обяви. "
+                          "Моля, архивирайте или изтрийте някоя от активните."
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if listing_type in ['top', 'normal']:
+        listing.listing_type = listing_type
+
+    listing.is_draft = False
+    listing.is_archived = False
+    listing.is_active = True
+    listing.created_at = timezone.now()
+    listing.save()
+
+    serializer = CarListingSerializer(listing, context={'request': request})
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_listing_type(request, listing_id):
+    """Update listing type (top/normal) for a listing."""
+    listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
+    listing_type = request.data.get('listing_type')
+
+    if listing_type not in ['top', 'normal']:
+        return Response(
+            {"detail": "Невалиден тип на обявата."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    listing.listing_type = listing_type
+    listing.save()
+
+    serializer = CarListingSerializer(listing, context={'request': request})
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
@@ -388,6 +498,13 @@ def remove_favorite(request, listing_id):
 @permission_classes([IsAuthenticated])
 def get_user_favorites(request):
     """Get current user's favorite listings"""
-    favorites = Favorite.objects.filter(user=request.user).select_related('listing').prefetch_related('listing__images')
+    cutoff = get_expiry_cutoff()
+    favorites = Favorite.objects.filter(
+        user=request.user,
+        listing__is_active=True,
+        listing__is_draft=False,
+        listing__is_archived=False,
+        listing__created_at__gte=cutoff
+    ).select_related('listing').prefetch_related('listing__images')
     serializer = FavoriteSerializer(favorites, many=True, context={'request': request})
     return Response(serializer.data)

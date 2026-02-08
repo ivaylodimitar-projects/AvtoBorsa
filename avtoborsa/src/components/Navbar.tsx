@@ -10,11 +10,28 @@ const Navbar: React.FC = () => {
   const location = useLocation();
   const { logout, isAuthenticated } = useAuth();
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const [showLogoutModal, setShowLogoutModal] = React.useState(false);
+  const [isLoggingOut, setIsLoggingOut] = React.useState(false);
 
   const isActive = (path: string) => location.pathname === path;
 
-  const handleLogout = async () => {
+  React.useEffect(() => {
+    if (!showLogoutModal) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isLoggingOut) {
+        setShowLogoutModal(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [showLogoutModal, isLoggingOut]);
+
+  const handleLogoutConfirm = async () => {
+    setIsLoggingOut(true);
     await logout();
+    setIsLoggingOut(false);
+    setShowLogoutModal(false);
     setMobileOpen(false);
     navigate("/");
   };
@@ -64,12 +81,12 @@ const Navbar: React.FC = () => {
 
             {isAuthenticated ? (
               <Link
-                to="/my-ads"
-                className="nav-link"
+                to="/publish"
+                className={`nav-link ${isActive("/publish") ? "active" : ""}`}
                 onClick={() => setMobileOpen(false)}
               >
                 <Plus size={16} />
-                Моите обяви
+                Добави обява
               </Link>
             ) : (
               <Link
@@ -87,7 +104,7 @@ const Navbar: React.FC = () => {
             {isAuthenticated ? (
               <>
                 <ProfileMenu />
-                <button className="btn-ghost" onClick={handleLogout}>
+                <button className="btn-ghost" onClick={() => setShowLogoutModal(true)}>
                   <LogOut size={16} />
                   Изход
                 </button>
@@ -105,6 +122,37 @@ const Navbar: React.FC = () => {
           </div>
         </nav>
       </div>
+
+      {showLogoutModal && (
+        <div style={styles.logoutOverlay} onClick={() => !isLoggingOut && setShowLogoutModal(false)}>
+          <div style={styles.logoutModal} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.logoutIconWrap}>
+              <LogOut size={18} />
+            </div>
+            <h3 style={styles.logoutTitle}>Потвърди изход</h3>
+            <p style={styles.logoutText}>Сигурен ли си, че искаш да излезеш от профила си?</p>
+            <div style={styles.logoutActions}>
+              <button
+                style={styles.logoutCancelButton}
+                onClick={() => setShowLogoutModal(false)}
+                disabled={isLoggingOut}
+              >
+                Отказ
+              </button>
+              <button
+                style={{
+                  ...styles.logoutConfirmButton,
+                  ...(isLoggingOut ? styles.logoutConfirmButtonDisabled : {}),
+                }}
+                onClick={handleLogoutConfirm}
+                disabled={isLoggingOut}
+              >
+                {isLoggingOut ? "Излизане..." : "Изход"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   );
 };
@@ -169,6 +217,81 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 16,
     marginLeft: "auto",
     flex: 1,
+  },
+  logoutOverlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(2, 6, 23, 0.55)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2000,
+    padding: 16,
+  },
+  logoutModal: {
+    width: "100%",
+    maxWidth: 420,
+    borderRadius: 14,
+    background: "#fff",
+    border: "1px solid #e2e8f0",
+    boxShadow: "0 24px 60px rgba(15, 23, 42, 0.35)",
+    padding: 22,
+  },
+  logoutIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    background: "#eff6ff",
+    color: "#1d4ed8",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  logoutTitle: {
+    margin: "0 0 8px 0",
+    fontSize: 19,
+    lineHeight: 1.25,
+    color: "#0f172a",
+    fontWeight: 800,
+  },
+  logoutText: {
+    margin: "0 0 18px 0",
+    fontSize: 14,
+    lineHeight: 1.45,
+    color: "#475569",
+  },
+  logoutActions: {
+    display: "flex",
+    gap: 10,
+    justifyContent: "flex-end",
+  },
+  logoutCancelButton: {
+    height: 40,
+    padding: "0 16px",
+    borderRadius: 10,
+    border: "1px solid #cbd5e1",
+    background: "#fff",
+    color: "#334155",
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  logoutConfirmButton: {
+    height: 40,
+    padding: "0 16px",
+    borderRadius: 10,
+    border: "1px solid #1d4ed8",
+    background: "#1d4ed8",
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: "pointer",
+    minWidth: 104,
+  },
+  logoutConfirmButtonDisabled: {
+    opacity: 0.7,
+    cursor: "not-allowed",
   },
 };
 

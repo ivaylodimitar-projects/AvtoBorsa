@@ -1,7 +1,18 @@
+from datetime import timedelta
+
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils import timezone
 from django.utils.text import slugify
+
+LISTING_EXPIRY_MINUTES = 30
+
+
+def get_expiry_cutoff(now=None):
+    """Return the datetime before which listings are considered expired."""
+    current = now or timezone.now()
+    return current - timedelta(minutes=LISTING_EXPIRY_MINUTES)
 
 class CarListing(models.Model):
     """Model for car listings/advertisements"""

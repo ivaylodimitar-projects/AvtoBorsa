@@ -360,66 +360,122 @@ const PublishPage: React.FC = () => {
   const [editingListingId, setEditingListingId] = useState<number | null>(null);
   const [existingCoverImage, setExistingCoverImage] = useState<string | null>(null);
 
-  // Car features/extras
-  const CAR_FEATURES = [
-    "Климатик",
-    "Автоматичен климатик",
-    "Панорамен покрив",
-    "Кожен салон",
-    "Електрически прозорци",
-    "Електрически огледала",
-    "Круиз контрол",
-    "Паркинг сензори",
-    "Камера за паркиране",
-    "Навигация",
-    "Bluetooth",
-    "USB",
-    "AUX",
-    "Мултимедия",
-    "Спортен пакет",
-    "Люк",
-    "Тонирани стъкла",
-    "Алуминиеви джанти",
-    "Спортни джанти",
-    "Всички подушки",
-    "Странични подушки",
-    "Предни подушки",
-    "Задни подушки",
-    "Система за стабилност",
-    "ABS",
-    "ESP",
-    "Тракшън контрол",
-    "Помощ при паркиране",
-    "Адаптивен круиз контрол",
-    "Система за следене на пътната лента",
-    "Автоматични светлини",
-    "Дневни светлини",
-    "LED светлини",
-    "Ксенонови светлини",
-    "Лазерни светлини",
-    "Отопляемо предно стъкло",
-    "Отопляемо задно стъкло",
-    "Отопляеми седалки",
-    "Масаж на седалки",
-    "Вентилирани седалки",
-    "Памет на седалки",
-    "Електрически седалки",
-    "Регулируемо волан",
-    "Волан с отопление",
-    "Волан с управление",
-    "Спортен волан",
-    "Кожен волан",
-    "Система за контрол на стабилност",
-    "Система за помощ при спиране",
-    "Система за предупреждение при сблъсък",
-    "Система за разпознаване на пътни знаци",
-    "Система за контрол на налягането на гумите",
-    "Система за помощ при катерене",
-    "Система за помощ при спускане",
-    "Система за контрол на тягата",
-    "Система за контрол на динамиката",
-    "Система за контрол на скоростта",
-    "Система за контрол на стабилността",
+  // Car features/extras grouped by category
+  const FEATURE_CATEGORIES = [
+    {
+      id: "safety",
+      title: "Безопасност",
+      description: "Въздушни възглавници и системи за предупреждение",
+      items: [
+        "Всички подушки",
+        "Странични подушки",
+        "Предни подушки",
+        "Задни подушки",
+        "Система за предупреждение при сблъсък",
+        "Система за следене на пътната лента",
+        "Система за разпознаване на пътни знаци",
+        "Система за контрол на налягането на гумите",
+      ],
+    },
+    {
+      id: "protection",
+      title: "Защита",
+      description: "Стабилност, сцепление и контрол",
+      items: [
+        "Система за стабилност",
+        "ABS",
+        "ESP",
+        "Тракшън контрол",
+        "Система за контрол на стабилност",
+        "Система за контрол на стабилността",
+        "Система за помощ при спиране",
+        "Система за контрол на тягата",
+        "Система за контрол на динамиката",
+        "Система за контрол на скоростта",
+        "Система за помощ при катерене",
+        "Система за помощ при спускане",
+      ],
+    },
+    {
+      id: "comfort",
+      title: "Комфорт",
+      description: "Климат, седалки и удобства",
+      items: [
+        "Климатик",
+        "Автоматичен климатик",
+        "Електрически прозорци",
+        "Електрически огледала",
+        "Круиз контрол",
+        "Адаптивен круиз контрол",
+        "Отопляемо предно стъкло",
+        "Отопляемо задно стъкло",
+        "Отопляеми седалки",
+        "Масаж на седалки",
+        "Вентилирани седалки",
+        "Памет на седалки",
+        "Електрически седалки",
+        "Регулируемо волан",
+        "Волан с отопление",
+      ],
+    },
+    {
+      id: "interior",
+      title: "Интериор",
+      description: "Материали и ергономия",
+      items: [
+        "Кожен салон",
+        "Волан с управление",
+        "Спортен волан",
+        "Кожен волан",
+      ],
+    },
+    {
+      id: "exterior",
+      title: "Екстериор",
+      description: "Дизайн и външни елементи",
+      items: [
+        "Панорамен покрив",
+        "Люк",
+        "Тонирани стъкла",
+        "Алуминиеви джанти",
+        "Спортни джанти",
+        "Спортен пакет",
+      ],
+    },
+    {
+      id: "parking",
+      title: "Паркиране",
+      description: "Камери и асистенти",
+      items: [
+        "Паркинг сензори",
+        "Камера за паркиране",
+        "Помощ при паркиране",
+      ],
+    },
+    {
+      id: "lighting",
+      title: "Осветление",
+      description: "Фарове и дневни светлини",
+      items: [
+        "Автоматични светлини",
+        "Дневни светлини",
+        "LED светлини",
+        "Ксенонови светлини",
+        "Лазерни светлини",
+      ],
+    },
+    {
+      id: "multimedia",
+      title: "Мултимедия и свързаност",
+      description: "Навигация и връзка",
+      items: [
+        "Навигация",
+        "Bluetooth",
+        "USB",
+        "AUX",
+        "Мултимедия",
+      ],
+    },
   ];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -890,38 +946,126 @@ const PublishPage: React.FC = () => {
       gap: 16px;
     }
 
+    .feature-groups {
+      display: grid;
+      gap: 16px;
+    }
+
+    .feature-group {
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      padding: 14px;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+    }
+
+    .feature-group-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .feature-group-title {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .feature-group-subtitle {
+      margin: 4px 0 0;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .feature-group-count {
+      align-self: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: #1d4ed8;
+      background: #eef2ff;
+      padding: 4px 10px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
     .feature-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 10px;
     }
 
     .feature-card {
+      position: relative;
       display: flex;
       align-items: center;
       gap: 10px;
       padding: 10px 12px;
       border-radius: 12px;
       border: 1px solid var(--border);
-      background: #fff;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+      background: #f8fafc;
+      cursor: pointer;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease,
+        transform 0.2s ease;
+    }
+
+    .feature-card:hover {
+      border-color: #cbd5e1;
+      background: #f1f5f9;
+      transform: translateY(-1px);
     }
 
     .feature-card.is-selected {
-      border-color: #93c5fd;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
-      background: #f0f7ff;
+      border-color: #60a5fa;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+      background: #eef6ff;
     }
 
     .feature-checkbox {
-      width: 18px;
-      height: 18px;
-      accent-color: #1d4ed8;
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
     }
 
-    .feature-card span {
-      font-size: 14px;
+    .feature-check {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      display: grid;
+      place-items: center;
+      color: #ffffff;
+      transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .feature-check svg {
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .feature-card.is-selected .feature-check {
+      background: #2563eb;
+      border-color: #2563eb;
+      box-shadow: 0 6px 12px rgba(37, 99, 235, 0.3);
+    }
+
+    .feature-card.is-selected .feature-check svg {
+      opacity: 1;
+    }
+
+    .feature-label {
+      font-size: 13px;
+      font-weight: 600;
       color: var(--text);
+    }
+
+    .feature-card:focus-within {
+      outline: 3px solid rgba(59, 130, 246, 0.4);
+      outline-offset: 2px;
     }
 
     .listing-type-grid {
@@ -1419,23 +1563,49 @@ const PublishPage: React.FC = () => {
               <p style={{ color: "#64748b", marginBottom: 16, fontSize: 14 }}>
                 Избери всички екстри и опции, които има автомобилът
               </p>
-              <div className="feature-grid">
-                {CAR_FEATURES.map((feature) => (
-                  <label
-                    key={feature}
-                    className={`feature-card ${
-                      formData.features.includes(feature) ? "is-selected" : ""
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={formData.features.includes(feature)}
-                      onChange={() => handleFeatureChange(feature)}
-                      className="feature-checkbox"
-                    />
-                    <span>{feature}</span>
-                  </label>
-                ))}
+              <div className="feature-groups">
+                {FEATURE_CATEGORIES.map((group) => {
+                  const selectedCount = group.items.filter((feature) =>
+                    formData.features.includes(feature)
+                  ).length;
+
+                  return (
+                    <div key={group.id} className="feature-group">
+                      <div className="feature-group-header">
+                        <div>
+                          <h3 className="feature-group-title">{group.title}</h3>
+                          {group.description && (
+                            <p className="feature-group-subtitle">{group.description}</p>
+                          )}
+                        </div>
+                        <span className="feature-group-count">
+                          {selectedCount}/{group.items.length}
+                        </span>
+                      </div>
+                      <div className="feature-grid">
+                        {group.items.map((feature) => (
+                          <label
+                            key={feature}
+                            className={`feature-card ${
+                              formData.features.includes(feature) ? "is-selected" : ""
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={formData.features.includes(feature)}
+                              onChange={() => handleFeatureChange(feature)}
+                              className="feature-checkbox"
+                            />
+                            <span className="feature-check" aria-hidden="true">
+                              <Check size={12} />
+                            </span>
+                            <span className="feature-label">{feature}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

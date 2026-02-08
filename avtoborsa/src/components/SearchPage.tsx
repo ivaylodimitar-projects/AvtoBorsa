@@ -1,7 +1,24 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { Heart } from "lucide-react";
+import {
+  Heart,
+  MapPin,
+  Clock,
+  Calendar,
+  Fuel,
+  Gauge,
+  Zap,
+  Settings,
+  User,
+  Building2,
+  BadgeCheck,
+  Tag,
+  CheckCircle2,
+  HelpCircle,
+  ImageOff,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 
 type CarListing = {
   id: number;
@@ -18,6 +35,12 @@ type CarListing = {
   power: number;
   city: string;
   image_url?: string;
+  images?: Array<{
+    id: number;
+    image: string;
+    order?: number;
+    is_cover?: boolean;
+  }>;
   is_active: boolean;
   is_draft: boolean;
   is_archived: boolean;
@@ -57,6 +80,7 @@ const SearchPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [favoriteStates, setFavoriteStates] = useState<Record<number, boolean>>({});
+  const getImageUrl = useImageUrl();
 
   // Format relative time
   const getRelativeTime = (dateString: string) => {
@@ -218,36 +242,45 @@ const SearchPage: React.FC = () => {
   }, [searchParams]);
 
   const styles: Record<string, React.CSSProperties> = {
-    page: { minHeight: "100vh", background: "#f5f5f5", width: "100%", paddingTop: 20, paddingBottom: 40 },
+    page: { minHeight: "100vh", background: "#f4f6f9", width: "100%", paddingTop: 20, paddingBottom: 40 },
     container: { width: "100%", maxWidth: 1200, margin: "0 auto", padding: "0 20px" },
-    header: { marginBottom: 24, background: "#fff", padding: 24, borderRadius: 8, boxShadow: "0 2px 4px rgba(0,0,0,0.08)" },
-    title: { fontSize: 28, fontWeight: 700, color: "#333", margin: "0 0 16px 0" },
+    header: { marginBottom: 24, background: "#fff", padding: 24, borderRadius: 10, boxShadow: "0 6px 18px rgba(15, 23, 42, 0.08)" },
+    title: { fontSize: 28, fontWeight: 700, color: "#0f172a", margin: "0 0 16px 0" },
     criteria: { display: "flex", flexWrap: "wrap", gap: 12, marginTop: 16 },
-    criteriaTag: { background: "#f0f0f0", padding: "8px 14px", borderRadius: 20, fontSize: 13, color: "#555", fontWeight: 500 },
+    criteriaTag: { background: "#f1f5f9", padding: "8px 14px", borderRadius: 20, fontSize: 13, color: "#475569", fontWeight: 600 },
     results: { display: "flex", flexDirection: "column", gap: 16 },
-    item: { background: "#fff", borderRadius: 8, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,0.08)", display: "flex", cursor: "pointer", transition: "all 0.3s", position: "relative" as const },
-    itemPhoto: { width: 280, height: 210, background: "linear-gradient(135deg, #e0e0e0 0%, #d0d0d0 100%)", flexShrink: 0, position: "relative" as const, overflow: "hidden" },
+    item: { background: "#fff", borderRadius: 12, overflow: "hidden", border: "1px solid #e7edf3", boxShadow: "0 8px 24px rgba(15, 23, 42, 0.08)", display: "flex", cursor: "pointer", transition: "all 0.3s", position: "relative" as const },
+    itemPhoto: { width: 280, flexShrink: 0, display: "flex", flexDirection: "column" as const, background: "#fff" },
+    photoMain: { height: 210, position: "relative" as const, overflow: "hidden", background: "linear-gradient(135deg, #e2e8f0 0%, #cbd5f5 100%)" },
     itemImage: { width: "100%", height: "100%", objectFit: "cover" },
-    itemPhotoOverlay: { position: "absolute" as const, top: 0, right: 0, bottom: 0, left: 0, display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 12, background: "linear-gradient(to top, rgba(0,0,0,0.4), transparent)", zIndex: 1 },
+    itemPhotoOverlay: { position: "absolute" as const, top: 0, right: 0, bottom: 0, left: 0, display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 12, background: "linear-gradient(to top, rgba(15, 23, 42, 0.45), transparent)", zIndex: 1 },
     topBadge: { position: "absolute" as const, top: 12, left: 12, background: "linear-gradient(135deg, #f59e0b, #f97316)", color: "#fff", padding: "6px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase" as const, boxShadow: "0 6px 14px rgba(249, 115, 22, 0.35)", zIndex: 2 },
-    favoriteButton: { background: "rgba(255,255,255,0.95)", border: "none", borderRadius: "50%", width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s", padding: 0, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" },
-    itemText: { flex: 1, padding: 20, display: "flex", flexDirection: "column" as const, justifyContent: "space-between", position: "relative" as const },
-    itemHeader: { marginBottom: 16, paddingTop: 36 },
-    itemTitle: { fontSize: 20, fontWeight: 600, color: "#0066cc", marginBottom: 10, textDecoration: "none", lineHeight: 1.3 },
-    itemPrice: { fontSize: 24, fontWeight: 700, color: "#1a1a1a", marginBottom: 4 },
-    itemPriceSmall: { fontSize: 13, color: "#888", fontWeight: 400 },
-    itemParams: { display: "flex", flexWrap: "wrap", gap: 16, fontSize: 14, color: "#666", marginBottom: 14, alignItems: "center" },
-    itemParam: { display: "flex", alignItems: "center", gap: 4 },
-    itemDescription: { fontSize: 14, color: "#555", lineHeight: 1.6, marginBottom: 14, maxHeight: 68, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as any },
-    itemFooter: { display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 12, borderTop: "1px solid #f0f0f0" },
-    itemLocation: { fontSize: 13, color: "#666", display: "flex", alignItems: "center", gap: 6 },
-    itemDate: { fontSize: 12, color: "#999", fontStyle: "italic" },
-    sellerInfo: { position: "absolute" as const, top: 16, right: 16, display: "flex", alignItems: "center", gap: 10, background: "rgba(255,255,255,0.95)", padding: "8px 12px", borderRadius: 8, boxShadow: "0 2px 6px rgba(0,0,0,0.1)" },
-    sellerAvatar: { width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 14, fontWeight: 600 },
-    sellerName: { fontSize: 13, color: "#333", fontWeight: 500, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" as const },
-    sellerBadge: { fontSize: 10, color: "#fff", background: "#4CAF50", padding: "2px 6px", borderRadius: 10, fontWeight: 600, textTransform: "uppercase" as const },
-    empty: { textAlign: "center", padding: 60, background: "#fff", borderRadius: 8, boxShadow: "0 2px 4px rgba(0,0,0,0.08)" },
-    loading: { textAlign: "center", padding: 60, background: "#fff", borderRadius: 8, boxShadow: "0 2px 4px rgba(0,0,0,0.08)" },
+    favoriteButton: { background: "rgba(255,255,255,0.95)", border: "none", borderRadius: "50%", width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s", padding: 0, boxShadow: "0 6px 14px rgba(15, 23, 42, 0.18)" },
+    photoPlaceholder: { width: "100%", height: "100%", display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center", gap: 6, color: "#94a3b8", fontSize: 13, fontWeight: 600 },
+    thumbStrip: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, padding: "10px", background: "#fff", borderTop: "1px solid #e2e8f0" },
+    thumb: { width: "100%", aspectRatio: "4 / 3", borderRadius: 10, overflow: "hidden", border: "1px solid #e2e8f0", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center" },
+    thumbImage: { width: "100%", height: "100%", objectFit: "cover" },
+    thumbPlaceholder: { color: "#94a3b8" },
+    thumbMore: { background: "#e2e8f0", color: "#334155", fontSize: 12, fontWeight: 700 },
+    itemText: { flex: 1, display: "flex", alignItems: "stretch", minHeight: 210 },
+    itemMain: { flex: 1, padding: 20, display: "flex", flexDirection: "column" as const, gap: 12 },
+    itemHeader: { marginBottom: 4 },
+    itemTitle: { fontSize: 20, fontWeight: 700, color: "#0f5ec7", marginBottom: 10, textDecoration: "none", lineHeight: 1.3 },
+    itemPrice: { fontSize: 24, fontWeight: 700, color: "#0f172a", marginBottom: 4 },
+    itemPriceSmall: { fontSize: 13, color: "#64748b", fontWeight: 500 },
+    itemParams: { display: "flex", flexWrap: "wrap", gap: 8, fontSize: 13, color: "#475569", alignItems: "center" },
+    itemParam: { display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 999, fontSize: 13, color: "#475569", fontWeight: 600 },
+    paramIcon: { color: "#64748b" },
+    itemDescription: { fontSize: 14, color: "#475569", lineHeight: 1.6, marginBottom: 0, maxHeight: 68, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as any },
+    itemSide: { width: 240, padding: 16, background: "linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)", borderLeft: "1px solid #e2e8f0", display: "flex", flexDirection: "column" as const, gap: 12 },
+    sideSection: { display: "flex", flexDirection: "column" as const, gap: 8 },
+    sideTitle: { fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 0.6, textTransform: "uppercase" as const },
+    sideDivider: { height: 1, background: "#e2e8f0", width: "100%" },
+    metaRow: { display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#334155", fontWeight: 600 },
+    metaIcon: { color: "#64748b" },
+    metaMuted: { color: "#94a3b8", fontWeight: 600 },
+    empty: { textAlign: "center", padding: 60, background: "#fff", borderRadius: 10, boxShadow: "0 2px 4px rgba(0,0,0,0.08)" },
+    loading: { textAlign: "center", padding: 60, background: "#fff", borderRadius: 10, boxShadow: "0 2px 4px rgba(0,0,0,0.08)" },
   };
 
   return (
@@ -278,111 +311,203 @@ const SearchPage: React.FC = () => {
           </div>
         ) : results.length > 0 ? (
           <div style={styles.results} className="search-results">
-            {results.map((listing) => (
-              <div
-                key={listing.id}
-                style={styles.item}
-                onClick={() => navigate(`/details/${listing.slug}`)}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,0.12)";
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)";
-                  e.currentTarget.style.transform = "translateY(0)";
-                }}
-              >
-                <div style={styles.itemPhoto}>
-                  {isTopListing(listing) && (
-                    <div style={styles.topBadge}>Топ обява</div>
-                  )}
-                  {listing.image_url ? (
-                    <>
-                      <img src={listing.image_url} alt={`${listing.brand} ${listing.model}`} style={styles.itemImage} />
-                      <div style={styles.itemPhotoOverlay}>
-                        <button
-                          style={{
-                            ...styles.favoriteButton,
-                            background: listing.is_favorited ? "#ff4458" : "rgba(255,255,255,0.95)",
-                          }}
-                          onClick={(e) => toggleFavorite(e, listing.id, listing.is_favorited || false)}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = "scale(1.1)";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = "scale(1)";
-                          }}
-                          title={listing.is_favorited ? "Премахни от бележника" : "Добави в бележника"}
-                        >
-                          <Heart
-                            size={22}
-                            color={listing.is_favorited ? "#fff" : "#ff4458"}
-                            fill={listing.is_favorited ? "#fff" : "none"}
-                          />
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#999" }}>
-                      Снимка
-                    </div>
-                  )}
-                </div>
-                <div style={styles.itemText}>
-                  {/* Seller info in top-right corner */}
-                  <div style={styles.sellerInfo} onClick={(e) => e.stopPropagation()}>
-                    <div style={styles.sellerAvatar}>
-                      {listing.seller_name ? listing.seller_name.charAt(0).toUpperCase() : "?"}
-                    </div>
-                    <div>
-                      <div style={styles.sellerName}>
-                        {listing.seller_name || "Unknown"}
-                      </div>
-                      {listing.seller_type === "business" && (
-                        <div style={styles.sellerBadge}>Търговец</div>
+            {results.map((listing) => {
+              const categoryLabel = listing.category_display || listing.category;
+              const conditionLabel = listing.condition_display || listing.condition;
+              const sellerLabel = listing.seller_name || "Не е посочено";
+              const locationLabel = listing.city || "Не е посочено";
+              const sellerTypeLabel =
+                listing.seller_type === "business"
+                  ? "Търговец"
+                  : listing.seller_type === "private"
+                    ? "Частно лице"
+                    : "Не е посочено";
+              const SellerTypeIcon =
+                listing.seller_type === "business"
+                  ? Building2
+                  : listing.seller_type === "private"
+                    ? BadgeCheck
+                    : HelpCircle;
+              const images = listing.images || [];
+              const mainImagePath = listing.image_url || images[0]?.image;
+              const mainImageUrl = mainImagePath ? getImageUrl(mainImagePath) : "";
+              const extraImages = images.slice(1);
+              const maxThumbs = 3;
+              const thumbItems: Array<{ type: "image" | "more" | "placeholder"; src?: string; label?: string }> = [];
+
+              if (extraImages.length > maxThumbs) {
+                extraImages.slice(0, maxThumbs - 1).forEach((img) => {
+                  thumbItems.push({ type: "image", src: getImageUrl(img.image) });
+                });
+                thumbItems.push({ type: "more", label: `+${extraImages.length - (maxThumbs - 1)}` });
+              } else {
+                extraImages.forEach((img) => {
+                  thumbItems.push({ type: "image", src: getImageUrl(img.image) });
+                });
+              }
+
+              while (thumbItems.length < maxThumbs) {
+                thumbItems.push({ type: "placeholder" });
+              }
+
+              return (
+                <div
+                  key={listing.id}
+                  style={styles.item}
+                  onClick={() => navigate(`/details/${listing.slug}`)}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = "0 10px 28px rgba(15, 23, 42, 0.16)";
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = "0 8px 24px rgba(15, 23, 42, 0.08)";
+                    e.currentTarget.style.transform = "translateY(0)";
+                  }}
+                >
+                  <div style={styles.itemPhoto}>
+                    <div style={styles.photoMain}>
+                      {isTopListing(listing) && (
+                        <div style={styles.topBadge}>Топ обява</div>
+                      )}
+                      {mainImageUrl ? (
+                        <>
+                          <img src={mainImageUrl} alt={`${listing.brand} ${listing.model}`} style={styles.itemImage} />
+                          <div style={styles.itemPhotoOverlay}>
+                            <button
+                              style={{
+                                ...styles.favoriteButton,
+                                background: listing.is_favorited ? "#ff4458" : "rgba(255,255,255,0.95)",
+                              }}
+                              onClick={(e) => toggleFavorite(e, listing.id, listing.is_favorited || false)}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.transform = "scale(1.1)";
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.transform = "scale(1)";
+                              }}
+                              title={listing.is_favorited ? "Премахни от бележника" : "Добави в бележника"}
+                            >
+                              <Heart
+                                size={22}
+                                color={listing.is_favorited ? "#fff" : "#ff4458"}
+                                fill={listing.is_favorited ? "#fff" : "none"}
+                              />
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <div style={styles.photoPlaceholder}>
+                          <ImageOff size={26} />
+                          <span>Снимка</span>
+                        </div>
                       )}
                     </div>
-                  </div>
+                    <div style={styles.thumbStrip}>
+                      {thumbItems.map((thumb, index) => {
+                        if (thumb.type === "image" && thumb.src) {
+                          return (
+                            <div key={`thumb-${listing.id}-${index}`} style={styles.thumb}>
+                              <img src={thumb.src} alt={`Допълнителна снимка ${index + 1}`} style={styles.thumbImage} />
+                            </div>
+                          );
+                        }
 
-                  <div>
-                    <div style={styles.itemHeader}>
-                      <a href={`/details/${listing.slug}`} style={styles.itemTitle} onClick={(e) => e.stopPropagation()}>
-                        {listing.brand} {listing.model}
-                      </a>
-                      <div style={styles.itemPrice}>
-                        € {listing.price.toLocaleString("bg-BG")}
-                        <div style={styles.itemPriceSmall}>
-                          {(listing.price * 1.96).toLocaleString("bg-BG", { maximumFractionDigits: 2 })} лв.
+                        if (thumb.type === "more") {
+                          return (
+                            <div key={`thumb-more-${listing.id}-${index}`} style={{ ...styles.thumb, ...styles.thumbMore }}>
+                              {thumb.label}
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div key={`thumb-placeholder-${listing.id}-${index}`} style={styles.thumb}>
+                            <ImageOff size={16} style={styles.thumbPlaceholder} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div style={styles.itemText}>
+                    <div style={styles.itemMain}>
+                      <div style={styles.itemHeader}>
+                        <a href={`/details/${listing.slug}`} style={styles.itemTitle} onClick={(e) => e.stopPropagation()}>
+                          {listing.brand} {listing.model}
+                        </a>
+                        <div style={styles.itemPrice}>
+                          € {listing.price.toLocaleString("bg-BG")}
+                          <div style={styles.itemPriceSmall}>
+                            {(listing.price * 1.96).toLocaleString("bg-BG", { maximumFractionDigits: 2 })} лв.
+                          </div>
+                        </div>
+                      </div>
+                      <div style={styles.itemParams}>
+                        <span style={styles.itemParam}>
+                          <Calendar size={16} style={styles.paramIcon} />
+                          {listing.year_from} г.
+                        </span>
+                        <span style={styles.itemParam}>
+                          <Gauge size={16} style={styles.paramIcon} />
+                          {listing.mileage.toLocaleString("bg-BG")} км
+                        </span>
+                        <span style={styles.itemParam}>
+                          <Fuel size={16} style={styles.paramIcon} />
+                          {listing.fuel_display}
+                        </span>
+                        <span style={styles.itemParam}>
+                          <Zap size={16} style={styles.paramIcon} />
+                          {listing.power} к.с.
+                        </span>
+                        <span style={styles.itemParam}>
+                          <Settings size={16} style={styles.paramIcon} />
+                          {listing.gearbox_display}
+                        </span>
+                      </div>
+                      {listing.description && (
+                        <div style={styles.itemDescription}>{listing.description}</div>
+                      )}
+                    </div>
+                    <div style={styles.itemSide}>
+                      <div style={styles.sideSection}>
+                        <div style={styles.sideTitle}>Локация</div>
+                        <div style={styles.metaRow}>
+                          <MapPin size={16} style={styles.metaIcon} />
+                          <span style={!listing.city ? styles.metaMuted : undefined}>{locationLabel}</span>
+                        </div>
+                        <div style={styles.metaRow}>
+                          <Clock size={16} style={styles.metaIcon} />
+                          <span>{getRelativeTime(listing.created_at)}</span>
+                        </div>
+                      </div>
+                      <div style={styles.sideDivider} />
+                      <div style={styles.sideSection}>
+                        <div style={styles.sideTitle}>Продавач</div>
+                        <div style={styles.metaRow}>
+                          <User size={16} style={styles.metaIcon} />
+                          <span style={!listing.seller_name ? styles.metaMuted : undefined}>{sellerLabel}</span>
+                        </div>
+                        <div style={styles.metaRow}>
+                          <SellerTypeIcon size={16} style={styles.metaIcon} />
+                          <span style={listing.seller_type ? undefined : styles.metaMuted}>{sellerTypeLabel}</span>
+                        </div>
+                      </div>
+                      <div style={styles.sideDivider} />
+                      <div style={styles.sideSection}>
+                        <div style={styles.sideTitle}>Детайли</div>
+                        <div style={styles.metaRow}>
+                          <Tag size={16} style={styles.metaIcon} />
+                          <span style={!categoryLabel ? styles.metaMuted : undefined}>{categoryLabel || "Не е посочено"}</span>
+                        </div>
+                        <div style={styles.metaRow}>
+                          <CheckCircle2 size={16} style={styles.metaIcon} />
+                          <span style={!conditionLabel ? styles.metaMuted : undefined}>{conditionLabel || "Не е посочено"}</span>
                         </div>
                       </div>
                     </div>
-                    <div style={styles.itemParams}>
-                      <span style={{ fontWeight: 500 }}>{listing.year_from} г.</span>
-                      <span style={{ color: "#ddd" }}>•</span>
-                      <span>{listing.mileage.toLocaleString("bg-BG")} км</span>
-                      <span style={{ color: "#ddd" }}>•</span>
-                      <span>{listing.fuel_display}</span>
-                      <span style={{ color: "#ddd" }}>•</span>
-                      <span>{listing.power} к.с.</span>
-                      <span style={{ color: "#ddd" }}>•</span>
-                      <span>{listing.gearbox_display}</span>
-                    </div>
-                    {listing.description && (
-                      <div style={styles.itemDescription}>{listing.description}</div>
-                    )}
-                  </div>
-                  <div style={styles.itemFooter}>
-                    <div style={styles.itemLocation}>
-                      <span>📍</span>
-                      <span>{listing.city}</span>
-                    </div>
-                    <div style={styles.itemDate}>
-                      {getRelativeTime(listing.created_at)}
-                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div style={styles.empty}>
