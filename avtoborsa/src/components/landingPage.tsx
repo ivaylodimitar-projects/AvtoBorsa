@@ -39,6 +39,10 @@ const isTopListing = (listing: CarListing) => {
   return display.includes("топ");
 };
 
+const NEW_LISTING_BADGE_MINUTES = 10;
+const NEW_LISTING_BADGE_WINDOW_MS = NEW_LISTING_BADGE_MINUTES * 60 * 1000;
+const NEW_LISTING_BADGE_REFRESH_MS = 30_000;
+
 type Fuel = "Бензин" | "Дизел" | "Газ/Бензин" | "Хибрид" | "Електро";
 type Gearbox = "Ръчна" | "Автоматик";
 type Condition = "Всички" | "Нова" | "Употребявана";
@@ -157,6 +161,7 @@ export default function LandingPage() {
   // Latest listings
   const [latestListings, setLatestListings] = useState<CarListing[]>([]);
   const [listingsLoading, setListingsLoading] = useState(true);
+  const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
 
   useEffect(() => {
     const fetchLatest = async () => {
@@ -180,6 +185,13 @@ export default function LandingPage() {
       }
     };
     fetchLatest();
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCurrentTimeMs(Date.now());
+    }, NEW_LISTING_BADGE_REFRESH_MS);
+    return () => window.clearInterval(timer);
   }, []);
 
   // filters
@@ -249,6 +261,14 @@ export default function LandingPage() {
     setSelectedFeatures((prev) =>
       prev.includes(feature) ? prev.filter((f) => f !== feature) : [...prev, feature]
     );
+  };
+
+  const isListingNew = (createdAt?: string) => {
+    if (!createdAt) return false;
+    const createdAtMs = new Date(createdAt).getTime();
+    if (Number.isNaN(createdAtMs)) return false;
+    const listingAgeMs = currentTimeMs - createdAtMs;
+    return listingAgeMs >= 0 && listingAgeMs <= NEW_LISTING_BADGE_WINDOW_MS;
   };
 
   const getRelativeTime = (dateString: string) => {
@@ -693,6 +713,21 @@ export default function LandingPage() {
               box-shadow: 0 4px 10px rgba(220,38,38,0.3);
               z-index: 2;
             }
+            .listing-new-badge {
+              position: absolute;
+              top: 10px;
+              left: 10px;
+              background: linear-gradient(135deg, #10b981, #059669);
+              color: #fff;
+              padding: 4px 10px;
+              border-radius: 999px;
+              font-size: 11px;
+              font-weight: 700;
+              letter-spacing: 0.3px;
+              text-transform: uppercase;
+              box-shadow: 0 4px 10px rgba(5,150,105,0.35);
+              z-index: 2;
+            }
             .latest-grid {
               display: grid;
               grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -731,92 +766,102 @@ export default function LandingPage() {
             ) : latestListings.length > 0 ? (
               <>
                 <div className="latest-grid">
-                {latestListings.map((listing) => (
-                  <div
-                    key={listing.id}
-                    className="listing-card-hover"
-                    style={{
-                      borderRadius: 10,
-                      overflow: "hidden",
-                        border: isTopListing(listing) ? "2px solid #dc2626" : "1px solid #eef2f7",
-                      background: "#fff",
-                      boxShadow: "0 2px 8px rgba(15,23,42,0.06)",
-                      display: "flex",
-                      flexDirection: "column",
-                      cursor: "pointer",
-                    }}
-                    onClick={() => navigate(`/details/${listing.slug}`)}
-                  >
-                    {/* Image */}
-                    <div style={{ position: "relative", height: 170, background: "#f0f0f0", overflow: "hidden" }}>
-                      {isTopListing(listing) && (
-                        <div className="listing-top-badge">TOP</div>
-                      )}
-                      {listing.image_url ? (
-                        <img
-                          src={listing.image_url}
-                          alt={`${listing.brand} ${listing.model}`}
-                          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                        />
-                      ) : (
-                        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>
-                          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                            <circle cx="8.5" cy="8.5" r="1.5" />
-                            <polyline points="21 15 16 10 5 21" />
-                          </svg>
+                {latestListings.map((listing) => {
+                  const isTop = isTopListing(listing);
+                  const isNew = isListingNew(listing.created_at);
+                  return (
+                    <div
+                      key={listing.id}
+                      className="listing-card-hover"
+                      style={{
+                        borderRadius: 10,
+                        overflow: "hidden",
+                        border: isTop ? "2px solid #dc2626" : "1px solid #eef2f7",
+                        background: "#fff",
+                        boxShadow: "0 2px 8px rgba(15,23,42,0.06)",
+                        display: "flex",
+                        flexDirection: "column",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => navigate(`/details/${listing.slug}`)}
+                    >
+                      {/* Image */}
+                      <div style={{ position: "relative", height: 170, background: "#f0f0f0", overflow: "hidden" }}>
+                        {isTop && <div className="listing-top-badge">TOP</div>}
+                        {isNew && (
+                          <div
+                            className="listing-new-badge"
+                            style={{ top: isTop ? 38 : 10 }}
+                          >
+                            Нова
+                          </div>
+                        )}
+                        {listing.image_url ? (
+                          <img
+                            src={listing.image_url}
+                            alt={`${listing.brand} ${listing.model}`}
+                            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                          />
+                        ) : (
+                          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                              <circle cx="8.5" cy="8.5" r="1.5" />
+                              <polyline points="21 15 16 10 5 21" />
+                            </svg>
+                          </div>
+                        )}
+                        {/* Price overlay */}
+                        <div style={{
+                          position: "absolute",
+                          bottom: 8,
+                          left: 8,
+                          background: "rgba(255,255,255,0.95)",
+                          padding: "5px 10px",
+                          borderRadius: 6,
+                          fontWeight: 700,
+                          fontSize: 14,
+                          color: "#0f766e",
+                          boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+                        }}>
+                          {listing.price.toLocaleString("bg-BG")} &euro;
                         </div>
-                      )}
-                      {/* Price overlay */}
-                      <div style={{
-                        position: "absolute",
-                        bottom: 8,
-                        left: 8,
-                        background: "rgba(255,255,255,0.95)",
-                        padding: "5px 10px",
-                        borderRadius: 6,
-                        fontWeight: 700,
-                        fontSize: 14,
-                        color: "#0f766e",
-                        boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
-                      }}>
-                        {listing.price.toLocaleString("bg-BG")} &euro;
                       </div>
-                    </div>
 
-                    {/* Body */}
-                    <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", lineHeight: 1.3 }}>
-                        {listing.brand} {listing.model}
-                      </div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, fontSize: 12, color: "#6b7280" }}>
-                        <span>{listing.year_from} г.</span>
-                        <span style={{ color: "#d1d5db" }}>|</span>
-                        <span>{listing.mileage.toLocaleString("bg-BG")} км</span>
-                        <span style={{ color: "#d1d5db" }}>|</span>
-                        <span>{listing.fuel_display}</span>
-                        <span style={{ color: "#d1d5db" }}>|</span>
-                        <span>{listing.power} к.с.</span>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12, color: "#9ca3af", marginTop: "auto" }}>
-                        <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                            <circle cx="12" cy="10" r="3" />
-                          </svg>
-                          {listing.city}
-                        </span>
-                        <span style={{ display: "flex", alignItems: "center", gap: 4, color: "#d97706" }}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10" />
-                            <polyline points="12 6 12 12 16 14" />
-                          </svg>
-                          {getRelativeTime(listing.created_at)}
-                        </span>
+                      {/* Body */}
+                      <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", lineHeight: 1.3 }}>
+                          {listing.brand} {listing.model}
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, fontSize: 12, color: "#6b7280" }}>
+                          <span>{listing.year_from} г.</span>
+                          <span style={{ color: "#d1d5db" }}>|</span>
+                          <span>{listing.mileage.toLocaleString("bg-BG")} км</span>
+                          <span style={{ color: "#d1d5db" }}>|</span>
+                          <span>{listing.fuel_display}</span>
+                          <span style={{ color: "#d1d5db" }}>|</span>
+                          <span>{listing.power} к.с.</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12, color: "#9ca3af", marginTop: "auto" }}>
+                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                              <circle cx="12" cy="10" r="3" />
+                            </svg>
+                            {listing.city}
+                          </span>
+                          <span style={{ display: "flex", alignItems: "center", gap: 4, color: "#d97706" }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="10" />
+                              <polyline points="12 6 12 12 16 14" />
+                            </svg>
+                            {getRelativeTime(listing.created_at)}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 </div>
 
                 {/* View more button */}

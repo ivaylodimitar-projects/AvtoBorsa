@@ -7,6 +7,7 @@ import {
   ArchiveRestore,
   Heart,
   List,
+  Eye,
   FileText,
   Lock,
   Inbox,
@@ -59,6 +60,10 @@ interface Favorite {
 
 type TabType = "active" | "archived" | "drafts" | "liked" | "top" | "expired";
 type ListingType = "normal" | "top";
+// Change this value to control how long the "Нова" badge remains visible.
+const NEW_LISTING_BADGE_MINUTES = 10;
+const NEW_LISTING_BADGE_WINDOW_MS = NEW_LISTING_BADGE_MINUTES * 60 * 1000;
+const NEW_LISTING_BADGE_REFRESH_MS = 30_000;
 
 const MyAdsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -90,6 +95,7 @@ const MyAdsPage: React.FC = () => {
   const [previewListing, setPreviewListing] = useState<CarListing | null>(null);
   const [previewTab, setPreviewTab] = useState<TabType | null>(null);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
+  const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -161,6 +167,14 @@ const MyAdsPage: React.FC = () => {
     }
   }, [toast]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCurrentTimeMs(Date.now());
+    }, NEW_LISTING_BADGE_REFRESH_MS);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
   };
@@ -217,6 +231,14 @@ const MyAdsPage: React.FC = () => {
     const clean = text.replace(/\s+/g, " ").trim();
     if (clean.length <= maxLength) return clean;
     return `${clean.slice(0, maxLength).trim()}…`;
+  };
+
+  const isListingNew = (createdAt?: string) => {
+    if (!createdAt) return false;
+    const createdAtMs = new Date(createdAt).getTime();
+    if (Number.isNaN(createdAtMs)) return false;
+    const listingAgeMs = currentTimeMs - createdAtMs;
+    return listingAgeMs >= 0 && listingAgeMs <= NEW_LISTING_BADGE_WINDOW_MS;
   };
 
   const openListingTypeModal = (
@@ -955,6 +977,20 @@ const MyAdsPage: React.FC = () => {
     boxShadow: "0 6px 14px rgba(249, 115, 22, 0.35)",
     zIndex: 2,
   },
+  newBadge: {
+    position: "absolute" as const,
+    left: 12,
+    padding: "6px 10px",
+    borderRadius: 999,
+    background: "linear-gradient(135deg, #10b981, #059669)",
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: 0.4,
+    textTransform: "uppercase" as const,
+    boxShadow: "0 6px 14px rgba(5, 150, 105, 0.35)",
+    zIndex: 2,
+  },
   statusBadge: {
     position: "absolute" as const,
     top: 12,
@@ -1264,6 +1300,7 @@ const MyAdsPage: React.FC = () => {
     previewStatusLabel === "Изтекла"
       ? { ...styles.previewStatusPill, ...styles.previewStatusPillExpired }
       : styles.previewStatusPill;
+  const isPreviewListingNew = previewListing ? isListingNew(previewListing.created_at) : false;
 
   if (totalListings === 0) {
     return (
@@ -1449,6 +1486,16 @@ const MyAdsPage: React.FC = () => {
                   <div style={styles.previewMedia}>
                     {previewListing.listing_type === "top" && (
                       <div style={styles.topBadge}>Топ обява</div>
+                    )}
+                    {isPreviewListingNew && (
+                      <div
+                        style={{
+                          ...styles.newBadge,
+                          top: previewListing.listing_type === "top" ? 46 : 12,
+                        }}
+                      >
+                        Нова
+                      </div>
                     )}
                     {previewImage ? (
                       <img
@@ -1660,6 +1707,7 @@ const MyAdsPage: React.FC = () => {
               listing.color ? `Цвят: ${listing.color}` : "",
             ].filter(Boolean) as string[];
             const visibleChips = chips.slice(0, 6);
+            const isNewListing = isListingNew(listing.created_at);
 
             return (
             <div
@@ -1686,6 +1734,16 @@ const MyAdsPage: React.FC = () => {
               <div style={styles.listingMedia}>
                 {listing.listing_type === "top" && (
                   <div style={styles.topBadge}>Топ обява</div>
+                )}
+                {isNewListing && (
+                  <div
+                    style={{
+                      ...styles.newBadge,
+                      top: listing.listing_type === "top" ? 46 : 12,
+                    }}
+                  >
+                    Нова
+                  </div>
                 )}
                 {statusLabel && (
                   <div style={statusBadgeStyle}>{statusLabel}</div>
@@ -2190,4 +2248,3 @@ const MyAdsPage: React.FC = () => {
 };
 
 export default MyAdsPage;
-

@@ -72,6 +72,10 @@ const isTopListing = (listing: CarListing) => {
   return display.includes("топ");
 };
 
+const NEW_LISTING_BADGE_MINUTES = 10;
+const NEW_LISTING_BADGE_WINDOW_MS = NEW_LISTING_BADGE_MINUTES * 60 * 1000;
+const NEW_LISTING_BADGE_REFRESH_MS = 30_000;
+
 const SearchPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -80,6 +84,7 @@ const SearchPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [favoriteStates, setFavoriteStates] = useState<Record<number, boolean>>({});
+  const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
   const getImageUrl = useImageUrl();
 
   // Format relative time
@@ -142,6 +147,13 @@ const SearchPage: React.FC = () => {
     fetchListings();
   }, [searchParams]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCurrentTimeMs(Date.now());
+    }, NEW_LISTING_BADGE_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, []);
+
   // Toggle favorite status
   const toggleFavorite = async (e: React.MouseEvent, listingId: number, isFavorited: boolean) => {
     e.stopPropagation();
@@ -180,6 +192,14 @@ const SearchPage: React.FC = () => {
     const normalListings = listings.filter((listing) => !isTopListing(listing));
     return [...topListings, ...normalListings];
   }, [listings]);
+
+  const isListingNew = (createdAt?: string) => {
+    if (!createdAt) return false;
+    const createdAtMs = new Date(createdAt).getTime();
+    if (Number.isNaN(createdAtMs)) return false;
+    const listingAgeMs = currentTimeMs - createdAtMs;
+    return listingAgeMs >= 0 && listingAgeMs <= NEW_LISTING_BADGE_WINDOW_MS;
+  };
 
   // Build search criteria display
   const searchCriteriaDisplay = useMemo(() => {
@@ -249,12 +269,13 @@ const SearchPage: React.FC = () => {
     criteria: { display: "flex", flexWrap: "wrap", gap: 12, marginTop: 16 },
     criteriaTag: { background: "#f1f5f9", padding: "8px 14px", borderRadius: 20, fontSize: 13, color: "#475569", fontWeight: 600 },
     results: { display: "flex", flexDirection: "column", gap: 16 },
-    item: { background: "#fff", borderRadius: 12, overflow: "hidden", border: "1px solid #e7edf3", boxShadow: "0 8px 24px rgba(15, 23, 42, 0.08)", display: "flex", cursor: "pointer", transition: "all 0.3s", position: "relative" as const },
+    item: { background: "#fff", borderRadius: 10, overflow: "hidden", border: "none", boxShadow: "0 2px 8px rgba(15, 23, 42, 0.06)", display: "flex", cursor: "pointer", transition: "transform 0.25s ease, box-shadow 0.25s ease", position: "relative" as const },
     itemPhoto: { width: 280, flexShrink: 0, display: "flex", flexDirection: "column" as const, background: "#fff" },
     photoMain: { height: 210, position: "relative" as const, overflow: "hidden", background: "linear-gradient(135deg, #e2e8f0 0%, #cbd5f5 100%)" },
     itemImage: { width: "100%", height: "100%", objectFit: "cover" },
     itemPhotoOverlay: { position: "absolute" as const, top: 0, right: 0, bottom: 0, left: 0, display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 12, background: "linear-gradient(to top, rgba(15, 23, 42, 0.45), transparent)", zIndex: 1 },
-    topBadge: { position: "absolute" as const, top: 12, left: 12, background: "linear-gradient(135deg, #f59e0b, #f97316)", color: "#fff", padding: "6px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase" as const, boxShadow: "0 6px 14px rgba(249, 115, 22, 0.35)", zIndex: 2 },
+    topBadge: { position: "absolute" as const, top: 10, left: 10, background: "linear-gradient(135deg, #ef4444, #dc2626)", color: "#fff", padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: 0.3, textTransform: "uppercase" as const, boxShadow: "0 4px 10px rgba(220, 38, 38, 0.3)", zIndex: 2 },
+    newBadge: { position: "absolute" as const, left: 10, background: "linear-gradient(135deg, #10b981, #059669)", color: "#fff", padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: 0.3, textTransform: "uppercase" as const, boxShadow: "0 4px 10px rgba(5, 150, 105, 0.35)", zIndex: 2 },
     favoriteButton: { background: "rgba(255,255,255,0.95)", border: "none", borderRadius: "50%", width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s", padding: 0, boxShadow: "0 6px 14px rgba(15, 23, 42, 0.18)" },
     photoPlaceholder: { width: "100%", height: "100%", display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center", gap: 6, color: "#94a3b8", fontSize: 13, fontWeight: 600 },
     thumbStrip: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, padding: "10px", background: "#fff", borderTop: "1px solid #e2e8f0" },
@@ -265,8 +286,8 @@ const SearchPage: React.FC = () => {
     itemText: { flex: 1, display: "flex", alignItems: "stretch", minHeight: 210 },
     itemMain: { flex: 1, padding: 20, display: "flex", flexDirection: "column" as const, gap: 12 },
     itemHeader: { marginBottom: 4 },
-    itemTitle: { fontSize: 20, fontWeight: 700, color: "#0f5ec7", marginBottom: 10, textDecoration: "none", lineHeight: 1.3 },
-    itemPrice: { fontSize: 24, fontWeight: 700, color: "#0f172a", marginBottom: 4 },
+    itemTitle: { fontSize: 20, fontWeight: 700, color: "#111827", marginBottom: 10, textDecoration: "none", lineHeight: 1.3 },
+    itemPrice: { fontSize: 24, fontWeight: 700, color: "#0f766e", marginBottom: 4 },
     itemPriceSmall: { fontSize: 13, color: "#64748b", fontWeight: 500 },
     itemParams: { display: "flex", flexWrap: "wrap", gap: 8, fontSize: 13, color: "#475569", alignItems: "center" },
     itemParam: { display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 999, fontSize: 13, color: "#475569", fontWeight: 600 },
@@ -312,6 +333,8 @@ const SearchPage: React.FC = () => {
         ) : results.length > 0 ? (
           <div style={styles.results} className="search-results">
             {results.map((listing) => {
+              const isTop = isTopListing(listing);
+              const isNewListing = isListingNew(listing.created_at);
               const categoryLabel = listing.category_display || listing.category;
               const conditionLabel = listing.condition_display || listing.condition;
               const sellerLabel = listing.seller_name || "Не е посочено";
@@ -356,18 +379,21 @@ const SearchPage: React.FC = () => {
                   style={styles.item}
                   onClick={() => navigate(`/details/${listing.slug}`)}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.boxShadow = "0 10px 28px rgba(15, 23, 42, 0.16)";
-                    e.currentTarget.style.transform = "translateY(-2px)";
+                    e.currentTarget.style.boxShadow = "0 12px 32px rgba(15,23,42,0.12)";
+                    e.currentTarget.style.transform = "translateY(-4px)";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.boxShadow = "0 8px 24px rgba(15, 23, 42, 0.08)";
+                    e.currentTarget.style.boxShadow = "0 2px 8px rgba(15,23,42,0.06)";
                     e.currentTarget.style.transform = "translateY(0)";
                   }}
                 >
                   <div style={styles.itemPhoto}>
                     <div style={styles.photoMain}>
-                      {isTopListing(listing) && (
-                        <div style={styles.topBadge}>Топ обява</div>
+                      {isTop && <div style={styles.topBadge}>Топ обява</div>}
+                      {isNewListing && (
+                        <div style={{ ...styles.newBadge, top: isTop ? 38 : 10 }}>
+                          Нова
+                        </div>
                       )}
                       {mainImageUrl ? (
                         <>
@@ -521,4 +547,3 @@ const SearchPage: React.FC = () => {
 };
 
 export default SearchPage;
-
