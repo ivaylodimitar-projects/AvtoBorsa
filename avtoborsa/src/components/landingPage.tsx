@@ -670,7 +670,19 @@ export default function LandingPage() {
                   </label>
 
                   <div style={styles.actions} className="form-actions">
-                    <button type="button" style={styles.secondaryBtn} onClick={resetFilters}>
+                    <button
+                      type="button"
+                      style={{ ...styles.secondaryBtn, ...styles.clearFiltersBtn }}
+                      onClick={resetFilters}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#b91c1c";
+                        e.currentTarget.style.borderColor = "#b91c1c";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "#dc2626";
+                        e.currentTarget.style.borderColor = "#dc2626";
+                      }}
+                    >
                       Изчисти
                     </button>
                     <button type="submit" style={styles.primaryBtnWide}>
@@ -814,15 +826,16 @@ export default function LandingPage() {
                         {/* Price overlay */}
                         <div style={{
                           position: "absolute",
-                          bottom: 8,
-                          left: 8,
-                          background: "rgba(255,255,255,0.95)",
-                          padding: "5px 10px",
-                          borderRadius: 6,
-                          fontWeight: 700,
+                          right: 12,
+                          bottom: 12,
+                          background: "#0f766e",
+                          padding: "6px 12px",
+                          borderRadius: 4,
+                          fontWeight: 800,
                           fontSize: 14,
-                          color: "#0f766e",
-                          boxShadow: "0 2px 6px rgba(0,0,0,0.1)",
+                          color: "#fff",
+                          border: "1px solid #e0e0e0",
+                          boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
                         }}>
                           {listing.price.toLocaleString("bg-BG")} &euro;
                         </div>
@@ -900,6 +913,8 @@ export default function LandingPage() {
             )}
           </div>
         </section>
+
+        <div style={styles.glassDivider} aria-hidden="true" />
 
         {/* ABOUT */}
         <section id="about" style={styles.section}>
@@ -1201,6 +1216,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 15,
     cursor: "pointer",
   },
+  clearFiltersBtn: {
+    border: "1px solid #dc2626",
+    background: "#dc2626",
+    color: "#fff",
+  },
   secondaryBtnSmall: {
     height: 34,
     padding: "0 16px",
@@ -1236,6 +1256,17 @@ const styles: Record<string, React.CSSProperties> = {
     padding: 22,
     boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
   },
+  glassDivider: {
+    height: 2,
+    margin: "24px auto 6px",
+    width: "100%",
+    borderRadius: 999,
+    background:
+      "linear-gradient(90deg, rgba(16,185,129,0.02), rgba(16,185,129,0.32), rgba(16,185,129,0.02))",
+    border: "1px solid rgba(16,185,129,0.18)",
+    boxShadow: "0 4px 10px rgba(16,185,129,0.12)",
+    backdropFilter: "blur(4px)",
+  },
   containerHeader: { marginTop: 0 },
   h2: {
     margin: 0,
@@ -1266,15 +1297,16 @@ const styles: Record<string, React.CSSProperties> = {
   cardImg: { width: "100%", height: "100%", objectFit: "cover", display: "block" },
   pricePill: {
     position: "absolute",
-    left: 8,
-    bottom: 8,
+    right: 12,
+    bottom: 12,
     padding: "6px 12px",
     borderRadius: 4,
-    fontWeight: 700,
-    fontSize: 16,
-    background: "#fff",
-    color: "#0f766e",
+    fontWeight: 800,
+    fontSize: 14,
+    background: "#0f766e",
+    color: "#fff",
     border: "1px solid #e0e0e0",
+    boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
   },
   cardBody: { padding: 14, display: "flex", flexDirection: "column", gap: 10, flex: 1 },
   cardTitleRow: { display: "flex", alignItems: "start", justifyContent: "space-between", gap: 10 },

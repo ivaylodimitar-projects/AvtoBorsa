@@ -45,11 +45,11 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
 
   const styles: Record<string, React.CSSProperties> = {
     container: {
-      background: "linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)",
-      borderRadius: 16,
+      background: "#fff",
+      borderRadius: 8,
       padding: "20px",
-      border: "1px solid #e2e8f0",
-      boxShadow: "0 12px 24px rgba(15, 23, 42, 0.08)",
+      border: "1px solid #e0e0e0",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
     },
     header: {
       display: "flex",
@@ -88,21 +88,22 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
     infoTitle: {
       fontSize: 16,
       fontWeight: 700,
-      color: "#0f172a",
+      color: "#333",
       marginBottom: 4,
       display: "flex",
       alignItems: "center",
       gap: 8,
+      fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
     },
     infoText: {
       fontSize: 13,
-      color: "#475569",
+      color: "#666",
       marginBottom: 10,
     },
     progressBar: {
       width: "100%",
       height: 8,
-      background: "#e2e8f0",
+      background: "#e0e0e0",
       borderRadius: 999,
       overflow: "hidden",
     },
@@ -118,8 +119,9 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
     tipsTitle: {
       fontSize: 13,
       fontWeight: 700,
-      color: "#0f172a",
+      color: "#333",
       marginBottom: 12,
+      fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
     },
     tipsList: {
       display: "grid",
@@ -129,15 +131,15 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
     tip: {
       padding: "12px",
       background: "#fff",
-      borderRadius: 12,
-      border: "1px solid #e2e8f0",
+      borderRadius: 8,
+      border: "1px solid #e0e0e0",
       display: "flex",
       gap: 10,
       alignItems: "flex-start",
     },
     tipCompleted: {
-      background: "#f0fdf4",
-      borderColor: "#bbf7d0",
+      background: "#ecfdf5",
+      borderColor: "#99f6e4",
     },
     tipIcon: {
       display: "inline-flex",
@@ -146,8 +148,8 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
       width: 28,
       height: 28,
       borderRadius: 8,
-      background: "#eef2ff",
-      color: "#1d4ed8",
+      background: "#ecfdf5",
+      color: "#0f766e",
       flexShrink: 0,
     },
     tipContent: {
@@ -156,12 +158,12 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
     tipTitle: {
       fontSize: 12,
       fontWeight: 700,
-      color: "#0f172a",
+      color: "#333",
       marginBottom: 4,
     },
     tipDescription: {
       fontSize: 11,
-      color: "#64748b",
+      color: "#666",
     },
   };
 

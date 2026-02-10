@@ -372,14 +372,19 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     .adv-clear-btn {
       display: inline-flex;
       align-items: center;
-      background: #fff;
-      border: 1.5px solid #e2e8f0;
+      background: rgba(220, 38, 38, 0.12);
+      border: 1.5px solid rgba(220, 38, 38, 0.35);
       border-radius: 10px;
-      color: #6b7280;
+      color: #b91c1c;
       font-size: 13px;
       padding: 8px 20px;
       cursor: pointer;
       transition: all 0.2s;
+    }
+    .adv-clear-btn:hover {
+      background: rgba(185, 28, 28, 0.18);
+      border-color: rgba(185, 28, 28, 0.45);
+      color: #991b1b;
     }
     .adv-recent-searches {
       display: flex;
@@ -831,13 +836,13 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                 <input type="number" placeholder="Макс." value={searchCriteria.mileageTo} onChange={(e) => handleInputChange("mileageTo", e.target.value)} className="adv-input" />
               </div>
 
-              {/* Engine Range */}
+              {/* Power Range */}
               <div className="adv-field">
-                <label className="adv-label">КУБАТУРА ОТ (CC)</label>
+                <label className="adv-label">МОЩНОСТ ОТ (К.С.)</label>
                 <input type="number" placeholder="Мин." value={searchCriteria.engineFrom} onChange={(e) => handleInputChange("engineFrom", e.target.value)} className="adv-input" />
               </div>
               <div className="adv-field">
-                <label className="adv-label">КУБАТУРА ДО (CC)</label>
+                <label className="adv-label">МОЩНОСТ ДО (К.С.)</label>
                 <input type="number" placeholder="Макс." value={searchCriteria.engineTo} onChange={(e) => handleInputChange("engineTo", e.target.value)} className="adv-input" />
               </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Phone,
   Heart,
@@ -6,10 +6,12 @@ import {
   Printer,
   MapPin,
   Mail,
-  Copy,
   Check,
   User,
   Clock,
+  Link,
+  MessageCircle,
+  Send,
 } from 'lucide-react';
 
 interface ContactSidebarProps {
@@ -35,9 +37,11 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
 }) => {
   const [isFavorite, setIsFavorite] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [showShareOptions, setShowShareOptions] = useState(false);
   const [copied, setCopied] = useState(false);
   const [phoneRevealed, setPhoneRevealed] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
+  const shareMenuRef = useRef<HTMLDivElement | null>(null);
+  const shareButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     const checkFavorite = async () => {
@@ -95,11 +99,41 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
     }
   };
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopyLink = async () => {
+    const url = window.location.href;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const tempInput = document.createElement('input');
+        tempInput.value = url;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Error copying link:', err);
+    }
   };
+
+  useEffect(() => {
+    if (!showShareMenu) return;
+    const handleOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        shareMenuRef.current &&
+        !shareMenuRef.current.contains(target) &&
+        !shareButtonRef.current?.contains(target)
+      ) {
+        setShowShareMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [showShareMenu]);
 
   const maskPhone = (p: string) => {
     const cleaned = p.replace(/\D/g, '');
@@ -109,6 +143,54 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
 
   const EUR_TO_BGN = 1.9558;
   const priceInBGN = (price * EUR_TO_BGN).toFixed(2);
+
+  const shareUrl = window.location.href;
+  const shareText = `${title || 'Обява'}${city ? ` · ${city}` : ''}`;
+  const encodedUrl = encodeURIComponent(shareUrl);
+  const encodedText = encodeURIComponent(shareText);
+
+  const shareOptions = [
+    {
+      id: 'copy',
+      label: copied ? 'Копирано' : 'Копирай линк',
+      onClick: async () => {
+        await handleCopyLink();
+        setShowShareMenu(false);
+      },
+      isPrimary: true,
+      icon: copied ? Check : Link,
+    },
+    {
+      id: 'whatsapp',
+      label: 'WhatsApp',
+      url: `https://wa.me/?text=${encodedText}%20${encodedUrl}`,
+      icon: MessageCircle,
+    },
+    {
+      id: 'telegram',
+      label: 'Telegram',
+      url: `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`,
+      icon: Send,
+    },
+    {
+      id: 'viber',
+      label: 'Viber',
+      url: `viber://forward?text=${encodedText}%20${encodedUrl}`,
+      icon: Share2,
+    },
+    {
+      id: 'facebook',
+      label: 'Facebook',
+      url: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+      icon: User,
+    },
+    {
+      id: 'email',
+      label: 'Email',
+      url: `mailto:?subject=${encodedText}&body=${encodedText}%0A${encodedUrl}`,
+      icon: Mail,
+    },
+  ];
 
   const initials = sellerName
     .split(' ')
@@ -138,7 +220,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
           style={{
             flex: 1,
             padding: '12px 16px',
-            background: '#0066cc',
+            background: '#0f766e',
             color: '#fff',
             border: 'none',
             borderRadius: 10,
@@ -182,13 +264,13 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
     <div style={{ position: 'sticky', top: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Main Contact Box */}
       <div
-        style={{
-          background: '#fff',
-          borderRadius: 14,
-          border: '1px solid #eef2f7',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-          overflow: 'hidden',
-        }}
+          style={{
+            background: '#fff',
+            borderRadius: 14,
+            border: '1px solid #eef2f7',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            overflow: 'visible',
+          }}
       >
         {/* Title + ID */}
         <div style={{ padding: '20px 20px 16px' }}>
@@ -196,16 +278,17 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
             style={{
               fontSize: 17,
               fontWeight: 700,
-              color: '#111827',
+              color: '#333',
               margin: '0 0 6px',
               lineHeight: 1.35,
               wordBreak: 'break-word',
+              fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
             }}
           >
             {title}
           </h2>
           <div style={{ fontSize: 12, color: '#9ca3af', fontWeight: 500 }}>
-            ID: {listingId}
+            Обява: {listingId}
           </div>
         </div>
 
@@ -221,7 +304,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
           }}
         >
           <MapPin size={14} color="#9ca3af" />
-          Намира се в гр. {city}
+          Намира се в {city}
         </div>
 
         {/* Price */}
@@ -229,12 +312,20 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
           style={{
             margin: '0 20px',
             padding: '16px',
-            background: '#f0f4ff',
+            background: '#ecfdf5',
             borderRadius: 10,
             marginBottom: 16,
           }}
         >
-          <div style={{ fontSize: 24, fontWeight: 800, color: '#0066cc', marginBottom: 4 }}>
+          <div
+            style={{
+              fontSize: 24,
+              fontWeight: 800,
+              color: '#0f766e',
+              marginBottom: 4,
+              fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
+            }}
+          >
             {price.toLocaleString('bg-BG')} &euro;
           </div>
           <div style={{ fontSize: 13, color: '#6b7280', fontWeight: 500 }}>
@@ -265,14 +356,14 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                 width: 36,
                 height: 36,
                 borderRadius: '50%',
-                background: '#e0f2fe',
+                background: '#ecfdf5',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
               }}
             >
-              <Phone size={16} color="#0066cc" />
+              <Phone size={16} color="#0f766e" />
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 2 }}>
@@ -289,7 +380,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
               style={{
                 width: '100%',
                 padding: '10px',
-                background: '#0066cc',
+                background: '#0f766e',
                 color: '#fff',
                 border: 'none',
                 borderRadius: 8,
@@ -298,8 +389,8 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#0052a3')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = '#0066cc')}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#0b5f58')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = '#0f766e')}
             >
               Покажи телефона
             </button>
@@ -310,7 +401,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                 display: 'block',
                 width: '100%',
                 padding: '10px',
-                background: '#0066cc',
+                background: '#0f766e',
                 color: '#fff',
                 border: 'none',
                 borderRadius: 8,
@@ -338,9 +429,9 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
               gap: 8,
               width: '100%',
               padding: '12px',
-              background: '#f8fafc',
-              color: '#0066cc',
-              border: '1px solid #eef2f7',
+              background: '#fff7ed',
+              color: '#d97706',
+              border: '1px solid #fed7aa',
               borderRadius: 10,
               fontSize: 13,
               fontWeight: 600,
@@ -360,6 +451,8 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
           style={{
             display: 'flex',
             borderTop: '1px solid #eef2f7',
+            position: 'relative',
+            overflow: 'visible',
           }}
         >
           <button
@@ -382,7 +475,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
               transition: 'all 0.2s ease',
             }}
             onMouseEnter={(e) => {
-              if (!isFavorite) e.currentTarget.style.color = '#0066cc';
+              if (!isFavorite) e.currentTarget.style.color = '#0f766e';
               e.currentTarget.style.background = '#f8fafc';
             }}
             onMouseLeave={(e) => {
@@ -393,36 +486,39 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
             <Heart size={15} fill={isFavorite ? 'currentColor' : 'none'} />
             {isFavorite ? 'Запазено' : 'Запази'}
           </button>
-          <button
-            onClick={() => setShowShareOptions(!showShareOptions)}
-            style={{
-              flex: 1,
-              padding: '14px 8px',
-              background: 'none',
-              border: 'none',
-              borderRight: '1px solid #eef2f7',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6,
-              fontSize: 12,
-              fontWeight: 600,
-              color: showShareOptions ? '#0066cc' : '#6b7280',
-              transition: 'all 0.2s ease',
-            }}
-            onMouseEnter={(e) => {
-              if (!showShareOptions) e.currentTarget.style.color = '#0066cc';
-              e.currentTarget.style.background = '#f8fafc';
-            }}
-            onMouseLeave={(e) => {
-              if (!showShareOptions) e.currentTarget.style.color = '#6b7280';
-              e.currentTarget.style.background = 'none';
-            }}
-          >
-            <Share2 size={15} />
-            Сподели
-          </button>
+          <div style={{ flex: 1 }}>
+            <button
+              ref={shareButtonRef}
+              onClick={() => setShowShareMenu((prev) => !prev)}
+              style={{
+                width: '100%',
+                padding: '14px 8px',
+                background: 'none',
+                border: 'none',
+                borderRight: '1px solid #eef2f7',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                fontSize: 12,
+                fontWeight: 600,
+                color: '#6b7280',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#0f766e';
+                e.currentTarget.style.background = '#f8fafc';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = '#6b7280';
+                e.currentTarget.style.background = 'none';
+              }}
+            >
+              <Share2 size={15} />
+              Сподели
+            </button>
+          </div>
           <button
             onClick={() => window.print()}
             style={{
@@ -441,7 +537,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
               transition: 'all 0.2s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.color = '#0066cc';
+              e.currentTarget.style.color = '#0f766e';
               e.currentTarget.style.background = '#f8fafc';
             }}
             onMouseLeave={(e) => {
@@ -452,88 +548,93 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
             <Printer size={15} />
             Принтирай
           </button>
-        </div>
-
-        {/* Share Options Panel */}
-        {showShareOptions && (
           <div
+            ref={shareMenuRef}
             style={{
-              padding: '14px 20px',
-              borderTop: '1px solid #eef2f7',
-              background: '#f8fafc',
+              position: 'absolute',
+              left: 12,
+              right: 12,
+              top: 'calc(100% + 8px)',
+              padding: '10px 12px',
+              borderRadius: 12,
+              border: '1px solid #e5e7eb',
+              background: '#fff',
+              boxShadow: '0 12px 30px rgba(15, 23, 42, 0.12)',
+              display: 'flex',
+              flexDirection: 'row',
+              gap: 8,
+              zIndex: 20,
+              overflowX: 'auto',
+              scrollbarWidth: 'thin',
+              scrollbarColor: '#cbd5f5 transparent',
+              opacity: showShareMenu ? 1 : 0,
+              transform: showShareMenu ? 'translateY(0)' : 'translateY(-6px)',
+              pointerEvents: showShareMenu ? 'auto' : 'none',
+              transition: 'all 0.2s ease',
             }}
           >
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                color: '#9ca3af',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-                marginBottom: 10,
-              }}
-            >
-              Сподели чрез
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={handleCopyLink}
-                title="Копирай линка"
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 8,
-                  background: '#fff',
-                  border: '1px solid #eef2f7',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  color: copied ? '#16a34a' : '#6b7280',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = '#0066cc';
-                  e.currentTarget.style.color = '#0066cc';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#eef2f7';
-                  e.currentTarget.style.color = copied ? '#16a34a' : '#6b7280';
-                }}
-              >
-                {copied ? <Check size={16} /> : <Copy size={16} />}
-              </button>
-              <a
-                href={`mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(title + '\n' + window.location.href)}`}
-                title="Сподели по Email"
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 8,
-                  background: '#fff',
-                  border: '1px solid #eef2f7',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  color: '#6b7280',
-                  textDecoration: 'none',
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.borderColor = '#0066cc';
-                  (e.currentTarget as HTMLElement).style.color = '#0066cc';
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.borderColor = '#eef2f7';
-                  (e.currentTarget as HTMLElement).style.color = '#6b7280';
-                }}
-              >
-                <Mail size={16} />
-              </a>
-            </div>
+            {shareOptions.map((option) => {
+              const Icon = option.icon;
+              const baseStyle: React.CSSProperties = {
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 44,
+                height: 40,
+                padding: 0,
+                borderRadius: 8,
+                border: '1px solid transparent',
+                background: '#f8fafc',
+                color: '#334155',
+                cursor: 'pointer',
+                textDecoration: 'none',
+              };
+
+              const primaryStyle: React.CSSProperties = option.isPrimary
+                ? {
+                    background: '#ecfdf5',
+                    borderColor: '#99f6e4',
+                    color: '#0f766e',
+                  }
+                : {};
+
+                if (option.onClick) {
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={option.onClick}
+                      title={option.label}
+                      aria-label={option.label}
+                      style={{ ...baseStyle, ...primaryStyle }}
+                    >
+                      {Icon ? <Icon size={16} /> : null}
+                    </button>
+                  );
+                }
+
+                if (option.url) {
+                  const isHttp = option.url.startsWith('http');
+                  return (
+                    <a
+                      key={option.id}
+                      href={option.url}
+                      target={isHttp ? '_blank' : undefined}
+                      rel={isHttp ? 'noopener noreferrer' : undefined}
+                      title={option.label}
+                      aria-label={option.label}
+                      style={{ ...baseStyle, ...primaryStyle }}
+                      onClick={() => setShowShareMenu(false)}
+                    >
+                      {Icon ? <Icon size={16} /> : null}
+                    </a>
+                  );
+                }
+
+              return null;
+            })}
           </div>
-        )}
+        </div>
       </div>
 
       {/* Seller Card */}
@@ -552,7 +653,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
               width: 48,
               height: 48,
               borderRadius: '50%',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              background: 'linear-gradient(135deg, #0f766e 0%, #0b5f58 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -569,11 +670,12 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
               style={{
                 fontSize: 14,
                 fontWeight: 700,
-                color: '#111827',
+                color: '#333',
                 marginBottom: 2,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
+                fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
               }}
             >
               {sellerName}
@@ -615,7 +717,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
             href={`mailto:${sellerEmail}`}
             style={{
               fontSize: 13,
-              color: '#0066cc',
+              color: '#0f766e',
               textDecoration: 'none',
               fontWeight: 500,
               display: 'flex',

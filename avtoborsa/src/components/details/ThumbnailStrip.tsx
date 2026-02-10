@@ -1,4 +1,5 @@
-import React, { memo, useEffect, useRef, useMemo } from 'react';
+import React, { memo, useEffect, useRef, useMemo, useState } from 'react';
+import { Image } from 'lucide-react';
 
 interface Image {
   id: number;
@@ -15,8 +16,32 @@ interface ThumbnailStripProps {
 
 const ThumbnailStrip = memo<ThumbnailStripProps>(
   ({ images, currentIndex, onSlideTo, getImageUrl, isMobile }) => {
+    const minThumbnails = 5;
+    const [visibleSlots, setVisibleSlots] = useState(minThumbnails);
+    const [stretchToFill, setStretchToFill] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const activeThumbRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+      const updateSlots = () => {
+        const container = containerRef.current;
+        if (!container) return;
+        const containerWidth = container.clientWidth;
+        if (!containerWidth) return;
+        const thumbSize = isMobile ? 60 : 80;
+        const gap = isMobile ? 6 : 8;
+        const slots = Math.max(minThumbnails, Math.floor((containerWidth + gap) / (thumbSize + gap)));
+        const contentWidth = slots * thumbSize + (slots - 1) * gap;
+        setVisibleSlots(slots);
+        setStretchToFill(images.length <= slots && contentWidth < containerWidth - 1);
+      };
+
+      updateSlots();
+      window.addEventListener('resize', updateSlots);
+      return () => window.removeEventListener('resize', updateSlots);
+    }, [isMobile, images.length]);
+
+    const emptySlots = Math.max(0, visibleSlots - images.length);
 
     // Auto-scroll active thumbnail into view
     useEffect(() => {
@@ -53,6 +78,7 @@ const ThumbnailStrip = memo<ThumbnailStripProps>(
         container: {
           display: 'flex',
           gap: isMobile ? 6 : 8,
+          justifyContent: stretchToFill ? 'space-between' : 'flex-start',
           padding: isMobile ? 8 : 12,
           background: '#fff',
           borderTop: '1px solid #e0e0e0',
@@ -76,6 +102,18 @@ const ThumbnailStrip = memo<ThumbnailStripProps>(
           willChange: 'transform',
           transform: 'translate3d(0, 0, 0)',
           backfaceVisibility: 'hidden' as const,
+        } as React.CSSProperties,
+        placeholder: {
+          width: isMobile ? 60 : 80,
+          height: isMobile ? 60 : 80,
+          borderRadius: 4,
+          border: '1px dashed #d1d5db',
+          background: '#f8fafc',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#cbd5e1',
+          flexShrink: 0,
         } as React.CSSProperties,
       }),
       [isMobile]
@@ -107,9 +145,14 @@ const ThumbnailStrip = memo<ThumbnailStripProps>(
               style={{
                 ...styles.thumbnail,
                 opacity: idx === currentIndex ? 1 : 0.7,
-                borderColor: idx === currentIndex ? '#0066cc' : 'transparent',
+                borderColor: idx === currentIndex ? '#0f766e' : 'transparent',
               } as React.CSSProperties}
             />
+          </div>
+        ))}
+        {Array.from({ length: emptySlots }).map((_, idx) => (
+          <div key={`placeholder-${idx}`} style={styles.placeholder} aria-hidden="true">
+            <Image size={isMobile ? 18 : 20} />
           </div>
         ))}
       </div>

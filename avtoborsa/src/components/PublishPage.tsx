@@ -355,6 +355,7 @@ const PublishPage: React.FC = () => {
     listingType: "normal",
   });
 
+  const initialFormSnapshotRef = useRef<string | null>(null);
   const [images, setImages] = useState<ImageItem[]>([]);
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 8;
@@ -495,6 +496,68 @@ const PublishPage: React.FC = () => {
     setFormData((prev) => ({ ...prev, listingType: value }));
   };
 
+  const REQUIRED_FIELDS_BY_STEP: Record<
+    number,
+    Array<{
+      key: keyof typeof formData;
+      label: string;
+      when?: (data: typeof formData) => boolean;
+    }>
+  > = {
+    1: [
+      { key: "brand", label: "Марка" },
+      { key: "model", label: "Модел" },
+      { key: "yearFrom", label: "Година" },
+    ],
+    2: [
+      { key: "fuel", label: "Гориво" },
+      { key: "gearbox", label: "Скоростна кутия" },
+      { key: "mileage", label: "Пробег" },
+    ],
+    3: [
+      { key: "price", label: "Цена" },
+      { key: "locationCountry", label: "Регион" },
+      {
+        key: "city",
+        label: "Град",
+        when: (data) => !!data.locationCountry && data.locationCountry !== "Извън страната",
+      },
+    ],
+    6: [{ key: "description", label: "Описание" }],
+    7: [
+      { key: "phone", label: "Телефон" },
+      { key: "email", label: "Имейл" },
+    ],
+  };
+
+  const getMissingFields = (step: number, data: typeof formData) => {
+    const fields = REQUIRED_FIELDS_BY_STEP[step] ?? [];
+    return fields
+      .filter((field) => (field.when ? field.when(data) : true))
+      .filter((field) => {
+        const value = data[field.key];
+        if (Array.isArray(value)) return value.length === 0;
+        return String(value ?? "").trim().length === 0;
+      })
+      .map((field) => field.label);
+  };
+
+  const getFirstInvalidStep = (data: typeof formData) => {
+    const steps = Object.keys(REQUIRED_FIELDS_BY_STEP)
+      .map((step) => Number(step))
+      .sort((a, b) => a - b);
+    for (const step of steps) {
+      const missing = getMissingFields(step, data);
+      if (missing.length > 0) {
+        return { step, missing };
+      }
+    }
+    return null;
+  };
+
+  const formatMissingMessage = (fields: string[]) =>
+    fields.length ? `Моля, попълнете: ${fields.join(", ")}` : "";
+
   const confirmTopListing = () => {
     setFormData((prev) => ({ ...prev, listingType: "top" }));
     setShowTopConfirm(false);
@@ -504,8 +567,50 @@ const PublishPage: React.FC = () => {
     setShowTopConfirm(false);
   };
 
+  const normalizeFeatures = (raw: any): string[] => {
+    if (Array.isArray(raw)) return raw.filter(Boolean);
+    if (typeof raw === "string") {
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
+  const normalizeFormSnapshot = (data: typeof formData) =>
+    JSON.stringify({
+      mainCategory: data.mainCategory ?? "",
+      category: data.category ?? "",
+      title: data.title ?? "",
+      brand: data.brand ?? "",
+      model: data.model ?? "",
+      yearFrom: data.yearFrom ?? "",
+      month: data.month ?? "",
+      vin: data.vin ?? "",
+      locationCountry: data.locationCountry ?? "",
+      locationRegion: data.locationRegion ?? "",
+      price: data.price ?? "",
+      city: data.city ?? "",
+      fuel: data.fuel ?? "",
+      gearbox: data.gearbox ?? "",
+      mileage: data.mileage ?? "",
+      color: data.color ?? "",
+      condition: data.condition ?? "",
+      power: data.power ?? "",
+      displacement: data.displacement ?? "",
+      euroStandard: data.euroStandard ?? "",
+      description: data.description ?? "",
+      phone: data.phone ?? "",
+      email: data.email ?? "",
+      features: [...data.features].sort(),
+      listingType: data.listingType ?? "normal",
+    });
+
   const applyListingToForm = (data: any) => {
-    setFormData({
+    const nextFormData = {
       mainCategory: data.main_category ?? data.mainCategory ?? "1",
       category: data.category ?? "",
       title: data.title ?? "",
@@ -530,9 +635,12 @@ const PublishPage: React.FC = () => {
       phone: data.phone ?? "",
       email: data.email ?? "",
       pictures: [],
-      features: Array.isArray(data.features) ? data.features : [],
+      features: normalizeFeatures(data.features),
       listingType: data.listing_type ?? data.listingType ?? "normal",
-    });
+    };
+
+    setFormData(nextFormData);
+    initialFormSnapshotRef.current = normalizeFormSnapshot(nextFormData);
 
     setImages([]);
     setExistingCoverImage(data.image_url || data.coverImage || null);
@@ -560,6 +668,11 @@ const PublishPage: React.FC = () => {
   };
 
   const completionPercentage = calculateCompletion();
+  const currentFormSnapshot = normalizeFormSnapshot(formData);
+  const isDirty =
+    isEditMode &&
+    !!initialFormSnapshotRef.current &&
+    (currentFormSnapshot !== initialFormSnapshotRef.current || images.length > 0);
   const priceSummary = {
     price: formData.price ? `${formData.price} EUR` : "не е въведена",
     region: formData.locationCountry ? formData.locationCountry : "не е избран",
@@ -572,6 +685,9 @@ const PublishPage: React.FC = () => {
   };
   const coverPreview =
     images.find((img) => img.isCover)?.preview || existingCoverImage || undefined;
+  const stepMissingFields = getMissingFields(currentStep, formData);
+  const validationMessage = formatMissingMessage(stepMissingFields);
+  const isNextDisabled = currentStep < totalSteps && stepMissingFields.length > 0;
 
   useEffect(() => {
     const editIdParam = searchParams.get("edit");
@@ -579,6 +695,7 @@ const PublishPage: React.FC = () => {
       setIsEditMode(false);
       setEditingListingId(null);
       setExistingCoverImage(null);
+      initialFormSnapshotRef.current = null;
       return;
     }
 
@@ -592,11 +709,13 @@ const PublishPage: React.FC = () => {
       setIsEditMode(false);
       setEditingListingId(null);
       setExistingCoverImage(null);
+      initialFormSnapshotRef.current = null;
       return;
     }
 
     setIsEditMode(true);
     setEditingListingId(editId);
+    initialFormSnapshotRef.current = null;
     const stateListing = (location.state as { listing?: any } | null)?.listing;
     const fallbackListing =
       stateListing && String(stateListing.id) === String(editId) ? stateListing : null;
@@ -828,6 +947,7 @@ const PublishPage: React.FC = () => {
       } else {
         setImages([]);
         setExistingCoverImage(savedListing.image_url || existingCoverImage);
+        initialFormSnapshotRef.current = normalizeFormSnapshot(formData);
       }
 
       // Redirect to my ads after 2 seconds
@@ -842,19 +962,42 @@ const PublishPage: React.FC = () => {
     }
   };
 
+  const handleNextStep = () => {
+    if (currentStep >= totalSteps) return;
+    const missing = getMissingFields(currentStep, formData);
+    if (missing.length > 0) return;
+    setErrors({});
+    setCurrentStep(Math.min(totalSteps, currentStep + 1));
+  };
+
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (currentStep < totalSteps) {
-      setCurrentStep(Math.min(totalSteps, currentStep + 1));
-    }
+    handleNextStep();
   };
 
   const handlePublishClick = () => {
     if (loadingListing) return;
+    const firstInvalid = getFirstInvalidStep(formData);
+    if (firstInvalid) {
+      setCurrentStep(firstInvalid.step);
+      return;
+    }
     const form = formRef.current;
     if (!form) return;
     if (!form.reportValidity()) return;
     submitListing();
+  };
+
+  const handleStepClick = (step: number) => {
+    if (step <= currentStep) {
+      setErrors({});
+      setCurrentStep(step);
+      return;
+    }
+    const missing = getMissingFields(currentStep, formData);
+    if (missing.length > 0) return;
+    setErrors({});
+    setCurrentStep(step);
   };
 
   const handleFeatureChange = (feature: string) => {
@@ -869,35 +1012,41 @@ const PublishPage: React.FC = () => {
   const styles: Record<string, React.CSSProperties> = {
     page: {
       minHeight: "100vh",
-      background: "#f3f6fb",
+      background: "#f5f5f5",
       width: "100%",
       overflow: "visible",
       textAlign: "left",
-      color: "#0f172a",
+      color: "#333",
     },
     container: { width: "100%" },
     form: {
       width: "100%",
       background: "#ffffff",
-      borderRadius: 16,
+      borderRadius: 8,
       padding: 24,
-      border: "1px solid #e2e8f0",
-      boxShadow: "0 12px 30px rgba(15, 23, 42, 0.08)",
+      border: "1px solid #e0e0e0",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
       overflow: "visible",
       boxSizing: "border-box",
     },
-    title: { fontSize: 24, fontWeight: 800, color: "#0f172a", margin: 0 },
+    title: {
+      fontSize: 24,
+      fontWeight: 800,
+      color: "#333",
+      margin: 0,
+      fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+    },
     section: {
       marginBottom: 20,
       padding: 16,
-      borderRadius: 14,
-      border: "1px solid #e2e8f0",
-      background: "#f8fafc",
+      borderRadius: 8,
+      border: "1px solid #e0e0e0",
+      background: "#fafafa",
     },
     sectionTitle: {
       fontSize: 15,
       fontWeight: 700,
-      color: "#0f172a",
+      color: "#333",
       margin: 0,
       marginBottom: 12,
       display: "flex",
@@ -906,19 +1055,19 @@ const PublishPage: React.FC = () => {
     },
     input: {
       padding: "10px 14px",
-      border: "1px solid #e2e8f0",
-      borderRadius: 12,
+      border: "1px solid #e0e0e0",
+      borderRadius: 4,
       fontSize: 14,
       fontFamily: "inherit",
       width: "100%",
       boxSizing: "border-box",
       background: "#fff",
-      color: "#0f172a",
+      color: "#333",
     },
     textarea: {
       padding: "10px 14px",
-      border: "1px solid #e2e8f0",
-      borderRadius: 12,
+      border: "1px solid #e0e0e0",
+      borderRadius: 4,
       fontSize: 14,
       fontFamily: "inherit",
       minHeight: 120,
@@ -926,9 +1075,9 @@ const PublishPage: React.FC = () => {
       width: "100%",
       boxSizing: "border-box",
       background: "#fff",
-      color: "#0f172a",
+      color: "#333",
     },
-    note: { fontSize: 12, color: "#64748b", marginTop: 8 },
+    note: { fontSize: 12, color: "#dc2626", marginTop: 8 },
     confirmOverlay: {
       position: "fixed",
       inset: 0,
@@ -942,7 +1091,7 @@ const PublishPage: React.FC = () => {
     confirmModal: {
       background: "#fff",
       borderRadius: 14,
-      border: "1px solid #e2e8f0",
+      border: "1px solid #e0e0e0",
       boxShadow: "0 24px 60px rgba(15, 23, 42, 0.35)",
       padding: 22,
       width: "100%",
@@ -952,13 +1101,14 @@ const PublishPage: React.FC = () => {
       margin: "0 0 8px 0",
       fontSize: 18,
       fontWeight: 800,
-      color: "#111827",
+      color: "#333",
+      fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
     },
     confirmText: {
       margin: "0 0 18px 0",
       fontSize: 14,
       lineHeight: 1.5,
-      color: "#374151",
+      color: "#666",
     },
     confirmActions: {
       display: "flex",
@@ -969,9 +1119,9 @@ const PublishPage: React.FC = () => {
       height: 40,
       padding: "0 16px",
       borderRadius: 10,
-      border: "1px solid #cbd5f5",
+      border: "1px solid #e0e0e0",
       background: "#fff",
-      color: "#111827",
+      color: "#333",
       fontSize: 14,
       fontWeight: 700,
       cursor: "pointer",
@@ -980,8 +1130,8 @@ const PublishPage: React.FC = () => {
       height: 40,
       padding: "0 16px",
       borderRadius: 10,
-      border: "1px solid #1d4ed8",
-      background: "#1d4ed8",
+      border: "1px solid #0f766e",
+      background: "#0f766e",
       color: "#fff",
       fontSize: 14,
       fontWeight: 700,
@@ -991,14 +1141,14 @@ const PublishPage: React.FC = () => {
 
   const css = `
     .publish-page {
-      --bg: #f3f6fb;
+      --bg: #f5f5f5;
       --card: #ffffff;
-      --border: #e2e8f0;
-      --text: #0f172a;
-      --muted: #64748b;
-      --primary: #1d4ed8;
-      --primary-2: #0ea5e9;
-      --ring: rgba(59, 130, 246, 0.22);
+      --border: #e0e0e0;
+      --text: #333;
+      --muted: #666;
+      --primary: #0f766e;
+      --primary-2: #0f766e;
+      --ring: rgba(15, 118, 110, 0.16);
       font-family: "Manrope", "Segoe UI", -apple-system, system-ui, sans-serif;
       color: var(--text);
       text-align: left;
@@ -1007,7 +1157,7 @@ const PublishPage: React.FC = () => {
     .publish-container {
       max-width: 1200px;
       margin: 0 auto;
-      padding: 24px 20px 48px;
+      padding: 20px 20px 60px;
     }
 
     .publish-layout {
@@ -1020,8 +1170,8 @@ const PublishPage: React.FC = () => {
     .publish-card {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
 
     .publish-form {
@@ -1036,11 +1186,52 @@ const PublishPage: React.FC = () => {
       margin-bottom: 18px;
     }
 
+    .publish-save-bar {
+      position: sticky;
+      top: 88px;
+      z-index: 6;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(220, 38, 38, 0.35);
+      background: rgba(254, 242, 242, 0.95);
+      box-shadow: 0 8px 18px rgba(220, 38, 38, 0.18);
+      margin-bottom: 16px;
+      backdrop-filter: blur(6px);
+    }
+
+    .publish-save-text {
+      font-size: 13px;
+      color: #b91c1c;
+      font-weight: 600;
+    }
+
+    .publish-save-btn {
+      height: 38px;
+      padding: 0 18px;
+      font-size: 13px;
+      border-radius: 10px;
+      white-space: nowrap;
+      background: #dc2626;
+      border-color: #dc2626;
+      color: #fff;
+      box-shadow: 0 6px 14px rgba(220, 38, 38, 0.3);
+    }
+
+    .publish-save-btn:hover:not(.disabled) {
+      background: #b91c1c;
+      border-color: #b91c1c;
+    }
+
     .publish-title {
       margin: 0;
       font-size: 24px;
       font-weight: 800;
       letter-spacing: 0.2px;
+      font-family: "Space Grotesk", "Manrope", "Segoe UI", sans-serif;
     }
 
     .publish-subtitle {
@@ -1079,7 +1270,7 @@ const PublishPage: React.FC = () => {
       border: 1px solid var(--border);
       background: #ffffff;
       padding: 14px;
-      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
 
     .feature-group-header {
@@ -1107,8 +1298,8 @@ const PublishPage: React.FC = () => {
       align-self: center;
       font-size: 12px;
       font-weight: 700;
-      color: #1d4ed8;
-      background: #eef2ff;
+      color: #0f766e;
+      background: #ecfdf5;
       padding: 4px 10px;
       border-radius: 999px;
       white-space: nowrap;
@@ -1128,22 +1319,22 @@ const PublishPage: React.FC = () => {
       padding: 10px 12px;
       border-radius: 12px;
       border: 1px solid var(--border);
-      background: #f8fafc;
+      background: #fafafa;
       cursor: pointer;
       transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease,
         transform 0.2s ease;
     }
 
     .feature-card:hover {
-      border-color: #cbd5e1;
-      background: #f1f5f9;
+      border-color: #d0d0d0;
+      background: #f5f5f5;
       transform: translateY(-1px);
     }
 
     .feature-card.is-selected {
-      border-color: #60a5fa;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-      background: #eef6ff;
+      border-color: #0f766e;
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.16);
+      background: #ecfdf5;
     }
 
     .feature-checkbox {
@@ -1156,7 +1347,7 @@ const PublishPage: React.FC = () => {
       width: 20px;
       height: 20px;
       border-radius: 6px;
-      border: 1px solid #cbd5e1;
+      border: 1px solid #e0e0e0;
       background: #ffffff;
       display: grid;
       place-items: center;
@@ -1171,9 +1362,9 @@ const PublishPage: React.FC = () => {
     }
 
     .feature-card.is-selected .feature-check {
-      background: #2563eb;
-      border-color: #2563eb;
-      box-shadow: 0 6px 12px rgba(37, 99, 235, 0.3);
+      background: #0f766e;
+      border-color: #0f766e;
+      box-shadow: 0 6px 12px rgba(15, 118, 110, 0.3);
     }
 
     .feature-card.is-selected .feature-check svg {
@@ -1208,8 +1399,8 @@ const PublishPage: React.FC = () => {
     }
 
     .listing-type-card.is-selected {
-      border-color: #60a5fa;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
+      border-color: #0f766e;
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.16);
     }
 
     .listing-type-card:hover {
@@ -1240,7 +1431,7 @@ const PublishPage: React.FC = () => {
     .publish-form textarea {
       width: 100%;
       padding: 10px 14px;
-      border-radius: 12px;
+      border-radius: 4px;
       border: 1px solid var(--border);
       background: #fff;
       color: var(--text);
@@ -1263,7 +1454,7 @@ const PublishPage: React.FC = () => {
     .publish-form select:focus,
     .publish-form textarea:focus {
       outline: none;
-      border-color: #60a5fa !important;
+      border-color: #0f766e !important;
       box-shadow: 0 0 0 3px var(--ring) !important;
     }
 
@@ -1271,10 +1462,10 @@ const PublishPage: React.FC = () => {
       margin-top: 8px;
       padding: 8px 10px;
       border-radius: 10px;
-      border: 1px dashed #dbeafe;
-      background: #f8fafc;
+      border: 1px dashed #99f6e4;
+      background: #ecfdf5;
       font-size: 12px;
-      color: #475569;
+      color: #666;
       display: flex;
       flex-wrap: wrap;
       gap: 6px 12px;
@@ -1287,7 +1478,7 @@ const PublishPage: React.FC = () => {
     }
 
     .price-summary strong {
-      color: #0f172a;
+      color: #0f766e;
       font-weight: 700;
     }
 
@@ -1302,8 +1493,8 @@ const PublishPage: React.FC = () => {
     .publish-btn {
       height: 42px;
       padding: 0 20px;
-      border-radius: 999px;
-      border: none;
+      border-radius: 4px;
+      border: 1px solid transparent;
       font-size: 14px;
       font-weight: 700;
       cursor: pointer;
@@ -1314,20 +1505,21 @@ const PublishPage: React.FC = () => {
     }
 
     .publish-btn.primary {
-      background: linear-gradient(135deg, #2563eb, #0ea5e9);
+      background: #0f766e;
       color: #fff;
-      box-shadow: 0 10px 20px rgba(37, 99, 235, 0.35);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
 
     .publish-btn.secondary {
-      background: #0f172a;
-      color: #fff;
-      box-shadow: 0 10px 20px rgba(15, 23, 42, 0.2);
+      background: #fff;
+      color: #333;
+      border-color: #e0e0e0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
 
     .publish-btn.disabled {
-      background: #cbd5e1;
-      color: #475569;
+      background: #e0e0e0;
+      color: #999;
       box-shadow: none;
       cursor: not-allowed;
     }
@@ -1362,9 +1554,9 @@ const PublishPage: React.FC = () => {
     }
 
     .publish-alert.info {
-      background: #eff6ff;
-      border-color: #bfdbfe;
-      color: #1d4ed8;
+      background: #fff7ed;
+      border-color: #fdba74;
+      color: #c2410c;
     }
 
     .publish-toast {
@@ -1373,7 +1565,7 @@ const PublishPage: React.FC = () => {
       right: 20px;
       padding: 12px 18px;
       border-radius: 10px;
-      background: #16a34a;
+      background: #0f766e;
       color: #fff;
       font-size: 13px;
       font-weight: 700;
@@ -1412,6 +1604,12 @@ const PublishPage: React.FC = () => {
 
       .publish-aside {
         position: static;
+      }
+
+      .publish-save-bar {
+        top: 70px;
+        flex-direction: column;
+        align-items: flex-start;
       }
 
       .publish-actions {
@@ -1459,14 +1657,34 @@ const PublishPage: React.FC = () => {
             </div>
 
           {/* Error Message */}
-          {errors.submit && (
-            <div className="publish-alert error">{errors.submit}</div>
+          {(validationMessage || errors.submit) && (
+            <div className="publish-alert error">
+              {validationMessage || errors.submit}
+            </div>
           )}
 
           {/* Edit Mode */}
           {isEditMode && (
             <div className="publish-alert info">
               Режим редакция: промените се запазват върху текущата обява.
+            </div>
+          )}
+
+          {isEditMode && isDirty && (
+            <div className="publish-save-bar">
+              <div className="publish-save-text">
+                Засякохме промени! Можете да ги запазите тук.
+              </div>
+              <button
+                type="button"
+                onClick={handlePublishClick}
+                disabled={loading || loadingListing}
+                className={`publish-btn primary publish-save-btn ${
+                  loading || loadingListing ? "disabled" : ""
+                }`}
+              >
+                {loading ? "Запазване..." : "Запази"}
+              </button>
             </div>
           )}
 
@@ -1485,7 +1703,7 @@ const PublishPage: React.FC = () => {
                 id: 2,
                 label: "Детайли",
                 icon: <Settings2 size={16} />,
-                description: "Гориво, пробег",
+                description: "Гориво, пробег, мощност",
               },
               {
                 id: 3,
@@ -1524,7 +1742,7 @@ const PublishPage: React.FC = () => {
                 description: "Топ или нормална",
               },
             ]}
-            onStepClick={setCurrentStep}
+            onStepClick={handleStepClick}
             completedSteps={Array.from({ length: currentStep - 1 }, (_, i) => i + 1)}
           />
 
@@ -1547,7 +1765,7 @@ const PublishPage: React.FC = () => {
                 Основна информация
               </h2>
               <div className="field-grid">
-                <FormFieldWithTooltip label="Марка" required tooltip="Производител на автомобила" example="BMW, Mercedes">
+                <FormFieldWithTooltip label="Марка" required tooltip="Производител на автомобила">
                   <select style={styles.input} name="brand" value={formData.brand} onChange={handleChange} required>
                     <option value="">Избери марка</option>
                     {BRANDS.map((brand) => (
@@ -1558,7 +1776,7 @@ const PublishPage: React.FC = () => {
                   </select>
                 </FormFieldWithTooltip>
 
-                <FormFieldWithTooltip label="Модел" required tooltip="Модел на автомобила" example="3 Series, C-Class">
+                <FormFieldWithTooltip label="Модел" required tooltip="Модел на автомобила">
                   <select
                     style={styles.input}
                     name="model"
@@ -1578,7 +1796,7 @@ const PublishPage: React.FC = () => {
                   </select>
                 </FormFieldWithTooltip>
 
-                <FormFieldWithTooltip label="Година" required tooltip="Година на производство" example="2020, 2019">
+                <FormFieldWithTooltip label="Година" required tooltip="Година на производство">
                   <select style={styles.input} name="yearFrom" value={formData.yearFrom} onChange={handleChange} required>
                     <option value="">Избери година</option>
                     {years.map((year) => (
@@ -1600,7 +1818,7 @@ const PublishPage: React.FC = () => {
                 Детайли на автомобила
               </h2>
               <div className="field-grid">
-                <FormFieldWithTooltip label="Гориво" required tooltip="Тип на горивото" example="Бензин, Дизел">
+                <FormFieldWithTooltip label="Гориво" required tooltip="Тип на горивото">
                   <select style={styles.input} name="fuel" value={formData.fuel} onChange={handleChange}>
                     <option value="">Избери гориво</option>
                     <option value="benzin">Бензин</option>
@@ -1611,7 +1829,7 @@ const PublishPage: React.FC = () => {
                   </select>
                 </FormFieldWithTooltip>
 
-                <FormFieldWithTooltip label="Скоростна кутия" required tooltip="Тип на скоростната кутия" example="Ръчна, Автоматик">
+                <FormFieldWithTooltip label="Скоростна кутия" required tooltip="Тип на скоростната кутия">
                   <select style={styles.input} name="gearbox" value={formData.gearbox} onChange={handleChange}>
                     <option value="">Избери кутия</option>
                     <option value="ruchna">Ръчна</option>
@@ -1619,8 +1837,20 @@ const PublishPage: React.FC = () => {
                   </select>
                 </FormFieldWithTooltip>
 
-                <FormFieldWithTooltip label="Пробег (км)" required tooltip="Общо изминати километри" example="150000, 75000">
+                <FormFieldWithTooltip label="Пробег (км)" required tooltip="Общо изминати километри">
                   <input style={styles.input} type="number" name="mileage" placeholder="Въведи пробег" min="0" value={formData.mileage} onChange={handleChange} />
+                </FormFieldWithTooltip>
+
+                <FormFieldWithTooltip label="Мощност (к.с.)" tooltip="Конски сили">
+                  <input
+                    style={styles.input}
+                    type="number"
+                    name="power"
+                    placeholder="напр. 150"
+                    min="0"
+                    value={formData.power}
+                    onChange={handleChange}
+                  />
                 </FormFieldWithTooltip>
               </div>
             </div>
@@ -1634,7 +1864,7 @@ const PublishPage: React.FC = () => {
                 Цена и локация
               </h2>
               <div className="field-grid">
-                <FormFieldWithTooltip label="Цена (EUR)" required tooltip="Цена на автомобила" example="5000, 10000">
+                <FormFieldWithTooltip label="Цена (EUR)" required tooltip="Цена на автомобила">
                   <input style={styles.input} type="number" name="price" placeholder="Въведи цена" min="0" step="0.01" value={formData.price} onChange={handleChange} required />
                   <div className="price-summary">
                     <span>
@@ -1661,7 +1891,7 @@ const PublishPage: React.FC = () => {
                 </FormFieldWithTooltip>
 
                 {formData.locationCountry && formData.locationCountry !== "Извън страната" && (
-                  <FormFieldWithTooltip label="Град" required tooltip="Град, където се намира автомобилът" example="София, Пловдив">
+                  <FormFieldWithTooltip label="Град" required tooltip="Град, където се намира автомобилът">
                     <select style={styles.input} name="city" value={formData.city} onChange={handleChange} required>
                       <option value="">Избери град</option>
                       {BULGARIAN_CITIES_BY_REGION[formData.locationCountry]?.map((city) => (
@@ -1683,7 +1913,7 @@ const PublishPage: React.FC = () => {
                 <Sparkles size={18} className="section-icon" />
                 Екстри и опции
               </h2>
-              <p style={{ color: "#64748b", marginBottom: 16, fontSize: 14 }}>
+              <p style={{ color: "#666", marginBottom: 16, fontSize: 14 }}>
                 Избери всички екстри и опции, които има автомобилът
               </p>
               <div className="feature-groups">
@@ -1771,7 +2001,6 @@ const PublishPage: React.FC = () => {
                   label="Телефон"
                   required
                   tooltip="Телефонен номер за връзка"
-                  example="+359 88 123 4567"
                 >
                   <input
                     style={styles.input}
@@ -1788,7 +2017,6 @@ const PublishPage: React.FC = () => {
                   label="Имейл"
                   required
                   tooltip="Имейл адрес за връзка"
-                  example="example@gmail.com"
                 >
                   <input
                     style={styles.input}
@@ -1810,7 +2038,7 @@ const PublishPage: React.FC = () => {
                 <Sparkles size={18} className="section-icon" />
                 Тип обява
               </h2>
-              <p style={{ color: "#64748b", marginBottom: 16, fontSize: 14 }}>
+              <p style={{ color: "#666", marginBottom: 16, fontSize: 14 }}>
                 Избери дали обявата да е нормална или топ за по-голяма видимост.
               </p>
               <div className="listing-type-grid">
@@ -1886,10 +2114,9 @@ const PublishPage: React.FC = () => {
             ) : (
               <button
                 type="button"
-                onClick={() =>
-                  setCurrentStep(Math.min(totalSteps, currentStep + 1))
-                }
-                className="publish-btn primary"
+                onClick={handleNextStep}
+                disabled={isNextDisabled}
+                className={`publish-btn primary ${isNextDisabled ? "disabled" : ""}`}
               >
                 Напред
                 <ArrowRight size={16} />
@@ -1944,6 +2171,7 @@ const PublishPage: React.FC = () => {
             mileage={formData.mileage}
             fuel={formData.fuel}
             gearbox={formData.gearbox}
+            power={formData.power}
             coverImage={coverPreview}
             description={formData.description}
             completionPercentage={completionPercentage}

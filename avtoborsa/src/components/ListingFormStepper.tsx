@@ -24,6 +24,10 @@ const ListingFormStepper: React.FC<ListingFormStepperProps> = ({
   completedSteps = [],
 }) => {
   const progressPercentage = (currentStep / totalSteps) * 100;
+  const completedCount = completedSteps.length;
+  const completionPercent = Math.round(progressPercentage);
+  const completedCountColor = completedCount === 0 ? "#16a34a" : "#0f766e";
+  const completionPercentColor = completionPercent < 25 ? "#f59e0b" : "#0f766e";
   const stepsContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -50,21 +54,21 @@ const ListingFormStepper: React.FC<ListingFormStepperProps> = ({
     container: {
       marginBottom: 24,
       padding: "18px",
-      background: "#f8fafc",
-      borderRadius: 14,
-      border: "1px solid #e2e8f0",
+      background: "#fafafa",
+      borderRadius: 8,
+      border: "1px solid #e0e0e0",
     },
     progressBar: {
       width: "100%",
       height: 6,
-      background: "#e2e8f0",
+      background: "#e0e0e0",
       borderRadius: 999,
       overflow: "hidden",
       marginBottom: 16,
     },
     progressFill: {
       height: "100%",
-      background: "linear-gradient(90deg, #1d4ed8, #0ea5e9)",
+      background: "linear-gradient(90deg, #0f766e, #0b5f58)",
       width: `${progressPercentage}%`,
       transition: "width 0.3s ease",
     },
@@ -74,7 +78,7 @@ const ListingFormStepper: React.FC<ListingFormStepperProps> = ({
       overflowX: "auto",
       paddingBottom: 8,
       scrollbarWidth: "thin",
-      scrollbarColor: "#cbd5f5 transparent",
+      scrollbarColor: "#0f766e transparent",
       scrollBehavior: "smooth",
       WebkitOverflowScrolling: "touch",
     },
@@ -101,20 +105,20 @@ const ListingFormStepper: React.FC<ListingFormStepperProps> = ({
       whiteSpace: "nowrap",
     },
     stepActive: {
-      background: "#1d4ed8",
+      background: "#0f766e",
       color: "#fff",
-      border: "1px solid #1d4ed8",
-      boxShadow: "0 6px 14px rgba(29, 78, 216, 0.3)",
+      border: "1px solid #0f766e",
+      boxShadow: "0 6px 14px rgba(15, 118, 110, 0.3)",
     },
     stepCompleted: {
-      background: "#ecfdf3",
-      color: "#15803d",
-      border: "1px solid #bbf7d0",
+      background: "#ecfdf5",
+      color: "#0f766e",
+      border: "1px solid #99f6e4",
     },
     stepInactive: {
       background: "#fff",
-      color: "#475569",
-      border: "1px solid #e2e8f0",
+      color: "#666",
+      border: "1px solid #e0e0e0",
     },
     statsContainer: {
       display: "flex",
@@ -122,7 +126,7 @@ const ListingFormStepper: React.FC<ListingFormStepperProps> = ({
       gap: 14,
       marginTop: 16,
       fontSize: 12,
-      color: "#64748b",
+      color: "#666",
     },
     stat: {
       display: "flex",
@@ -139,7 +143,7 @@ const ListingFormStepper: React.FC<ListingFormStepperProps> = ({
           height: 8px;
         }
         .listing-stepper-scroll::-webkit-scrollbar-thumb {
-          background: rgba(99, 102, 241, 0.35);
+          background: rgba(15, 118, 110, 0.35);
           border-radius: 999px;
         }
         .listing-stepper-scroll::-webkit-scrollbar-track {
@@ -190,11 +194,21 @@ const ListingFormStepper: React.FC<ListingFormStepperProps> = ({
         </div>
         <div style={styles.stat}>
           <CheckCircle2 size={14} />
-          <span>{completedSteps.length} завършени</span>
+          <span>
+            <span style={{ color: completedCountColor, fontWeight: 700 }}>
+              {completedCount}
+            </span>{" "}
+            завършени
+          </span>
         </div>
         <div style={styles.stat}>
           <TrendingUp size={14} />
-          <span>{Math.round(progressPercentage)}% попълване</span>
+          <span>
+            <span style={{ color: completionPercentColor, fontWeight: 700 }}>
+              {completionPercent}%
+            </span>{" "}
+            попълване
+          </span>
         </div>
       </div>
     </div>

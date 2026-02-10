@@ -40,10 +40,10 @@ class CarListingSerializer(serializers.ModelSerializer):
             'id', 'slug', 'user', 'user_email', 'main_category', 'category', 'category_display', 'title', 'brand', 'model',
             'year_from', 'month', 'vin', 'price', 'location_country', 'location_region', 'city',
             'fuel', 'fuel_display', 'gearbox', 'gearbox_display', 'mileage', 'color', 'condition', 'condition_display', 'power', 'displacement', 'euro_standard',
-            'description', 'phone', 'email', 'features', 'listing_type', 'listing_type_display',
+            'description', 'phone', 'email', 'features', 'listing_type', 'listing_type_display', 'top_expires_at',
             'is_draft', 'is_active', 'is_archived', 'created_at', 'updated_at', 'images', 'image_url', 'is_favorited', 'seller_name', 'seller_type', 'images_upload'
         ]
-        read_only_fields = ['id', 'slug', 'user', 'user_email', 'created_at', 'updated_at', 'images', 'image_url', 'is_favorited', 'is_draft', 'is_active', 'fuel_display', 'gearbox_display', 'condition_display', 'category_display', 'listing_type_display', 'seller_name', 'seller_type']
+        read_only_fields = ['id', 'slug', 'user', 'user_email', 'created_at', 'updated_at', 'images', 'image_url', 'is_favorited', 'is_draft', 'is_active', 'fuel_display', 'gearbox_display', 'condition_display', 'category_display', 'listing_type_display', 'seller_name', 'seller_type', 'top_expires_at']
 
     def get_fuel_display(self, obj):
         """Return display name for fuel"""

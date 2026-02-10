@@ -18,6 +18,12 @@ import {
   Euro,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import {
+  formatConditionLabel,
+  formatEuroStandardLabel,
+  formatFuelLabel,
+  formatGearboxLabel,
+} from "../utils/listingLabels";
 
 interface CarListing {
   id: number;
@@ -50,6 +56,7 @@ interface CarListing {
   is_draft: boolean;
   listing_type?: "top" | "normal" | string;
   listing_type_display?: string;
+  top_expires_at?: string;
 }
 
 interface Favorite {
@@ -65,6 +72,13 @@ const NEW_LISTING_BADGE_MINUTES = 10;
 const NEW_LISTING_BADGE_WINDOW_MS = NEW_LISTING_BADGE_MINUTES * 60 * 1000;
 const NEW_LISTING_BADGE_REFRESH_MS = 30_000;
 const TOP_LISTING_PRICE_EUR = 3;
+
+const globalCss = `
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Manrope", "Segoe UI", sans-serif; font-size: 15px; }
+  input, select, button { font-family: inherit; }
+`;
 
 const MyAdsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -246,6 +260,7 @@ const MyAdsPage: React.FC = () => {
     });
   };
 
+
   const getShortDescription = (text?: string, maxLength = 140) => {
     if (!text) return "";
     const clean = text.replace(/\s+/g, " ").trim();
@@ -259,6 +274,22 @@ const MyAdsPage: React.FC = () => {
     if (Number.isNaN(createdAtMs)) return false;
     const listingAgeMs = currentTimeMs - createdAtMs;
     return listingAgeMs >= 0 && listingAgeMs <= NEW_LISTING_BADGE_WINDOW_MS;
+  };
+
+  const getTopRemainingLabel = (listing: CarListing) => {
+    if (listing.listing_type !== "top") return "";
+    if (!listing.top_expires_at) return "";
+    const expiresAtMs = new Date(listing.top_expires_at).getTime();
+    if (Number.isNaN(expiresAtMs)) return "";
+    const diffMs = expiresAtMs - currentTimeMs;
+    if (diffMs <= 0) return "";
+    const totalMinutes = Math.ceil(diffMs / 60000);
+    const days = Math.floor(totalMinutes / (60 * 24));
+    const hours = Math.floor((totalMinutes - days * 24 * 60) / 60);
+    const minutes = totalMinutes - days * 24 * 60 - hours * 60;
+    if (days > 0) return `ТОП изтича: ${days}д ${hours}ч`;
+    if (hours > 0) return `ТОП изтича: ${hours}ч ${minutes}мин`;
+    return `ТОП изтича: ${minutes}мин`;
   };
 
   const openListingTypeModal = (
@@ -561,22 +592,25 @@ const MyAdsPage: React.FC = () => {
   const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: "100vh",
-    background: "#f7f7f7", // По-светъл фон за страницата
+    background: "#f5f5f5",
+    color: "#333",
     width: "100%",
     boxSizing: "border-box",
+    fontFamily: "\"Manrope\", \"Segoe UI\", sans-serif",
   },
   container: {
     maxWidth: 1200,
     margin: "0 auto",
-    padding: "32px 20px",
+    padding: "20px 20px 60px",
     boxSizing: "border-box",
   },
   header: {
-    background: "linear-gradient(135deg, #667eea 0%, #4f5f89 100%)", // По-мек и не толкова ярък син
-    padding: "32px",
-    borderRadius: 16,
-    marginBottom: 32,
-    boxShadow: "0 4px 12px rgba(102, 126, 234, 0.15)", // Лека сянка
+    background: "#fff",
+    padding: "24px",
+    borderRadius: 8,
+    marginBottom: 24,
+    border: "1px solid #e0e0e0",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
   },
   headerRow: {
     display: "flex",
@@ -592,33 +626,35 @@ const MyAdsPage: React.FC = () => {
     gap: 16,
   },
   titleIcon: {
-    color: "#fff",
+    color: "#0f766e",
   },
   title: {
     fontSize: 32,
     fontWeight: 700,
-    color: "#fff",
+    color: "#333",
     margin: 0,
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
   },
   subtitle: {
     fontSize: 15,
-    color: "rgba(255, 255, 255, 0.9)",
+    color: "#666",
     margin: 0,
     fontWeight: 500,
   },
   emptyState: {
     background: "#fff",
     padding: "64px 32px",
-    borderRadius: 16,
+    borderRadius: 8,
     textAlign: "center",
-    boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+    border: "1px solid #e0e0e0",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
   },
   emptyIconWrapper: {
     width: 80,
     height: 80,
     margin: "0 auto 24px",
     borderRadius: "50%",
-    background: "linear-gradient(135deg, #667eea 0%, #4f5f89 100%)", // Същото синьо като за заглавието
+    background: "#0f766e",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -631,19 +667,20 @@ const MyAdsPage: React.FC = () => {
     fontWeight: 700,
     color: "#333", // По-тъмно сиво за текста
     marginBottom: 12,
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
   },
   emptySubtext: {
     fontSize: 15,
-    color: "#777", // Леко по-светло сиво
+    color: "#666", // Леко по-светло сиво
     lineHeight: 1.6,
   },
   ctaButton: {
     marginTop: 24,
     padding: "14px 32px",
-    background: "linear-gradient(135deg, #667eea 0%, #4f5f89 100%)", // По-мек син цвят за бутона
+    background: "#0f766e",
     color: "#fff",
     border: "none",
-    borderRadius: 8,
+    borderRadius: 4,
     fontSize: 15,
     fontWeight: 700,
     cursor: "pointer",
@@ -651,15 +688,15 @@ const MyAdsPage: React.FC = () => {
     display: "inline-flex",
     alignItems: "center",
     gap: 8,
-    boxShadow: "0 4px 12px rgba(102, 126, 234, 0.3)",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
     transition: "all 0.2s",
   },
   addButton: {
     padding: "12px 20px",
-    background: "rgba(255, 255, 255, 0.15)",
+    background: "#0f766e",
     color: "#fff",
-    border: "1px solid rgba(255, 255, 255, 0.35)",
-    borderRadius: 999,
+    border: "none",
+    borderRadius: 4,
     fontSize: 14,
     fontWeight: 700,
     cursor: "pointer",
@@ -667,8 +704,7 @@ const MyAdsPage: React.FC = () => {
     alignItems: "center",
     gap: 8,
     transition: "all 0.2s",
-    boxShadow: "0 6px 16px rgba(15, 23, 42, 0.15)",
-    backdropFilter: "blur(6px)",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
   },
   tabsContainer: {
     display: "flex",
@@ -679,9 +715,9 @@ const MyAdsPage: React.FC = () => {
   tab: {
     padding: "12px 24px",
     background: "#fff",
-    color: "#666",
-    border: "2px solid #e0e0e0",
-    borderRadius: 12,
+    color: "#333",
+    border: "1px solid #e0e0e0",
+    borderRadius: 6,
     fontSize: 15,
     fontWeight: 600,
     cursor: "pointer",
@@ -692,10 +728,10 @@ const MyAdsPage: React.FC = () => {
     gap: 10,
   },
   tabActive: {
-    background: "linear-gradient(135deg, #667eea 0%, #4f5f89 100%)",
+    background: "#0f766e",
     color: "#fff",
-    border: "2px solid transparent",
-    boxShadow: "0 4px 12px rgba(102, 126, 234, 0.3)",
+    border: "1px solid #0f766e",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
   },
   tabBadge: {
     background: "rgba(255, 255, 255, 0.3)",
@@ -706,7 +742,7 @@ const MyAdsPage: React.FC = () => {
     fontWeight: 700,
   },
   tabBadgeInactive: {
-    background: "#f0f0f0",
+    background: "#f5f5f5",
     color: "#666",
     padding: "2px 8px",
     borderRadius: 10,
@@ -738,20 +774,21 @@ const MyAdsPage: React.FC = () => {
     background: "#fff",
     borderRadius: 14,
     padding: "22px",
-    border: "1px solid #e2e8f0",
+    border: "1px solid #e0e0e0",
     boxShadow: "0 24px 60px rgba(15, 23, 42, 0.35)",
   },
   confirmTitle: {
     margin: "0 0 8px 0",
     fontSize: 18,
     fontWeight: 800,
-    color: "#111827",
+    color: "#333",
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
   },
   confirmText: {
     margin: "0 0 18px 0",
     fontSize: 14,
     lineHeight: 1.5,
-    color: "#374151",
+    color: "#666",
   },
   confirmActions: {
     display: "flex",
@@ -762,9 +799,9 @@ const MyAdsPage: React.FC = () => {
     height: 40,
     padding: "0 16px",
     borderRadius: 10,
-    border: "1px solid #cbd5f5",
+    border: "1px solid #e0e0e0",
     background: "#fff",
-    color: "#111827",
+    color: "#333",
     fontSize: 14,
     fontWeight: 700,
     cursor: "pointer",
@@ -773,8 +810,8 @@ const MyAdsPage: React.FC = () => {
     height: 40,
     padding: "0 16px",
     borderRadius: 10,
-    border: "1px solid #1d4ed8",
-    background: "#1d4ed8",
+    border: "1px solid #0f766e",
+    background: "#0f766e",
     color: "#fff",
     fontSize: 14,
     fontWeight: 700,
@@ -799,19 +836,20 @@ const MyAdsPage: React.FC = () => {
   modalTitle: {
     fontSize: 20,
     fontWeight: 700,
-    color: "#0f172a",
+    color: "#333",
     margin: 0,
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
   },
   modalSubtitle: {
     fontSize: 13,
-    color: "#64748b",
+    color: "#666",
     margin: "6px 0 0 0",
     lineHeight: 1.5,
   },
   modalClose: {
     border: "none",
     background: "transparent",
-    color: "#64748b",
+    color: "#666",
     cursor: "pointer",
     padding: 4,
   },
@@ -823,7 +861,7 @@ const MyAdsPage: React.FC = () => {
   listingTypeCard: {
     position: "relative" as const,
     borderRadius: 14,
-    border: "1px solid #e2e8f0",
+    border: "1px solid #e0e0e0",
     padding: "16px",
     background: "#fff",
     cursor: "pointer",
@@ -831,18 +869,18 @@ const MyAdsPage: React.FC = () => {
     transition: "border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease",
   },
   listingTypeCardSelected: {
-    borderColor: "#60a5fa",
-    boxShadow: "0 0 0 3px rgba(59, 130, 246, 0.16)",
+    borderColor: "#0f766e",
+    boxShadow: "0 0 0 3px rgba(15, 118, 110, 0.16)",
   },
   listingTypeTitle: {
     fontSize: 14,
     fontWeight: 700,
-    color: "#0f172a",
+    color: "#333",
     margin: "0 0 6px",
   },
   listingTypeDesc: {
     fontSize: 12,
-    color: "#64748b",
+    color: "#666",
     margin: 0,
   },
   modalActions: {
@@ -861,18 +899,18 @@ const MyAdsPage: React.FC = () => {
     transition: "transform 0.2s ease, box-shadow 0.2s ease",
   },
   modalButtonSecondary: {
-    background: "#f1f5f9",
-    color: "#475569",
-    borderColor: "#e2e8f0",
+    background: "#f5f5f5",
+    color: "#333",
+    borderColor: "#e0e0e0",
   },
   modalButtonPrimary: {
-    background: "linear-gradient(135deg, #667eea 0%, #4f5f89 100%)",
+    background: "#0f766e",
     color: "#fff",
-    boxShadow: "0 6px 16px rgba(102, 126, 234, 0.3)",
+    boxShadow: "0 6px 16px rgba(15, 118, 110, 0.3)",
   },
   modalHint: {
     fontSize: 12,
-    color: "#94a3b8",
+    color: "#999",
     margin: 0,
   },
   previewModal: {
@@ -894,8 +932,9 @@ const MyAdsPage: React.FC = () => {
   previewTitle: {
     fontSize: 22,
     fontWeight: 700,
-    color: "#0f172a",
+    color: "#333",
     margin: 0,
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
   },
   previewMetaRow: {
     display: "flex",
@@ -906,16 +945,16 @@ const MyAdsPage: React.FC = () => {
   },
   previewMetaText: {
     fontSize: 13,
-    color: "#64748b",
+    color: "#666",
   },
   previewStatusPill: {
     fontSize: 11,
     fontWeight: 700,
     padding: "4px 8px",
     borderRadius: 999,
-    background: "#f1f5f9",
-    color: "#475569",
-    border: "1px solid #e2e8f0",
+    background: "#f5f5f5",
+    color: "#666",
+    border: "1px solid #e0e0e0",
   },
   previewStatusPillExpired: {
     background: "#fee2e2",
@@ -931,7 +970,7 @@ const MyAdsPage: React.FC = () => {
     position: "relative" as const,
     borderRadius: 14,
     overflow: "hidden",
-    background: "#f1f5f9",
+    background: "#f0f0f0",
     minHeight: 260,
   },
   previewImage: {
@@ -945,7 +984,7 @@ const MyAdsPage: React.FC = () => {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    color: "#94a3b8",
+    color: "#999",
     fontSize: 14,
     gap: 8,
   },
@@ -959,15 +998,15 @@ const MyAdsPage: React.FC = () => {
     width: 64,
     height: 48,
     borderRadius: 8,
-    border: "1px solid #e2e8f0",
+    border: "1px solid #e0e0e0",
     background: "#fff",
     padding: 0,
     overflow: "hidden",
     cursor: "pointer",
   },
   previewThumbButtonActive: {
-    borderColor: "#f59e0b",
-    boxShadow: "0 0 0 2px rgba(249, 115, 22, 0.2)",
+    borderColor: "#0f766e",
+    boxShadow: "0 0 0 2px rgba(15, 118, 110, 0.2)",
   },
   previewThumb: {
     width: "100%",
@@ -983,8 +1022,8 @@ const MyAdsPage: React.FC = () => {
   previewPrice: {
     fontSize: 22,
     fontWeight: 800,
-    color: "#667eea",
-    background: "#eef2ff",
+    color: "#fff",
+    background: "#0f766e",
     borderRadius: 10,
     padding: "10px 12px",
     textAlign: "center" as const,
@@ -996,13 +1035,13 @@ const MyAdsPage: React.FC = () => {
   },
   previewSpec: {
     padding: "10px 12px",
-    background: "#f8fafc",
+    background: "#fafafa",
     borderRadius: 10,
-    border: "1px solid #e2e8f0",
+    border: "1px solid #e0e0e0",
   },
   previewSpecLabel: {
     fontSize: 11,
-    color: "#94a3b8",
+    color: "#999",
     fontWeight: 700,
     textTransform: "uppercase",
     marginBottom: 4,
@@ -1010,16 +1049,16 @@ const MyAdsPage: React.FC = () => {
   previewSpecValue: {
     fontSize: 14,
     fontWeight: 600,
-    color: "#0f172a",
+    color: "#333",
   },
   previewDescription: {
     fontSize: 13,
-    color: "#475569",
+    color: "#666",
     lineHeight: 1.6,
     padding: "12px",
-    background: "#f8fafc",
+    background: "#fafafa",
     borderRadius: 10,
-    border: "1px solid #e2e8f0",
+    border: "1px solid #e0e0e0",
     maxHeight: 160,
     overflow: "auto",
     whiteSpace: "pre-line" as const,
@@ -1032,9 +1071,9 @@ const MyAdsPage: React.FC = () => {
     marginTop: 4,
   },
   previewButton: {
-    background: "#f1f5f9",
-    color: "#475569",
-    border: "1px solid #e2e8f0",
+    background: "#f5f5f5",
+    color: "#333",
+    border: "1px solid #e0e0e0",
   },
   listingsGrid: {
     display: "grid",
@@ -1043,11 +1082,11 @@ const MyAdsPage: React.FC = () => {
   },
   listingCard: {
     background: "#fff",
-    borderRadius: 18,
+    borderRadius: 6,
     overflow: "hidden",
-    border: "1px solid #e5e7eb",
-    boxShadow: "0 10px 24px rgba(15, 23, 42, 0.08)",
-    transition: "transform 0.25s ease, box-shadow 0.25s ease",
+    border: "1px solid #e0e0e0",
+    boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+    transition: "transform 0.2s ease, box-shadow 0.2s ease",
     cursor: "pointer",
     position: "relative",
     display: "flex",
@@ -1055,13 +1094,13 @@ const MyAdsPage: React.FC = () => {
     minHeight: "100%",
   },
   listingCardHover: {
-    transform: "translateY(-6px)",
-    boxShadow: "0 18px 36px rgba(15, 23, 42, 0.15)",
+    transform: "translateY(-2px)",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
   },
   listingMedia: {
     position: "relative" as const,
     height: 220,
-    background: "#f1f5f9",
+    background: "#f0f0f0",
   },
   listingImage: {
     width: "100%",
@@ -1080,37 +1119,37 @@ const MyAdsPage: React.FC = () => {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    color: "#94a3b8",
+    color: "#999",
     fontSize: 14,
     gap: 8,
   },
   topBadge: {
     position: "absolute" as const,
-    top: 12,
-    left: 12,
-    padding: "6px 10px",
+    top: 10,
+    left: 10,
+    padding: "4px 10px",
     borderRadius: 999,
-    background: "linear-gradient(135deg, #f59e0b, #f97316)",
+    background: "linear-gradient(135deg, #ef4444, #dc2626)",
     color: "#fff",
     fontSize: 11,
     fontWeight: 700,
-    letterSpacing: 0.4,
+    letterSpacing: 0.3,
     textTransform: "uppercase" as const,
-    boxShadow: "0 6px 14px rgba(249, 115, 22, 0.35)",
+    boxShadow: "0 4px 10px rgba(220, 38, 38, 0.3)",
     zIndex: 2,
   },
   newBadge: {
     position: "absolute" as const,
     left: 12,
-    padding: "6px 10px",
+    padding: "4px 10px",
     borderRadius: 999,
     background: "linear-gradient(135deg, #10b981, #059669)",
     color: "#fff",
     fontSize: 11,
     fontWeight: 700,
-    letterSpacing: 0.4,
+    letterSpacing: 0.3,
     textTransform: "uppercase" as const,
-    boxShadow: "0 6px 14px rgba(5, 150, 105, 0.35)",
+    boxShadow: "0 4px 10px rgba(5, 150, 105, 0.35)",
     zIndex: 2,
   },
   statusBadge: {
@@ -1136,13 +1175,13 @@ const MyAdsPage: React.FC = () => {
     right: 12,
     bottom: 12,
     padding: "6px 12px",
-    borderRadius: 999,
-    background: "#fff",
-    color: "#0f172a",
-    fontSize: 13,
+    borderRadius: 4,
+    background: "#0f766e",
+    color: "#fff",
+    fontSize: 14,
     fontWeight: 800,
-    border: "1px solid #e5e7eb",
-    boxShadow: "0 6px 16px rgba(15, 23, 42, 0.2)",
+    border: "1px solid #e0e0e0",
+    boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
     zIndex: 2,
   },
   listingContent: {
@@ -1161,22 +1200,34 @@ const MyAdsPage: React.FC = () => {
   listingTitle: {
     fontSize: 17,
     fontWeight: 700,
-    color: "#0f172a",
+    color: "#333",
     margin: 0,
     lineHeight: 1.3,
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
   },
   listingMeta: {
     fontSize: 12,
-    color: "#64748b",
+    color: "#666",
     whiteSpace: "nowrap",
+  },
+  listingMetaStack: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    gap: 4,
+  },
+  topTimer: {
+    fontSize: 12,
+    color: "#dc2626",
+    fontWeight: 700,
   },
   listingSubtitle: {
     fontSize: 13,
-    color: "#475569",
+    color: "#666",
   },
   listingDescription: {
     fontSize: 13,
-    color: "#475569",
+    color: "#666",
     lineHeight: 1.6,
     display: "-webkit-box",
     WebkitLineClamp: 2,
@@ -1190,11 +1241,11 @@ const MyAdsPage: React.FC = () => {
   },
   listingChip: {
     fontSize: 12,
-    color: "#0f172a",
-    background: "#f8fafc",
-    border: "1px solid #e2e8f0",
+    color: "#0f766e",
+    background: "#ecfdf5",
+    border: "1px solid #99f6e4",
     padding: "4px 8px",
-    borderRadius: 999,
+    borderRadius: 3,
     fontWeight: 600,
   },
   listingActions: {
@@ -1202,14 +1253,14 @@ const MyAdsPage: React.FC = () => {
     gap: 8,
     marginTop: "auto",
     paddingTop: 16,
-    borderTop: "1px solid #e5e7eb",
+    borderTop: "1px solid #e0e0e0",
     flexWrap: "wrap",
   },
   actionButton: {
     flex: 1,
     padding: "10px 16px",
     border: "none",
-    borderRadius: 8,
+    borderRadius: 4,
     fontSize: 13,
     fontWeight: 700,
     cursor: "pointer",
@@ -1221,9 +1272,10 @@ const MyAdsPage: React.FC = () => {
     minWidth: "fit-content",
   },
   editButton: {
-    background: "linear-gradient(135deg, #667eea 0%, #4f5f89 100%)",
+    background: "#d97706",
     color: "#fff",
-    boxShadow: "0 2px 8px rgba(102, 126, 234, 0.3)",
+    border: "1.5px solid #d97706",
+    boxShadow: "0 2px 8px rgba(217, 119, 6, 0.3)",
   },
   deleteButton: {
     background: "#f5f5f5",
@@ -1247,6 +1299,8 @@ const MyAdsPage: React.FC = () => {
   },
 };
 
+  const activeCountLabel = `Моите активни обяви: ${activeListings.length}`;
+
   const renderHeader = (subtitleText: string, showAddButton: boolean) => (
     <div style={styles.header}>
       <div style={styles.headerRow}>
@@ -1261,13 +1315,13 @@ const MyAdsPage: React.FC = () => {
             onClick={() => navigate("/publish")}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = "translateY(-2px)";
-              e.currentTarget.style.boxShadow = "0 10px 22px rgba(15, 23, 42, 0.2)";
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.22)";
+              e.currentTarget.style.boxShadow = "0 6px 16px rgba(15, 118, 110, 0.3)";
+              e.currentTarget.style.background = "#0b5f58";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "0 6px 16px rgba(15, 23, 42, 0.15)";
-              e.currentTarget.style.background = "rgba(255, 255, 255, 0.15)";
+              e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)";
+              e.currentTarget.style.background = "#0f766e";
             }}
           >
             <FileText size={18} />
@@ -1282,8 +1336,9 @@ const MyAdsPage: React.FC = () => {
   if (!isAuthenticated) {
     return (
       <div style={styles.page}>
+        <style>{globalCss}</style>
         <div style={styles.container}>
-          {renderHeader("Твоите публикувани автомобили", false)}
+          {renderHeader(activeCountLabel, false)}
           <div style={styles.emptyState}>
             <div style={styles.emptyIconWrapper}>
               <Lock size={40} style={styles.emptyIcon} />
@@ -1297,11 +1352,11 @@ const MyAdsPage: React.FC = () => {
               style={styles.ctaButton}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = "0 6px 20px rgba(102, 126, 234, 0.4)";
+                e.currentTarget.style.boxShadow = "0 6px 20px rgba(15, 118, 110, 0.4)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.3)";
+                e.currentTarget.style.boxShadow = "0 4px 12px rgba(15, 118, 110, 0.3)";
               }}
             >
               <Lock size={18} />
@@ -1316,8 +1371,9 @@ const MyAdsPage: React.FC = () => {
   if (isLoading) {
     return (
       <div style={styles.page}>
+        <style>{globalCss}</style>
         <div style={styles.container}>
-          {renderHeader("Твоите публикувани автомобили", true)}
+          {renderHeader(activeCountLabel, true)}
           <div style={styles.loadingState}>
             <p>Зареждане...</p>
           </div>
@@ -1329,8 +1385,9 @@ const MyAdsPage: React.FC = () => {
   if (error) {
     return (
       <div style={styles.page}>
+        <style>{globalCss}</style>
         <div style={styles.container}>
-          {renderHeader("Твоите публикувани автомобили", true)}
+          {renderHeader(activeCountLabel, true)}
           <div style={styles.errorState}>
             <p>Грешка: {error}</p>
           </div>
@@ -1392,8 +1449,8 @@ const MyAdsPage: React.FC = () => {
     ? [
         { label: "Година", value: previewListing.year_from ? String(previewListing.year_from) : "" },
         { label: "Град", value: previewListing.city },
-        { label: "Гориво", value: previewListing.fuel },
-        { label: "Скоростна кутия", value: previewListing.gearbox },
+        { label: "Гориво", value: formatFuelLabel(previewListing.fuel) },
+        { label: "Скоростна кутия", value: formatGearboxLabel(previewListing.gearbox) },
         {
           label: "Пробег",
           value: Number.isFinite(previewListing.mileage)
@@ -1412,8 +1469,8 @@ const MyAdsPage: React.FC = () => {
             ? `${previewListing.displacement} cc`
             : "",
         },
-        { label: "Състояние", value: previewListing.condition },
-        { label: "Еко стандарт", value: previewListing.euro_standard },
+        { label: "Състояние", value: formatConditionLabel(previewListing.condition) },
+        { label: "Еко стандарт", value: formatEuroStandardLabel(previewListing.euro_standard) },
         { label: "Цвят", value: previewListing.color },
       ].filter((spec) => spec.value)
     : [];
@@ -1423,12 +1480,20 @@ const MyAdsPage: React.FC = () => {
       ? { ...styles.previewStatusPill, ...styles.previewStatusPillExpired }
       : styles.previewStatusPill;
   const isPreviewListingNew = previewListing ? isListingNew(previewListing.created_at) : false;
+  const isPreviewTopActive =
+    !!previewListing &&
+    previewTab !== "expired" &&
+    previewListing.listing_type === "top" &&
+    (!previewListing.top_expires_at ||
+      (Number.isFinite(new Date(previewListing.top_expires_at).getTime()) &&
+        new Date(previewListing.top_expires_at).getTime() > currentTimeMs));
 
   if (totalListings === 0) {
     return (
       <div style={styles.page}>
+        <style>{globalCss}</style>
         <div style={styles.container}>
-          {renderHeader("Твоите публикувани автомобили", true)}
+          {renderHeader(activeCountLabel, true)}
 
           <div style={styles.emptyState}>
             <div style={styles.emptyIconWrapper}>
@@ -1443,11 +1508,11 @@ const MyAdsPage: React.FC = () => {
               style={styles.ctaButton}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = "0 6px 20px rgba(102, 126, 234, 0.4)";
+                e.currentTarget.style.boxShadow = "0 6px 20px rgba(15, 118, 110, 0.4)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.3)";
+                e.currentTarget.style.boxShadow = "0 4px 12px rgba(15, 118, 110, 0.3)";
               }}
             >
               <FileText size={18} />
@@ -1461,8 +1526,9 @@ const MyAdsPage: React.FC = () => {
 
   return (
     <div style={styles.page}>
+      <style>{globalCss}</style>
       <div style={styles.container}>
-        {renderHeader(`Твоите публикувани автомобили (${totalListings})`, true)}
+        {renderHeader(activeCountLabel, true)}
 
         {/* Toast Notification */}
         {toast && (
@@ -1625,14 +1691,14 @@ const MyAdsPage: React.FC = () => {
               <div style={styles.previewGrid}>
                 <div>
                   <div style={styles.previewMedia}>
-                    {previewListing.listing_type === "top" && (
+                    {isPreviewTopActive && (
                       <div style={styles.topBadge}>Топ обява</div>
                     )}
                     {isPreviewListingNew && (
                       <div
                         style={{
                           ...styles.newBadge,
-                          top: previewListing.listing_type === "top" ? 46 : 12,
+                          top: isPreviewTopActive ? 46 : 12,
                         }}
                       >
                         Нова
@@ -1741,8 +1807,8 @@ const MyAdsPage: React.FC = () => {
                 onMouseEnter={(e) => {
                   if (!isActive) {
                     e.currentTarget.style.background = "#f5f5f5";
-                    e.currentTarget.style.borderColor = "#667eea";
-                    e.currentTarget.style.color = "#667eea";
+                    e.currentTarget.style.borderColor = "#0f766e";
+                    e.currentTarget.style.color = "#0f766e";
                   }
                 }}
                 onMouseLeave={(e) => {
@@ -1795,11 +1861,11 @@ const MyAdsPage: React.FC = () => {
                 style={styles.ctaButton}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = "translateY(-2px)";
-                  e.currentTarget.style.boxShadow = "0 6px 20px rgba(102, 126, 234, 0.4)";
+                  e.currentTarget.style.boxShadow = "0 6px 20px rgba(15, 118, 110, 0.4)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.3)";
+                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(15, 118, 110, 0.3)";
                 }}
               >
                 <FileText size={18} />
@@ -1816,11 +1882,18 @@ const MyAdsPage: React.FC = () => {
             const subtitleParts = [
               listing.year_from ? `${listing.year_from} г.` : "",
               listing.city || "",
-              listing.condition && listing.condition !== "0" ? listing.condition : "",
+              formatConditionLabel(listing.condition),
             ].filter(Boolean);
             const subtitle = subtitleParts.join(" · ");
             const createdLabel = formatDate(listing.created_at);
             const descriptionSnippet = getShortDescription(listing.description);
+            const isTopActive =
+              listing.listing_type === "top" &&
+              activeTab !== "expired" &&
+              (!listing.top_expires_at ||
+                (Number.isFinite(new Date(listing.top_expires_at).getTime()) &&
+                  new Date(listing.top_expires_at).getTime() > currentTimeMs));
+            const topRemainingLabel = isTopActive ? getTopRemainingLabel(listing) : "";
             const priceValue = Number(listing.price);
             const priceLabel =
               Number.isFinite(priceValue) && priceValue > 0
@@ -1831,8 +1904,8 @@ const MyAdsPage: React.FC = () => {
                 ? { ...styles.statusBadge, ...styles.statusBadgeExpired }
                 : styles.statusBadge;
             const chips = [
-              listing.fuel ? `Гориво: ${listing.fuel}` : "",
-              listing.gearbox ? `Кутия: ${listing.gearbox}` : "",
+              listing.fuel ? `Гориво: ${formatFuelLabel(listing.fuel)}` : "",
+              listing.gearbox ? `Кутия: ${formatGearboxLabel(listing.gearbox)}` : "",
               Number.isFinite(listing.mileage) && listing.mileage > 0
                 ? `Пробег: ${listing.mileage.toLocaleString("bg-BG")} км`
                 : "",
@@ -1843,7 +1916,7 @@ const MyAdsPage: React.FC = () => {
                 ? `Кубатура: ${listing.displacement} cc`
                 : "",
               listing.euro_standard && listing.euro_standard !== "0"
-                ? `Еко: ${listing.euro_standard}`
+                ? `Еко: ${formatEuroStandardLabel(listing.euro_standard)}`
                 : "",
               listing.color ? `Цвят: ${listing.color}` : "",
             ].filter(Boolean) as string[];
@@ -1869,18 +1942,18 @@ const MyAdsPage: React.FC = () => {
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = "";
                 e.currentTarget.style.boxShadow =
-                  "0 10px 24px rgba(15, 23, 42, 0.08)";
+                  "0 2px 6px rgba(0,0,0,0.08)";
               }}
             >
               <div style={styles.listingMedia}>
-                {listing.listing_type === "top" && (
+                {isTopActive && (
                   <div style={styles.topBadge}>Топ обява</div>
                 )}
                 {isNewListing && (
                   <div
                     style={{
                       ...styles.newBadge,
-                      top: listing.listing_type === "top" ? 46 : 12,
+                      top: isTopActive ? 46 : 12,
                     }}
                   >
                     Нова
@@ -1908,8 +1981,15 @@ const MyAdsPage: React.FC = () => {
               <div style={styles.listingContent}>
                 <div style={styles.listingTitleRow}>
                   <h3 style={styles.listingTitle}>{listingTitle}</h3>
-                  {createdLabel && (
-                    <span style={styles.listingMeta}>Създадена: {createdLabel}</span>
+                  {(createdLabel || topRemainingLabel) && (
+                    <div style={styles.listingMetaStack}>
+                      {createdLabel && (
+                        <span style={styles.listingMeta}>Създадена: {createdLabel}</span>
+                      )}
+                      {topRemainingLabel && (
+                        <span style={styles.topTimer}>{topRemainingLabel}</span>
+                      )}
+                    </div>
                   )}
                 </div>
 
@@ -1946,11 +2026,15 @@ const MyAdsPage: React.FC = () => {
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.transform = "translateY(-2px)";
-                          e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.4)";
+                          e.currentTarget.style.background = "#ea580c";
+                          e.currentTarget.style.borderColor = "#ea580c";
+                          e.currentTarget.style.boxShadow = "0 4px 12px rgba(234, 88, 12, 0.35)";
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.transform = "translateY(0)";
-                          e.currentTarget.style.boxShadow = "0 2px 8px rgba(102, 126, 234, 0.3)";
+                          e.currentTarget.style.background = "#d97706";
+                          e.currentTarget.style.borderColor = "#d97706";
+                          e.currentTarget.style.boxShadow = "0 2px 8px rgba(217, 119, 6, 0.3)";
                         }}
                       >
                         <Edit2 size={14} />
@@ -1966,22 +2050,22 @@ const MyAdsPage: React.FC = () => {
                           disabled={actionLoading === listing.id}
                           style={{
                             ...styles.actionButton,
-                            background: "linear-gradient(135deg, #f59e0b 0%, #f97316 100%)",
+                            background: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
                             color: "#fff",
                             opacity: actionLoading === listing.id ? 0.6 : 1,
                             cursor: actionLoading === listing.id ? "not-allowed" : "pointer",
-                            boxShadow: "0 2px 8px rgba(249, 115, 22, 0.35)",
+                            boxShadow: "0 2px 8px rgba(220, 38, 38, 0.35)",
                           }}
                           onMouseEnter={(e) => {
                             if (actionLoading !== listing.id) {
                               e.currentTarget.style.transform = "translateY(-2px)";
-                              e.currentTarget.style.boxShadow = "0 4px 12px rgba(249, 115, 22, 0.45)";
+                              e.currentTarget.style.boxShadow = "0 4px 12px rgba(220, 38, 38, 0.45)";
                             }
                           }}
                           onMouseLeave={(e) => {
                             if (actionLoading !== listing.id) {
                               e.currentTarget.style.transform = "translateY(0)";
-                              e.currentTarget.style.boxShadow = "0 2px 8px rgba(249, 115, 22, 0.35)";
+                              e.currentTarget.style.boxShadow = "0 2px 8px rgba(220, 38, 38, 0.35)";
                             }
                           }}
                         >
@@ -1995,24 +2079,25 @@ const MyAdsPage: React.FC = () => {
                         disabled={actionLoading === listing.id}
                         style={{
                           ...styles.actionButton,
-                          background: "#f59e0b",
-                          color: "#fff",
+                          background: "#f5f5f5",
+                          color: "#0f766e",
+                          border: "1px solid #0f766e",
                           opacity: actionLoading === listing.id ? 0.6 : 1,
                           cursor: actionLoading === listing.id ? "not-allowed" : "pointer",
-                          boxShadow: "0 2px 8px rgba(245, 158, 11, 0.3)",
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
                         }}
                         onMouseEnter={(e) => {
                           if (actionLoading !== listing.id) {
-                            e.currentTarget.style.background = "#d97706";
+                            e.currentTarget.style.background = "#ecfdf5";
                             e.currentTarget.style.transform = "translateY(-2px)";
-                            e.currentTarget.style.boxShadow = "0 4px 12px rgba(245, 158, 11, 0.4)";
+                            e.currentTarget.style.boxShadow = "0 4px 12px rgba(15, 118, 110, 0.2)";
                           }
                         }}
                         onMouseLeave={(e) => {
                           if (actionLoading !== listing.id) {
-                            e.currentTarget.style.background = "#f59e0b";
+                            e.currentTarget.style.background = "#f5f5f5";
                             e.currentTarget.style.transform = "translateY(0)";
-                            e.currentTarget.style.boxShadow = "0 2px 8px rgba(245, 158, 11, 0.3)";
+                            e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)";
                           }
                         }}
                       >
@@ -2082,11 +2167,15 @@ const MyAdsPage: React.FC = () => {
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.transform = "translateY(-2px)";
-                          e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.4)";
+                          e.currentTarget.style.background = "#ea580c";
+                          e.currentTarget.style.borderColor = "#ea580c";
+                          e.currentTarget.style.boxShadow = "0 4px 12px rgba(234, 88, 12, 0.35)";
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.transform = "translateY(0)";
-                          e.currentTarget.style.boxShadow = "0 2px 8px rgba(102, 126, 234, 0.3)";
+                          e.currentTarget.style.background = "#d97706";
+                          e.currentTarget.style.borderColor = "#d97706";
+                          e.currentTarget.style.boxShadow = "0 2px 8px rgba(217, 119, 6, 0.3)";
                         }}
                       >
                         <Edit2 size={14} />
@@ -2184,11 +2273,15 @@ const MyAdsPage: React.FC = () => {
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.transform = "translateY(-2px)";
-                          e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.4)";
+                          e.currentTarget.style.background = "#ea580c";
+                          e.currentTarget.style.borderColor = "#ea580c";
+                          e.currentTarget.style.boxShadow = "0 4px 12px rgba(234, 88, 12, 0.35)";
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.transform = "translateY(0)";
-                          e.currentTarget.style.boxShadow = "0 2px 8px rgba(102, 126, 234, 0.3)";
+                          e.currentTarget.style.background = "#d97706";
+                          e.currentTarget.style.borderColor = "#d97706";
+                          e.currentTarget.style.boxShadow = "0 2px 8px rgba(217, 119, 6, 0.3)";
                         }}
                       >
                         <Edit2 size={14} />
@@ -2290,10 +2383,12 @@ const MyAdsPage: React.FC = () => {
                           goToEdit(listing);
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.background = "#0052a3";
+                          e.currentTarget.style.background = "#ea580c";
+                          e.currentTarget.style.borderColor = "#ea580c";
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.background = "#0066cc";
+                          e.currentTarget.style.background = "#d97706";
+                          e.currentTarget.style.borderColor = "#d97706";
                         }}
                       >
                         <Edit2 size={14} style={{ marginRight: "4px" }} />

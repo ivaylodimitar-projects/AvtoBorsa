@@ -42,6 +42,7 @@ interface CarListing {
   features: string[];
   images: CarImage[];
   user_email: string;
+  created_at?: string;
   listing_type?: 'top' | 'normal' | string | number;
   listing_type_display?: string;
   is_top?: boolean;
@@ -64,6 +65,20 @@ const isTopListing = (listing: CarListing) => {
   return display.includes('топ');
 };
 
+const NEW_LISTING_BADGE_MINUTES = 10;
+const NEW_LISTING_BADGE_WINDOW_MS = NEW_LISTING_BADGE_MINUTES * 60 * 1000;
+const NEW_LISTING_BADGE_REFRESH_MS = 30_000;
+
+const globalCss = `
+  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+  * { box-sizing: border-box; }
+  html, body { width: 100%; margin: 0; padding: 0; }
+  body { margin: 0; font-family: "Manrope", "Segoe UI", sans-serif; font-size: 15px; color: #333; background: #f5f5f5; }
+  #root { width: 100%; }
+  input, select, button, textarea { font-family: inherit; }
+  [role="button"]:focus-visible { outline: 2px solid #0f766e; outline-offset: 2px; }
+`;
+
 const VehicleDetailsPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const [id, setId] = useState<number | null>(null);
@@ -71,6 +86,7 @@ const VehicleDetailsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
 
   // Extract ID from slug
   useEffect(() => {
@@ -90,6 +106,13 @@ const VehicleDetailsPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCurrentTimeMs(Date.now());
+    }, NEW_LISTING_BADGE_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
     const fetchListing = async () => {
       try {
         const token = localStorage.getItem('authToken');
@@ -103,7 +126,10 @@ const VehicleDetailsPage: React.FC = () => {
           { headers }
         );
         if (!response.ok) {
-          throw new Error('Failed to fetch listing');
+          if (response.status === 404 || response.status === 410) {
+            throw new Error('Обявата е премахната или изтекла.');
+          }
+          throw new Error('Грешка при зареждане на обявата.');
         }
         const data = await response.json();
         setListing(data);
@@ -129,6 +155,7 @@ const VehicleDetailsPage: React.FC = () => {
       paddingBottom: isMobile ? 120 : 0,
       width: '100%',
       boxSizing: 'border-box',
+      color: '#333',
     },
     navbar: {
       background: '#fff',
@@ -137,6 +164,7 @@ const VehicleDetailsPage: React.FC = () => {
       position: 'sticky',
       top: 0,
       zIndex: 50,
+      boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
     },
     navbarContent: {
       maxWidth: 1200,
@@ -153,19 +181,33 @@ const VehicleDetailsPage: React.FC = () => {
       border: 'none',
       fontSize: isMobile ? 20 : 24,
       cursor: 'pointer',
-      color: '#0066cc',
-      padding: 4,
+      color: '#0f766e',
+      padding: 6,
+      borderRadius: 4,
       flexShrink: 0,
       transition: 'opacity 0.2s',
     },
     navbarTitle: {
       fontSize: isMobile ? 14 : 16,
-      fontWeight: 700,
-      color: '#1a1a1a',
+      fontWeight: 600,
+      color: '#333',
+      fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
       overflow: 'hidden',
       textOverflow: 'ellipsis',
       whiteSpace: 'nowrap',
       flex: 1,
+    },
+    navbarRouteSegment: {
+      color: '#64748b',
+      fontWeight: 600,
+    },
+    navbarRouteStrong: {
+      color: '#0f766e',
+      fontWeight: 700,
+    },
+    navbarRouteSeparator: {
+      color: '#cbd5f5',
+      margin: '0 6px',
     },
     content: {
       maxWidth: 1200,
@@ -188,12 +230,14 @@ const VehicleDetailsPage: React.FC = () => {
       background: '#fff',
       borderRadius: 8,
       padding: isMobile ? 16 : 20,
-      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+      border: '1px solid #e0e0e0',
     },
     title: {
       fontSize: isMobile ? 18 : 28,
       fontWeight: 700,
-      color: '#1a1a1a',
+      color: '#333',
+      fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
       marginBottom: 8,
       lineHeight: 1.3,
       wordBreak: 'break-word',
@@ -207,18 +251,20 @@ const VehicleDetailsPage: React.FC = () => {
       background: '#fff',
       borderRadius: 8,
       padding: isMobile ? 16 : 20,
-      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+      border: '1px solid #e0e0e0',
     },
     descriptionTitle: {
       fontSize: isMobile ? 15 : 16,
       fontWeight: 700,
-      color: '#1a1a1a',
+      color: '#333',
+      fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
       marginBottom: 12,
     },
     description: {
       fontSize: isMobile ? 13 : 14,
       lineHeight: 1.6,
-      color: '#333',
+      color: '#4b5563',
       whiteSpace: 'pre-wrap',
       wordBreak: 'break-word',
       overflowWrap: 'break-word',
@@ -232,11 +278,11 @@ const VehicleDetailsPage: React.FC = () => {
       fontSize: isMobile ? 14 : 16,
     },
     errorContainer: {
-      background: '#fff3cd',
-      border: '1px solid #ffc107',
+      background: '#fef2f2',
+      border: '1px solid #fecaca',
       borderRadius: 8,
       padding: isMobile ? 16 : 20,
-      color: '#856404',
+      color: '#b91c1c',
       textAlign: 'center',
       fontSize: isMobile ? 13 : 14,
       margin: isMobile ? 12 : 24,
@@ -244,12 +290,18 @@ const VehicleDetailsPage: React.FC = () => {
   };
 
   if (isLoading) {
-    return <SkeletonLoader isMobile={isMobile} />;
+    return (
+      <div style={styles.container}>
+        <style>{globalCss}</style>
+        <SkeletonLoader isMobile={isMobile} />
+      </div>
+    );
   }
 
   if (error || !listing) {
     return (
       <div style={styles.container}>
+        <style>{globalCss}</style>
         <div style={styles.errorContainer}>
           {error || 'Обявата не е намерена'}
         </div>
@@ -258,15 +310,36 @@ const VehicleDetailsPage: React.FC = () => {
   }
 
   const title = `${listing.year_from} ${listing.brand} ${listing.model}`;
+  const sellerName = listing.user_email ? listing.user_email.split('@')[0] : 'Потребител';
+  const cityLabel = listing.city || listing.location_region || 'Град';
+  const routeSegments = [cityLabel, sellerName, title].filter(Boolean);
+  const isNewListing = (() => {
+    if (!listing.created_at) return false;
+    const createdAtMs = new Date(listing.created_at).getTime();
+    if (Number.isNaN(createdAtMs)) return false;
+    const listingAgeMs = currentTimeMs - createdAtMs;
+    return listingAgeMs >= 0 && listingAgeMs <= NEW_LISTING_BADGE_WINDOW_MS;
+  })();
 
   return (
     <div style={styles.container}>
+      <style>{globalCss}</style>
       <div style={styles.navbar}>
         <div style={styles.navbarContent}>
           <button style={styles.backButton} onClick={() => window.history.back()}>
             ←
           </button>
-          <span style={styles.navbarTitle}>{title}</span>
+          <span style={styles.navbarTitle}>
+            {routeSegments.map((segment, index) => {
+              const isLast = index === routeSegments.length - 1;
+              return (
+                <span key={`${segment}-${index}`} style={isLast ? styles.navbarRouteStrong : styles.navbarRouteSegment}>
+                  {segment}
+                  {!isLast && <span style={styles.navbarRouteSeparator}>/</span>}
+                </span>
+              );
+            })}
+          </span>
         </div>
       </div>
 
@@ -277,6 +350,7 @@ const VehicleDetailsPage: React.FC = () => {
             title={title}
             isMobile={isMobile}
             showTopBadge={isTopListing(listing)}
+            showNewBadge={isNewListing}
           />
 
           <TechnicalDataSection

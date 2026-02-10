@@ -104,7 +104,7 @@ const Navbar: React.FC = () => {
             {isAuthenticated ? (
               <>
                 <ProfileMenu />
-                <button className="btn-ghost" onClick={() => setShowLogoutModal(true)}>
+                <button className="btn-ghost btn-logout" onClick={() => setShowLogoutModal(true)}>
                   <LogOut size={16} />
                   Изход
                 </button>
@@ -400,6 +400,12 @@ const css = `
 .btn-ghost:hover {
   background: #f5f5f5;
   border-color: #bbb;
+}
+
+.btn-logout:hover {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
 }
 
 /* BURGER */

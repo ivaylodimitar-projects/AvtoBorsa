@@ -1,4 +1,17 @@
 import React from 'react';
+import {
+  Calendar,
+  Fuel,
+  Gauge,
+  Ruler,
+  Cog,
+  Car,
+  Route,
+  Palette,
+  Barcode,
+  ShieldCheck,
+  Leaf,
+} from 'lucide-react';
 
 interface TechnicalDataSectionProps {
   year: number;
@@ -81,37 +94,75 @@ const TechnicalDataSection: React.FC<TechnicalDataSectionProps> = ({
   const styles: Record<string, React.CSSProperties> = {
     container: {
       background: '#fff',
-      borderRadius: 8,
+      borderRadius: 10,
       padding: isMobile ? 16 : 20,
-      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+      border: '1px solid #e0e0e0',
+    },
+    header: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      marginBottom: 16,
     },
     title: {
       fontSize: isMobile ? 15 : 19,
       fontWeight: 700,
-      color: '#1a1a1a',
-      marginBottom: 16,
+      color: '#333',
       margin: 0,
       padding: 0,
+      fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
+    },
+    subtitle: {
+      fontSize: 11,
+      color: '#9ca3af',
+      fontWeight: 700,
+      textTransform: 'uppercase',
+      letterSpacing: '0.4px',
     },
     itemsGrid: {
       display: 'grid',
-      gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-      gap: isMobile ? 12 : 16,
+      gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, minmax(0, 1fr))',
+      gap: isMobile ? 12 : 14,
     },
-    item: {
+    itemCard: {
+      display: 'flex',
+      alignItems: 'flex-start',
+      gap: 12,
+      padding: '12px 14px',
+      borderRadius: 8,
+      background: '#fafafa',
+      border: '1px solid #e5e7eb',
+    },
+    iconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 8,
+      background: '#ecfdf5',
+      color: '#0f766e',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    itemBody: {
       display: 'flex',
       flexDirection: 'column',
       gap: 4,
+      minWidth: 0,
     },
     label: {
-      fontSize: isMobile ? 12 : 13,
-      color: '#666',
-      fontWeight: 600,
+      fontSize: 11,
+      color: '#6b7280',
+      fontWeight: 700,
+      textTransform: 'uppercase',
+      letterSpacing: '0.4px',
     },
     value: {
       fontSize: isMobile ? 13 : 14,
-      color: '#1a1a1a',
-      fontWeight: 500,
+      color: '#111827',
+      fontWeight: 600,
     },
   };
 
@@ -122,78 +173,96 @@ const TechnicalDataSection: React.FC<TechnicalDataSectionProps> = ({
     return year.toString();
   };
 
+  const items = [
+    {
+      key: 'date',
+      label: 'Дата на производство',
+      value: formatDate(year, month),
+      icon: Calendar,
+    },
+    {
+      key: 'fuel',
+      label: 'Гориво',
+      value: FUEL_LABELS[fuel] || fuel,
+      icon: Fuel,
+    },
+    {
+      key: 'power',
+      label: 'Мощност',
+      value: typeof power === 'number' ? `${power} к.с.` : null,
+      icon: Gauge,
+    },
+    {
+      key: 'displacement',
+      label: 'Кубатура',
+      value: typeof displacement === 'number' ? `${displacement} см³` : null,
+      icon: Ruler,
+    },
+    {
+      key: 'gearbox',
+      label: 'Скоростна кутия',
+      value: GEARBOX_LABELS[gearbox] || gearbox,
+      icon: Cog,
+    },
+    {
+      key: 'category',
+      label: 'Категория',
+      value: category ? (CAR_TYPE_LABELS[category] || category) : null,
+      icon: Car,
+    },
+    {
+      key: 'mileage',
+      label: 'Пробег',
+      value: `${mileage.toLocaleString('bg-BG')} км`,
+      icon: Route,
+    },
+    {
+      key: 'color',
+      label: 'Цвят',
+      value: color || null,
+      icon: Palette,
+    },
+    {
+      key: 'vin',
+      label: 'VIN номер',
+      value: vin || null,
+      icon: Barcode,
+    },
+    {
+      key: 'condition',
+      label: 'Състояние',
+      value: condition ? (CONDITION_LABELS[condition] || condition) : null,
+      icon: ShieldCheck,
+    },
+    {
+      key: 'euro',
+      label: 'Евро стандарт',
+      value: euroStandard ? (EURO_LABELS[euroStandard] || euroStandard) : null,
+      icon: Leaf,
+    },
+  ].filter((item) => item.value !== null && item.value !== undefined && item.value !== '');
+
   return (
     <div style={styles.container}>
-      <h2 style={styles.title}>Технически данни</h2>
+      <div style={styles.header}>
+        <h2 style={styles.title}>Технически данни</h2>
+        <span style={styles.subtitle}>{items.length} параметъра</span>
+      </div>
       <div style={styles.itemsGrid}>
-        <div style={styles.item}>
-          <div style={styles.label}>Дата на производство</div>
-          <div style={styles.value}>{formatDate(year, month)}</div>
-        </div>
-
-        <div style={styles.item}>
-          <div style={styles.label}>Двигател</div>
-          <div style={styles.value}>{FUEL_LABELS[fuel] || fuel}</div>
-        </div>
-
-        {power && (
-          <div style={styles.item}>
-            <div style={styles.label}>Мощност</div>
-            <div style={styles.value}>{power} к.с.</div>
-          </div>
-        )}
-
-        {displacement && (
-          <div style={styles.item}>
-            <div style={styles.label}>Кубатура [куб.см]</div>
-            <div style={styles.value}>{displacement} см<sup>3</sup></div>
-          </div>
-        )}
-
-        <div style={styles.item}>
-          <div style={styles.label}>Скоростна кутия</div>
-          <div style={styles.value}>{GEARBOX_LABELS[gearbox] || gearbox}</div>
-        </div>
-
-        {category && (
-          <div style={styles.item}>
-            <div style={styles.label}>Категория</div>
-            <div style={styles.value}>{CAR_TYPE_LABELS[category] || category}</div>
-          </div>
-        )}
-
-        <div style={styles.item}>
-          <div style={styles.label}>Пробег [км]</div>
-          <div style={styles.value}>{mileage.toLocaleString('bg-BG')} км</div>
-        </div>
-
-        {color && (
-          <div style={styles.item}>
-            <div style={styles.label}>Цвят</div>
-            <div style={styles.value}>{color}</div>
-          </div>
-        )}
-
-        {vin && (
-          <div style={styles.item}>
-            <div style={styles.label}>VIN номер</div>
-            <div style={styles.value}>{vin}</div>
-          </div>
-        )}
-
-        {condition && (
-          <div style={styles.item}>
-            <div style={styles.label}>Състояние</div>
-            <div style={styles.value}>{CONDITION_LABELS[condition] || condition}</div>
-          </div>
-        )}
-
-        {euroStandard && (
-          <div style={styles.item}>
-            <div style={styles.label}>Евро стандарт</div>
-            <div style={styles.value}>{EURO_LABELS[euroStandard] || euroStandard}</div>
-          </div>
-        )}
+        {items.map((item) => {
+          const Icon = item.icon;
+          return (
+            <div key={item.key} style={styles.itemCard}>
+              <div style={styles.iconWrap}>
+                <Icon size={18} />
+              </div>
+              <div style={styles.itemBody}>
+                <div style={styles.label}>{item.label}</div>
+                <div style={styles.value}>{item.value}</div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

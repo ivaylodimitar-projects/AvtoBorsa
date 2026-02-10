@@ -15,6 +15,7 @@ interface RezonGalleryProps {
   isMobile: boolean;
   promoLabel?: string;
   showTopBadge?: boolean;
+  showNewBadge?: boolean;
 }
 
 // Memoized main image component with lazy loading
@@ -55,6 +56,7 @@ const FullscreenModal = memo<{
   getImageUrl: (path: string) => string;
   isMobile: boolean;
   showTopBadge?: boolean;
+  showNewBadge?: boolean;
 }>(
   ({
     isOpen,
@@ -68,6 +70,7 @@ const FullscreenModal = memo<{
     getImageUrl,
     isMobile,
     showTopBadge = false,
+    showNewBadge = false,
   }) => {
     const [zoomLevel, setZoomLevel] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -227,7 +230,7 @@ const FullscreenModal = memo<{
             {showTopBadge && (
               <span
                 style={{
-                  background: 'linear-gradient(135deg, #f59e0b, #f97316)',
+                  background: 'linear-gradient(135deg, #ef4444, #dc2626)',
                   color: '#fff',
                   padding: isMobile ? '5px 9px' : '6px 11px',
                   borderRadius: 999,
@@ -235,10 +238,27 @@ const FullscreenModal = memo<{
                   fontWeight: 700,
                   letterSpacing: 0.3,
                   textTransform: 'uppercase',
-                  boxShadow: '0 6px 14px rgba(249, 115, 22, 0.35)',
+                  boxShadow: '0 6px 14px rgba(220, 38, 38, 0.35)',
                 }}
               >
                 Топ обява
+              </span>
+            )}
+            {showNewBadge && (
+              <span
+                style={{
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  color: '#fff',
+                  padding: isMobile ? '5px 9px' : '6px 11px',
+                  borderRadius: 999,
+                  fontSize: isMobile ? 10 : 11,
+                  fontWeight: 700,
+                  letterSpacing: 0.3,
+                  textTransform: 'uppercase',
+                  boxShadow: '0 6px 14px rgba(5, 150, 105, 0.35)',
+                }}
+              >
+                Нова
               </span>
             )}
             <h2 style={{ color: '#fff', margin: 0, fontSize: isMobile ? 14 : 16 }}>
@@ -476,6 +496,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
   isMobile,
   promoLabel,
   showTopBadge = false,
+  showNewBadge = false,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
@@ -561,7 +582,8 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         background: '#fff',
         borderRadius: 8,
         overflow: 'hidden',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+        border: '1px solid #e0e0e0',
       } as React.CSSProperties,
       carouselWrapper: {
         position: 'relative' as const,
@@ -656,7 +678,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         position: 'absolute' as const,
         top: isMobile ? 8 : 12,
         left: isMobile ? 8 : 12,
-        background: 'linear-gradient(135deg, #f59e0b, #f97316)',
+        background: 'linear-gradient(135deg, #ef4444, #dc2626)',
         color: '#fff',
         padding: isMobile ? '5px 9px' : '6px 11px',
         borderRadius: 999,
@@ -664,7 +686,22 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         fontWeight: 700,
         letterSpacing: 0.3,
         textTransform: 'uppercase' as const,
-        boxShadow: '0 6px 14px rgba(249, 115, 22, 0.35)',
+        boxShadow: '0 6px 14px rgba(220, 38, 38, 0.35)',
+        zIndex: 11,
+      } as React.CSSProperties,
+      newBadge: {
+        position: 'absolute' as const,
+        top: isMobile ? 8 : 12,
+        left: isMobile ? 8 : 12,
+        background: 'linear-gradient(135deg, #10b981, #059669)',
+        color: '#fff',
+        padding: isMobile ? '5px 9px' : '6px 11px',
+        borderRadius: 999,
+        fontSize: isMobile ? 10 : 11,
+        fontWeight: 700,
+        letterSpacing: 0.3,
+        textTransform: 'uppercase' as const,
+        boxShadow: '0 6px 14px rgba(5, 150, 105, 0.35)',
         zIndex: 11,
       } as React.CSSProperties,
     }),
@@ -692,6 +729,16 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
           {/* Promo Label */}
           {showTopBadge && (
             <div style={styles.topBadge}>Топ обява</div>
+          )}
+          {showNewBadge && (
+            <div
+              style={{
+                ...styles.newBadge,
+                top: showTopBadge ? (isMobile ? 40 : 48) : (isMobile ? 8 : 12),
+              }}
+            >
+              Нова
+            </div>
           )}
 
           {promoLabel && (
@@ -772,7 +819,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         </div>
 
         {/* Thumbnail Strip */}
-        {images.length > 1 && (
+        {images.length > 0 && (
           <ThumbnailStrip
             images={images}
             currentIndex={currentIndex}
@@ -796,10 +843,10 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         getImageUrl={getImageUrl}
         isMobile={isMobile}
         showTopBadge={showTopBadge}
+        showNewBadge={showNewBadge}
       />
     </>
   );
 };
 
 export default RezonGallery;
-

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
+import { formatConditionLabel, formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 
 type CarListing = {
   id: number;
@@ -253,10 +254,10 @@ const SearchPage: React.FC = () => {
     }
 
     if (region) criteria.push(`Регион: ${region}`);
-    if (fuel) criteria.push(`Гориво: ${fuel}`);
-    if (gearbox) criteria.push(`Скоростна кутия: ${gearbox}`);
+    if (fuel) criteria.push(`Гориво: ${formatFuelLabel(fuel)}`);
+    if (gearbox) criteria.push(`Скоростна кутия: ${formatGearboxLabel(gearbox)}`);
     if (color) criteria.push(`Цвят: ${color}`);
-    if (condition) criteria.push(`Състояние: ${condition}`);
+    if (condition) criteria.push(`Състояние: ${formatConditionLabel(condition)}`);
 
     return criteria;
   }, [searchParams]);

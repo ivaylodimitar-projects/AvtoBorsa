@@ -39,6 +39,7 @@ const SellerCard: React.FC<SellerCardProps> = ({
       borderRadius: 8,
       padding: isMobile ? 16 : 20,
       boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+      border: '1px solid #e0e0e0',
     },
     header: {
       display: 'flex',
@@ -52,7 +53,7 @@ const SellerCard: React.FC<SellerCardProps> = ({
       width: isMobile ? 56 : 64,
       height: isMobile ? 56 : 64,
       borderRadius: '50%',
-      background: 'linear-gradient(135deg, #0066cc, #0052a3)',
+      background: 'linear-gradient(135deg, #0f766e, #0b5f58)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -68,11 +69,12 @@ const SellerCard: React.FC<SellerCardProps> = ({
     sellerName: {
       fontSize: isMobile ? 15 : 16,
       fontWeight: 700,
-      color: '#1a1a1a',
+      color: '#333',
       marginBottom: 4,
       overflow: 'hidden',
       textOverflow: 'ellipsis',
       whiteSpace: 'nowrap',
+      fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
     },
     sellerEmail: {
       fontSize: isMobile ? 11 : 12,
@@ -111,7 +113,7 @@ const SellerCard: React.FC<SellerCardProps> = ({
       border: '1px solid #e0e0e0',
     },
     phoneIcon: {
-      color: '#0066cc',
+      color: '#0f766e',
       flexShrink: 0,
     },
     phoneContent: {
@@ -138,7 +140,7 @@ const SellerCard: React.FC<SellerCardProps> = ({
       background: 'none',
       border: 'none',
       cursor: 'pointer',
-      color: '#0066cc',
+      color: '#0f766e',
       padding: 0,
       display: 'flex',
       alignItems: 'center',
@@ -148,7 +150,7 @@ const SellerCard: React.FC<SellerCardProps> = ({
     callButton: {
       width: '100%',
       padding: isMobile ? '10px 14px' : '12px 16px',
-      background: '#0066cc',
+      background: '#0f766e',
       color: '#fff',
       border: 'none',
       borderRadius: 6,
@@ -205,11 +207,11 @@ const SellerCard: React.FC<SellerCardProps> = ({
 
         <button
           style={styles.callButton}
-          onMouseEnter={(e) =>
-            (e.currentTarget.style.background = '#0052a3')
+    onMouseEnter={(e) =>
+            (e.currentTarget.style.background = '#0b5f58')
           }
-          onMouseLeave={(e) =>
-            (e.currentTarget.style.background = '#0066cc')
+    onMouseLeave={(e) =>
+            (e.currentTarget.style.background = '#0f766e')
           }
         >
           <Phone size={18} />

@@ -12,6 +12,8 @@ const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features }) => {
   >({
     безопасност: true,
     комфорт: true,
+    други: true,
+    неразпределени: true,
   });
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
@@ -36,13 +38,14 @@ const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features }) => {
       borderRadius: 8,
       boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
       overflow: 'hidden',
+      border: '1px solid #e0e0e0',
     },
     categoryHeader: {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
       padding: isMobile ? '12px 16px' : '16px 20px',
-      background: '#f9f9f9',
+      background: '#fafafa',
       borderBottom: '1px solid #e0e0e0',
       cursor: 'pointer',
       userSelect: 'none',
@@ -51,9 +54,10 @@ const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features }) => {
     categoryTitle: {
       fontSize: isMobile ? 13 : 14,
       fontWeight: 700,
-      color: '#1a1a1a',
+      color: '#333',
       textTransform: 'capitalize',
       wordBreak: 'break-word',
+      fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
     },
     categoryContent: {
       padding: isMobile ? '12px 16px' : '16px 20px',
@@ -71,7 +75,7 @@ const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features }) => {
       width: 18,
       height: 18,
       borderRadius: 4,
-      background: '#0066cc',
+      background: '#0f766e',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -92,12 +96,30 @@ const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features }) => {
     },
   };
 
+  const normalizedFeatures = Array.isArray(features)
+    ? Array.from(new Set(features.filter(Boolean)))
+    : (() => {
+        if (typeof features === 'string') {
+          try {
+            const parsed = JSON.parse(features);
+            return Array.isArray(parsed)
+              ? Array.from(new Set(parsed.filter(Boolean)))
+              : [];
+          } catch {
+            return [];
+          }
+        }
+        return [];
+      })();
+  const usedFeatures = new Set<string>();
+
   return (
     <div style={styles.container}>
       {Object.entries(CAR_FEATURES).map(([category, categoryFeatures]) => {
-        const categoryFeaturesList = features.filter((f) =>
+        const categoryFeaturesList = normalizedFeatures.filter((f) =>
           categoryFeatures.includes(f)
         );
+        categoryFeaturesList.forEach((feature) => usedFeatures.add(feature));
         const isExpanded = expandedCategories[category];
 
         return (
@@ -161,6 +183,71 @@ const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features }) => {
           </div>
         );
       })}
+
+      {normalizedFeatures.length > 0 && (
+        (() => {
+          const otherFeatures = normalizedFeatures.filter(
+            (feature) => !usedFeatures.has(feature)
+          );
+
+          if (otherFeatures.length === 0) return null;
+
+          return (
+            <div key="other-features">
+              <div
+                style={styles.categoryHeader}
+                onClick={() => toggleCategory("неразпределени")}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = '#f0f0f0')
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = '#f9f9f9')
+                }
+              >
+                <span style={styles.categoryTitle}>Други екстри</span>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: '#666',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {otherFeatures.length}
+                  </span>
+                  <ChevronDown
+                    size={20}
+                    style={{
+                      transform: expandedCategories["неразпределени"] ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.2s',
+                      color: '#666',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {(expandedCategories["неразпределени"] ?? true) && (
+                <div style={styles.categoryContent}>
+                  {otherFeatures.map((feature) => (
+                    <div key={feature} style={styles.featureItem}>
+                      <div style={styles.featureCheckbox}>
+                        <Check size={16} color="#fff" />
+                      </div>
+                      <span style={styles.featureLabel}>{feature}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()
+      )}
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import React from "react";
 import { CheckCircle2, ImageOff } from "lucide-react";
+import { formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 
 interface ListingPreviewProps {
   title: string;
@@ -11,6 +12,7 @@ interface ListingPreviewProps {
   mileage: string;
   fuel: string;
   gearbox: string;
+  power?: string;
   coverImage?: string;
   description: string;
   completionPercentage: number;
@@ -29,6 +31,7 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
   mileage,
   fuel,
   gearbox,
+  power,
   coverImage,
   description,
   completionPercentage,
@@ -41,11 +44,18 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
   const baseTitle = title?.trim() || `${brand} ${model}`.trim();
   const heading = year ? `${baseTitle} (${year})` : baseTitle;
 
+  const formattedFuel = formatFuelLabel(fuel);
+  const formattedGearbox = formatGearboxLabel(gearbox);
+  const powerValue = Number(power);
+  const powerLabel =
+    Number.isFinite(powerValue) && powerValue > 0 ? `${powerValue} к.с.` : "";
+
   const specs = [
     { label: "Година", value: year },
+    { label: "Мощност", value: powerLabel },
+    { label: "Гориво", value: formattedFuel },
+    { label: "Скоростна кутия", value: formattedGearbox },
     { label: "Пробег", value: mileage ? `${mileage} км` : "" },
-    { label: "Гориво", value: fuel },
-    { label: "Скоростна кутия", value: gearbox },
     { label: "Град", value: city },
   ].filter((spec) => spec.value);
 
@@ -88,7 +98,7 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
     },
     completionFill: {
       height: "100%",
-      background: "linear-gradient(90deg, #1d4ed8, #0ea5e9)",
+      background: "linear-gradient(90deg, #0f766e, #14b8a6)",
       width: `${completionPercentage}%`,
       transition: "width 0.3s ease",
     },
@@ -161,10 +171,10 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
     price: {
       fontSize: isCompact ? 18 : 20,
       fontWeight: 800,
-      color: "#1d4ed8",
+      color: "#fff",
       marginBottom: 14,
       padding: "10px",
-      background: "#eef2ff",
+      background: "#0f766e",
       borderRadius: 10,
       textAlign: "center" as const,
     },

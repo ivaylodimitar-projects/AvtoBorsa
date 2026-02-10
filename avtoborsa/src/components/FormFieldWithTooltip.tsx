@@ -37,7 +37,7 @@ const FormFieldWithTooltip: React.FC<FormFieldWithTooltipProps> = ({
     label: {
       fontSize: 14,
       fontWeight: 700,
-      color: "#0f172a",
+      color: "#333",
     },
     required: {
       color: "#b91c1c",
@@ -51,11 +51,11 @@ const FormFieldWithTooltip: React.FC<FormFieldWithTooltipProps> = ({
       width: 22,
       height: 22,
       borderRadius: "50%",
-      background: "#eef2ff",
-      color: "#1d4ed8",
+      background: "#ecfdf5",
+      color: "#0f766e",
       cursor: "pointer",
       position: "relative",
-      border: "1px solid #c7d2fe",
+      border: "1px solid #99f6e4",
     },
     tooltip: {
       position: "absolute" as const,
@@ -72,7 +72,7 @@ const FormFieldWithTooltip: React.FC<FormFieldWithTooltipProps> = ({
     },
     helperText: {
       fontSize: 12,
-      color: "#64748b",
+      color: "#666",
       marginTop: 6,
       display: "flex",
       alignItems: "center",
@@ -80,12 +80,12 @@ const FormFieldWithTooltip: React.FC<FormFieldWithTooltipProps> = ({
     },
     example: {
       fontSize: 12,
-      color: "#475569",
+      color: "#666",
       marginTop: 6,
       padding: "6px 8px",
-      background: "#f1f5f9",
+      background: "#fafafa",
       borderRadius: 6,
-      borderLeft: "3px solid #1d4ed8",
+      borderLeft: "3px solid #0f766e",
     },
     hint: {
       fontSize: 12,
