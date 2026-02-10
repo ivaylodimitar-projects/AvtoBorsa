@@ -1,13 +1,37 @@
 import React, { useState } from "react";
-import { useAuth } from "../context/AuthContext";
 
 interface TopUpModalProps {
   onClose: () => void;
   onSuccess: () => void;
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const STRIPE_CHECKOUT_ENDPOINT =
+  import.meta.env.VITE_STRIPE_CHECKOUT_ENDPOINT ||
+  `${API_BASE_URL}/api/payments/create-checkout-session/`;
+const STRIPE_SESSION_STORAGE_KEY = "stripe_checkout_session_id";
+
+type StripeCheckoutResponse = {
+  url?: string;
+  session_id?: string;
+  error?: string;
+};
+
+const extractErrorMessage = (payload: unknown, fallback: string): string => {
+  if (!payload || typeof payload !== "object") {
+    return fallback;
+  }
+
+  const data = payload as Record<string, unknown>;
+  const error = data.error;
+  if (typeof error === "string" && error.trim()) {
+    return error;
+  }
+
+  return fallback;
+};
+
 const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
-  const { user, updateBalance } = useAuth();
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -18,7 +42,6 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
     setError("");
     setSuccess(false);
 
-    // Validation
     if (!amount.trim()) {
       setError("Please enter an amount");
       return;
@@ -31,7 +54,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
     }
 
     if (numAmount > 999999.99) {
-      setError("Amount exceeds maximum limit (999,999.99 BGN)");
+      setError("Amount exceeds maximum limit (999,999.99 EUR)");
       return;
     }
 
@@ -39,30 +62,51 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
 
     try {
       const token = localStorage.getItem("authToken");
-      const response = await fetch("http://localhost:8000/api/auth/balance/topup/", {
+      if (!token) {
+        throw new Error("Authentication token missing. Please log in again.");
+      }
+
+      const currentUrl = `${window.location.origin}${window.location.pathname}`;
+      const response = await fetch(STRIPE_CHECKOUT_ENDPOINT, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Token ${token}`,
         },
-        body: JSON.stringify({ amount: numAmount }),
+        body: JSON.stringify({
+          amount: numAmount,
+          success_url: `${currentUrl}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${currentUrl}?payment=cancelled`,
+        }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to top up balance");
+      let data: StripeCheckoutResponse = {};
+      try {
+        data = (await response.json()) as StripeCheckoutResponse;
+      } catch {
+        data = {};
       }
 
-      const data = await response.json();
-      const newBalance = parseFloat(data.data.balance);
-      updateBalance(newBalance);
+      if (!response.ok) {
+        throw new Error(
+          extractErrorMessage(data, "Failed to create Stripe checkout session")
+        );
+      }
+
+      const checkoutUrl = data.url;
+      if (!checkoutUrl) {
+        throw new Error("Stripe checkout URL was not returned by the server.");
+      }
+
+      const sessionId = data.session_id;
+      if (sessionId) {
+        localStorage.setItem(STRIPE_SESSION_STORAGE_KEY, sessionId);
+      }
+
       setSuccess(true);
       setAmount("");
-
-      // Close modal after 2 seconds
-      setTimeout(() => {
-        onSuccess();
-      }, 2000);
+      onSuccess();
+      window.location.assign(checkoutUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -125,10 +169,6 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
       fontFamily: "inherit",
       transition: "border-color 0.2s",
     },
-    inputFocus: {
-      borderColor: "#0f766e",
-      outline: "none",
-    },
     error: {
       color: "#d32f2f",
       fontSize: 13,
@@ -161,9 +201,6 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
       background: "#0f766e",
       color: "#fff",
     },
-    submitButtonHover: {
-      background: "#0d9488",
-    },
     submitButtonDisabled: {
       background: "#ccc",
       cursor: "not-allowed",
@@ -173,26 +210,23 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
       color: "#333",
       border: "1px solid #ccc",
     },
-    cancelButtonHover: {
-      background: "#e8e8e8",
-    },
   };
 
   return (
     <div style={styles.overlay} onClick={onClose}>
       <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
         <h2 style={styles.title}>Top Up Balance</h2>
-        <p style={styles.subtitle}>Add funds to your account</p>
+        <p style={styles.subtitle}>
+          You will be redirected to secure Stripe checkout.
+        </p>
 
         {success && (
-          <div style={styles.success}>
-            ✓ Balance updated successfully!
-          </div>
+          <div style={styles.success}>Redirecting to Stripe checkout...</div>
         )}
 
         <form style={styles.form} onSubmit={handleTopUp}>
           <div style={styles.formGroup}>
-            <label style={styles.label}>Amount (BGN)</label>
+            <label style={styles.label}>Amount (EUR)</label>
             <input
               type="number"
               step="0.01"
@@ -206,7 +240,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
             />
           </div>
 
-          {error && <div style={styles.error}>⚠ {error}</div>}
+          {error && <div style={styles.error}>Error: {error}</div>}
 
           <div style={styles.buttonGroup}>
             <button
@@ -226,7 +260,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
               }}
               disabled={isLoading || success}
             >
-              {isLoading ? "Processing..." : "Top Up"}
+              {isLoading ? "Redirecting..." : "Continue to payment"}
             </button>
           </div>
         </form>

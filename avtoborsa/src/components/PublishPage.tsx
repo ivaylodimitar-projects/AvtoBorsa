@@ -278,15 +278,17 @@ const PublishPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const location = useLocation();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user, updateBalance } = useAuth();
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 30 }, (_, i) => currentYear - i);
+  const TOP_LISTING_PRICE_EUR = 3;
 
   const [loading, setLoading] = useState(false);
   const [loadingListing, setLoadingListing] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [userListingsCount, setUserListingsCount] = useState(0);
+  const [showTopConfirm, setShowTopConfirm] = useState(false);
 
   // Check authentication on mount and fetch user's listings count
   useEffect(() => {
@@ -484,6 +486,24 @@ const PublishPage: React.FC = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleListingTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value === "top" && formData.listingType !== "top") {
+      setShowTopConfirm(true);
+      return;
+    }
+    setFormData((prev) => ({ ...prev, listingType: value }));
+  };
+
+  const confirmTopListing = () => {
+    setFormData((prev) => ({ ...prev, listingType: "top" }));
+    setShowTopConfirm(false);
+  };
+
+  const cancelTopListing = () => {
+    setShowTopConfirm(false);
+  };
+
   const applyListingToForm = (data: any) => {
     setFormData({
       mainCategory: data.main_category ?? data.mainCategory ?? "1",
@@ -625,6 +645,14 @@ const PublishPage: React.FC = () => {
 
   const submitListing = async () => {
     setErrors({});
+    if (formData.listingType === "top") {
+      const balance = user?.balance;
+      if (typeof balance === "number" && balance < TOP_LISTING_PRICE_EUR) {
+        setToast({ message: "Недостатъчни средства", type: "error" });
+        return;
+      }
+    }
+
     setLoading(true);
 
     // Check if user has reached the 3 advert limit
@@ -719,10 +747,31 @@ const PublishPage: React.FC = () => {
           }
         }
         setErrors({ submit: errorMessage });
+        if (errorMessage === "Недостатъчни средства") {
+          setToast({ message: "Недостатъчни средства", type: "error" });
+        }
         return;
       }
 
       const savedListing = await response.json();
+      if (formData.listingType === "top") {
+        try {
+          const token = localStorage.getItem("authToken");
+          if (token) {
+            const meRes = await fetch("http://localhost:8000/api/auth/me/", {
+              headers: { Authorization: `Token ${token}` },
+            });
+            if (meRes.ok) {
+              const meData = await meRes.json();
+              if (typeof meData.balance === "number") {
+                updateBalance(meData.balance);
+              }
+            }
+          }
+        } catch {
+          // ignore balance refresh errors
+        }
+      }
 
       if (isEditMode && editingListingId && images.length > 0) {
         const imagesData = new FormData();
@@ -880,6 +929,64 @@ const PublishPage: React.FC = () => {
       color: "#0f172a",
     },
     note: { fontSize: 12, color: "#64748b", marginTop: 8 },
+    confirmOverlay: {
+      position: "fixed",
+      inset: 0,
+      background: "rgba(2, 6, 23, 0.5)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 3000,
+      padding: 16,
+    },
+    confirmModal: {
+      background: "#fff",
+      borderRadius: 14,
+      border: "1px solid #e2e8f0",
+      boxShadow: "0 24px 60px rgba(15, 23, 42, 0.35)",
+      padding: 22,
+      width: "100%",
+      maxWidth: 420,
+    },
+    confirmTitle: {
+      margin: "0 0 8px 0",
+      fontSize: 18,
+      fontWeight: 800,
+      color: "#111827",
+    },
+    confirmText: {
+      margin: "0 0 18px 0",
+      fontSize: 14,
+      lineHeight: 1.5,
+      color: "#374151",
+    },
+    confirmActions: {
+      display: "flex",
+      gap: 10,
+      justifyContent: "flex-end",
+    },
+    confirmButtonGhost: {
+      height: 40,
+      padding: "0 16px",
+      borderRadius: 10,
+      border: "1px solid #cbd5f5",
+      background: "#fff",
+      color: "#111827",
+      fontSize: 14,
+      fontWeight: 700,
+      cursor: "pointer",
+    },
+    confirmButtonPrimary: {
+      height: 40,
+      padding: "0 16px",
+      borderRadius: 10,
+      border: "1px solid #1d4ed8",
+      background: "#1d4ed8",
+      color: "#fff",
+      fontSize: 14,
+      fontWeight: 700,
+      cursor: "pointer",
+    },
   };
 
   const css = `
@@ -1717,7 +1824,7 @@ const PublishPage: React.FC = () => {
                     name="listingType"
                     value="normal"
                     checked={formData.listingType === "normal"}
-                    onChange={handleChange}
+                    onChange={handleListingTypeChange}
                   />
                   <h3 className="listing-type-title">Нормална обява</h3>
                   <p className="listing-type-desc">
@@ -1735,7 +1842,7 @@ const PublishPage: React.FC = () => {
                     name="listingType"
                     value="top"
                     checked={formData.listingType === "top"}
-                    onChange={handleChange}
+                    onChange={handleListingTypeChange}
                   />
                   <h3 className="listing-type-title">Топ обява</h3>
                   <p className="listing-type-desc">
@@ -1845,6 +1952,24 @@ const PublishPage: React.FC = () => {
         </aside>
       </div>
     </div>
+    {showTopConfirm && (
+      <div style={styles.confirmOverlay} onClick={cancelTopListing}>
+        <div style={styles.confirmModal} onClick={(e) => e.stopPropagation()}>
+          <h3 style={styles.confirmTitle}>ТОП обява</h3>
+          <p style={styles.confirmText}>
+            Публикуването на обява като "ТОП" струва 3 EUR.
+          </p>
+          <div style={styles.confirmActions}>
+            <button style={styles.confirmButtonGhost} onClick={cancelTopListing}>
+              Отхвърли
+            </button>
+            <button style={styles.confirmButtonPrimary} onClick={confirmTopListing}>
+              Продължи
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 };

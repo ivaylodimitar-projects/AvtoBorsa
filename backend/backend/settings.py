@@ -10,10 +10,26 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from backend/.env if present (local dev convenience).
+ENV_FILE = BASE_DIR / ".env"
+if ENV_FILE.exists():
+    for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        if not key:
+            continue
+        value = value.strip().strip('"').strip("'")
+        if not os.environ.get(key):
+            os.environ[key] = value
 
 
 # Quick-start development settings - unsuitable for production
@@ -44,6 +60,7 @@ INSTALLED_APPS = [
 
     "backend.accounts",
     "backend.listings",
+    "backend.payments",
 ]
 
 MIDDLEWARE = [
@@ -152,3 +169,24 @@ REST_FRAMEWORK = {
 # Media Files Configuration
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Frontend URL used for Stripe checkout redirects
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
+
+# Stripe settings
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+STRIPE_CURRENCY = os.getenv("STRIPE_CURRENCY", "EUR")
+STRIPE_API_BASE = os.getenv("STRIPE_API_BASE", "https://api.stripe.com/v1")
+STRIPE_TIMEOUT_SECONDS = int(os.getenv("STRIPE_TIMEOUT_SECONDS", "20"))
+STRIPE_WEBHOOK_TOLERANCE_SECONDS = int(
+    os.getenv("STRIPE_WEBHOOK_TOLERANCE_SECONDS", "300")
+)
+STRIPE_CHECKOUT_SUCCESS_URL = os.getenv(
+    "STRIPE_CHECKOUT_SUCCESS_URL",
+    f"{FRONTEND_BASE_URL}/?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
+)
+STRIPE_CHECKOUT_CANCEL_URL = os.getenv(
+    "STRIPE_CHECKOUT_CANCEL_URL",
+    f"{FRONTEND_BASE_URL}/?payment=cancelled",
+)

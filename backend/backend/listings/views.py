@@ -1,3 +1,6 @@
+from decimal import Decimal
+from datetime import timedelta
+
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -5,10 +8,45 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.exceptions import ValidationError
 from django.shortcuts import get_object_or_404
+from django.db import transaction as db_transaction
 from django.db.models import Q
 from django.utils import timezone
-from .models import CarListing, CarImage, Favorite, get_expiry_cutoff
+from backend.accounts.models import UserProfile
+from .models import CarListing, CarImage, Favorite, get_expiry_cutoff, TOP_LISTING_DURATION_DAYS
 from .serializers import CarListingSerializer, CarImageSerializer, FavoriteSerializer
+
+
+TOP_LISTING_PRICE_EUR = Decimal("3.00")
+
+
+def _demote_expired_top_listings():
+    """Ensure expired top listings are demoted to normal."""
+    CarListing.demote_expired_top_listings()
+
+
+def _charge_top_listing_fee(user):
+    """Charge the top listing fee from the user's wallet."""
+    with db_transaction.atomic():
+        profile, _ = UserProfile.objects.select_for_update().get_or_create(user=user)
+        if profile.balance < TOP_LISTING_PRICE_EUR:
+            raise ValidationError("Недостатъчни средства")
+        profile.balance -= TOP_LISTING_PRICE_EUR
+        profile.save(update_fields=["balance"])
+        return profile
+
+
+def _apply_top_listing_window(listing, now=None):
+    """Set a fresh 14-day top window on the listing."""
+    current = now or timezone.now()
+    listing.listing_type = "top"
+    listing.top_paid_at = current
+    listing.top_expires_at = current + timedelta(days=TOP_LISTING_DURATION_DAYS)
+
+
+def _clear_top_listing_window(listing):
+    """Remove top status timing fields from the listing."""
+    listing.top_paid_at = None
+    listing.top_expires_at = None
 
 
 class CarListingViewSet(viewsets.ModelViewSet):
@@ -18,6 +56,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Get listings based on user and filters"""
+        _demote_expired_top_listings()
         cutoff = get_expiry_cutoff()
         queryset = CarListing.objects.filter(
             is_active=True,
@@ -198,6 +237,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """Create listing and associate with current user"""
+        _demote_expired_top_listings()
         # Check if user has reached the 3 advert limit
         cutoff = get_expiry_cutoff()
         active_listings_count = CarListing.objects.filter(
@@ -214,14 +254,46 @@ class CarListingViewSet(viewsets.ModelViewSet):
                 "Моля, изтрийте или архивирайте някоя от вашите обяви, за да добавите нова."
             )
 
-        serializer.save(user=self.request.user)
+        listing_type = serializer.validated_data.get("listing_type", "normal")
+        with db_transaction.atomic():
+            if listing_type == "top":
+                _charge_top_listing_fee(self.request.user)
+
+            listing = serializer.save(user=self.request.user)
+
+            if listing_type == "top":
+                _apply_top_listing_window(listing)
+                listing.save(update_fields=["listing_type", "top_paid_at", "top_expires_at"])
 
     def perform_update(self, serializer):
         """Update listing - only owner can update"""
+        _demote_expired_top_listings()
         listing = self.get_object()
         if listing.user != self.request.user:
             raise PermissionError("You can only edit your own listings")
-        serializer.save()
+        listing_type = serializer.validated_data.get("listing_type")
+        now = timezone.now()
+
+        with db_transaction.atomic():
+            if listing_type == "top":
+                is_current_top = (
+                    listing.listing_type == "top"
+                    and listing.top_expires_at
+                    and listing.top_expires_at > now
+                )
+                if not is_current_top:
+                    _charge_top_listing_fee(self.request.user)
+                    _apply_top_listing_window(listing, now=now)
+
+            updated = serializer.save()
+
+            if listing_type == "top":
+                updated.top_paid_at = listing.top_paid_at
+                updated.top_expires_at = listing.top_expires_at
+                updated.save(update_fields=["listing_type", "top_paid_at", "top_expires_at"])
+            elif listing_type == "normal":
+                _clear_top_listing_window(updated)
+                updated.save(update_fields=["listing_type", "top_paid_at", "top_expires_at"])
 
     def perform_destroy(self, instance):
         """Delete listing - only owner can delete"""
@@ -234,6 +306,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
 @permission_classes([IsAuthenticated])
 def get_user_listings(request):
     """Get current user's active listings"""
+    _demote_expired_top_listings()
     cutoff = get_expiry_cutoff()
     listings = CarListing.objects.filter(
         user=request.user,
@@ -250,6 +323,7 @@ def get_user_listings(request):
 @permission_classes([IsAuthenticated])
 def get_user_drafts(request):
     """Get current user's draft listings"""
+    _demote_expired_top_listings()
     drafts = CarListing.objects.filter(user=request.user, is_draft=True).prefetch_related('images')
     serializer = CarListingSerializer(drafts, many=True, context={'request': request})
     return Response(serializer.data)
@@ -259,6 +333,7 @@ def get_user_drafts(request):
 @permission_classes([IsAuthenticated])
 def get_user_archived(request):
     """Get current user's archived listings"""
+    _demote_expired_top_listings()
     archived = CarListing.objects.filter(user=request.user, is_archived=True).prefetch_related('images')
     serializer = CarListingSerializer(archived, many=True, context={'request': request})
     return Response(serializer.data)
@@ -268,6 +343,7 @@ def get_user_archived(request):
 @permission_classes([IsAuthenticated])
 def get_user_expired(request):
     """Get current user's expired listings"""
+    _demote_expired_top_listings()
     cutoff = get_expiry_cutoff()
     expired = CarListing.objects.filter(
         user=request.user,
@@ -339,6 +415,7 @@ def delete_listing(request, listing_id):
 @permission_classes([IsAuthenticated])
 def republish_listing(request, listing_id):
     """Republish a listing for another 30 minutes."""
+    _demote_expired_top_listings()
     listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
     listing_type = request.data.get('listing_type')
 
@@ -361,14 +438,26 @@ def republish_listing(request, listing_id):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    if listing_type in ['top', 'normal']:
-        listing.listing_type = listing_type
+    if listing_type not in ['top', 'normal']:
+        return Response(
+            {"detail": "ÐÐµÐ²Ð°Ð»Ð¸Ð´ÐµÐ½ Ñ‚Ð¸Ð¿ Ð½Ð° Ð¾Ð±ÑÐ²Ð°Ñ‚Ð°."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
-    listing.is_draft = False
-    listing.is_archived = False
-    listing.is_active = True
-    listing.created_at = timezone.now()
-    listing.save()
+    now = timezone.now()
+    with db_transaction.atomic():
+        if listing_type == "top":
+            _charge_top_listing_fee(request.user)
+            _apply_top_listing_window(listing, now=now)
+        else:
+            listing.listing_type = "normal"
+            _clear_top_listing_window(listing)
+
+        listing.is_draft = False
+        listing.is_archived = False
+        listing.is_active = True
+        listing.created_at = now
+        listing.save()
 
     serializer = CarListingSerializer(listing, context={'request': request})
     return Response(serializer.data, status=status.HTTP_200_OK)
@@ -378,6 +467,7 @@ def republish_listing(request, listing_id):
 @permission_classes([IsAuthenticated])
 def update_listing_type(request, listing_id):
     """Update listing type (top/normal) for a listing."""
+    _demote_expired_top_listings()
     listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
     listing_type = request.data.get('listing_type')
 
@@ -387,8 +477,22 @@ def update_listing_type(request, listing_id):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    listing.listing_type = listing_type
-    listing.save()
+    now = timezone.now()
+    with db_transaction.atomic():
+        if listing_type == "top":
+            is_current_top = (
+                listing.listing_type == "top"
+                and listing.top_expires_at
+                and listing.top_expires_at > now
+            )
+            if not is_current_top:
+                _charge_top_listing_fee(request.user)
+                _apply_top_listing_window(listing, now=now)
+        else:
+            listing.listing_type = "normal"
+            _clear_top_listing_window(listing)
+
+        listing.save()
 
     serializer = CarListingSerializer(listing, context={'request': request})
     return Response(serializer.data, status=status.HTTP_200_OK)
@@ -498,6 +602,7 @@ def remove_favorite(request, listing_id):
 @permission_classes([IsAuthenticated])
 def get_user_favorites(request):
     """Get current user's favorite listings"""
+    _demote_expired_top_listings()
     cutoff = get_expiry_cutoff()
     favorites = Favorite.objects.filter(
         user=request.user,

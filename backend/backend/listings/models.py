@@ -7,12 +7,19 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 LISTING_EXPIRY_MINUTES = 30
+TOP_LISTING_DURATION_DAYS = 14
 
 
 def get_expiry_cutoff(now=None):
     """Return the datetime before which listings are considered expired."""
     current = now or timezone.now()
     return current - timedelta(minutes=LISTING_EXPIRY_MINUTES)
+
+
+def get_top_expiry(now=None):
+    """Return the datetime when a top listing should expire."""
+    current = now or timezone.now()
+    return current + timedelta(days=TOP_LISTING_DURATION_DAYS)
 
 class CarListing(models.Model):
     """Model for car listings/advertisements"""
@@ -126,6 +133,8 @@ class CarListing(models.Model):
     is_active = models.BooleanField(default=True)
     is_archived = models.BooleanField(default=False)
     listing_type = models.CharField(max_length=10, choices=LISTING_TYPE_CHOICES, default='normal')
+    top_paid_at = models.DateTimeField(null=True, blank=True)
+    top_expires_at = models.DateTimeField(null=True, blank=True)
 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -147,8 +156,37 @@ class CarListing(models.Model):
             return f"obiava-{self.id}-{brand_slug}-{model_slug}"
         return None
 
+    def apply_top_status(self, now=None):
+        """Ensure top listings have an expiry and demote expired ones."""
+        current = now or timezone.now()
+        if self.listing_type == 'top':
+            if self.top_expires_at and self.top_expires_at <= current:
+                self.listing_type = 'normal'
+                self.top_paid_at = None
+                self.top_expires_at = None
+                return
+
+            if self.top_paid_at is None:
+                self.top_paid_at = current
+            if self.top_expires_at is None:
+                self.top_expires_at = get_top_expiry(self.top_paid_at)
+        else:
+            self.top_paid_at = None
+            self.top_expires_at = None
+
+    @classmethod
+    def demote_expired_top_listings(cls, now=None):
+        """Bulk demote expired top listings to normal."""
+        current = now or timezone.now()
+        return cls.objects.filter(
+            listing_type='top',
+            top_expires_at__isnull=False,
+            top_expires_at__lte=current,
+        ).update(listing_type='normal', top_paid_at=None, top_expires_at=None)
+
     def save(self, *args, **kwargs):
         """Override save to auto-generate slug"""
+        self.apply_top_status()
         # First save to get an ID if it's a new object
         if not self.pk:
             # Remove force_insert to allow normal insert

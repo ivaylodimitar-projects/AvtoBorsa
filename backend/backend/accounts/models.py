@@ -15,7 +15,7 @@ class UserProfile(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Profile for {self.user.email} - Balance: {self.balance} BGN"
+        return f"Profile for {self.user.email} - Balance: {self.balance} EUR"
 
     class Meta:
         verbose_name = "User Profile"

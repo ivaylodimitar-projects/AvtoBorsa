@@ -64,10 +64,11 @@ type ListingType = "normal" | "top";
 const NEW_LISTING_BADGE_MINUTES = 10;
 const NEW_LISTING_BADGE_WINDOW_MS = NEW_LISTING_BADGE_MINUTES * 60 * 1000;
 const NEW_LISTING_BADGE_REFRESH_MS = 30_000;
+const TOP_LISTING_PRICE_EUR = 3;
 
 const MyAdsPage: React.FC = () => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user, updateBalance } = useAuth();
   const [activeListings, setActiveListings] = useState<CarListing[]>([]);
   const [archivedListings, setArchivedListings] = useState<CarListing[]>([]);
   const [draftListings, setDraftListings] = useState<CarListing[]>([]);
@@ -79,6 +80,8 @@ const MyAdsPage: React.FC = () => {
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [showTopConfirm, setShowTopConfirm] = useState(false);
+  const [topConfirmApproved, setTopConfirmApproved] = useState(false);
   const [listingTypeModal, setListingTypeModal] = useState<{
     isOpen: boolean;
     listingId: number | null;
@@ -179,6 +182,23 @@ const MyAdsPage: React.FC = () => {
     setToast({ message, type });
   };
 
+  const refreshBalance = async () => {
+    try {
+      const token = localStorage.getItem("authToken");
+      if (!token) return;
+      const response = await fetch("http://localhost:8000/api/auth/me/", {
+        headers: { Authorization: `Token ${token}` },
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (typeof data.balance === "number") {
+        updateBalance(data.balance);
+      }
+    } catch {
+      // ignore balance refresh errors
+    }
+  };
+
   const goToEdit = (listing: CarListing) => {
     navigate(`/publish?edit=${listing.id}`, { state: { listing } });
   };
@@ -246,6 +266,8 @@ const MyAdsPage: React.FC = () => {
     mode: "republish" | "promote",
     defaultType: ListingType
   ) => {
+    setTopConfirmApproved(false);
+    setShowTopConfirm(false);
     setListingTypeModal({
       isOpen: true,
       listingId: listing.id,
@@ -256,6 +278,8 @@ const MyAdsPage: React.FC = () => {
   };
 
   const closeListingTypeModal = () => {
+    setShowTopConfirm(false);
+    setTopConfirmApproved(false);
     setListingTypeModal((prev) => ({
       ...prev,
       isOpen: false,
@@ -264,6 +288,14 @@ const MyAdsPage: React.FC = () => {
   };
 
   const submitRepublish = async (listingId: number, listingType: ListingType) => {
+    if (listingType === "top") {
+      const balance = user?.balance;
+      if (typeof balance === "number" && balance < TOP_LISTING_PRICE_EUR) {
+        showToast("Недостатъчни средства", "error");
+        return false;
+      }
+    }
+
     setActionLoading(listingId);
 
     try {
@@ -302,6 +334,9 @@ const MyAdsPage: React.FC = () => {
           ? "Обявата е публикувана отново като ТОП!"
           : "Обявата е публикувана отново като нормална."
       );
+      if (listingType === "top") {
+        await refreshBalance();
+      }
       return true;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Грешка при повторно публикуване";
@@ -313,6 +348,14 @@ const MyAdsPage: React.FC = () => {
   };
 
   const submitListingTypeUpdate = async (listingId: number, listingType: ListingType) => {
+    if (listingType === "top") {
+      const balance = user?.balance;
+      if (typeof balance === "number" && balance < TOP_LISTING_PRICE_EUR) {
+        showToast("Недостатъчни средства", "error");
+        return false;
+      }
+    }
+
     setActionLoading(listingId);
     try {
       const token = localStorage.getItem("authToken");
@@ -347,6 +390,9 @@ const MyAdsPage: React.FC = () => {
           ? "Обявата е промотирана до ТОП!"
           : "Типът на обявата е обновен."
       );
+      if (listingType === "top") {
+        await refreshBalance();
+      }
       return true;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Грешка при промяна на типа";
@@ -357,7 +403,7 @@ const MyAdsPage: React.FC = () => {
     }
   };
 
-  const handleListingTypeConfirm = async () => {
+  const executeListingTypeConfirm = async () => {
     if (!listingTypeModal.listingId) return;
     const { listingId, selectedType, mode } = listingTypeModal;
     const success =
@@ -367,6 +413,25 @@ const MyAdsPage: React.FC = () => {
     if (success) {
       closeListingTypeModal();
     }
+  };
+
+  const handleListingTypeConfirm = async () => {
+    if (!listingTypeModal.listingId) return;
+    if (listingTypeModal.selectedType === "top" && !topConfirmApproved) {
+      setShowTopConfirm(true);
+      return;
+    }
+    await executeListingTypeConfirm();
+  };
+
+  const confirmTopListingAction = async () => {
+    setTopConfirmApproved(true);
+    setShowTopConfirm(false);
+    await executeListingTypeConfirm();
+  };
+
+  const cancelTopListingAction = () => {
+    setShowTopConfirm(false);
   };
 
   const handleArchive = async (listingId: number, e: React.MouseEvent) => {
@@ -657,6 +722,63 @@ const MyAdsPage: React.FC = () => {
     justifyContent: "center",
     zIndex: 1200,
     padding: "24px",
+  },
+  confirmOverlay: {
+    position: "fixed" as const,
+    inset: 0,
+    background: "rgba(2, 6, 23, 0.55)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1300,
+    padding: "24px",
+  },
+  confirmModal: {
+    width: "min(420px, 92vw)",
+    background: "#fff",
+    borderRadius: 14,
+    padding: "22px",
+    border: "1px solid #e2e8f0",
+    boxShadow: "0 24px 60px rgba(15, 23, 42, 0.35)",
+  },
+  confirmTitle: {
+    margin: "0 0 8px 0",
+    fontSize: 18,
+    fontWeight: 800,
+    color: "#111827",
+  },
+  confirmText: {
+    margin: "0 0 18px 0",
+    fontSize: 14,
+    lineHeight: 1.5,
+    color: "#374151",
+  },
+  confirmActions: {
+    display: "flex",
+    gap: 10,
+    justifyContent: "flex-end",
+  },
+  confirmButtonGhost: {
+    height: 40,
+    padding: "0 16px",
+    borderRadius: 10,
+    border: "1px solid #cbd5f5",
+    background: "#fff",
+    color: "#111827",
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  confirmButtonPrimary: {
+    height: 40,
+    padding: "0 16px",
+    borderRadius: 10,
+    border: "1px solid #1d4ed8",
+    background: "#1d4ed8",
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: "pointer",
   },
   modal: {
     width: "min(560px, 92vw)",
@@ -1440,6 +1562,25 @@ const MyAdsPage: React.FC = () => {
               </div>
 
               <p style={styles.modalHint}>{modalHint}</p>
+            </div>
+          </div>
+        )}
+
+        {showTopConfirm && (
+          <div style={styles.confirmOverlay} onClick={cancelTopListingAction}>
+            <div style={styles.confirmModal} onClick={(e) => e.stopPropagation()}>
+              <h3 style={styles.confirmTitle}>ТОП обява</h3>
+              <p style={styles.confirmText}>
+                Публикуването на обява като "ТОП" струва 3 EUR.
+              </p>
+              <div style={styles.confirmActions}>
+                <button style={styles.confirmButtonGhost} onClick={cancelTopListingAction}>
+                  Отхвърли
+                </button>
+                <button style={styles.confirmButtonPrimary} onClick={confirmTopListingAction}>
+                  Продължи
+                </button>
+              </div>
             </div>
           </div>
         )}

@@ -1,10 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   User,
-  FileText,
-  Heart,
   Settings,
   HelpCircle,
   Wallet,
@@ -14,15 +12,112 @@ import {
   Camera
 } from "lucide-react";
 import TopUpModal from "./TopUpModal";
+import { useToast } from "../context/ToastContext";
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const STRIPE_SESSION_STORAGE_KEY = "stripe_checkout_session_id";
+
+type DealerProfile = {
+  email: string;
+  profile_image_url?: string | null;
+};
 
 const ProfileMenu: React.FC = () => {
-  const { user } = useAuth();
+  const { user, updateBalance } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { showToast } = useToast();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isTopUpModalOpen, setIsTopUpModalOpen] = useState(false);
   const [hoveredIcon, setHoveredIcon] = useState(false);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const params = new URLSearchParams(location.search);
+    const paymentState = params.get("payment");
+    if (!paymentState) return;
+
+    const token = localStorage.getItem("authToken");
+    if (!token) return;
+
+    const clearPaymentQueryParams = () => {
+      navigate(location.pathname, { replace: true });
+    };
+
+    const clearStoredSessionId = () => {
+      localStorage.removeItem(STRIPE_SESSION_STORAGE_KEY);
+    };
+
+    if (paymentState === "cancelled") {
+      clearStoredSessionId();
+      showToast("Payment was cancelled.", { type: "info" });
+      clearPaymentQueryParams();
+      return;
+    }
+
+    if (paymentState !== "success") {
+      clearStoredSessionId();
+      clearPaymentQueryParams();
+      return;
+    }
+
+    const sessionId = params.get("session_id") || localStorage.getItem(STRIPE_SESSION_STORAGE_KEY);
+
+    const syncBalanceAfterPayment = async () => {
+      try {
+        if (sessionId) {
+          const statusResponse = await fetch(
+            `${API_BASE_URL}/api/payments/session-status/?session_id=${encodeURIComponent(sessionId)}`,
+            {
+              headers: { Authorization: `Token ${token}` },
+            }
+          );
+
+          if (statusResponse.ok) {
+            const statusData = await statusResponse.json();
+            if (typeof statusData.balance === "number") {
+              updateBalance(statusData.balance);
+            }
+
+            if (statusData.status === "succeeded") {
+              showToast("Balance updated successfully.", { type: "success" });
+            } else if (statusData.status === "pending") {
+              showToast("Payment is processing. Balance will update shortly.", { type: "info" });
+            } else if (statusData.status === "failed" || statusData.status === "cancelled") {
+              showToast("Payment was not completed.", { type: "error" });
+            } else {
+              showToast("Payment status received.", { type: "info" });
+            }
+
+            return;
+          }
+        }
+
+        const meResponse = await fetch(`${API_BASE_URL}/api/auth/me/`, {
+          headers: { Authorization: `Token ${token}` },
+        });
+        if (meResponse.ok) {
+          const meData = await meResponse.json();
+          if (typeof meData.balance === "number") {
+            updateBalance(meData.balance);
+          }
+        }
+
+        showToast("Payment completed.", { type: "success" });
+      } catch {
+        showToast("Payment completed. Balance refresh failed.", { type: "info" });
+      } finally {
+        clearStoredSessionId();
+        clearPaymentQueryParams();
+      }
+    };
+
+    syncBalanceAfterPayment();
+  }, [location.pathname, location.search, navigate, showToast, updateBalance, user]);
 
   // Fetch profile image on mount for business users
   useEffect(() => {
@@ -34,13 +129,13 @@ const ProfileMenu: React.FC = () => {
             headers: token ? { Authorization: `Token ${token}` } : {},
           });
           if (response.ok) {
-            const dealers = await response.json();
-            const myDealer = dealers.find((d: any) => d.email === user.email);
+            const dealers = (await response.json()) as DealerProfile[];
+            const myDealer = dealers.find((d) => d.email === user.email);
             if (myDealer?.profile_image_url) {
               setProfileImageUrl(myDealer.profile_image_url);
             }
           }
-        } catch (err) {
+        } catch {
           // silent
         }
       };
@@ -81,8 +176,8 @@ const ProfileMenu: React.FC = () => {
               headers: { Authorization: `Token ${token}` },
             });
             if (dealersRes.ok) {
-              const dealers = await dealersRes.json();
-              const myDealer = dealers.find((d: any) => d.email === user?.email);
+              const dealers = (await dealersRes.json()) as DealerProfile[];
+              const myDealer = dealers.find((d) => d.email === user?.email);
               if (myDealer?.profile_image_url) {
                 setProfileImageUrl(myDealer.profile_image_url);
               }
@@ -290,10 +385,6 @@ const ProfileMenu: React.FC = () => {
     },
   };
 
-  // Exchange rate BGN to EUR (approximately 1 BGN = 0.51 EUR)
-  const BGN_TO_EUR = 0.51;
-  const balanceEUR = balance * BGN_TO_EUR;
-
   const initial = user.username?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || "?";
   const isBusiness = user.userType === "business";
 
@@ -397,10 +488,10 @@ const ProfileMenu: React.FC = () => {
                       Баланс
                     </div>
                     <div style={styles.balanceValue}>
-                      {balance.toFixed(2)} лв
+                      €{balance.toFixed(2)}
                     </div>
                     <div style={styles.balanceSubtext}>
-                      ≈ €{balanceEUR.toFixed(2)} EUR
+                      EUR balance
                     </div>
                   </div>
                 </div>
