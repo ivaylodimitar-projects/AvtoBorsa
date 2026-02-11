@@ -17,11 +17,6 @@ import { useToast } from "../context/ToastContext";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 const STRIPE_SESSION_STORAGE_KEY = "stripe_checkout_session_id";
 
-type DealerProfile = {
-  email: string;
-  profile_image_url?: string | null;
-};
-
 const ProfileMenu: React.FC = () => {
   const { user, updateBalance } = useAuth();
   const location = useLocation();
@@ -119,28 +114,27 @@ const ProfileMenu: React.FC = () => {
     syncBalanceAfterPayment();
   }, [location.pathname, location.search, navigate, showToast, updateBalance, user]);
 
-  // Fetch profile image on mount for business users
+  // Fetch profile image for current user
   useEffect(() => {
-    if (user?.userType === "business") {
-      const fetchProfileImage = async () => {
-        try {
-          const token = localStorage.getItem("authToken");
-          const response = await fetch("http://localhost:8000/api/auth/dealers/", {
-            headers: token ? { Authorization: `Token ${token}` } : {},
-          });
-          if (response.ok) {
-            const dealers = (await response.json()) as DealerProfile[];
-            const myDealer = dealers.find((d) => d.email === user.email);
-            if (myDealer?.profile_image_url) {
-              setProfileImageUrl(myDealer.profile_image_url);
-            }
+    if (!user) return;
+    const fetchProfileImage = async () => {
+      try {
+        const token = localStorage.getItem("authToken");
+        if (!token) return;
+        const response = await fetch(`${API_BASE_URL}/api/auth/me/`, {
+          headers: { Authorization: `Token ${token}` },
+        });
+        if (response.ok) {
+          const meData = await response.json();
+          if (meData?.profile_image_url) {
+            setProfileImageUrl(meData.profile_image_url);
           }
-        } catch {
-          // silent
         }
-      };
-      fetchProfileImage();
-    }
+      } catch {
+        // silent
+      }
+    };
+    fetchProfileImage();
   }, [user]);
 
   if (!user) return null;
@@ -385,7 +379,13 @@ const ProfileMenu: React.FC = () => {
     },
   };
 
-  const initial = user.username?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || "?";
+  const initial =
+    user.username?.charAt(0)?.toUpperCase() ||
+    user.first_name?.charAt(0)?.toUpperCase() ||
+    user.last_name?.charAt(0)?.toUpperCase() ||
+    user.email?.charAt(0)?.toUpperCase() ||
+    "?";
+  const fullName = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
   const isBusiness = user.userType === "business";
 
   return (
@@ -465,7 +465,7 @@ const ProfileMenu: React.FC = () => {
                   )}
                 </div>
                 <div style={styles.photoInfo}>
-                  <div style={styles.photoName}>{user.username || user.email}</div>
+                  <div style={styles.photoName}>{user.username || fullName || user.email}</div>
                   <div style={styles.photoType}>
                     {isBusiness ? "Бизнес профил" : "Частен профил"}
                     {uploadingPhoto && " — качване..."}
@@ -537,7 +537,8 @@ const ProfileMenu: React.FC = () => {
 
                 <div style={styles.divider} />
 
-                <button
+                <Link
+                  to="/settings"
                   style={styles.menuItem}
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLElement).style.background = "#ecfdf5";
@@ -547,14 +548,11 @@ const ProfileMenu: React.FC = () => {
                     (e.currentTarget as HTMLElement).style.background = "none";
                     (e.currentTarget as HTMLElement).style.color = "#333";
                   }}
-                  onClick={() => {
-                    // TODO: Navigate to settings
-                    closeDropdown();
-                  }}
+                  onClick={closeDropdown}
                 >
                   <Settings size={18} />
                   <span>Настройки</span>
-                </button>
+                </Link>
 
                 <button
                   style={styles.menuItem}

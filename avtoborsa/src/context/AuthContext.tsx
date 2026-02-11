@@ -6,6 +6,9 @@ interface User {
   username?: string;
   userType: "private" | "business";
   balance?: number;
+  first_name?: string;
+  last_name?: string;
+  profile_image_url?: string | null;
 }
 
 interface AuthContextType {
@@ -38,8 +41,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (response.ok) {
             const userData = await response.json();
             setUser(userData);
-          } else {
+          } else if (response.status === 401 || response.status === 403) {
             localStorage.removeItem("authToken");
+          } else {
+            // Keep token on transient errors
+            console.warn("Auth check failed with status:", response.status);
           }
         }
       } catch (error) {

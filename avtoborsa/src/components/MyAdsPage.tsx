@@ -16,6 +16,8 @@ import {
   Clock,
   X,
   Euro,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -52,11 +54,18 @@ interface CarListing {
   images: Array<{ id: number; image: string }>;
   image_url?: string;
   created_at: string;
+  updated_at?: string;
   is_archived: boolean;
   is_draft: boolean;
   listing_type?: "top" | "normal" | string;
   listing_type_display?: string;
   top_expires_at?: string;
+  price_history?: Array<{
+    old_price: number | string;
+    new_price: number | string;
+    delta: number | string;
+    changed_at: string;
+  }>;
 }
 
 interface Favorite {
@@ -72,6 +81,7 @@ const NEW_LISTING_BADGE_MINUTES = 10;
 const NEW_LISTING_BADGE_WINDOW_MS = NEW_LISTING_BADGE_MINUTES * 60 * 1000;
 const NEW_LISTING_BADGE_REFRESH_MS = 30_000;
 const TOP_LISTING_PRICE_EUR = 3;
+const PAGE_SIZE = 21;
 
 const globalCss = `
   @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
@@ -91,6 +101,7 @@ const MyAdsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("active");
+  const [currentPage, setCurrentPage] = useState(1);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -1028,6 +1039,23 @@ const MyAdsPage: React.FC = () => {
     padding: "10px 12px",
     textAlign: "center" as const,
   },
+  previewPriceWrap: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  previewPriceChangeBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "4px 10px",
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: 800,
+  },
+  previewPriceChangeUp: { background: "#fee2e2", color: "#dc2626", border: "1px solid #fecaca" },
+  previewPriceChangeDown: { background: "#dcfce7", color: "#16a34a", border: "1px solid #bbf7d0" },
   previewSpecs: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
@@ -1079,6 +1107,44 @@ const MyAdsPage: React.FC = () => {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
     gap: 24,
+  },
+  pagination: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 24,
+    flexWrap: "wrap",
+  },
+  paginationButton: {
+    minWidth: 36,
+    height: 36,
+    borderRadius: 8,
+    border: "1px solid #e2e8f0",
+    background: "#fff",
+    color: "#1f2937",
+    fontWeight: 600,
+    cursor: "pointer",
+    padding: "0 10px",
+  },
+  paginationButtonActive: {
+    background: "#0f766e",
+    borderColor: "#0f766e",
+    color: "#fff",
+  },
+  paginationButtonDisabled: {
+    opacity: 0.5,
+    cursor: "not-allowed",
+  },
+  paginationEllipsis: {
+    color: "#94a3b8",
+    fontWeight: 600,
+    padding: "0 4px",
+  },
+  paginationInfo: {
+    fontSize: 13,
+    color: "#64748b",
+    fontWeight: 600,
   },
   listingCard: {
     background: "#fff",
@@ -1183,7 +1249,23 @@ const MyAdsPage: React.FC = () => {
     border: "1px solid #e0e0e0",
     boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
     zIndex: 2,
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "flex-end",
+    gap: 4,
   },
+  listingPriceChangeBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "3px 8px",
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: 800,
+    lineHeight: 1,
+  },
+  listingPriceChangeUp: { background: "#fee2e2", color: "#dc2626", border: "1px solid #fecaca" },
+  listingPriceChangeDown: { background: "#dcfce7", color: "#16a34a", border: "1px solid #bbf7d0" },
   listingContent: {
     padding: "18px",
     display: "flex",
@@ -1208,6 +1290,18 @@ const MyAdsPage: React.FC = () => {
   listingMeta: {
     fontSize: 12,
     color: "#666",
+    whiteSpace: "nowrap",
+  },
+  listingMetaCreated: {
+    fontSize: 12,
+    color: "rgb(15, 118, 110)",
+    fontWeight: 700,
+    whiteSpace: "nowrap",
+  },
+  listingMetaUpdated: {
+    fontSize: 12,
+    color: "#f97316",
+    fontWeight: 700,
     whiteSpace: "nowrap",
   },
   listingMetaStack: {
@@ -1417,6 +1511,31 @@ const MyAdsPage: React.FC = () => {
   };
 
   const currentListings = getCurrentListings();
+  const totalPages = Math.ceil(currentListings.length / PAGE_SIZE);
+  const safePage = totalPages > 0 ? Math.min(currentPage, totalPages) : 1;
+  const paginatedListings = currentListings.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE
+  );
+  const visiblePages = (() => {
+    if (totalPages <= 1) return [];
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+    const pages = new Set<number>();
+    pages.add(1);
+    pages.add(totalPages);
+    for (let page = safePage - 2; page <= safePage + 2; page += 1) {
+      if (page > 1 && page < totalPages) {
+        pages.add(page);
+      }
+    }
+    return Array.from(pages).sort((a, b) => a - b);
+  })();
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+  };
   const totalListings =
     activeListings.length +
     archivedListings.length +
@@ -1445,6 +1564,14 @@ const MyAdsPage: React.FC = () => {
     Number.isFinite(previewPriceValue) && previewPriceValue > 0
       ? `€${previewPriceValue.toLocaleString("bg-BG")}`
       : "Цена не е зададена";
+  const previewLatestHistory = previewListing?.price_history?.[0];
+  const previewDeltaValue = previewLatestHistory ? Number(previewLatestHistory.delta) : Number.NaN;
+  const showPreviewPriceChange = Number.isFinite(previewDeltaValue) && previewDeltaValue !== 0;
+  const previewChangeDirection = previewDeltaValue > 0 ? "up" : "down";
+  const previewChangeLabel = showPreviewPriceChange
+    ? `${Math.abs(previewDeltaValue).toLocaleString("bg-BG")} €`
+    : "";
+  const PreviewChangeIcon = previewChangeDirection === "up" ? TrendingUp : TrendingDown;
   const previewSpecs = previewListing
     ? [
         { label: "Година", value: previewListing.year_from ? String(previewListing.year_from) : "" },
@@ -1742,7 +1869,24 @@ const MyAdsPage: React.FC = () => {
                 </div>
 
                 <div style={styles.previewInfo}>
-                  <div style={styles.previewPrice}>{previewPriceLabel}</div>
+                  <div style={styles.previewPriceWrap}>
+                    <div style={styles.previewPrice}>{previewPriceLabel}</div>
+                    {showPreviewPriceChange && (
+                      <span
+                        style={{
+                          ...styles.previewPriceChangeBadge,
+                          ...(previewChangeDirection === "up"
+                            ? styles.previewPriceChangeUp
+                            : styles.previewPriceChangeDown),
+                        }}
+                        title={previewChangeDirection === "up" ? "Повишена цена" : "Намалена цена"}
+                      >
+                        <PreviewChangeIcon size={14} />
+                        {previewChangeDirection === "up" ? "+" : "-"}
+                        {previewChangeLabel}
+                      </span>
+                    )}
+                  </div>
 
                   {previewSpecs.length > 0 && (
                     <div style={styles.previewSpecs}>
@@ -1799,7 +1943,10 @@ const MyAdsPage: React.FC = () => {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as TabType)}
+                onClick={() => {
+                  setActiveTab(tab.id as TabType);
+                  setCurrentPage(1);
+                }}
                 style={{
                   ...styles.tab,
                   ...(isActive ? styles.tabActive : {}),
@@ -1874,8 +2021,9 @@ const MyAdsPage: React.FC = () => {
             )}
           </div>
         ) : (
+          <>
           <div style={styles.listingsGrid}>
-            {currentListings.map((listing) => {
+            {paginatedListings.map((listing) => {
             const statusLabel = getPreviewStatusLabel(activeTab);
             const fallbackTitle = `${listing.brand || ""} ${listing.model || ""}`.trim();
             const listingTitle = (listing.title || fallbackTitle || "Без заглавие").trim();
@@ -1886,6 +2034,10 @@ const MyAdsPage: React.FC = () => {
             ].filter(Boolean);
             const subtitle = subtitleParts.join(" · ");
             const createdLabel = formatDate(listing.created_at);
+            const updatedLabel =
+              listing.updated_at && listing.updated_at !== listing.created_at
+                ? formatDate(listing.updated_at)
+                : "";
             const descriptionSnippet = getShortDescription(listing.description);
             const isTopActive =
               listing.listing_type === "top" &&
@@ -1899,6 +2051,14 @@ const MyAdsPage: React.FC = () => {
               Number.isFinite(priceValue) && priceValue > 0
                 ? `${priceValue.toLocaleString("bg-BG")} €`
                 : "Цена не е зададена";
+            const latestPriceHistory = listing.price_history?.[0];
+            const latestDeltaValue = latestPriceHistory ? Number(latestPriceHistory.delta) : Number.NaN;
+            const showPriceChange = Number.isFinite(latestDeltaValue) && latestDeltaValue !== 0;
+            const priceChangeDirection = latestDeltaValue > 0 ? "up" : "down";
+            const priceChangeLabel = showPriceChange
+              ? `${Math.abs(latestDeltaValue).toLocaleString("bg-BG")} €`
+              : "";
+            const PriceChangeIcon = priceChangeDirection === "up" ? TrendingUp : TrendingDown;
             const statusBadgeStyle =
               statusLabel === "Изтекла"
                 ? { ...styles.statusBadge, ...styles.statusBadgeExpired }
@@ -1975,7 +2135,24 @@ const MyAdsPage: React.FC = () => {
                   </div>
                 )}
                 <div style={styles.listingMediaOverlay} />
-                <div style={styles.listingPricePill}>{priceLabel}</div>
+                <div style={styles.listingPricePill}>
+                  <span>{priceLabel}</span>
+                  {showPriceChange && (
+                    <span
+                      style={{
+                        ...styles.listingPriceChangeBadge,
+                        ...(priceChangeDirection === "up"
+                          ? styles.listingPriceChangeUp
+                          : styles.listingPriceChangeDown),
+                      }}
+                      title={priceChangeDirection === "up" ? "Повишена цена" : "Намалена цена"}
+                    >
+                      <PriceChangeIcon size={12} />
+                      {priceChangeDirection === "up" ? "+" : "-"}
+                      {priceChangeLabel}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div style={styles.listingContent}>
@@ -1984,7 +2161,10 @@ const MyAdsPage: React.FC = () => {
                   {(createdLabel || topRemainingLabel) && (
                     <div style={styles.listingMetaStack}>
                       {createdLabel && (
-                        <span style={styles.listingMeta}>Създадена: {createdLabel}</span>
+                        <span style={styles.listingMetaCreated}>Създадена: {createdLabel}</span>
+                      )}
+                      {updatedLabel && (
+                        <span style={styles.listingMetaUpdated}>Редактирана: {updatedLabel}</span>
                       )}
                       {topRemainingLabel && (
                         <span style={styles.topTimer}>{topRemainingLabel}</span>
@@ -2477,6 +2657,55 @@ const MyAdsPage: React.FC = () => {
             </div>
           )})}
           </div>
+          {totalPages > 1 && (
+            <div style={styles.pagination}>
+              <button
+                type="button"
+                style={{
+                  ...styles.paginationButton,
+                  ...(safePage === 1 ? styles.paginationButtonDisabled : {}),
+                }}
+                disabled={safePage === 1}
+                onClick={() => handlePageChange(safePage - 1)}
+              >
+                Предишна
+              </button>
+              {visiblePages.map((page, index) => {
+                const prevPage = visiblePages[index - 1];
+                const showEllipsis = prevPage && page - prevPage > 1;
+                return (
+                  <React.Fragment key={`page-${page}`}>
+                    {showEllipsis && <span style={styles.paginationEllipsis}>...</span>}
+                    <button
+                      type="button"
+                      style={{
+                        ...styles.paginationButton,
+                        ...(page === safePage ? styles.paginationButtonActive : {}),
+                      }}
+                      onClick={() => handlePageChange(page)}
+                    >
+                      {page}
+                    </button>
+                  </React.Fragment>
+                );
+              })}
+              <button
+                type="button"
+                style={{
+                  ...styles.paginationButton,
+                  ...(safePage === totalPages ? styles.paginationButtonDisabled : {}),
+                }}
+                disabled={safePage === totalPages}
+                onClick={() => handlePageChange(safePage + 1)}
+              >
+                Следваща
+              </button>
+              <span style={styles.paginationInfo}>
+                Страница {safePage} от {totalPages}
+              </span>
+            </div>
+          )}
+          </>
         )}
       </div>
     </div>

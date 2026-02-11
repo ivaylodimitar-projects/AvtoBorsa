@@ -1,6 +1,7 @@
 ﻿from rest_framework import serializers
 from django.conf import settings
 from .models import CarListing, CarImage, Favorite
+from decimal import Decimal, InvalidOperation
 
 
 def _normalize_media_path(raw_path):
@@ -35,13 +36,14 @@ class CarListingLiteSerializer(serializers.ModelSerializer):
     fuel_display = serializers.SerializerMethodField()
     listing_type_display = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
+    price_change = serializers.SerializerMethodField()
 
     class Meta:
         model = CarListing
         fields = [
             'id', 'slug', 'brand', 'model', 'year_from', 'price', 'mileage',
             'fuel', 'fuel_display', 'power', 'city', 'created_at',
-            'listing_type', 'listing_type_display', 'image_url'
+            'listing_type', 'listing_type_display', 'image_url', 'price_change'
         ]
         read_only_fields = fields
 
@@ -60,6 +62,41 @@ class CarListingLiteSerializer(serializers.ModelSerializer):
             return _normalize_media_path(images[0].image.url)
         return None
 
+    def _resolve_price_change(self, obj):
+        delta = getattr(obj, 'last_price_change_delta', None)
+        changed_at = getattr(obj, 'last_price_change_at', None)
+        if delta is None and changed_at is None:
+            last = obj.price_history.order_by('-changed_at').values('delta', 'changed_at').first()
+            if not last:
+                return None, None
+            delta = last['delta']
+            changed_at = last['changed_at']
+        return delta, changed_at
+
+    def get_price_change(self, obj):
+        delta, changed_at = self._resolve_price_change(obj)
+        if delta is None:
+            return None
+        try:
+            delta_value = Decimal(delta)
+        except (InvalidOperation, TypeError):
+            delta_value = None
+
+        if delta_value is None:
+            direction = 'same'
+        elif delta_value > 0:
+            direction = 'up'
+        elif delta_value < 0:
+            direction = 'down'
+        else:
+            direction = 'same'
+
+        return {
+            'delta': delta,
+            'direction': direction,
+            'changed_at': changed_at
+        }
+
 
 class CarListingListSerializer(serializers.ModelSerializer):
     """Optimized serializer for search/list pages."""
@@ -74,17 +111,18 @@ class CarListingListSerializer(serializers.ModelSerializer):
     seller_name = serializers.SerializerMethodField()
     seller_type = serializers.SerializerMethodField()
     description_preview = serializers.SerializerMethodField()
+    price_change = serializers.SerializerMethodField()
 
     class Meta:
         model = CarListing
         fields = [
-            'id', 'slug', 'brand', 'model', 'year_from', 'price', 'mileage', 'power', 'city',
+            'id', 'slug', 'brand', 'model', 'year_from', 'price', 'mileage', 'power', 'location_country', 'city',
             'fuel', 'fuel_display', 'gearbox', 'gearbox_display',
             'category', 'category_display', 'condition', 'condition_display',
-            'description_preview', 'created_at',
+            'description_preview', 'created_at', 'updated_at',
             'listing_type', 'listing_type_display',
             'is_active', 'is_draft', 'is_archived',
-            'image_url', 'images', 'is_favorited', 'seller_name', 'seller_type'
+            'image_url', 'images', 'is_favorited', 'seller_name', 'seller_type', 'price_change'
         ]
         read_only_fields = fields
 
@@ -158,9 +196,11 @@ class CarListingListSerializer(serializers.ModelSerializer):
         user = obj.user
         if hasattr(user, 'business_profile'):
             return user.business_profile.dealer_name
-        if hasattr(user, 'private_profile'):
-            return user.email.split('@')[0]
-        return user.email
+        first_name = (user.first_name or '').strip()
+        last_name = (user.last_name or '').strip()
+        if first_name and last_name:
+            return f"{first_name} {last_name}"
+        return "Частно лице"
 
     def get_seller_type(self, obj):
         user = obj.user
@@ -170,6 +210,40 @@ class CarListingListSerializer(serializers.ModelSerializer):
             return 'private'
         return 'unknown'
 
+    def _resolve_price_change(self, obj):
+        delta = getattr(obj, 'last_price_change_delta', None)
+        changed_at = getattr(obj, 'last_price_change_at', None)
+        if delta is None and changed_at is None:
+            last = obj.price_history.order_by('-changed_at').values('delta', 'changed_at').first()
+            if not last:
+                return None, None
+            delta = last['delta']
+            changed_at = last['changed_at']
+        return delta, changed_at
+
+    def get_price_change(self, obj):
+        delta, changed_at = self._resolve_price_change(obj)
+        if delta is None:
+            return None
+        try:
+            delta_value = Decimal(delta)
+        except (InvalidOperation, TypeError):
+            delta_value = None
+
+        if delta_value is None:
+            direction = 'same'
+        elif delta_value > 0:
+            direction = 'up'
+        elif delta_value < 0:
+            direction = 'down'
+        else:
+            direction = 'same'
+
+        return {
+            'delta': delta,
+            'direction': direction,
+            'changed_at': changed_at
+        }
 
 class CarListingSearchCompactSerializer(CarListingListSerializer):
     """Compact serializer for SearchPage pagination."""
@@ -177,11 +251,11 @@ class CarListingSearchCompactSerializer(CarListingListSerializer):
     class Meta:
         model = CarListing
         fields = [
-            'id', 'slug', 'brand', 'model', 'year_from', 'price', 'mileage', 'power', 'city',
+            'id', 'slug', 'brand', 'model', 'year_from', 'price', 'mileage', 'power', 'location_country', 'city',
             'fuel_display', 'gearbox_display', 'category_display', 'condition_display',
-            'description_preview', 'created_at',
+            'description_preview', 'created_at', 'updated_at',
             'listing_type', 'listing_type_display',
-            'image_url', 'is_favorited', 'seller_name', 'seller_type'
+            'image_url', 'images', 'is_favorited', 'seller_name', 'seller_type', 'price_change'
         ]
         read_only_fields = fields
 
@@ -203,6 +277,7 @@ class CarListingSerializer(serializers.ModelSerializer):
     # Seller information
     seller_name = serializers.SerializerMethodField()
     seller_type = serializers.SerializerMethodField()
+    price_history = serializers.SerializerMethodField()
     # Handle image uploads during creation
     images_upload = serializers.ListField(
         child=serializers.ImageField(),
@@ -216,61 +291,61 @@ class CarListingSerializer(serializers.ModelSerializer):
             'id', 'slug', 'user', 'user_email', 'main_category', 'category', 'category_display', 'title', 'brand', 'model',
             'year_from', 'month', 'vin', 'price', 'location_country', 'location_region', 'city',
             'fuel', 'fuel_display', 'gearbox', 'gearbox_display', 'mileage', 'color', 'condition', 'condition_display', 'power', 'displacement', 'euro_standard',
-            'description', 'phone', 'email', 'features', 'listing_type', 'listing_type_display', 'top_expires_at',
-            'is_draft', 'is_active', 'is_archived', 'created_at', 'updated_at', 'images', 'image_url', 'is_favorited', 'seller_name', 'seller_type', 'images_upload'
+            'description', 'phone', 'email', 'features', 'listing_type', 'listing_type_display', 'top_expires_at', 'view_count',
+            'is_draft', 'is_active', 'is_archived', 'created_at', 'updated_at', 'images', 'image_url', 'is_favorited', 'seller_name', 'seller_type', 'price_history', 'images_upload'
         ]
-        read_only_fields = ['id', 'slug', 'user', 'user_email', 'created_at', 'updated_at', 'images', 'image_url', 'is_favorited', 'is_draft', 'is_active', 'fuel_display', 'gearbox_display', 'condition_display', 'category_display', 'listing_type_display', 'seller_name', 'seller_type', 'top_expires_at']
+        read_only_fields = ['id', 'slug', 'user', 'user_email', 'created_at', 'updated_at', 'images', 'image_url', 'is_favorited', 'is_draft', 'is_active', 'fuel_display', 'gearbox_display', 'condition_display', 'category_display', 'listing_type_display', 'seller_name', 'seller_type', 'price_history', 'top_expires_at', 'view_count']
 
     def get_fuel_display(self, obj):
         """Return display name for fuel"""
         fuel_choices = {
-            'benzin': 'Ð‘ÐµÐ½Ð·Ð¸Ð½',
-            'dizel': 'Ð”Ð¸Ð·ÐµÐ»',
-            'gaz_benzin': 'Ð“Ð°Ð·/Ð‘ÐµÐ½Ð·Ð¸Ð½',
-            'hibrid': 'Ð¥Ð¸Ð±Ñ€Ð¸Ð´',
-            'elektro': 'Ð•Ð»ÐµÐºÑ‚Ñ€Ð¾',
+            'benzin': 'Бензин',
+            'dizel': 'Дизел',
+            'gaz_benzin': 'Газ/Бензин',
+            'hibrid': 'Хибрид',
+            'elektro': 'Електро',
         }
         return fuel_choices.get(obj.fuel, obj.fuel)
 
     def get_gearbox_display(self, obj):
         """Return display name for gearbox"""
         gearbox_choices = {
-            'ruchna': 'Ð ÑŠÑ‡Ð½Ð°',
-            'avtomatik': 'ÐÐ²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ðº',
+            'ruchna': 'Ръчна',
+            'avtomatik': 'Автоматик',
         }
         return gearbox_choices.get(obj.gearbox, obj.gearbox)
 
     def get_condition_display(self, obj):
         """Return display name for condition"""
         condition_choices = {
-            '0': 'ÐÐ¾Ð²',
-            '1': 'Ð£Ð¿Ð¾Ñ‚Ñ€ÐµÐ±ÑÐ²Ð°Ð½',
-            '2': 'ÐŸÐ¾Ð²Ñ€ÐµÐ´ÐµÐ½/ÑƒÐ´Ð°Ñ€ÐµÐ½',
-            '3': 'Ð—Ð° Ñ‡Ð°ÑÑ‚Ð¸',
+            '0': 'Нов',
+            '1': 'Употребяван',
+            '2': 'Повреден/ударен',
+            '3': 'За части',
         }
         return condition_choices.get(obj.condition, obj.condition)
 
     def get_category_display(self, obj):
         """Return display name for category"""
         category_choices = {
-            'van': 'Ð’Ð°Ð½',
-            'jeep': 'Ð”Ð¶Ð¸Ð¿',
-            'cabriolet': 'ÐšÐ°Ð±Ñ€Ð¸Ð¾',
-            'wagon': 'ÐšÐ¾Ð¼Ð±Ð¸',
-            'coupe': 'ÐšÑƒÐ¿Ðµ',
-            'minivan': 'ÐœÐ¸Ð½Ð¸Ð²Ð°Ð½',
-            'pickup': 'ÐŸÐ¸ÐºÐ°Ð¿',
-            'sedan': 'Ð¡ÐµÐ´Ð°Ð½',
-            'stretch_limo': 'Ð¡Ñ‚Ñ€ÐµÑ‡ Ð»Ð¸Ð¼ÑƒÐ·Ð¸Ð½Ð°',
-            'hatchback': 'Ð¥ÐµÑ‡Ð±ÐµÐº',
+            'van': 'Ван',
+            'jeep': 'Джип',
+            'cabriolet': 'Кабрио',
+            'wagon': 'Комби',
+            'coupe': 'Купе',
+            'minivan': 'Миниван',
+            'pickup': 'Пикап',
+            'sedan': 'Седан',
+            'stretch_limo': 'Стреч лимузина',
+            'hatchback': 'Хечбек',
         }
         return category_choices.get(obj.category, obj.category)
 
     def get_listing_type_display(self, obj):
         """Return display name for listing type"""
         listing_type_choices = {
-            'normal': 'ÐÐ¾Ñ€Ð¼Ð°Ð»Ð½Ð°',
-            'top': 'Ð¢Ð¾Ð¿',
+            'normal': 'Нормална',
+            'top': 'Топ',
         }
         return listing_type_choices.get(obj.listing_type, obj.listing_type)
 
@@ -304,12 +379,11 @@ class CarListingSerializer(serializers.ModelSerializer):
         # Check if user has a business profile
         if hasattr(user, 'business_profile'):
             return user.business_profile.dealer_name
-        # Check if user has a private profile
-        elif hasattr(user, 'private_profile'):
-            # For private users, return email or a generic name
-            return user.email.split('@')[0]  # Return username part of email
-        # Fallback to email
-        return user.email
+        first_name = (user.first_name or '').strip()
+        last_name = (user.last_name or '').strip()
+        if first_name and last_name:
+            return f"{first_name} {last_name}"
+        return "Частно лице"
 
     def get_seller_type(self, obj):
         """Return seller type (business or private)"""
@@ -319,6 +393,18 @@ class CarListingSerializer(serializers.ModelSerializer):
         elif hasattr(user, 'private_profile'):
             return 'private'
         return 'unknown'
+
+    def get_price_history(self, obj):
+        history = obj.price_history.order_by('-changed_at')[:20]
+        return [
+            {
+                'old_price': entry.old_price,
+                'new_price': entry.new_price,
+                'delta': entry.delta,
+                'changed_at': entry.changed_at,
+            }
+            for entry in history
+        ]
 
     def create(self, validated_data):
         """Create listing and handle image uploads"""

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { Star, Phone, Eye, EyeOff } from 'lucide-react';
+import { Star, Phone, Eye, EyeOff, MapPin } from 'lucide-react';
 
 interface SellerCardProps {
   sellerName: string;
   sellerEmail: string;
   phone: string;
+  city?: string;
+  showAvatar?: boolean;
   // rating?: number;
   reviewCount?: number;
 }
@@ -13,6 +15,8 @@ const SellerCard: React.FC<SellerCardProps> = ({
   sellerName,
   sellerEmail,
   phone,
+  city,
+  showAvatar = true,
   // rating = 4.5,
   reviewCount = 0,
 }) => {
@@ -66,6 +70,14 @@ const SellerCard: React.FC<SellerCardProps> = ({
       flex: 1,
       minWidth: 0,
     },
+    sellerLabel: {
+      fontSize: isMobile ? 10 : 11,
+      fontWeight: 700,
+      color: '#16a34a',
+      textTransform: 'uppercase',
+      letterSpacing: '0.3px',
+      marginBottom: 4,
+    },
     sellerName: {
       fontSize: isMobile ? 15 : 16,
       fontWeight: 700,
@@ -83,6 +95,28 @@ const SellerCard: React.FC<SellerCardProps> = ({
       overflow: 'hidden',
       textOverflow: 'ellipsis',
       whiteSpace: 'nowrap',
+    },
+    locationRow: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 8,
+      flexWrap: 'wrap',
+    },
+    locationLabel: {
+      fontSize: isMobile ? 10 : 11,
+      fontWeight: 700,
+      color: '#f97316',
+      textTransform: 'uppercase',
+      letterSpacing: '0.3px',
+    },
+    locationText: {
+      fontSize: isMobile ? 12 : 13,
+      color: '#475569',
+      fontWeight: 600,
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 4,
     },
     ratingContainer: {
       display: 'flex',
@@ -175,9 +209,19 @@ const SellerCard: React.FC<SellerCardProps> = ({
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <div style={styles.avatar}>{initials}</div>
+        {showAvatar && <div style={styles.avatar}>{initials}</div>}
         <div style={styles.sellerInfo}>
+          <div style={styles.sellerLabel}>Продавач</div>
           <div style={styles.sellerName}>{sellerName}</div>
+          {(city || '').trim() !== '' && (
+            <div style={styles.locationRow}>
+              <span style={styles.locationLabel}>Локация</span>
+              <span style={styles.locationText}>
+                <MapPin size={12} />
+                {city}
+              </span>
+            </div>
+          )}
           <div style={styles.sellerEmail}>{sellerEmail}</div>
           
         </div>

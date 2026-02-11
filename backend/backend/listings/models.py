@@ -135,6 +135,7 @@ class CarListing(models.Model):
     listing_type = models.CharField(max_length=10, choices=LISTING_TYPE_CHOICES, default='normal')
     top_paid_at = models.DateTimeField(null=True, blank=True)
     top_expires_at = models.DateTimeField(null=True, blank=True)
+    view_count = models.PositiveIntegerField(default=0)
 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -200,6 +201,9 @@ class CarListing(models.Model):
 
     def save(self, *args, **kwargs):
         """Override save to auto-generate slug"""
+        old_price = None
+        if self.pk:
+            old_price = CarListing.objects.filter(pk=self.pk).values_list('price', flat=True).first()
         self.apply_top_status()
         # First save to get an ID if it's a new object
         if not self.pk:
@@ -216,6 +220,32 @@ class CarListing(models.Model):
         # Save again with the slug (now it's an update since we have pk)
         kwargs.pop('force_insert', None)
         super().save(*args, **kwargs)
+
+        if old_price is not None and self.price is not None and old_price != self.price:
+            CarListingPriceHistory.objects.create(
+                listing=self,
+                old_price=old_price,
+                new_price=self.price,
+                delta=self.price - old_price
+            )
+
+
+class CarListingPriceHistory(models.Model):
+    """Track price changes for listings."""
+    listing = models.ForeignKey(CarListing, on_delete=models.CASCADE, related_name='price_history')
+    old_price = models.DecimalField(max_digits=10, decimal_places=2)
+    new_price = models.DecimalField(max_digits=10, decimal_places=2)
+    delta = models.DecimalField(max_digits=10, decimal_places=2)
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-changed_at']
+        indexes = [
+            models.Index(fields=['listing', 'changed_at'], name='carlist_price_hist_idx'),
+        ]
+
+    def __str__(self):
+        return f"Price change for {self.listing_id}: {self.old_price} -> {self.new_price}"
 
 
 class CarImage(models.Model):

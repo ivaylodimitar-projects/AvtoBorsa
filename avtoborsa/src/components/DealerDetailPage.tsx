@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
@@ -15,6 +15,9 @@ type CarListing = {
   power: number;
   city: string;
   image_url?: string;
+  description?: string | null;
+  condition?: string | number;
+  condition_display?: string;
   created_at: string;
   listing_type?: string | number;
   listing_type_display?: string;
@@ -48,6 +51,10 @@ const isTopListing = (listing: CarListing) => {
   return display.includes("топ");
 };
 
+const NEW_LISTING_BADGE_MINUTES = 10;
+const NEW_LISTING_BADGE_WINDOW_MS = NEW_LISTING_BADGE_MINUTES * 60 * 1000;
+const PAGE_SIZE = 30;
+
 const DealerDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -59,6 +66,9 @@ const DealerDetailPage: React.FC = () => {
   const [editingAbout, setEditingAbout] = useState(false);
   const [aboutDraft, setAboutDraft] = useState("");
   const [savingAbout, setSavingAbout] = useState(false);
+  const [listingModelFilter, setListingModelFilter] = useState<string>("all");
+  const [listingSort, setListingSort] = useState<"default" | "latest">("default");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const isOwner = user?.userType === "business" && dealer && user.email === dealer.email;
 
@@ -79,6 +89,15 @@ const DealerDetailPage: React.FC = () => {
     };
     fetchDealer();
   }, [id]);
+
+  useEffect(() => {
+    setListingModelFilter("all");
+    setListingSort("default");
+  }, [dealer?.id]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [dealer?.id, listingModelFilter, listingSort]);
 
   const handleSaveAbout = async () => {
     setSavingAbout(true);
@@ -124,6 +143,72 @@ const DealerDetailPage: React.FC = () => {
     return d.toLocaleDateString("bg-BG", { day: "numeric", month: "long", year: "numeric" });
   };
 
+  const isListingNew = (createdAt: string) => {
+    if (!createdAt) return false;
+    const createdAtMs = new Date(createdAt).getTime();
+    if (Number.isNaN(createdAtMs)) return false;
+    const listingAgeMs = Date.now() - createdAtMs;
+    return listingAgeMs >= 0 && listingAgeMs <= NEW_LISTING_BADGE_WINDOW_MS;
+  };
+
+  const getShortDescription = (text?: string | null, maxLength = 120) => {
+    if (!text) return "";
+    const clean = text.replace(/\s+/g, " ").trim();
+    if (clean.length <= maxLength) return clean;
+    return `${clean.slice(0, maxLength).trim()}…`;
+  };
+
+  const modelOptions = useMemo(() => {
+    if (!dealer?.listings) return [];
+    const models = new Set<string>();
+    dealer.listings.forEach((listing) => {
+      if (listing.model) models.add(listing.model);
+    });
+    return Array.from(models).sort();
+  }, [dealer?.listings]);
+
+  const visibleListings = useMemo(() => {
+    if (!dealer?.listings) return [];
+    let items = dealer.listings;
+    if (listingModelFilter !== "all") {
+      items = items.filter((listing) => listing.model === listingModelFilter);
+    }
+    if (listingSort === "latest") {
+      items = [...items].sort((a, b) => {
+        const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return bTime - aTime;
+      });
+    }
+    return items;
+  }, [dealer?.listings, listingModelFilter, listingSort]);
+
+  const totalPages = Math.ceil(visibleListings.length / PAGE_SIZE);
+  const safePage = totalPages > 0 ? Math.min(currentPage, totalPages) : 1;
+  const paginatedListings = visibleListings.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE
+  );
+  const visiblePages = useMemo(() => {
+    if (totalPages <= 1) return [];
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+    const pages = new Set<number>();
+    pages.add(1);
+    pages.add(totalPages);
+    for (let page = safePage - 2; page <= safePage + 2; page += 1) {
+      if (page > 1 && page < totalPages) {
+        pages.add(page);
+      }
+    }
+    return Array.from(pages).sort((a, b) => a - b);
+  }, [safePage, totalPages]);
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+  };
+
   const getGoogleMapsUrl = (address: string, city: string) => {
     const query = encodeURIComponent(`${address}, ${city}, Bulgaria`);
     return `https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${query}`;
@@ -160,10 +245,17 @@ const DealerDetailPage: React.FC = () => {
   const initial = dealer.dealer_name.charAt(0).toUpperCase();
 
   const styles: Record<string, React.CSSProperties> = {
-    page: { minHeight: "100vh", background: "#f8fafc" },
+    page: {
+      minHeight: "100vh",
+      background: "#f5f5f5",
+      color: "#333",
+      width: "100%",
+      boxSizing: "border-box",
+      fontFamily: "\"Manrope\", \"Segoe UI\", sans-serif",
+    },
     hero: {
-      background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)",
-      padding: "50px 20px 40px",
+      background: "#f5f5f5",
+      padding: "20px 20px 0",
     },
     heroInner: {
       maxWidth: 1200,
@@ -171,14 +263,21 @@ const DealerDetailPage: React.FC = () => {
       display: "flex",
       alignItems: "center",
       gap: 24,
+      flexWrap: "wrap",
+      background: "#fff",
+      padding: "24px",
+      borderRadius: 8,
+      border: "1px solid #e0e0e0",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
     },
     heroAvatar: {
-      width: 96,
-      height: 96,
+      width: 80,
+      height: 80,
       borderRadius: "50%",
       overflow: "hidden",
       flexShrink: 0,
-      border: "3px solid rgba(255,255,255,0.2)",
+      border: "2px solid #e5e7eb",
+      background: "#f3f4f6",
     },
     heroAvatarImg: {
       width: "100%",
@@ -188,20 +287,21 @@ const DealerDetailPage: React.FC = () => {
     heroAvatarFallback: {
       width: "100%",
       height: "100%",
-      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+      background: "#0f766e",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       color: "#fff",
-      fontSize: 36,
+      fontSize: 32,
       fontWeight: 700,
     },
     heroInfo: { flex: 1 },
     heroName: {
-      fontSize: 28,
-      fontWeight: 800,
-      color: "#fff",
+      fontSize: 26,
+      fontWeight: 700,
+      color: "#333",
       margin: "0 0 6px",
+      fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
     },
     heroMeta: {
       display: "flex",
@@ -214,168 +314,329 @@ const DealerDetailPage: React.FC = () => {
       alignItems: "center",
       gap: 6,
       fontSize: 14,
-      color: "rgba(255,255,255,0.6)",
+      color: "#666",
+      fontWeight: 500,
+    },
+    heroMetaItemGreen: {
+      color: "#16a34a",
+      fontWeight: 600,
+    },
+    heroMetaItemOrange: {
+      color: "#f97316",
+      fontWeight: 600,
     },
     backBtn: {
-      padding: "10px 20px",
-      background: "rgba(255,255,255,0.1)",
+      padding: "12px 20px",
+      background: "#0f766e",
       color: "#fff",
-      border: "1px solid rgba(255,255,255,0.2)",
-      borderRadius: 10,
+      border: "none",
+      borderRadius: 4,
       fontSize: 14,
-      fontWeight: 600,
+      fontWeight: 700,
       cursor: "pointer",
       display: "flex",
       alignItems: "center",
       gap: 8,
-      transition: "all 0.3s ease",
+      transition: "all 0.2s",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
       flexShrink: 0,
     },
     tabBar: {
-      background: "#fff",
-      borderBottom: "1px solid #eef2f7",
-      position: "sticky",
-      top: 0,
-      zIndex: 10,
+      background: "transparent",
+      borderBottom: "none",
+      position: "static",
     },
     tabBarInner: {
       maxWidth: 1200,
       margin: "0 auto",
       display: "flex",
-      gap: 0,
-      padding: "0 20px",
+      gap: 12,
+      padding: "16px 20px 12px",
+      flexWrap: "wrap",
     },
     tab: {
-      padding: "16px 24px",
+      padding: "12px 24px",
+      background: "#fff",
+      color: "#333",
+      border: "1px solid #e0e0e0",
+      borderRadius: 6,
       fontSize: 15,
       fontWeight: 600,
-      color: "#6b7280",
       cursor: "pointer",
-      border: "none",
-      background: "none",
-      borderBottom: "3px solid transparent",
-      transition: "all 0.3s ease",
+      transition: "all 0.2s",
+      whiteSpace: "nowrap",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
     },
     tabActive: {
-      color: "#0066cc",
-      borderBottomColor: "#0066cc",
+      background: "#0f766e",
+      color: "#fff",
+      border: "1px solid #0f766e",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
     },
     content: {
       maxWidth: 1200,
       margin: "0 auto",
-      padding: "30px 20px 60px",
+      padding: "0 20px 60px",
     },
     // Listings tab
     listingsGrid: {
       display: "grid",
-      gridTemplateColumns: "repeat(auto-fill, minmax(270px, 1fr))",
-      gap: 20,
+      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+      gap: 24,
+    },
+    pagination: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      marginTop: 24,
+      flexWrap: "wrap",
+    },
+    paginationButton: {
+      minWidth: 36,
+      height: 36,
+      borderRadius: 8,
+      border: "1px solid #e2e8f0",
+      background: "#fff",
+      color: "#1f2937",
+      fontWeight: 600,
+      cursor: "pointer",
+      padding: "0 10px",
+    },
+    paginationButtonActive: {
+      background: "#0f766e",
+      borderColor: "#0f766e",
+      color: "#fff",
+    },
+    paginationButtonDisabled: {
+      opacity: 0.5,
+      cursor: "not-allowed",
+    },
+    paginationEllipsis: {
+      color: "#94a3b8",
+      fontWeight: 600,
+      padding: "0 4px",
+    },
+    paginationInfo: {
+      fontSize: 13,
+      color: "#64748b",
+      fontWeight: 600,
+    },
+    listingsFilters: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      flexWrap: "wrap",
+      marginBottom: 16,
+    },
+    listingsFilterButton: {
+      padding: "8px 14px",
+      borderRadius: 999,
+      border: "1px solid #e0e0e0",
+      background: "#fff",
+      fontSize: 12,
+      fontWeight: 600,
+      color: "#666",
+      cursor: "pointer",
+      transition: "all 0.2s",
+    },
+    listingsFilterButtonActive: {
+      background: "#0f766e",
+      color: "#fff",
+      borderColor: "#0f766e",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+    },
+    listingsFilterSelect: {
+      height: 34,
+      padding: "0 12px",
+      borderRadius: 999,
+      border: "1px solid #e0e0e0",
+      background: "#fff",
+      fontSize: 12,
+      fontWeight: 600,
+      color: "#333",
+      outline: "none",
+      cursor: "pointer",
     },
     listingCard: {
       background: "#fff",
-      borderRadius: 14,
+      borderRadius: 6,
       overflow: "hidden",
-      border: "1px solid #eef2f7",
+      border: "1px solid #e0e0e0",
+      boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+      transition: "transform 0.2s ease, box-shadow 0.2s ease",
       cursor: "pointer",
-      transition: "all 0.3s ease",
-      boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+      position: "relative",
+      display: "flex",
+      flexDirection: "column",
+      minHeight: "100%",
     },
     listingCardHover: {
-      transform: "translateY(-4px)",
-      boxShadow: "0 12px 32px rgba(0,0,0,0.1)",
+      transform: "translateY(-2px)",
+      boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
     },
-    listingImgWrap: {
+    listingMedia: {
       position: "relative",
-      width: "100%",
-      height: 200,
-      background: "#f1f5f9",
-      overflow: "hidden",
+      height: 220,
+      background: "#f0f0f0",
     },
-    listingImg: {
+    listingImage: {
       width: "100%",
       height: "100%",
       objectFit: "cover",
+      display: "block",
+    },
+    listingMediaOverlay: {
+      position: "absolute",
+      inset: 0,
+      background: "linear-gradient(180deg, rgba(15,23,42,0) 40%, rgba(15,23,42,0.5) 100%)",
+      pointerEvents: "none",
+    },
+    listingPlaceholder: {
+      height: "100%",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "#999",
+      fontSize: 14,
+      gap: 8,
     },
     topBadge: {
       position: "absolute",
       top: 10,
       left: 10,
-      background: "linear-gradient(135deg, #f59e0b 0%, #f97316 100%)",
-      color: "#fff",
       padding: "4px 10px",
-      borderRadius: 6,
+      borderRadius: 999,
+      background: "linear-gradient(135deg, #ef4444, #dc2626)",
+      color: "#fff",
       fontSize: 11,
       fontWeight: 700,
-      letterSpacing: "0.5px",
+      letterSpacing: 0.3,
+      textTransform: "uppercase",
+      boxShadow: "0 4px 10px rgba(220, 38, 38, 0.3)",
+      zIndex: 2,
     },
-    priceOverlay: {
+    newBadge: {
       position: "absolute",
-      bottom: 10,
-      right: 10,
-      background: "rgba(0,0,0,0.75)",
+      left: 12,
+      padding: "4px 10px",
+      borderRadius: 999,
+      background: "linear-gradient(135deg, #10b981, #059669)",
       color: "#fff",
-      padding: "6px 12px",
-      borderRadius: 8,
-      fontSize: 15,
+      fontSize: 11,
       fontWeight: 700,
+      letterSpacing: 0.3,
+      textTransform: "uppercase",
+      boxShadow: "0 4px 10px rgba(5, 150, 105, 0.35)",
+      zIndex: 2,
     },
-    listingBody: {
-      padding: 16,
+    listingPricePill: {
+      position: "absolute",
+      right: 12,
+      bottom: 12,
+      padding: "6px 12px",
+      borderRadius: 4,
+      background: "#0f766e",
+      color: "#fff",
+      fontSize: 14,
+      fontWeight: 800,
+      border: "1px solid #e0e0e0",
+      boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
+      zIndex: 2,
+    },
+    listingContent: {
+      padding: "18px",
+      display: "flex",
+      flexDirection: "column",
+      gap: 12,
+      flex: 1,
+    },
+    listingTitleRow: {
+      display: "flex",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 12,
     },
     listingTitle: {
-      fontSize: 15,
+      fontSize: 17,
       fontWeight: 700,
-      color: "#111827",
-      marginBottom: 8,
+      color: "#333",
+      margin: 0,
+      lineHeight: 1.3,
+      fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
     },
-    listingSpecs: {
-      display: "flex",
-      flexWrap: "wrap",
-      gap: 8,
-      marginBottom: 10,
+    listingSubtitle: {
+      fontSize: 13,
+      color: "#666",
     },
-    specTag: {
-      padding: "4px 8px",
-      background: "#f8fafc",
-      border: "1px solid #eef2f7",
-      borderRadius: 6,
-      fontSize: 12,
+    listingDescription: {
+      fontSize: 13,
       color: "#6b7280",
+      lineHeight: 1.5,
     },
     listingFooter: {
       display: "flex",
+      alignItems: "center",
       justifyContent: "space-between",
-      alignItems: "center",
+      gap: 12,
       fontSize: 12,
-      color: "#9ca3af",
-      paddingTop: 10,
-      borderTop: "1px solid #f5f5f5",
+      color: "#666",
+      marginTop: "auto",
+      paddingTop: 8,
     },
-    noImgPlaceholder: {
-      width: "100%",
-      height: "100%",
-      display: "flex",
+    listingFooterItem: {
+      display: "inline-flex",
       alignItems: "center",
-      justifyContent: "center",
-      background: "#f1f5f9",
-      color: "#cbd5e1",
+      gap: 6,
+      color: "#666",
+      fontWeight: 600,
+      whiteSpace: "nowrap",
+    },
+    listingFooterIcon: {
+      color: "#94a3b8",
+    },
+    listingFooterTime: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      color: "#f97316",
+      fontWeight: 600,
+      whiteSpace: "nowrap",
+    },
+    listingChips: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    listingChip: {
+      fontSize: 12,
+      color: "#0f766e",
+      background: "#ecfdf5",
+      border: "1px solid #99f6e4",
+      padding: "4px 8px",
+      borderRadius: 3,
+      fontWeight: 600,
     },
     // About tab
     aboutCard: {
       background: "#fff",
-      borderRadius: 14,
-      border: "1px solid #eef2f7",
-      padding: 32,
+      borderRadius: 6,
+      border: "1px solid #e0e0e0",
+      padding: 24,
+      boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
       maxWidth: 800,
     },
     aboutTitle: {
-      fontSize: 20,
+      fontSize: 17,
       fontWeight: 700,
-      color: "#111827",
+      color: "#333",
       marginBottom: 16,
       display: "flex",
       alignItems: "center",
       gap: 10,
+      fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
     },
     aboutText: {
       fontSize: 15,
@@ -408,7 +669,7 @@ const DealerDetailPage: React.FC = () => {
     },
     btnPrimary: {
       padding: "10px 20px",
-      background: "#0066cc",
+      background: "#0f766e",
       color: "#fff",
       border: "none",
       borderRadius: 8,
@@ -428,9 +689,9 @@ const DealerDetailPage: React.FC = () => {
     },
     editBtn: {
       padding: "6px 14px",
-      background: "#f0f4ff",
-      color: "#0066cc",
-      border: "1px solid #c7dcff",
+      background: "#ecfdf5",
+      color: "#0f766e",
+      border: "1px solid #99f6e4",
       borderRadius: 8,
       fontSize: 13,
       fontWeight: 600,
@@ -445,18 +706,20 @@ const DealerDetailPage: React.FC = () => {
     },
     contactCard: {
       background: "#fff",
-      borderRadius: 14,
-      border: "1px solid #eef2f7",
-      padding: 28,
+      borderRadius: 6,
+      border: "1px solid #e0e0e0",
+      padding: 24,
+      boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
     },
     contactCardTitle: {
-      fontSize: 16,
+      fontSize: 17,
       fontWeight: 700,
-      color: "#111827",
+      color: "#333",
       marginBottom: 20,
       display: "flex",
       alignItems: "center",
       gap: 10,
+      fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
     },
     contactDetail: {
       display: "flex",
@@ -484,10 +747,11 @@ const DealerDetailPage: React.FC = () => {
     },
     mapCard: {
       background: "#fff",
-      borderRadius: 14,
-      border: "1px solid #eef2f7",
+      borderRadius: 6,
+      border: "1px solid #e0e0e0",
       overflow: "hidden",
       gridColumn: "1 / -1",
+      boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
     },
     mapHeader: {
       padding: "20px 28px",
@@ -497,18 +761,21 @@ const DealerDetailPage: React.FC = () => {
       alignItems: "center",
     },
     mapTitle: {
-      fontSize: 16,
+      fontSize: 17,
       fontWeight: 700,
-      color: "#111827",
+      color: "#333",
       display: "flex",
       alignItems: "center",
       gap: 10,
+      fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
     },
     mapLink: {
       fontSize: 13,
-      color: "#0066cc",
+      color: "#0f766e",
       fontWeight: 600,
       textDecoration: "none",
+      display: "inline-flex",
+      alignItems: "center",
     },
     mapEmbed: {
       width: "100%",
@@ -519,8 +786,9 @@ const DealerDetailPage: React.FC = () => {
       textAlign: "center",
       padding: 60,
       background: "#fff",
-      borderRadius: 14,
-      border: "1px solid #eef2f7",
+      borderRadius: 8,
+      border: "1px solid #e0e0e0",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
     },
   };
 
@@ -571,7 +839,7 @@ const DealerDetailPage: React.FC = () => {
                 </svg>
                 {dealer.city}
               </span>
-              <span style={styles.heroMetaItem}>
+              <span style={{ ...styles.heroMetaItem, ...styles.heroMetaItemGreen }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="3" width="7" height="7" />
                   <rect x="14" y="3" width="7" height="7" />
@@ -580,7 +848,7 @@ const DealerDetailPage: React.FC = () => {
                 </svg>
                 {dealer.listing_count} обяви
               </span>
-              <span style={styles.heroMetaItem}>
+              <span style={{ ...styles.heroMetaItem, ...styles.heroMetaItemOrange }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10" />
                   <polyline points="12 6 12 12 16 14" />
@@ -594,10 +862,10 @@ const DealerDetailPage: React.FC = () => {
             className="dealer-back-btn"
             onClick={() => navigate("/dealers")}
             onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.2)";
+              (e.currentTarget as HTMLElement).style.background = "#115e59";
             }}
             onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.1)";
+              (e.currentTarget as HTMLElement).style.background = "#0f766e";
             }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -644,8 +912,56 @@ const DealerDetailPage: React.FC = () => {
         {activeTab === "listings" && (
           <>
             {dealer.listings && dealer.listings.length > 0 ? (
-              <div style={styles.listingsGrid} className="dealer-listings-grid">
-                {dealer.listings.map((listing) => (
+              <>
+                <div style={styles.listingsFilters}>
+                  <button
+                    type="button"
+                    style={{
+                      ...styles.listingsFilterButton,
+                      ...(listingSort === "latest" ? styles.listingsFilterButtonActive : {}),
+                    }}
+                    onClick={() => setListingSort(listingSort === "latest" ? "default" : "latest")}
+                  >
+                    Най-нови
+                  </button>
+                  <select
+                    value={listingModelFilter}
+                    onChange={(e) => setListingModelFilter(e.target.value)}
+                    style={styles.listingsFilterSelect}
+                  >
+                    <option value="all">Всички модели</option>
+                    {modelOptions.map((model) => (
+                      <option key={model} value={model}>
+                        {model}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div style={styles.listingsGrid} className="dealer-listings-grid">
+                {paginatedListings.map((listing) => {
+                  const isTop = isTopListing(listing);
+                  const isNew = isListingNew(listing.created_at);
+                  const priceLabel = `${listing.price.toLocaleString("bg-BG")} лв`;
+                  const conditionLabel =
+                    listing.condition_display ||
+                    (listing.condition ? String(listing.condition) : "");
+                  const subtitleParts = [
+                    conditionLabel,
+                    listing.year_from ? `${listing.year_from} г.` : "",
+                  ].filter(Boolean);
+                  const subtitle = subtitleParts.join(" · ");
+                  const descriptionSnippet = getShortDescription(listing.description);
+                  const chips = [
+                    listing.fuel_display || "",
+                    listing.gearbox_display || "",
+                    Number.isFinite(listing.power) && listing.power > 0 ? `${listing.power} к.с.` : "",
+                    Number.isFinite(listing.mileage) && listing.mileage > 0
+                      ? `${listing.mileage.toLocaleString("bg-BG")} км`
+                      : "",
+                  ].filter(Boolean);
+                  const createdLabel = getRelativeTime(listing.created_at);
+
+                  return (
                   <div
                     key={listing.id}
                     style={{
@@ -656,43 +972,121 @@ const DealerDetailPage: React.FC = () => {
                     onMouseLeave={() => setHoveredCard(null)}
                     onClick={() => navigate(`/details/${listing.slug}`)}
                   >
-                    <div style={styles.listingImgWrap}>
+                    <div style={styles.listingMedia}>
+                      {isTop && <div style={styles.topBadge}>Топ обява</div>}
+                      {isNew && (
+                        <div style={{ ...styles.newBadge, top: isTop ? 46 : 12 }}>
+                          Нова
+                        </div>
+                      )}
                       {listing.image_url ? (
-                        <img src={listing.image_url} alt={`${listing.brand} ${listing.model}`} style={styles.listingImg} />
+                        <img
+                          src={listing.image_url}
+                          alt={`${listing.brand} ${listing.model}`}
+                          style={styles.listingImage}
+                        />
                       ) : (
-                        <div style={styles.noImgPlaceholder}>
-                          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <div style={styles.listingPlaceholder}>
+                          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                             <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                             <circle cx="8.5" cy="8.5" r="1.5" />
                             <polyline points="21 15 16 10 5 21" />
                           </svg>
+                          Няма снимка
                         </div>
                       )}
-                      {isTopListing(listing) && (
-                        <div style={styles.topBadge}>TOP</div>
-                      )}
-                      <div style={styles.priceOverlay}>
-                        {listing.price.toLocaleString("bg-BG")} лв
-                      </div>
+                      <div style={styles.listingMediaOverlay} />
+                      <div style={styles.listingPricePill}>{priceLabel}</div>
                     </div>
-                    <div style={styles.listingBody}>
-                      <div style={styles.listingTitle}>
-                        {listing.brand} {listing.model} ({listing.year_from})
+                    <div style={styles.listingContent}>
+                      <div style={styles.listingTitleRow}>
+                        <h3 style={styles.listingTitle}>
+                          {listing.brand} {listing.model}
+                        </h3>
                       </div>
-                      <div style={styles.listingSpecs}>
-                        <span style={styles.specTag}>{listing.fuel_display}</span>
-                        <span style={styles.specTag}>{listing.gearbox_display}</span>
-                        <span style={styles.specTag}>{listing.power} к.с.</span>
-                        <span style={styles.specTag}>{listing.mileage.toLocaleString("bg-BG")} км</span>
-                      </div>
+                      {subtitle && <div style={styles.listingSubtitle}>{subtitle}</div>}
+                      {descriptionSnippet && (
+                        <div style={styles.listingDescription}>{descriptionSnippet}</div>
+                      )}
+                      {chips.length > 0 && (
+                        <div style={styles.listingChips}>
+                          {chips.map((chip, index) => (
+                            <span key={`${listing.id}-chip-${index}`} style={styles.listingChip}>
+                              {chip}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       <div style={styles.listingFooter}>
-                        <span>{listing.city}</span>
-                        <span>{getRelativeTime(listing.created_at)}</span>
+                        <div style={styles.listingFooterItem}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={styles.listingFooterIcon}>
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                            <circle cx="12" cy="10" r="3" />
+                          </svg>
+                          {listing.city || "Без град"}
+                        </div>
+                        <div style={styles.listingFooterTime}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                          </svg>
+                          Качена: {createdLabel}
+                        </div>
                       </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                );
+                })}
+                </div>
+                {totalPages > 1 && (
+                  <div style={styles.pagination}>
+                    <button
+                      type="button"
+                      style={{
+                        ...styles.paginationButton,
+                        ...(safePage === 1 ? styles.paginationButtonDisabled : {}),
+                      }}
+                      disabled={safePage === 1}
+                      onClick={() => handlePageChange(safePage - 1)}
+                    >
+                      Предишна
+                    </button>
+                    {visiblePages.map((page, index) => {
+                      const prevPage = visiblePages[index - 1];
+                      const showEllipsis = prevPage && page - prevPage > 1;
+                      return (
+                        <React.Fragment key={`page-${page}`}>
+                          {showEllipsis && <span style={styles.paginationEllipsis}>...</span>}
+                          <button
+                            type="button"
+                            style={{
+                              ...styles.paginationButton,
+                              ...(page === safePage ? styles.paginationButtonActive : {}),
+                            }}
+                            onClick={() => handlePageChange(page)}
+                          >
+                            {page}
+                          </button>
+                        </React.Fragment>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      style={{
+                        ...styles.paginationButton,
+                        ...(safePage === totalPages ? styles.paginationButtonDisabled : {}),
+                      }}
+                      disabled={safePage === totalPages}
+                      onClick={() => handlePageChange(safePage + 1)}
+                    >
+                      Следваща
+                    </button>
+                    <span style={styles.paginationInfo}>
+                      Страница {safePage} от {totalPages}
+                    </span>
+                  </div>
+                )}
+              </>
             ) : (
               <div style={styles.emptyListings}>
                 <div style={{ fontSize: 18, fontWeight: 600, color: "#374151", marginBottom: 8 }}>
@@ -710,7 +1104,7 @@ const DealerDetailPage: React.FC = () => {
         {activeTab === "about" && (
           <div style={styles.aboutCard} className="dealer-about-card">
             <div style={styles.aboutTitle}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0066cc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="rgb(15, 118, 110)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />
                 <line x1="12" y1="16" x2="12" y2="12" />
                 <line x1="12" y1="8" x2="12.01" y2="8" />
@@ -772,7 +1166,7 @@ const DealerDetailPage: React.FC = () => {
             {/* Contact Info Card */}
             <div style={styles.contactCard}>
               <div style={styles.contactCardTitle}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0066cc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(15, 118, 110)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
                 </svg>
                 Контактна информация
@@ -845,7 +1239,7 @@ const DealerDetailPage: React.FC = () => {
             {/* Company Info Card */}
             <div style={styles.contactCard}>
               <div style={styles.contactCardTitle}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0066cc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(15, 118, 110)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
                   <line x1="3" y1="6" x2="21" y2="6" />
                   <path d="M16 10a4 4 0 0 1-8 0" />
@@ -872,7 +1266,7 @@ const DealerDetailPage: React.FC = () => {
             <div style={styles.mapCard}>
               <div style={styles.mapHeader}>
                 <div style={styles.mapTitle}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0066cc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgb(15, 118, 110)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                     <circle cx="12" cy="10" r="3" />
                   </svg>
@@ -885,6 +1279,20 @@ const DealerDetailPage: React.FC = () => {
                   style={styles.mapLink}
                 >
                   Отвори в Google Maps
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ marginLeft: 6 }}
+                  >
+                    <path d="M7 17L17 7" />
+                    <polyline points="7 7 17 7 17 17" />
+                  </svg>
                 </a>
               </div>
               <iframe

@@ -7,6 +7,7 @@ import DealerDetailPage from './components/DealerDetailPage'
 import ProfileTypePage from './components/ProfileTypePage'
 import PrivateProfilePage from './components/PrivateProfilePage'
 import BusinessProfilePage from './components/BusinessProfilePage'
+import SettingsPage from './components/SettingsPage'
 import AuthPage from './components/AuthPage'
 import MyAdsPage from './components/MyAdsPage'
 import VehicleDetailsPage from './components/details/VehicleDetailsPage'
@@ -26,6 +27,7 @@ function App() {
         <Route path="/profile" element={<ProfileTypePage />} />
         <Route path="/profile/private" element={<PrivateProfilePage />} />
         <Route path="/profile/business" element={<BusinessProfilePage />} />
+        <Route path="/settings" element={<SettingsPage />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/my-ads" element={<MyAdsPage />} />
         <Route path="/details/:slug" element={<VehicleDetailsPage />} />

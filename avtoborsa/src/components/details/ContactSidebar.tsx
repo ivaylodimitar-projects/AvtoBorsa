@@ -9,9 +9,13 @@ import {
   Check,
   User,
   Clock,
+  Info,
+  TrendingUp,
+  TrendingDown,
   Link,
   MessageCircle,
   Send,
+  Eye,
 } from 'lucide-react';
 
 interface ContactSidebarProps {
@@ -19,6 +23,16 @@ interface ContactSidebarProps {
   sellerName: string;
   sellerEmail: string;
   phone: string;
+  showSellerAvatar?: boolean;
+  updatedLabel?: string | null;
+  updatedAt?: string;
+  priceHistory?: Array<{
+    old_price: number | string;
+    new_price: number | string;
+    delta: number | string;
+    changed_at: string;
+  }>;
+  viewCount?: number;
   listingId?: number;
   isMobile?: boolean;
   title?: string;
@@ -30,6 +44,11 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
   sellerName,
   sellerEmail,
   phone,
+  showSellerAvatar = true,
+  updatedLabel,
+  updatedAt,
+  priceHistory = [],
+  viewCount,
   listingId,
   isMobile = false,
   title = '',
@@ -40,6 +59,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
   const [copied, setCopied] = useState(false);
   const [phoneRevealed, setPhoneRevealed] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const [showPriceHistoryTooltip, setShowPriceHistoryTooltip] = useState(false);
   const shareMenuRef = useRef<HTMLDivElement | null>(null);
   const shareButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -143,6 +163,50 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
 
   const EUR_TO_BGN = 1.9558;
   const priceInBGN = (price * EUR_TO_BGN).toFixed(2);
+  const priceHistoryPreview = priceHistory.slice(0, 5);
+  const priceHistoryMore = priceHistory.length - priceHistoryPreview.length;
+  const hasPriceHistory = priceHistory.length > 0;
+  const latestPriceChange = priceHistory[0];
+  const latestDeltaValue = latestPriceChange ? Number(latestPriceChange.delta) : Number.NaN;
+  const showPriceDelta = Number.isFinite(latestDeltaValue) && latestDeltaValue !== 0;
+  const priceDeltaLabel = showPriceDelta
+    ? `${Math.abs(latestDeltaValue).toLocaleString('bg-BG')} €`
+    : '';
+  const PriceDeltaIcon = latestDeltaValue > 0 ? TrendingUp : TrendingDown;
+
+  const formatHistoryTime = (dateString: string) => {
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return '';
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays > 30) {
+      return date.toLocaleDateString('bg-BG', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+    if (diffDays > 0) {
+      return `преди ${diffDays} ${diffDays === 1 ? 'ден' : 'дни'}`;
+    }
+    if (diffHours > 0) {
+      return `преди ${diffHours} ${diffHours === 1 ? 'час' : 'часа'}`;
+    }
+    if (diffMins > 0) {
+      return `преди ${diffMins} ${diffMins === 1 ? 'минута' : 'минути'}`;
+    }
+    return 'току-що';
+  };
+
+  const formatClockTime = (dateString?: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleTimeString('bg-BG', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const updatedTimeLabel = formatClockTime(updatedAt);
+  const viewCountValue = Number.isFinite(viewCount ?? Number.NaN) ? Number(viewCount) : null;
 
   const shareUrl = window.location.href;
   const shareText = `${title || 'Обява'}${city ? ` · ${city}` : ''}`;
@@ -274,37 +338,150 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
       >
         {/* Title + ID */}
         <div style={{ padding: '20px 20px 16px' }}>
-          <h2
-            style={{
-              fontSize: 17,
-              fontWeight: 700,
-              color: '#333',
-              margin: '0 0 6px',
-              lineHeight: 1.35,
-              wordBreak: 'break-word',
-              fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
-            }}
-          >
-            {title}
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+            <h2
+              style={{
+                fontSize: 17,
+                fontWeight: 700,
+                color: '#333',
+                margin: '0 0 6px',
+                lineHeight: 1.35,
+                wordBreak: 'break-word',
+                fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
+                flex: 1,
+              }}
+            >
+              {title}
+            </h2>
+            <div
+              style={{
+                position: 'relative',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 28,
+                height: 28,
+                borderRadius: '50%',
+                border: '1px solid #e2e8f0',
+                background: '#f8fafc',
+                color: hasPriceHistory ? '#0f766e' : '#94a3b8',
+                cursor: hasPriceHistory ? 'pointer' : 'default',
+                flexShrink: 0,
+              }}
+              onMouseEnter={() => {
+                if (hasPriceHistory) setShowPriceHistoryTooltip(true);
+              }}
+              onMouseLeave={() => setShowPriceHistoryTooltip(false)}
+              onClick={() => {
+                if (!hasPriceHistory) return;
+                setShowPriceHistoryTooltip((prev) => !prev);
+              }}
+              onKeyDown={(event) => {
+                if (!hasPriceHistory) return;
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  setShowPriceHistoryTooltip((prev) => !prev);
+                }
+              }}
+              role={hasPriceHistory ? 'button' : undefined}
+              tabIndex={hasPriceHistory ? 0 : -1}
+              title={hasPriceHistory ? 'История на цената' : 'Няма промени в цената'}
+            >
+              <Info size={14} />
+              {showPriceHistoryTooltip && hasPriceHistory && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    right: 0,
+                    minWidth: 220,
+                    maxWidth: 280,
+                    background: '#fff',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 10,
+                    boxShadow: '0 12px 26px rgba(15, 23, 42, 0.12)',
+                    padding: 10,
+                    zIndex: 20,
+                  }}
+                >
+                  {priceHistoryPreview.map((entry, index) => {
+                    const oldPrice = Number(entry.old_price);
+                    const newPrice = Number(entry.new_price);
+                    const deltaValue = Number(entry.delta);
+                    const deltaLabel = Number.isFinite(deltaValue)
+                      ? `${deltaValue > 0 ? '+' : ''}${deltaValue.toLocaleString('bg-BG')}`
+                      : `${entry.delta}`;
+                    const metaLabel =
+                      Number.isFinite(oldPrice) && Number.isFinite(newPrice)
+                        ? `${oldPrice.toLocaleString('bg-BG')} → ${newPrice.toLocaleString('bg-BG')}`
+                        : `${entry.old_price} → ${entry.new_price}`;
+                    const deltaColor = deltaValue > 0 ? '#dc2626' : deltaValue < 0 ? '#16a34a' : '#64748b';
+                    return (
+                      <div
+                        key={`${entry.changed_at}-${index}`}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 8,
+                          padding: '6px 8px',
+                          borderRadius: 8,
+                          background: '#f8fafc',
+                          border: '1px solid #e2e8f0',
+                          marginBottom: 6,
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: '#111827' }}>{deltaLabel}</div>
+                          <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>
+                            {metaLabel} · {formatHistoryTime(entry.changed_at)}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: deltaColor }}>
+                          {deltaValue > 0 ? '↑' : deltaValue < 0 ? '↓' : '•'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {priceHistoryMore > 0 && (
+                    <div style={{ fontSize: 11, color: '#94a3b8', fontWeight: 600, textAlign: 'right' }}>
+                      + още {priceHistoryMore}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
           <div style={{ fontSize: 12, color: '#9ca3af', fontWeight: 500 }}>
             Обява: {listingId}
           </div>
         </div>
 
         {/* Location */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '0 20px 16px',
-            fontSize: 13,
-            color: '#6b7280',
-          }}
-        >
-          <MapPin size={14} color="#9ca3af" />
-          Намира се в {city}
+        <div style={{ padding: '0 20px 16px', fontSize: 13, color: '#6b7280' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <MapPin size={14} color="#9ca3af" />
+            Намира се в {city}
+          </div>
+          {updatedLabel && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, color: '#64748b' }}>
+              <Clock size={13} color="#f97316" />
+              <span>
+                Редактирана {updatedLabel}
+              </span>
+              {updatedTimeLabel && (
+                <span style={{ color: '#94a3b8', fontWeight: 600 }}>
+                  · {updatedTimeLabel}ч.
+                </span>
+              )}
+            </div>
+          )}
+          {viewCountValue !== null && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, color: '#111827' }}>
+              <Eye size={13} color="#111827" />
+              Обявата е видяна {viewCountValue.toLocaleString('bg-BG')} {viewCountValue === 1 ? 'път' : 'пъти'}
+            </div>
+          )}
         </div>
 
         {/* Price */}
@@ -317,16 +494,38 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
             marginBottom: 16,
           }}
         >
-          <div
-            style={{
-              fontSize: 24,
-              fontWeight: 800,
-              color: '#0f766e',
-              marginBottom: 4,
-              fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
-            }}
-          >
-            {price.toLocaleString('bg-BG')} &euro;
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
+            <div
+              style={{
+                fontSize: 24,
+                fontWeight: 800,
+                color: '#0f766e',
+                fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
+              }}
+            >
+              {price.toLocaleString('bg-BG')} &euro;
+            </div>
+            {showPriceDelta && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '4px 10px',
+                  borderRadius: 999,
+                  fontSize: 12,
+                  fontWeight: 800,
+                  border: `1px solid ${latestDeltaValue > 0 ? '#fecaca' : '#bbf7d0'}`,
+                  background: latestDeltaValue > 0 ? '#fee2e2' : '#dcfce7',
+                  color: latestDeltaValue > 0 ? '#dc2626' : '#16a34a',
+                }}
+                title={latestDeltaValue > 0 ? 'Повишена цена' : 'Намалена цена'}
+              >
+                <PriceDeltaIcon size={14} />
+                {latestDeltaValue > 0 ? '+' : '-'}
+                {priceDeltaLabel}
+              </span>
+            )}
           </div>
           <div style={{ fontSize: 13, color: '#6b7280', fontWeight: 500 }}>
             {Number(priceInBGN).toLocaleString('bg-BG')} лв.
@@ -648,23 +847,25 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
-          <div
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, #0f766e 0%, #0b5f58 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              fontSize: 18,
-              fontWeight: 700,
-              flexShrink: 0,
-            }}
-          >
-            {initials || <User size={20} />}
-          </div>
+          {showSellerAvatar && (
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #0f766e 0%, #0b5f58 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                fontSize: 18,
+                fontWeight: 700,
+                flexShrink: 0,
+              }}
+            >
+              {initials || <User size={20} />}
+            </div>
+          )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{

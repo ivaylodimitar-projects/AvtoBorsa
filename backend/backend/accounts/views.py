@@ -77,7 +77,12 @@ def login(request):
 
     # Determine user type
     user_type = 'private'
-    user_data = {'id': user.id, 'email': user.email}
+    user_data = {
+        'id': user.id,
+        'email': user.email,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+    }
 
     if hasattr(user, 'business_profile'):
         user_type = 'business'
@@ -113,11 +118,17 @@ def get_current_user(request):
     user_data = {
         'id': user.id,
         'email': user.email,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
     }
 
     if hasattr(user, 'business_profile'):
         user_type = 'business'
         user_data['username'] = user.business_profile.username
+        if user.business_profile.profile_image:
+            user_data['profile_image_url'] = request.build_absolute_uri(
+                user.business_profile.profile_image.url
+            )
 
     # Get user balance
     try:
@@ -168,13 +179,72 @@ def get_user_balance(request):
     """API endpoint to get current user's balance"""
     try:
         profile = UserProfile.objects.get(user=request.user)
-        serializer = UserProfileSerializer(profile)
+        serializer = UserProfileSerializer(profile, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
     except UserProfile.DoesNotExist:
         return Response(
             {'error': 'User profile not found'},
             status=status.HTTP_404_NOT_FOUND
         )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+    """Change password for the current user."""
+    old_password = request.data.get("old_password")
+    new_password = request.data.get("new_password")
+    confirm_password = request.data.get("confirm_password")
+
+    if not old_password or not new_password or not confirm_password:
+        return Response({'error': 'Всички полета са задължителни.'}, status=status.HTTP_400_BAD_REQUEST)
+    if new_password != confirm_password:
+        return Response({'error': 'Паролите не съвпадат.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not request.user.check_password(old_password):
+        return Response({'error': 'Старата парола е грешна.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    request.user.set_password(new_password)
+    request.user.save()
+    return Response({'message': 'Паролата е сменена успешно.'}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_profile_names(request):
+    """Update the first/last name for the current user."""
+    first_name = request.data.get('first_name', '')
+    last_name = request.data.get('last_name', '')
+    if first_name is None:
+        first_name = ''
+    if last_name is None:
+        last_name = ''
+    first_name = str(first_name).strip()
+    last_name = str(last_name).strip()
+
+    if len(first_name) > 150 or len(last_name) > 150:
+        return Response({'error': 'Името е твърде дълго.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    request.user.first_name = first_name
+    request.user.last_name = last_name
+    request.user.save()
+    return Response(
+        {'first_name': first_name, 'last_name': last_name},
+        status=status.HTTP_200_OK
+    )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def delete_account(request):
+    """Delete the current user's account."""
+    password = request.data.get("password")
+    if not password:
+        return Response({'error': 'Паролата е задължителна.'}, status=status.HTTP_400_BAD_REQUEST)
+    if not request.user.check_password(password):
+        return Response({'error': 'Паролата е грешна.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    request.user.delete()
+    return Response({'message': 'Акаунтът е изтрит.'}, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
@@ -278,7 +348,6 @@ def upload_profile_photo(request):
             {'error': 'Only business users can upload a profile photo'},
             status=status.HTTP_403_FORBIDDEN
         )
-
     image = request.FILES.get('image')
     if not image:
         return Response({'error': 'No image provided'}, status=status.HTTP_400_BAD_REQUEST)

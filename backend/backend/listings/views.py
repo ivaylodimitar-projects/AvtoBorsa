@@ -11,14 +11,14 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import PageNumberPagination
 from django.shortcuts import get_object_or_404
 from django.db import transaction as db_transaction
-from django.db.models import Q, OuterRef, Subquery, Case, When, Value, IntegerField
+from django.db.models import Q, OuterRef, Subquery, Case, When, Value, IntegerField, F
 from django.db.models import Prefetch
 from django.db.models.functions import Substr
 from django.core.cache import cache
 from django.utils.cache import patch_cache_control, patch_vary_headers
 from django.utils import timezone
 from backend.accounts.models import UserProfile
-from .models import CarListing, CarImage, Favorite, get_expiry_cutoff, TOP_LISTING_DURATION_DAYS
+from .models import CarListing, CarImage, Favorite, CarListingPriceHistory, get_expiry_cutoff, TOP_LISTING_DURATION_DAYS
 from .serializers import (
     CarListingSerializer,
     CarListingLiteSerializer,
@@ -35,7 +35,7 @@ LISTINGS_PUBLIC_STALE_SECONDS = 120
 TOP_DEMOTION_MIN_INTERVAL_SECONDS = 60
 TOP_DEMOTION_LOCK_KEY = "listings:demote-expired-top:lock"
 LATEST_LISTINGS_CACHE_SECONDS = 30
-LATEST_LISTINGS_CACHE_KEY = "listings:latest:v1"
+LATEST_LISTINGS_CACHE_KEY = "listings:latest:v2"
 
 
 class ListingsPagination(PageNumberPagination):
@@ -163,6 +163,20 @@ class CarListingViewSet(viewsets.ModelViewSet):
             is_archived=False,
             created_at__gte=cutoff
         )
+        queryset = queryset.annotate(
+            top_rank=Case(
+                When(listing_type='top', then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField(),
+            )
+        )
+        latest_price_change = CarListingPriceHistory.objects.filter(
+            listing=OuterRef('pk')
+        ).order_by('-changed_at')
+        queryset = queryset.annotate(
+            last_price_change_delta=Subquery(latest_price_change.values('delta')[:1]),
+            last_price_change_at=Subquery(latest_price_change.values('changed_at')[:1]),
+        )
 
         # Filter by user if requested
         user_id = self.request.query_params.get('user_id')
@@ -204,23 +218,23 @@ class CarListingViewSet(viewsets.ModelViewSet):
         sort_by = self.request.query_params.get('sortBy')
         if sort_by:
             if sort_by == 'price-asc':
-                queryset = queryset.order_by('price')
+                queryset = queryset.order_by('top_rank', 'price')
             elif sort_by == 'price-desc':
-                queryset = queryset.order_by('-price')
+                queryset = queryset.order_by('top_rank', '-price')
             elif sort_by == 'year-desc':
-                queryset = queryset.order_by('-year_from')
+                queryset = queryset.order_by('top_rank', '-year_from')
             elif sort_by == 'year-asc':
-                queryset = queryset.order_by('year_from')
+                queryset = queryset.order_by('top_rank', 'year_from')
             elif sort_by == 'Марка/Модел/Цена' or sort_by == '':
                 # Default: Марка/Модел/Цена
-                queryset = queryset.order_by('brand', 'model', 'price')
+                queryset = queryset.order_by('top_rank', 'brand', 'model', 'price')
             else:
                 # Default fallback
-                queryset = queryset.order_by('brand', 'model', 'price')
+                queryset = queryset.order_by('top_rank', 'brand', 'model', 'price')
 
         else:
             # Stable default ordering for pagination and landing page
-            queryset = queryset.order_by('-created_at')
+            queryset = queryset.order_by('top_rank', '-created_at')
 
         # Fuel filter - handle both display names and keys
         fuel = self.request.query_params.get('fuel')
@@ -361,7 +375,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
                     'user_id', 'user__email',
                     'user__business_profile__dealer_name',
                     'user__private_profile__id'
-                )
+                ).prefetch_related(image_prefetch)
             else:
                 queryset = queryset.annotate(
                     description_preview=Substr('description', 1, 220)
@@ -386,6 +400,13 @@ class CarListingViewSet(viewsets.ModelViewSet):
             ).prefetch_related('images')
 
         return queryset
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        CarListing.objects.filter(pk=instance.pk).update(view_count=F('view_count') + 1)
+        instance.refresh_from_db(fields=['view_count'])
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
     def get_permissions(self):
         """Set permissions based on action"""
@@ -600,7 +621,7 @@ def republish_listing(request, listing_id):
 
     if listing_type not in ['top', 'normal']:
         return Response(
-            {"detail": "ÐÐµÐ²Ð°Ð»Ð¸Ð´ÐµÐ½ Ñ‚Ð¸Ð¿ Ð½Ð° Ð¾Ð±ÑÐ²Ð°Ñ‚Ð°."},
+            {"detail": "Невалиден тип на обявата."},
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -791,6 +812,9 @@ def latest_listings(request):
     first_image_subquery = CarImage.objects.filter(
         listing_id=OuterRef('pk')
     ).order_by('-is_cover', 'order', 'id').values('image')[:1]
+    latest_price_change = CarListingPriceHistory.objects.filter(
+        listing=OuterRef('pk')
+    ).order_by('-changed_at')
 
     queryset = (
         CarListing.objects.filter(
@@ -806,6 +830,8 @@ def latest_listings(request):
                 output_field=IntegerField(),
             ),
             first_image=Subquery(first_image_subquery),
+            last_price_change_delta=Subquery(latest_price_change.values('delta')[:1]),
+            last_price_change_at=Subquery(latest_price_change.values('changed_at')[:1]),
         )
         .only(
             'id', 'slug', 'brand', 'model', 'year_from', 'price', 'mileage',

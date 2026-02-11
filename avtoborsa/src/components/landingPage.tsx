@@ -28,6 +28,11 @@ type CarListing = {
   is_top?: boolean;
   is_top_listing?: boolean;
   is_top_ad?: boolean;
+  price_change?: {
+    delta?: number | string;
+    direction?: string;
+    changed_at?: string;
+  } | null;
 };
 
 const isTopListing = (listing: CarListing) => {
@@ -42,7 +47,7 @@ const isTopListing = (listing: CarListing) => {
 
 const NEW_LISTING_BADGE_MINUTES = 10;
 const NEW_LISTING_BADGE_WINDOW_MS = NEW_LISTING_BADGE_MINUTES * 60 * 1000;
-const LATEST_LISTINGS_CACHE_KEY = "latestListingsLiteV2";
+const LATEST_LISTINGS_CACHE_KEY = "latestListingsLiteV3";
 const LATEST_LISTINGS_CACHE_TTL_MS = 60_000;
 
 type Fuel = "Бензин" | "Дизел" | "Газ/Бензин" | "Хибрид" | "Електро";
@@ -818,6 +823,16 @@ export default function LandingPage() {
                   const isNew = isListingNew(listing.created_at);
                   const isAboveFold = index < 4;
                   const listingImageUrl = listing.image_url ? getImageUrl(listing.image_url) : "";
+                  const priceChange = listing.price_change || null;
+                  const deltaRaw = priceChange?.delta;
+                  const deltaValue = deltaRaw === undefined || deltaRaw === null ? Number.NaN : Number(deltaRaw);
+                  const direction = (priceChange?.direction || "").toString().toLowerCase();
+                  const isUp = direction === "up" || (Number.isFinite(deltaValue) && deltaValue > 0);
+                  const isDown = direction === "down" || (Number.isFinite(deltaValue) && deltaValue < 0);
+                  const showPriceChange = isUp || isDown;
+                  const priceChangeLabel = Number.isFinite(deltaValue)
+                    ? `${Math.abs(deltaValue).toLocaleString("bg-BG")} €`
+                    : "";
                   return (
                     <div
                       key={listing.id}
@@ -863,6 +878,30 @@ export default function LandingPage() {
                               <circle cx="8.5" cy="8.5" r="1.5" />
                               <polyline points="21 15 16 10 5 21" />
                             </svg>
+                          </div>
+                        )}
+                        {showPriceChange && (
+                          <div
+                            style={{
+                              position: "absolute",
+                              right: 10,
+                              top: 10,
+                              padding: "4px 10px",
+                              borderRadius: 999,
+                              fontWeight: 800,
+                              fontSize: 12,
+                              background: isUp ? "#fee2e2" : "#dcfce7",
+                              color: isUp ? "#dc2626" : "#16a34a",
+                              border: `1px solid ${isUp ? "#fecaca" : "#bbf7d0"}`,
+                              boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 6,
+                            }}
+                            title={isUp ? "Повишена цена" : "Намалена цена"}
+                          >
+                            <span style={{ fontSize: 13 }}>{isUp ? "↑" : "↓"}</span>
+                            {priceChangeLabel || (isUp ? "Повишение" : "Намаление")}
                           </div>
                         )}
                         {/* Price overlay */}

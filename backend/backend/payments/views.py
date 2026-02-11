@@ -10,6 +10,7 @@ from rest_framework.response import Response
 
 from backend.accounts.models import UserProfile
 from backend.payments.models import PaymentTransaction
+from backend.payments.serializers import PaymentTransactionSerializer
 from backend.payments.services.stripe_service import (
     StripeServiceError,
     construct_event,
@@ -323,6 +324,15 @@ def checkout_session_status_view(request):
         },
         status=status.HTTP_200_OK,
     )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def list_transactions(request):
+    """List Stripe transactions for the current user."""
+    transactions = PaymentTransaction.objects.filter(user=request.user).order_by("-created_at")
+    serializer = PaymentTransactionSerializer(transactions, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 @api_view(["POST"])
