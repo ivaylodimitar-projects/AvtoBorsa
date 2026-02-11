@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   Heart,
@@ -46,6 +46,7 @@ type CarListing = {
   is_draft: boolean;
   is_archived: boolean;
   is_favorited?: boolean;
+  description_preview?: string;
   description?: string;
   category?: string;
   category_display?: string;
@@ -76,17 +77,40 @@ const isTopListing = (listing: CarListing) => {
 const NEW_LISTING_BADGE_MINUTES = 10;
 const NEW_LISTING_BADGE_WINDOW_MS = NEW_LISTING_BADGE_MINUTES * 60 * 1000;
 const NEW_LISTING_BADGE_REFRESH_MS = 30_000;
+const PAGE_SIZE = 20;
 
 const SearchPage: React.FC = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
-  const [listings, setListings] = useState<CarListing[]>([]);
+  const { isAuthenticated } = useAuth();
+  const [pageCache, setPageCache] = useState<Record<number, CarListing[]>>({});
+  const pageCacheRef = useRef<Record<number, CarListing[]>>({});
+  const prefetchCacheRef = useRef<Record<number, CarListing[]>>({});
+  const [totalCount, setTotalCount] = useState<number | null>(null);
+  const [totalPages, setTotalPages] = useState(1);
+  const [hasLoadedPrimary, setHasLoadedPrimary] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [favoriteStates, setFavoriteStates] = useState<Record<number, boolean>>({});
   const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
   const getImageUrl = useImageUrl();
+
+  const currentPage = useMemo(() => {
+    const rawPage = Number(searchParams.get("page") || "1");
+    return Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
+  }, [searchParams]);
+
+  const baseQueryString = useMemo(() => {
+    const params = new URLSearchParams(searchParams);
+    params.delete("page");
+    params.delete("page_size");
+    return params.toString();
+  }, [searchParams]);
+
+  const queryKey = baseQueryString;
+  const currentListings = pageCache[currentPage] || prefetchCacheRef.current[currentPage] || [];
+  const prefetchTokenRef = useRef(0);
+  const prevQueryKeyRef = useRef<string | null>(null);
+  const activeQueryRef = useRef(queryKey);
 
   // Format relative time
   const getRelativeTime = (dateString: string) => {
@@ -111,42 +135,204 @@ const SearchPage: React.FC = () => {
     }
   };
 
-  // Fetch listings from backend with search parameters
   useEffect(() => {
-    const fetchListings = async () => {
+    pageCacheRef.current = pageCache;
+  }, [pageCache]);
+
+  useEffect(() => {
+    activeQueryRef.current = queryKey;
+  }, [queryKey]);
+
+  useEffect(() => {
+    const pageParam = searchParams.get("page");
+    const parsedPage = Number(pageParam || "1");
+    if (!pageParam || !Number.isFinite(parsedPage) || parsedPage < 1) {
+      const params = new URLSearchParams(searchParams);
+      params.set("page", "1");
+      setSearchParams(params, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (prevQueryKeyRef.current && prevQueryKeyRef.current !== queryKey) {
+      const params = new URLSearchParams(searchParams);
+      params.set("page", "1");
+      setSearchParams(params, { replace: true });
+    }
+    prevQueryKeyRef.current = queryKey;
+  }, [queryKey, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    setPageCache({});
+    pageCacheRef.current = {};
+    prefetchCacheRef.current = {};
+    setTotalCount(null);
+    setTotalPages(1);
+    setHasLoadedPrimary(false);
+    setError(null);
+    setIsLoading(true);
+  }, [queryKey]);
+
+  const buildListingsUrl = useCallback(
+    (page: number) => {
+      const params = new URLSearchParams(baseQueryString);
+      params.set("page", String(page));
+      params.set("page_size", String(PAGE_SIZE));
+      params.set("compact", "1");
+      return `http://localhost:8000/api/listings/?${params.toString()}`;
+    },
+    [baseQueryString]
+  );
+
+  const loadPage = useCallback(
+    async (
+      page: number,
+      options: { signal?: AbortSignal; cacheOnly?: boolean; updateTotals?: boolean } = {}
+    ) => {
+      const cachedPage = pageCacheRef.current[page];
+      if (cachedPage) {
+        return cachedPage;
+      }
+
+      const prefetchedPage = prefetchCacheRef.current[page];
+      if (prefetchedPage) {
+        if (!options.cacheOnly) {
+          setPageCache((prev) => ({ ...prev, [page]: prefetchedPage }));
+        }
+        return prefetchedPage;
+      }
+
+      const url = buildListingsUrl(page);
+
+      const response = await fetch(url, { signal: options.signal });
+      if (!response.ok) throw new Error("Failed to fetch listings");
+      const data = await response.json();
+
+      if (activeQueryRef.current !== queryKey) {
+        return [];
+      }
+
+      const listingsData = Array.isArray(data.results) ? data.results : [];
+      const count = typeof data.count === "number" ? data.count : listingsData.length;
+      if (!options.cacheOnly) {
+        setPageCache((prev) => ({ ...prev, [page]: listingsData }));
+      } else {
+        prefetchCacheRef.current[page] = listingsData;
+      }
+      if (options.updateTotals !== false) {
+        setTotalCount(count);
+        setTotalPages(Math.max(1, Math.ceil(count / PAGE_SIZE)));
+      }
+      return listingsData;
+    },
+    [buildListingsUrl]
+  );
+
+  useEffect(() => {
+    let isCancelled = false;
+    const controller = new AbortController();
+    const hasCached = !!pageCacheRef.current[currentPage] || !!prefetchCacheRef.current[currentPage];
+
+    const fetchCurrentPage = async () => {
       try {
-        setIsLoading(true);
-
-        // Build query string from search parameters
-        const queryParams = new URLSearchParams();
-
-        // Add all search parameters to the query
-        searchParams.forEach((value, key) => {
-          queryParams.append(key, value);
-        });
-
-        const url = `http://localhost:8000/api/listings/?${queryParams.toString()}`;
-        console.log("Fetching from URL:", url);
-
-        const response = await fetch(url);
-        if (!response.ok) throw new Error("Failed to fetch listings");
-        const data = await response.json();
-
-        // Handle both paginated and direct array responses
-        const listingsData = Array.isArray(data) ? data : (data.results || []);
-        setListings(listingsData);
-        setError(null);
+        if (!hasCached) {
+          setIsLoading(true);
+        }
+        await loadPage(currentPage, { signal: controller.signal, updateTotals: true });
+        if (!isCancelled) {
+          setError(null);
+          setHasLoadedPrimary(true);
+        }
       } catch (err) {
+        if (controller.signal.aborted || isCancelled) return;
         console.error("Error fetching listings:", err);
-        setError("Failed to load listings");
-        setListings([]);
+        if (!hasCached) {
+          setError("Failed to load listings");
+        }
       } finally {
-        setIsLoading(false);
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
-    fetchListings();
-  }, [searchParams]);
+    fetchCurrentPage();
+    return () => {
+      isCancelled = true;
+      controller.abort();
+    };
+  }, [currentPage, queryKey, loadPage]);
+
+  useEffect(() => {
+    if (!hasLoadedPrimary || totalPages <= 1) return;
+
+    prefetchTokenRef.current += 1;
+    const token = prefetchTokenRef.current;
+    const nextPage = currentPage + 1;
+    if (nextPage > totalPages) return;
+    if (pageCacheRef.current[nextPage] || prefetchCacheRef.current[nextPage]) return;
+    const controller = new AbortController();
+
+    const browserWindow = window as Window & {
+      requestIdleCallback?: (cb: () => void, options?: { timeout?: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    const scheduleIdle = (callback: () => void) => {
+      if (typeof browserWindow.requestIdleCallback === "function") {
+        return browserWindow.requestIdleCallback(callback, { timeout: 1200 });
+      }
+      return window.setTimeout(callback, 120);
+    };
+    const cancelScheduledIdle = (id: number) => {
+      if (typeof browserWindow.cancelIdleCallback === "function") {
+        browserWindow.cancelIdleCallback(id);
+        return;
+      }
+      window.clearTimeout(id);
+    };
+
+    let idleHandle: number | null = null;
+    const waitForIdle = () =>
+      new Promise<void>((resolve) => {
+        idleHandle = scheduleIdle(() => {
+          idleHandle = null;
+          resolve();
+        });
+      });
+
+    const prefetchSequentially = async () => {
+      if (token !== prefetchTokenRef.current) return;
+      await waitForIdle();
+      if (token !== prefetchTokenRef.current || controller.signal.aborted) return;
+      try {
+        await loadPage(nextPage, {
+          signal: controller.signal,
+          cacheOnly: true,
+          updateTotals: false,
+        });
+      } catch (err) {
+        if (token !== prefetchTokenRef.current || controller.signal.aborted) return;
+        console.error("Error prefetching page:", nextPage, err);
+      }
+    };
+
+    prefetchSequentially();
+    return () => {
+      prefetchTokenRef.current += 1;
+      controller.abort();
+      if (idleHandle !== null) {
+        cancelScheduledIdle(idleHandle);
+      }
+    };
+  }, [hasLoadedPrimary, currentPage, totalPages, queryKey, loadPage]);
+
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      const params = new URLSearchParams(searchParams);
+      params.set("page", String(totalPages));
+      setSearchParams(params, { replace: true });
+    }
+  }, [currentPage, totalPages, searchParams, setSearchParams]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -175,12 +361,18 @@ const SearchPage: React.FC = () => {
       });
 
       if (response.ok) {
-        // Update the listing's favorite status
-        setListings(listings.map(listing =>
-          listing.id === listingId
-            ? { ...listing, is_favorited: !isFavorited }
-            : listing
-        ));
+        // Update the listing's favorite status in cache
+        setPageCache((prev) => {
+          const pageListings = prev[currentPage] || [];
+          return {
+            ...prev,
+            [currentPage]: pageListings.map((listing) =>
+              listing.id === listingId
+                ? { ...listing, is_favorited: !isFavorited }
+                : listing
+            ),
+          };
+        });
       }
     } catch (err) {
       console.error("Error toggling favorite:", err);
@@ -189,10 +381,10 @@ const SearchPage: React.FC = () => {
 
   // Results are already filtered by backend, but we keep "top" listings first
   const results = useMemo(() => {
-    const topListings = listings.filter(isTopListing);
-    const normalListings = listings.filter((listing) => !isTopListing(listing));
+    const topListings = currentListings.filter(isTopListing);
+    const normalListings = currentListings.filter((listing) => !isTopListing(listing));
     return [...topListings, ...normalListings];
-  }, [listings]);
+  }, [currentListings]);
 
   const isListingNew = (createdAt?: string) => {
     if (!createdAt) return false;
@@ -262,6 +454,42 @@ const SearchPage: React.FC = () => {
     return criteria;
   }, [searchParams]);
 
+  const totalListings = totalCount ?? results.length;
+  const skeletonRows = useMemo(() => Array.from({ length: PAGE_SIZE }, (_, idx) => idx), []);
+
+  const visiblePages = useMemo(() => {
+    if (totalPages <= 1) return [];
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+
+    const pages = new Set<number>();
+    pages.add(1);
+    pages.add(totalPages);
+
+    for (let page = currentPage - 2; page <= currentPage + 2; page += 1) {
+      if (page > 1 && page < totalPages) {
+        pages.add(page);
+      }
+    }
+
+    return Array.from(pages).sort((a, b) => a - b);
+  }, [currentPage, totalPages]);
+
+  const handlePageChange = (page: number) => {
+    if (page === currentPage || page < 1 || page > totalPages) return;
+    const params = new URLSearchParams(searchParams);
+    params.set("page", String(page));
+    setSearchParams(params);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const skeletonBase: React.CSSProperties = {
+    background: "linear-gradient(90deg, #e2e8f0 0%, #f8fafc 50%, #e2e8f0 100%)",
+    backgroundSize: "200% 100%",
+    animation: "skeletonShimmer 1.4s ease-in-out infinite",
+  };
+
   const styles: Record<string, React.CSSProperties> = {
     page: { minHeight: "100vh", background: "#f4f6f9", width: "100%", paddingTop: 20, paddingBottom: 40 },
     container: { width: "100%", maxWidth: 1200, margin: "0 auto", padding: "0 20px" },
@@ -270,7 +498,19 @@ const SearchPage: React.FC = () => {
     criteria: { display: "flex", flexWrap: "wrap", gap: 12, marginTop: 16 },
     criteriaTag: { background: "#f1f5f9", padding: "8px 14px", borderRadius: 20, fontSize: 13, color: "#475569", fontWeight: 600 },
     results: { display: "flex", flexDirection: "column", gap: 16 },
-    item: { background: "#fff", borderRadius: 10, overflow: "hidden", border: "none", boxShadow: "0 2px 8px rgba(15, 23, 42, 0.06)", display: "flex", cursor: "pointer", transition: "transform 0.25s ease, box-shadow 0.25s ease", position: "relative" as const },
+    item: {
+      background: "#fff",
+      borderRadius: 10,
+      overflow: "hidden",
+      border: "none",
+      boxShadow: "0 2px 8px rgba(15, 23, 42, 0.06)",
+      display: "flex",
+      cursor: "pointer",
+      transition: "transform 0.25s ease, box-shadow 0.25s ease",
+      position: "relative" as const,
+      contentVisibility: "auto",
+      containIntrinsicSize: "340px",
+    },
     itemPhoto: { width: 280, flexShrink: 0, display: "flex", flexDirection: "column" as const, background: "#fff" },
     photoMain: { height: 210, position: "relative" as const, overflow: "hidden", background: "linear-gradient(135deg, #e2e8f0 0%, #cbd5f5 100%)" },
     itemImage: { width: "100%", height: "100%", objectFit: "cover" },
@@ -303,10 +543,46 @@ const SearchPage: React.FC = () => {
     metaMuted: { color: "#94a3b8", fontWeight: 600 },
     empty: { textAlign: "center", padding: 60, background: "#fff", borderRadius: 10, boxShadow: "0 2px 4px rgba(0,0,0,0.08)" },
     loading: { textAlign: "center", padding: 60, background: "#fff", borderRadius: 10, boxShadow: "0 2px 4px rgba(0,0,0,0.08)" },
+    pagination: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 24, flexWrap: "wrap" },
+    paginationButton: { minWidth: 36, height: 36, borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#1f2937", fontWeight: 600, cursor: "pointer", padding: "0 10px" },
+    paginationButtonActive: { background: "#0f766e", borderColor: "#0f766e", color: "#fff" },
+    paginationButtonDisabled: { opacity: 0.5, cursor: "not-allowed" },
+    paginationEllipsis: { color: "#94a3b8", fontWeight: 600, padding: "0 4px" },
+    paginationInfo: { fontSize: 13, color: "#64748b", fontWeight: 600 },
+    skeletonCard: {
+      background: "#fff",
+      borderRadius: 10,
+      overflow: "hidden",
+      border: "none",
+      boxShadow: "0 2px 8px rgba(15, 23, 42, 0.06)",
+      display: "flex",
+      position: "relative" as const,
+    },
+    skeletonPhoto: { width: 280, flexShrink: 0, display: "flex", flexDirection: "column" as const },
+    skeletonImage: { width: "100%", height: 210, ...skeletonBase },
+    skeletonThumb: { width: "100%", aspectRatio: "4 / 3", borderRadius: 10, ...skeletonBase },
+    skeletonMain: { flex: 1, padding: 20, display: "flex", flexDirection: "column" as const, gap: 12 },
+    skeletonSide: { width: 240, padding: 16, borderLeft: "1px solid #e2e8f0", background: "#f8fafc", display: "flex", flexDirection: "column" as const, gap: 10 },
+    skeletonTitle: { height: 22, width: "60%", borderRadius: 8, ...skeletonBase },
+    skeletonPrice: { height: 26, width: "40%", borderRadius: 8, ...skeletonBase },
+    skeletonChip: { height: 28, width: 90, borderRadius: 999, ...skeletonBase },
+    skeletonDesc: { height: 14, width: "100%", borderRadius: 8, ...skeletonBase },
+    skeletonSideLine: { height: 14, width: "80%", borderRadius: 8, ...skeletonBase },
   };
 
   return (
     <div style={styles.page}>
+      <style>{`
+        @keyframes skeletonShimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+
+        .search-result-item:hover {
+          box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12) !important;
+          transform: translateY(-4px);
+        }
+      `}</style>
       <div style={styles.container}>
         <div style={styles.header}>
           <h1 style={styles.title}>Резултати от търсене</h1>
@@ -318,13 +594,45 @@ const SearchPage: React.FC = () => {
             </div>
           )}
           <p style={{ fontSize: 15, color: "#555", margin: "16px 0 0 0", fontWeight: 500 }}>
-            Намерени обяви: <strong style={{ color: "#0066cc" }}>{results.length}</strong>
+            Намерени обяви: <strong style={{ color: "#0066cc" }}>{totalListings}</strong>
           </p>
         </div>
 
         {isLoading ? (
-          <div style={styles.loading}>
-            <p style={{ fontSize: 16, color: "#666", margin: 0 }}>Зареждане на обяви...</p>
+          <div style={styles.results} className="search-results">
+            {skeletonRows.map((index) => (
+              <div key={`skeleton-${index}`} style={styles.skeletonCard}>
+                <div style={styles.skeletonPhoto}>
+                  <div style={styles.skeletonImage} />
+                  <div style={styles.thumbStrip}>
+                    {Array.from({ length: 3 }, (_, thumbIndex) => (
+                      <div key={`skeleton-thumb-${index}-${thumbIndex}`} style={styles.thumb}>
+                        <div style={styles.skeletonThumb} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div style={styles.itemText}>
+                  <div style={styles.skeletonMain}>
+                    <div style={styles.skeletonTitle} />
+                    <div style={styles.skeletonPrice} />
+                    <div style={styles.itemParams}>
+                      {Array.from({ length: 5 }, (_, chipIndex) => (
+                        <div key={`skeleton-chip-${index}-${chipIndex}`} style={styles.skeletonChip} />
+                      ))}
+                    </div>
+                    <div style={styles.skeletonDesc} />
+                    <div style={{ ...styles.skeletonDesc, width: "85%" }} />
+                  </div>
+                  <div style={styles.skeletonSide}>
+                    <div style={styles.skeletonSideLine} />
+                    <div style={styles.skeletonSideLine} />
+                    <div style={{ ...styles.skeletonSideLine, width: "60%" }} />
+                    <div style={{ ...styles.skeletonSideLine, width: "70%" }} />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : error ? (
           <div style={styles.empty}>
@@ -332,14 +640,16 @@ const SearchPage: React.FC = () => {
             <p style={{ fontSize: 14, color: "#666", margin: 0 }}>{error}</p>
           </div>
         ) : results.length > 0 ? (
-          <div style={styles.results} className="search-results">
-            {results.map((listing) => {
-              const isTop = isTopListing(listing);
-              const isNewListing = isListingNew(listing.created_at);
-              const categoryLabel = listing.category_display || listing.category;
-              const conditionLabel = listing.condition_display || listing.condition;
-              const sellerLabel = listing.seller_name || "Не е посочено";
-              const locationLabel = listing.city || "Не е посочено";
+          <>
+            <div style={styles.results} className="search-results">
+              {results.map((listing, index) => {
+                  const isTop = isTopListing(listing);
+                  const isNewListing = isListingNew(listing.created_at);
+                  const isPriorityImage = index < 3;
+                  const categoryLabel = listing.category_display || listing.category;
+                  const conditionLabel = listing.condition_display || listing.condition;
+                  const sellerLabel = listing.seller_name || "Не е посочено";
+                  const locationLabel = listing.city || "Не е посочено";
               const sellerTypeLabel =
                 listing.seller_type === "business"
                   ? "Търговец"
@@ -374,168 +684,223 @@ const SearchPage: React.FC = () => {
                 thumbItems.push({ type: "placeholder" });
               }
 
-              return (
-                <div
-                  key={listing.id}
-                  style={styles.item}
-                  onClick={() => navigate(`/details/${listing.slug}`)}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.boxShadow = "0 12px 32px rgba(15,23,42,0.12)";
-                    e.currentTarget.style.transform = "translateY(-4px)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.boxShadow = "0 2px 8px rgba(15,23,42,0.06)";
-                    e.currentTarget.style.transform = "translateY(0)";
-                  }}
-                >
-                  <div style={styles.itemPhoto}>
-                    <div style={styles.photoMain}>
-                      {isTop && <div style={styles.topBadge}>Топ обява</div>}
-                      {isNewListing && (
-                        <div style={{ ...styles.newBadge, top: isTop ? 38 : 10 }}>
-                          Нова
-                        </div>
-                      )}
-                      {mainImageUrl ? (
-                        <>
-                          <img src={mainImageUrl} alt={`${listing.brand} ${listing.model}`} style={styles.itemImage} />
-                          <div style={styles.itemPhotoOverlay}>
-                            <button
-                              style={{
-                                ...styles.favoriteButton,
-                                background: listing.is_favorited ? "#ff4458" : "rgba(255,255,255,0.95)",
-                              }}
-                              onClick={(e) => toggleFavorite(e, listing.id, listing.is_favorited || false)}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.transform = "scale(1.1)";
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.transform = "scale(1)";
-                              }}
-                              title={listing.is_favorited ? "Премахни от бележника" : "Добави в бележника"}
-                            >
-                              <Heart
-                                size={22}
-                                color={listing.is_favorited ? "#fff" : "#ff4458"}
-                                fill={listing.is_favorited ? "#fff" : "none"}
+                return (
+                  <div
+                    key={listing.id}
+                    className="search-result-item"
+                    style={styles.item}
+                    onClick={() => navigate(`/details/${listing.slug}`)}
+                  >
+                      <div style={styles.itemPhoto}>
+                        <div style={styles.photoMain}>
+                          {isTop && <div style={styles.topBadge}>Топ обява</div>}
+                          {isNewListing && (
+                            <div style={{ ...styles.newBadge, top: isTop ? 38 : 10 }}>
+                              Нова
+                            </div>
+                          )}
+                          {mainImageUrl ? (
+                            <>
+                              <img
+                                src={mainImageUrl}
+                                alt={`${listing.brand} ${listing.model}`}
+                                style={styles.itemImage}
+                                loading={isPriorityImage ? "eager" : "lazy"}
+                                decoding="async"
+                                fetchPriority={isPriorityImage ? "high" : "low"}
                               />
-                            </button>
-                          </div>
-                        </>
-                      ) : (
-                        <div style={styles.photoPlaceholder}>
-                          <ImageOff size={26} />
-                          <span>Снимка</span>
+                              <div style={styles.itemPhotoOverlay}>
+                                <button
+                                  style={{
+                                    ...styles.favoriteButton,
+                                    background: listing.is_favorited ? "#ff4458" : "rgba(255,255,255,0.95)",
+                                  }}
+                                  onClick={(e) => toggleFavorite(e, listing.id, listing.is_favorited || false)}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.transform = "scale(1.1)";
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = "scale(1)";
+                                  }}
+                                  title={listing.is_favorited ? "Премахни от бележника" : "Добави в бележника"}
+                                >
+                                  <Heart
+                                    size={22}
+                                    color={listing.is_favorited ? "#fff" : "#ff4458"}
+                                    fill={listing.is_favorited ? "#fff" : "none"}
+                                  />
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <div style={styles.photoPlaceholder}>
+                              <ImageOff size={26} />
+                              <span>Снимка</span>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    <div style={styles.thumbStrip}>
-                      {thumbItems.map((thumb, index) => {
-                        if (thumb.type === "image" && thumb.src) {
-                          return (
-                            <div key={`thumb-${listing.id}-${index}`} style={styles.thumb}>
-                              <img src={thumb.src} alt={`Допълнителна снимка ${index + 1}`} style={styles.thumbImage} />
-                            </div>
-                          );
-                        }
+                        <div style={styles.thumbStrip}>
+                          {thumbItems.map((thumb, index) => {
+                            if (thumb.type === "image" && thumb.src) {
+                              return (
+                                <div key={`thumb-${listing.id}-${index}`} style={styles.thumb}>
+                                  <img
+                                    src={thumb.src}
+                                    alt={`Допълнителна снимка ${index + 1}`}
+                                    style={styles.thumbImage}
+                                    loading="lazy"
+                                    decoding="async"
+                                  />
+                                </div>
+                              );
+                            }
 
-                        if (thumb.type === "more") {
-                          return (
-                            <div key={`thumb-more-${listing.id}-${index}`} style={{ ...styles.thumb, ...styles.thumbMore }}>
-                              {thumb.label}
-                            </div>
-                          );
-                        }
+                            if (thumb.type === "more") {
+                              return (
+                                <div key={`thumb-more-${listing.id}-${index}`} style={{ ...styles.thumb, ...styles.thumbMore }}>
+                                  {thumb.label}
+                                </div>
+                              );
+                            }
 
-                        return (
-                          <div key={`thumb-placeholder-${listing.id}-${index}`} style={styles.thumb}>
-                            <ImageOff size={16} style={styles.thumbPlaceholder} />
+                            return (
+                              <div key={`thumb-placeholder-${listing.id}-${index}`} style={styles.thumb}>
+                                <ImageOff size={16} style={styles.thumbPlaceholder} />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div style={styles.itemText}>
+                        <div style={styles.itemMain}>
+                          <div style={styles.itemHeader}>
+                            <a href={`/details/${listing.slug}`} style={styles.itemTitle} onClick={(e) => e.stopPropagation()}>
+                              {listing.brand} {listing.model}
+                            </a>
+                            <div style={styles.itemPrice}>
+                              € {listing.price.toLocaleString("bg-BG")}
+                              <div style={styles.itemPriceSmall}>
+                                {(listing.price * 1.96).toLocaleString("bg-BG", { maximumFractionDigits: 2 })} лв.
+                              </div>
+                            </div>
                           </div>
-                        );
-                      })}
+                          <div style={styles.itemParams}>
+                            <span style={styles.itemParam}>
+                              <Calendar size={16} style={styles.paramIcon} />
+                              {listing.year_from} г.
+                            </span>
+                            <span style={styles.itemParam}>
+                              <Gauge size={16} style={styles.paramIcon} />
+                              {listing.mileage.toLocaleString("bg-BG")} км
+                            </span>
+                            <span style={styles.itemParam}>
+                              <Fuel size={16} style={styles.paramIcon} />
+                              {listing.fuel_display}
+                            </span>
+                            <span style={styles.itemParam}>
+                              <Zap size={16} style={styles.paramIcon} />
+                              {listing.power} к.с.
+                            </span>
+                            <span style={styles.itemParam}>
+                              <Settings size={16} style={styles.paramIcon} />
+                              {listing.gearbox_display}
+                            </span>
+                          </div>
+                          {(listing.description_preview || listing.description) && (
+                            <div style={styles.itemDescription}>{listing.description_preview || listing.description}</div>
+                          )}
+                        </div>
+                        <div style={styles.itemSide}>
+                          <div style={styles.sideSection}>
+                            <div style={styles.sideTitle}>Локация</div>
+                            <div style={styles.metaRow}>
+                              <MapPin size={16} style={styles.metaIcon} />
+                              <span style={!listing.city ? styles.metaMuted : undefined}>{locationLabel}</span>
+                            </div>
+                            <div style={styles.metaRow}>
+                              <Clock size={16} style={styles.metaIcon} />
+                              <span>{getRelativeTime(listing.created_at)}</span>
+                            </div>
+                          </div>
+                          <div style={styles.sideDivider} />
+                          <div style={styles.sideSection}>
+                            <div style={styles.sideTitle}>Продавач</div>
+                            <div style={styles.metaRow}>
+                              <User size={16} style={styles.metaIcon} />
+                              <span style={!listing.seller_name ? styles.metaMuted : undefined}>{sellerLabel}</span>
+                            </div>
+                            <div style={styles.metaRow}>
+                              <SellerTypeIcon size={16} style={styles.metaIcon} />
+                              <span style={listing.seller_type ? undefined : styles.metaMuted}>{sellerTypeLabel}</span>
+                            </div>
+                          </div>
+                          <div style={styles.sideDivider} />
+                          <div style={styles.sideSection}>
+                            <div style={styles.sideTitle}>Детайли</div>
+                            <div style={styles.metaRow}>
+                              <Tag size={16} style={styles.metaIcon} />
+                              <span style={!categoryLabel ? styles.metaMuted : undefined}>{categoryLabel || "Не е посочено"}</span>
+                            </div>
+                            <div style={styles.metaRow}>
+                              <CheckCircle2 size={16} style={styles.metaIcon} />
+                              <span style={!conditionLabel ? styles.metaMuted : undefined}>{conditionLabel || "Не е посочено"}</span>
+                            </div>
+                          </div>
+                        </div>
                     </div>
                   </div>
-                  <div style={styles.itemText}>
-                    <div style={styles.itemMain}>
-                      <div style={styles.itemHeader}>
-                        <a href={`/details/${listing.slug}`} style={styles.itemTitle} onClick={(e) => e.stopPropagation()}>
-                          {listing.brand} {listing.model}
-                        </a>
-                        <div style={styles.itemPrice}>
-                          € {listing.price.toLocaleString("bg-BG")}
-                          <div style={styles.itemPriceSmall}>
-                            {(listing.price * 1.96).toLocaleString("bg-BG", { maximumFractionDigits: 2 })} лв.
-                          </div>
-                        </div>
-                      </div>
-                      <div style={styles.itemParams}>
-                        <span style={styles.itemParam}>
-                          <Calendar size={16} style={styles.paramIcon} />
-                          {listing.year_from} г.
-                        </span>
-                        <span style={styles.itemParam}>
-                          <Gauge size={16} style={styles.paramIcon} />
-                          {listing.mileage.toLocaleString("bg-BG")} км
-                        </span>
-                        <span style={styles.itemParam}>
-                          <Fuel size={16} style={styles.paramIcon} />
-                          {listing.fuel_display}
-                        </span>
-                        <span style={styles.itemParam}>
-                          <Zap size={16} style={styles.paramIcon} />
-                          {listing.power} к.с.
-                        </span>
-                        <span style={styles.itemParam}>
-                          <Settings size={16} style={styles.paramIcon} />
-                          {listing.gearbox_display}
-                        </span>
-                      </div>
-                      {listing.description && (
-                        <div style={styles.itemDescription}>{listing.description}</div>
-                      )}
-                    </div>
-                    <div style={styles.itemSide}>
-                      <div style={styles.sideSection}>
-                        <div style={styles.sideTitle}>Локация</div>
-                        <div style={styles.metaRow}>
-                          <MapPin size={16} style={styles.metaIcon} />
-                          <span style={!listing.city ? styles.metaMuted : undefined}>{locationLabel}</span>
-                        </div>
-                        <div style={styles.metaRow}>
-                          <Clock size={16} style={styles.metaIcon} />
-                          <span>{getRelativeTime(listing.created_at)}</span>
-                        </div>
-                      </div>
-                      <div style={styles.sideDivider} />
-                      <div style={styles.sideSection}>
-                        <div style={styles.sideTitle}>Продавач</div>
-                        <div style={styles.metaRow}>
-                          <User size={16} style={styles.metaIcon} />
-                          <span style={!listing.seller_name ? styles.metaMuted : undefined}>{sellerLabel}</span>
-                        </div>
-                        <div style={styles.metaRow}>
-                          <SellerTypeIcon size={16} style={styles.metaIcon} />
-                          <span style={listing.seller_type ? undefined : styles.metaMuted}>{sellerTypeLabel}</span>
-                        </div>
-                      </div>
-                      <div style={styles.sideDivider} />
-                      <div style={styles.sideSection}>
-                        <div style={styles.sideTitle}>Детайли</div>
-                        <div style={styles.metaRow}>
-                          <Tag size={16} style={styles.metaIcon} />
-                          <span style={!categoryLabel ? styles.metaMuted : undefined}>{categoryLabel || "Не е посочено"}</span>
-                        </div>
-                        <div style={styles.metaRow}>
-                          <CheckCircle2 size={16} style={styles.metaIcon} />
-                          <span style={!conditionLabel ? styles.metaMuted : undefined}>{conditionLabel || "Не е посочено"}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          {totalPages > 1 && (
+            <div style={styles.pagination}>
+              <button
+                type="button"
+                style={{
+                  ...styles.paginationButton,
+                  ...(currentPage === 1 ? styles.paginationButtonDisabled : {}),
+                }}
+                disabled={currentPage === 1}
+                onClick={() => handlePageChange(currentPage - 1)}
+              >
+                Предишна
+              </button>
+              {visiblePages.map((page, index) => {
+                const prevPage = visiblePages[index - 1];
+                const showEllipsis = prevPage && page - prevPage > 1;
+                return (
+                  <React.Fragment key={`page-${page}`}>
+                    {showEllipsis && <span style={styles.paginationEllipsis}>...</span>}
+                    <button
+                      type="button"
+                      style={{
+                        ...styles.paginationButton,
+                        ...(page === currentPage ? styles.paginationButtonActive : {}),
+                      }}
+                      onClick={() => handlePageChange(page)}
+                    >
+                      {page}
+                    </button>
+                  </React.Fragment>
+                );
+              })}
+              <button
+                type="button"
+                style={{
+                  ...styles.paginationButton,
+                  ...(currentPage === totalPages ? styles.paginationButtonDisabled : {}),
+                }}
+                disabled={currentPage === totalPages}
+                onClick={() => handlePageChange(currentPage + 1)}
+              >
+                Следваща
+              </button>
+              <span style={styles.paginationInfo}>
+                Страница {currentPage} от {totalPages}
+              </span>
+            </div>
+          )}
+          </>
         ) : (
           <div style={styles.empty}>
             <h3 style={{ fontSize: 20, color: "#333", marginBottom: 12 }}>Няма намерени обяви</h3>

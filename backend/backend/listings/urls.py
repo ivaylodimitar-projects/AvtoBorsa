@@ -6,6 +6,7 @@ router = DefaultRouter()
 router.register(r'listings', views.CarListingViewSet, basename='listing')
 
 urlpatterns = [
+    path('listings/latest/', views.latest_listings, name='latest_listings'),
     path('', include(router.urls)),
     path('my-listings/', views.get_user_listings, name='my_listings'),
     path('my-drafts/', views.get_user_drafts, name='my_drafts'),

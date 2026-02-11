@@ -1,5 +1,6 @@
 from decimal import Decimal
 from datetime import timedelta
+import hashlib
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view, permission_classes
@@ -7,21 +8,62 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.exceptions import ValidationError
+from rest_framework.pagination import PageNumberPagination
 from django.shortcuts import get_object_or_404
 from django.db import transaction as db_transaction
-from django.db.models import Q
+from django.db.models import Q, OuterRef, Subquery, Case, When, Value, IntegerField
+from django.db.models import Prefetch
+from django.db.models.functions import Substr
+from django.core.cache import cache
+from django.utils.cache import patch_cache_control, patch_vary_headers
 from django.utils import timezone
 from backend.accounts.models import UserProfile
 from .models import CarListing, CarImage, Favorite, get_expiry_cutoff, TOP_LISTING_DURATION_DAYS
-from .serializers import CarListingSerializer, CarImageSerializer, FavoriteSerializer
+from .serializers import (
+    CarListingSerializer,
+    CarListingLiteSerializer,
+    CarListingListSerializer,
+    CarListingSearchCompactSerializer,
+    CarImageSerializer,
+    FavoriteSerializer,
+)
 
 
 TOP_LISTING_PRICE_EUR = Decimal("3.00")
+LISTINGS_PUBLIC_CACHE_SECONDS = 30
+LISTINGS_PUBLIC_STALE_SECONDS = 120
+TOP_DEMOTION_MIN_INTERVAL_SECONDS = 60
+TOP_DEMOTION_LOCK_KEY = "listings:demote-expired-top:lock"
+LATEST_LISTINGS_CACHE_SECONDS = 30
+LATEST_LISTINGS_CACHE_KEY = "listings:latest:v1"
+
+
+class ListingsPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = "page_size"
+    max_page_size = 20
+
+    def get_page_size(self, request):
+        page_size = super().get_page_size(request)
+        if page_size is None:
+            limit = request.query_params.get("limit")
+            if limit is not None:
+                try:
+                    page_size = int(limit)
+                except (TypeError, ValueError):
+                    page_size = None
+        if page_size is None:
+            return self.page_size
+        if self.max_page_size:
+            return max(1, min(page_size, self.max_page_size))
+        return max(1, page_size)
 
 
 def _demote_expired_top_listings():
     """Ensure expired top listings are demoted to normal."""
-    CarListing.demote_expired_top_listings()
+    if not cache.add(TOP_DEMOTION_LOCK_KEY, 1, TOP_DEMOTION_MIN_INTERVAL_SECONDS):
+        return 0
+    return CarListing.demote_expired_top_listings()
 
 
 def _charge_top_listing_fee(user):
@@ -49,10 +91,67 @@ def _clear_top_listing_window(listing):
     listing.top_expires_at = None
 
 
+def _set_public_cache_headers(response, max_age=LISTINGS_PUBLIC_CACHE_SECONDS):
+    response["Cache-Control"] = (
+        f"public, max-age={max_age}, stale-while-revalidate={LISTINGS_PUBLIC_STALE_SECONDS}"
+    )
+
+
 class CarListingViewSet(viewsets.ModelViewSet):
     """ViewSet for car listings"""
     serializer_class = CarListingSerializer
     parser_classes = (MultiPartParser, FormParser)
+    pagination_class = ListingsPagination
+
+    def _build_public_cache_key(self):
+        # Normalize params so query param order does not fragment cache keys.
+        normalized_parts = []
+        for key in sorted(self.request.query_params.keys()):
+            values = self.request.query_params.getlist(key)
+            for value in sorted(values):
+                normalized_parts.append(f"{key}={value}")
+        normalized_query = "&".join(normalized_parts)
+        digest = hashlib.sha256(normalized_query.encode("utf-8")).hexdigest()
+        return f"listings:list:v1:{digest}"
+
+    def _set_list_cache_headers(self, response):
+        patch_vary_headers(response, ("Authorization",))
+        if self.request.user.is_authenticated:
+            patch_cache_control(response, private=True, no_cache=True, no_store=True, max_age=0)
+            return
+        _set_public_cache_headers(response, max_age=LISTINGS_PUBLIC_CACHE_SECONDS)
+
+    def list(self, request, *args, **kwargs):
+        cache_key = None
+        if not request.user.is_authenticated:
+            cache_key = self._build_public_cache_key()
+            cached_payload = cache.get(cache_key)
+            if cached_payload is not None:
+                response = Response(cached_payload, status=status.HTTP_200_OK)
+                self._set_list_cache_headers(response)
+                response["X-Listings-Cache"] = "HIT"
+                return response
+
+        response = super().list(request, *args, **kwargs)
+
+        if cache_key and response.status_code == status.HTTP_200_OK:
+            cache.set(cache_key, response.data, LISTINGS_PUBLIC_CACHE_SECONDS)
+            response["X-Listings-Cache"] = "MISS"
+
+        self._set_list_cache_headers(response)
+        return response
+
+    def get_serializer_class(self):
+        """Use a lightweight serializer when requested."""
+        if self.action == "list":
+            lite = (self.request.query_params.get("lite") or "").lower()
+            if lite in {"1", "true", "yes"}:
+                return CarListingLiteSerializer
+            compact = (self.request.query_params.get("compact") or "").lower()
+            if compact in {"1", "true", "yes"}:
+                return CarListingSearchCompactSerializer
+            return CarListingListSerializer
+        return super().get_serializer_class()
 
     def get_queryset(self):
         """Get listings based on user and filters"""
@@ -118,6 +217,10 @@ class CarListingViewSet(viewsets.ModelViewSet):
             else:
                 # Default fallback
                 queryset = queryset.order_by('brand', 'model', 'price')
+
+        else:
+            # Stable default ordering for pagination and landing page
+            queryset = queryset.order_by('-created_at')
 
         # Fuel filter - handle both display names and keys
         fuel = self.request.query_params.get('fuel')
@@ -224,6 +327,63 @@ class CarListingViewSet(viewsets.ModelViewSet):
             }
             category_key = category_mapping.get(category, category)
             queryset = queryset.filter(category=category_key)
+
+        if self.action == "list":
+            lite = (self.request.query_params.get("lite") or "").lower()
+            compact = (self.request.query_params.get("compact") or "").lower()
+            first_image_subquery = CarImage.objects.filter(
+                listing_id=OuterRef('pk')
+            ).order_by('-is_cover', 'order', 'id').values('image')[:1]
+            image_prefetch = Prefetch(
+                'images',
+                queryset=CarImage.objects.only('id', 'image', 'order', 'is_cover', 'listing_id').order_by('order')
+            )
+
+            if lite in {"1", "true", "yes"}:
+                queryset = queryset.annotate(
+                    first_image=Subquery(first_image_subquery)
+                ).only(
+                    'id', 'slug', 'brand', 'model', 'year_from', 'price', 'mileage',
+                    'fuel', 'power', 'city', 'created_at', 'listing_type'
+                )
+            elif compact in {"1", "true", "yes"}:
+                queryset = queryset.annotate(
+                    description_preview=Substr('description', 1, 220),
+                    first_image=Subquery(first_image_subquery)
+                ).select_related(
+                    'user',
+                    'user__business_profile',
+                    'user__private_profile'
+                ).only(
+                    'id', 'slug', 'brand', 'model', 'year_from', 'price', 'mileage',
+                    'fuel', 'gearbox', 'power', 'city',
+                    'category', 'condition', 'created_at', 'listing_type',
+                    'user_id', 'user__email',
+                    'user__business_profile__dealer_name',
+                    'user__private_profile__id'
+                )
+            else:
+                queryset = queryset.annotate(
+                    description_preview=Substr('description', 1, 220)
+                ).select_related(
+                    'user',
+                    'user__business_profile',
+                    'user__private_profile'
+                ).only(
+                    'id', 'slug', 'brand', 'model', 'year_from', 'price', 'mileage',
+                    'fuel', 'gearbox', 'power', 'city',
+                    'category', 'condition', 'created_at', 'listing_type',
+                    'is_active', 'is_draft', 'is_archived',
+                    'user_id', 'user__email',
+                    'user__business_profile__dealer_name',
+                    'user__private_profile__id'
+                ).prefetch_related(image_prefetch)
+        elif self.action == "retrieve":
+            queryset = queryset.select_related(
+                'user',
+                'user__business_profile',
+                'user__private_profile'
+            ).prefetch_related('images')
 
         return queryset
 
@@ -613,3 +773,51 @@ def get_user_favorites(request):
     ).select_related('listing').prefetch_related('listing__images')
     serializer = FavoriteSerializer(favorites, many=True, context={'request': request})
     return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def latest_listings(request):
+    """Return the latest 16 listings for the landing page with minimal payload."""
+    cached_payload = cache.get(LATEST_LISTINGS_CACHE_KEY)
+    if cached_payload is not None:
+        response = Response(cached_payload, status=status.HTTP_200_OK)
+        _set_public_cache_headers(response, max_age=LATEST_LISTINGS_CACHE_SECONDS)
+        response["X-Latest-Listings-Cache"] = "HIT"
+        return response
+
+    _demote_expired_top_listings()
+    cutoff = get_expiry_cutoff()
+    first_image_subquery = CarImage.objects.filter(
+        listing_id=OuterRef('pk')
+    ).order_by('-is_cover', 'order', 'id').values('image')[:1]
+
+    queryset = (
+        CarListing.objects.filter(
+            is_active=True,
+            is_draft=False,
+            is_archived=False,
+            created_at__gte=cutoff
+        )
+        .annotate(
+            top_rank=Case(
+                When(listing_type='top', then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField(),
+            ),
+            first_image=Subquery(first_image_subquery),
+        )
+        .only(
+            'id', 'slug', 'brand', 'model', 'year_from', 'price', 'mileage',
+            'fuel', 'power', 'city', 'created_at', 'listing_type'
+        )
+        .order_by('top_rank', '-created_at')[:16]
+    )
+
+    payload = CarListingLiteSerializer(queryset, many=True, context={'request': request}).data
+    cache.set(LATEST_LISTINGS_CACHE_KEY, payload, LATEST_LISTINGS_CACHE_SECONDS)
+
+    response = Response(payload, status=status.HTTP_200_OK)
+    _set_public_cache_headers(response, max_age=LATEST_LISTINGS_CACHE_SECONDS)
+    response["X-Latest-Listings-Cache"] = "MISS"
+    return response

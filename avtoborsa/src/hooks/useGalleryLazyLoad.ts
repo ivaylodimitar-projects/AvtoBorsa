@@ -52,10 +52,19 @@ export const useGalleryLazyLoad = (
  */
 export const useImageUrl = () => {
   return useCallback((imagePath: string) => {
+    if (!imagePath) {
+      return '';
+    }
     if (imagePath.startsWith('http')) {
       return imagePath;
     }
-    return `http://localhost:8000${imagePath}`;
+    if (imagePath.startsWith('/')) {
+      return `http://localhost:8000${imagePath}`;
+    }
+    if (imagePath.startsWith('media/')) {
+      return `http://localhost:8000/${imagePath}`;
+    }
+    return `http://localhost:8000/media/${imagePath}`;
   }, []);
 };
 
@@ -85,4 +94,3 @@ export const useImagePreloader = () => {
 
   return { preloadImage, preloadImages };
 };
-

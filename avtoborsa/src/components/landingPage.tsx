@@ -4,6 +4,7 @@ import { CAR_FEATURES } from "../constants/carFeatures";
 import { AdvancedSearch } from "./AdvancedSearch";
 import { useRecentSearches } from "../hooks/useRecentSearches";
 import { useSavedSearches } from "../hooks/useSavedSearches";
+import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 
 type CarListing = {
   id: number;
@@ -41,7 +42,8 @@ const isTopListing = (listing: CarListing) => {
 
 const NEW_LISTING_BADGE_MINUTES = 10;
 const NEW_LISTING_BADGE_WINDOW_MS = NEW_LISTING_BADGE_MINUTES * 60 * 1000;
-const NEW_LISTING_BADGE_REFRESH_MS = 30_000;
+const LATEST_LISTINGS_CACHE_KEY = "latestListingsLiteV2";
+const LATEST_LISTINGS_CACHE_TTL_MS = 60_000;
 
 type Fuel = "Бензин" | "Дизел" | "Газ/Бензин" | "Хибрид" | "Електро";
 type Gearbox = "Ръчна" | "Автоматик";
@@ -157,41 +159,74 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const { searches } = useRecentSearches();
   const { savedSearches } = useSavedSearches();
+  const getImageUrl = useImageUrl();
 
   // Latest listings
   const [latestListings, setLatestListings] = useState<CarListing[]>([]);
   const [listingsLoading, setListingsLoading] = useState(true);
-  const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
 
   useEffect(() => {
+    const controller = new AbortController();
+    let hasValidCache = false;
+
+    const cachedRaw = sessionStorage.getItem(LATEST_LISTINGS_CACHE_KEY);
+    if (cachedRaw) {
+      try {
+        const cached = JSON.parse(cachedRaw) as { ts: number; data: CarListing[] };
+        if (cached?.data && Date.now() - cached.ts < LATEST_LISTINGS_CACHE_TTL_MS) {
+          hasValidCache = true;
+          setLatestListings(cached.data);
+          setListingsLoading(false);
+        }
+      } catch (err) {
+        console.warn("Failed to parse latest listings cache:", err);
+      }
+    }
+
     const fetchLatest = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/listings/?limit=16");
-        if (!response.ok) throw new Error("Failed to fetch");
-        const data = await response.json();
-        const all: CarListing[] = Array.isArray(data) ? data : (data.results || []);
-        // Sort: TOP first, then by created_at descending
-        const sorted = [...all].sort((a, b) => {
-          const aTop = isTopListing(a) ? 1 : 0;
-          const bTop = isTopListing(b) ? 1 : 0;
-          if (bTop !== aTop) return bTop - aTop;
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        });
-        setLatestListings(sorted.slice(0, 16));
+        if (!hasValidCache) {
+          setListingsLoading(true);
+        }
+        const latestResponse = await fetch(
+          "http://localhost:8000/api/listings/latest/",
+          { signal: controller.signal }
+        );
+
+        let latest: CarListing[] = [];
+        if (latestResponse.ok) {
+          const latestData = await latestResponse.json();
+          latest = Array.isArray(latestData) ? latestData : [];
+        } else {
+          const fallbackResponse = await fetch(
+            "http://localhost:8000/api/listings/?page=1&page_size=16&lite=1",
+            { signal: controller.signal }
+          );
+          if (!fallbackResponse.ok) throw new Error("Failed to fetch latest listings");
+          const fallbackData = await fallbackResponse.json();
+          const fallbackListings: CarListing[] = Array.isArray(fallbackData)
+            ? fallbackData
+            : (fallbackData.results || []);
+          latest = fallbackListings.slice(0, 16);
+        }
+
+        setLatestListings(latest);
+        sessionStorage.setItem(
+          LATEST_LISTINGS_CACHE_KEY,
+          JSON.stringify({ ts: Date.now(), data: latest })
+        );
       } catch (err) {
-        console.error("Error fetching latest listings:", err);
+        if (!controller.signal.aborted) {
+          console.error("Error fetching latest listings:", err);
+        }
       } finally {
-        setListingsLoading(false);
+        if (!controller.signal.aborted) {
+          setListingsLoading(false);
+        }
       }
     };
     fetchLatest();
-  }, []);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setCurrentTimeMs(Date.now());
-    }, NEW_LISTING_BADGE_REFRESH_MS);
-    return () => window.clearInterval(timer);
+    return () => controller.abort();
   }, []);
 
   // filters
@@ -267,7 +302,7 @@ export default function LandingPage() {
     if (!createdAt) return false;
     const createdAtMs = new Date(createdAt).getTime();
     if (Number.isNaN(createdAtMs)) return false;
-    const listingAgeMs = currentTimeMs - createdAtMs;
+    const listingAgeMs = Date.now() - createdAtMs;
     return listingAgeMs >= 0 && listingAgeMs <= NEW_LISTING_BADGE_WINDOW_MS;
   };
 
@@ -778,9 +813,11 @@ export default function LandingPage() {
             ) : latestListings.length > 0 ? (
               <>
                 <div className="latest-grid">
-                {latestListings.map((listing) => {
+                {latestListings.map((listing, index) => {
                   const isTop = isTopListing(listing);
                   const isNew = isListingNew(listing.created_at);
+                  const isAboveFold = index < 4;
+                  const listingImageUrl = listing.image_url ? getImageUrl(listing.image_url) : "";
                   return (
                     <div
                       key={listing.id}
@@ -794,6 +831,8 @@ export default function LandingPage() {
                         display: "flex",
                         flexDirection: "column",
                         cursor: "pointer",
+                        contentVisibility: "auto",
+                        containIntrinsicSize: "300px",
                       }}
                       onClick={() => navigate(`/details/${listing.slug}`)}
                     >
@@ -810,9 +849,12 @@ export default function LandingPage() {
                         )}
                         {listing.image_url ? (
                           <img
-                            src={listing.image_url}
+                            src={listingImageUrl}
                             alt={`${listing.brand} ${listing.model}`}
                             style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                            loading={isAboveFold ? "eager" : "lazy"}
+                            decoding="async"
+                            fetchPriority={isAboveFold ? "high" : "low"}
                           />
                         ) : (
                           <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>

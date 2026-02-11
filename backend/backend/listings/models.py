@@ -6,14 +6,14 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 from django.utils.text import slugify
 
-LISTING_EXPIRY_MINUTES = 30
+LISTING_EXPIRY_DAYS = 30
 TOP_LISTING_DURATION_DAYS = 14
 
 
 def get_expiry_cutoff(now=None):
     """Return the datetime before which listings are considered expired."""
     current = now or timezone.now()
-    return current - timedelta(minutes=LISTING_EXPIRY_MINUTES)
+    return current - timedelta(days=LISTING_EXPIRY_DAYS)
 
 
 def get_top_expiry(now=None):
@@ -144,6 +144,20 @@ class CarListing(models.Model):
         ordering = ['-created_at']
         verbose_name = 'Car Listing'
         verbose_name_plural = 'Car Listings'
+        indexes = [
+            models.Index(fields=['is_active', 'is_draft', 'is_archived', 'created_at'], name='carlist_state_created_idx'),
+            models.Index(fields=['created_at'], name='carlist_created_idx'),
+            models.Index(fields=['price'], name='carlist_price_idx'),
+            models.Index(fields=['year_from'], name='carlist_year_idx'),
+            models.Index(fields=['mileage'], name='carlist_mileage_idx'),
+            models.Index(fields=['power'], name='carlist_power_idx'),
+            models.Index(fields=['fuel'], name='carlist_fuel_idx'),
+            models.Index(fields=['gearbox'], name='carlist_gearbox_idx'),
+            models.Index(fields=['condition'], name='carlist_condition_idx'),
+            models.Index(fields=['category'], name='carlist_category_idx'),
+            models.Index(fields=['location_region'], name='carlist_region_idx'),
+            models.Index(fields=['listing_type', 'top_expires_at'], name='carlist_top_exp_idx'),
+        ]
 
     def __str__(self):
         return f"{self.brand} {self.model} - {self.title}"
