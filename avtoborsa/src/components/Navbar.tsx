@@ -338,6 +338,7 @@ const css = `
   background: #ecfdf5;
   border-color: #99f6e4;
   color: #0f766e;
+  text-decoration: none;
   transform: translateY(-1px);
 }
 
@@ -370,13 +371,15 @@ const css = `
   gap: 8px;
   text-decoration: none;
   box-shadow: 0 8px 18px rgba(15, 118, 110, 0.28);
-  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
   white-space: nowrap;
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 22px rgba(15, 118, 110, 0.35);
+  background: #0b5f59;
+  color: #fff;
+  text-decoration: none;
+  box-shadow: 0 10px 22px rgba(15, 118, 110, 0.32);
 }
 
 /* GHOST BUTTON */

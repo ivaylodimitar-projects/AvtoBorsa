@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+﻿import React, { useEffect, useRef } from "react";
 import { Activity, CheckCircle2, TrendingUp } from "lucide-react";
 
 interface Step {

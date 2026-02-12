@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
+﻿import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
 import { ChevronLeft, ChevronRight, Monitor, X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import ThumbnailStrip from './ThumbnailStrip';
 import { useThrottle } from '../../hooks/useThrottle';
@@ -29,6 +29,7 @@ const MainCarouselImage = memo<{
     src={getImageUrl(image.image)}
     alt={title}
     loading={isActive ? 'eager' : 'lazy'}
+    draggable={false}
     style={{
       width: '100%',
       height: '100%',
@@ -36,7 +37,12 @@ const MainCarouselImage = memo<{
       objectPosition: 'center',
       imageRendering: 'auto',
       display: 'block',
+      userSelect: 'none',
+      WebkitUserSelect: 'none',
+      msUserSelect: 'none',
+      WebkitUserDrag: 'none',
     }}
+    onDragStart={(e) => e.preventDefault()}
   />
 ));
 
@@ -405,7 +411,12 @@ const FullscreenModal = memo<{
                 transition: isDragging ? 'none' : 'transform 0.05s ease-out',
                 willChange: 'transform',
                 imageRendering: 'auto',
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+                msUserSelect: 'none',
+                WebkitUserDrag: 'none',
               }}
+              onDragStart={(e) => e.preventDefault()}
             />
           </div>
 
@@ -594,6 +605,9 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         overflow: 'hidden',
         backfaceVisibility: 'hidden' as const,
         transform: 'translateZ(0)',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        msUserSelect: 'none',
       } as React.CSSProperties,
       carouselInner: {
         position: 'absolute' as const,

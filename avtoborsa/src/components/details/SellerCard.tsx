@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Star, Phone, Eye, EyeOff, MapPin } from 'lucide-react';
 
 interface SellerCardProps {

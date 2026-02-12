@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Archive,
@@ -18,6 +18,16 @@ import {
   Euro,
   TrendingUp,
   TrendingDown,
+  Calendar,
+  MapPin,
+  Fuel,
+  Gauge,
+  Zap,
+  Settings,
+  Ruler,
+  Palette,
+  ShieldCheck,
+  Leaf,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -113,6 +123,7 @@ const MyAdsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("active");
+  const [modelFilter, setModelFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
@@ -163,19 +174,19 @@ const MyAdsPage: React.FC = () => {
         // Fetch all listing types in parallel
         const [activeRes, archivedRes, draftsRes, expiredRes, favoritesRes] = await Promise.all([
           fetch("http://localhost:8000/api/my-listings/", {
-            headers: { Authorization: `Token ${token}` },
+            headers: { Authorization: `Bearer ${token}` },
           }),
           fetch("http://localhost:8000/api/my-archived/", {
-            headers: { Authorization: `Token ${token}` },
+            headers: { Authorization: `Bearer ${token}` },
           }),
           fetch("http://localhost:8000/api/my-drafts/", {
-            headers: { Authorization: `Token ${token}` },
+            headers: { Authorization: `Bearer ${token}` },
           }),
           fetch("http://localhost:8000/api/my-expired/", {
-            headers: { Authorization: `Token ${token}` },
+            headers: { Authorization: `Bearer ${token}` },
           }),
           fetch("http://localhost:8000/api/my-favorites/", {
-            headers: { Authorization: `Token ${token}` },
+            headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
 
@@ -246,7 +257,7 @@ const MyAdsPage: React.FC = () => {
       const token = localStorage.getItem("authToken");
       if (!token) return;
       const response = await fetch("http://localhost:8000/api/auth/me/", {
-        headers: { Authorization: `Token ${token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) return;
       const data = await response.json();
@@ -416,7 +427,7 @@ const MyAdsPage: React.FC = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ listing_type: listingType }),
       });
@@ -476,7 +487,7 @@ const MyAdsPage: React.FC = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ listing_type: listingType }),
       });
@@ -554,7 +565,7 @@ const MyAdsPage: React.FC = () => {
       const token = localStorage.getItem("authToken");
       const response = await fetch(`http://localhost:8000/api/listings/${listingId}/archive/`, {
         method: "POST",
-        headers: { Authorization: `Token ${token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!response.ok) throw new Error("Failed to archive listing");
@@ -583,7 +594,7 @@ const MyAdsPage: React.FC = () => {
       const token = localStorage.getItem("authToken");
       const response = await fetch(`http://localhost:8000/api/listings/${listingId}/unarchive/`, {
         method: "POST",
-        headers: { Authorization: `Token ${token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!response.ok) {
@@ -627,7 +638,7 @@ const MyAdsPage: React.FC = () => {
       const token = localStorage.getItem("authToken");
       const response = await fetch(`http://localhost:8000/api/listings/${listingId}/delete/`, {
         method: "DELETE",
-        headers: { Authorization: `Token ${token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!response.ok) throw new Error("Failed to delete listing");
@@ -657,7 +668,7 @@ const MyAdsPage: React.FC = () => {
       const token = localStorage.getItem("authToken");
       const response = await fetch(`http://localhost:8000/api/listings/${listingId}/unfavorite/`, {
         method: "DELETE",
-        headers: { Authorization: `Token ${token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (!response.ok) throw new Error("Failed to remove from favorites");
@@ -833,6 +844,55 @@ const MyAdsPage: React.FC = () => {
     borderRadius: 10,
     fontSize: 12,
     fontWeight: 700,
+  },
+  filterRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    flexWrap: "wrap",
+    padding: "12px 16px",
+    marginBottom: 24,
+    borderRadius: 10,
+    border: "1px solid #bbf7d0",
+    background: "#ecfdf5",
+  },
+  filterLabel: {
+    fontSize: 13,
+    fontWeight: 700,
+    color: "#0f766e",
+  },
+  filterControls: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  filterSelect: {
+    height: 38,
+    minWidth: 200,
+    padding: "0 12px",
+    borderRadius: 8,
+    border: "1px solid #5eead4",
+    background: "#ffffff",
+    color: "#0f766e",
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  filterCount: {
+    fontSize: 12,
+    fontWeight: 600,
+    color: "#0f766e",
+  },
+  filterEmpty: {
+    padding: "24px 20px",
+    background: "#fff",
+    border: "1px solid #bbf7d0",
+    borderRadius: 8,
+    textAlign: "center",
+    color: "#0f766e",
+    fontWeight: 600,
   },
   modalOverlay: {
     position: "fixed" as const,
@@ -1141,21 +1201,30 @@ const MyAdsPage: React.FC = () => {
   },
   previewSpec: {
     padding: "10px 12px",
-    background: "#fafafa",
+    background: "#ecfdf5",
     borderRadius: 10,
-    border: "1px solid #e0e0e0",
+    border: "1px solid #bbf7d0",
+  },
+  previewSpecHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+  },
+  previewSpecIcon: {
+    color: "#0f766e",
   },
   previewSpecLabel: {
     fontSize: 11,
-    color: "#999",
+    color: "#111827",
     fontWeight: 700,
     textTransform: "uppercase",
-    marginBottom: 4,
+    letterSpacing: "0.3px",
   },
   previewSpecValue: {
     fontSize: 14,
-    fontWeight: 600,
-    color: "#333",
+    fontWeight: 700,
+    color: "#111827",
   },
   previewDescription: {
     fontSize: 13,
@@ -1224,23 +1293,22 @@ const MyAdsPage: React.FC = () => {
     color: "#64748b",
     fontWeight: 600,
   },
-  listingCard: {
-    background: "#fff",
-    borderRadius: 6,
-    overflow: "hidden",
-    border: "1px solid #e0e0e0",
-    boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
-    transition: "transform 0.2s ease, box-shadow 0.2s ease",
-    cursor: "pointer",
-    position: "relative",
-    display: "flex",
-    flexDirection: "column",
-    minHeight: "100%",
-  },
-  listingCardHover: {
-    transform: "translateY(-2px)",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
-  },
+    listingCard: {
+      background: "#fff",
+      borderRadius: 6,
+      overflow: "hidden",
+      border: "1px solid #e0e0e0",
+      boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
+      transition: "box-shadow 0.2s",
+      cursor: "pointer",
+      position: "relative",
+      display: "flex",
+      flexDirection: "column",
+      minHeight: "100%",
+    },
+    listingCardHover: {
+      boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+    },
   listingMedia: {
     position: "relative" as const,
     height: 220,
@@ -1397,11 +1465,11 @@ const MyAdsPage: React.FC = () => {
   },
   listingSubtitle: {
     fontSize: 13,
-    color: "#666",
+    color: "#6b7280",
   },
   listingDescription: {
     fontSize: 13,
-    color: "#666",
+    color: "#6b7280",
     lineHeight: 1.6,
     display: "-webkit-box",
     WebkitLineClamp: 2,
@@ -1415,12 +1483,18 @@ const MyAdsPage: React.FC = () => {
   },
   listingChip: {
     fontSize: 12,
-    color: "#0f766e",
+    color: "#111827",
     background: "#ecfdf5",
-    border: "1px solid #99f6e4",
+    border: "1px solid #bbf7d0",
     padding: "4px 8px",
     borderRadius: 3,
     fontWeight: 600,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+  },
+  listingChipIcon: {
+    color: "#0f766e",
   },
   listingActions: {
     display: "flex",
@@ -1591,9 +1665,23 @@ const MyAdsPage: React.FC = () => {
   };
 
   const currentListings = getCurrentListings();
-  const totalPages = Math.ceil(currentListings.length / PAGE_SIZE);
+  const modelOptions = Array.from(
+    new Set(
+      currentListings
+        .map((listing) => (listing.model || "").trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, "bg", { sensitivity: "base" }));
+  const showModelFilter = currentListings.length > 10;
+  const selectedModel = modelOptions.includes(modelFilter) ? modelFilter : "all";
+  const filteredListings =
+    selectedModel === "all"
+      ? currentListings
+      : currentListings.filter((listing) => listing.model === selectedModel);
+  const hasFilteredListings = filteredListings.length > 0;
+  const totalPages = Math.ceil(filteredListings.length / PAGE_SIZE);
   const safePage = totalPages > 0 ? Math.min(currentPage, totalPages) : 1;
-  const paginatedListings = currentListings.slice(
+  const paginatedListings = filteredListings.slice(
     (safePage - 1) * PAGE_SIZE,
     safePage * PAGE_SIZE
   );
@@ -1654,31 +1742,38 @@ const MyAdsPage: React.FC = () => {
   const PreviewChangeIcon = previewChangeDirection === "up" ? TrendingUp : TrendingDown;
   const previewSpecs = previewListing
     ? [
-        { label: "Година", value: previewListing.year_from ? String(previewListing.year_from) : "" },
-        { label: "Град", value: previewListing.city },
-        { label: "Гориво", value: formatFuelLabel(previewListing.fuel) },
-        { label: "Скоростна кутия", value: formatGearboxLabel(previewListing.gearbox) },
+        {
+          label: "Година",
+          value: previewListing.year_from ? String(previewListing.year_from) : "",
+          icon: Calendar,
+        },
+        { label: "Град", value: previewListing.city || "", icon: MapPin },
+        { label: "Гориво", value: formatFuelLabel(previewListing.fuel), icon: Fuel },
+        { label: "Скоростна кутия", value: formatGearboxLabel(previewListing.gearbox), icon: Settings },
         {
           label: "Пробег",
           value: Number.isFinite(previewListing.mileage)
             ? `${previewListing.mileage.toLocaleString("bg-BG")} км`
             : "",
+          icon: Gauge,
         },
         {
           label: "Мощност",
           value: Number.isFinite(previewListing.power)
             ? `${previewListing.power} к.с.`
             : "",
+          icon: Zap,
         },
         {
           label: "Кубатура",
           value: Number.isFinite(previewListing.displacement)
             ? `${previewListing.displacement} cc`
             : "",
+          icon: Ruler,
         },
-        { label: "Състояние", value: formatConditionLabel(previewListing.condition) },
-        { label: "Еко стандарт", value: formatEuroStandardLabel(previewListing.euro_standard) },
-        { label: "Цвят", value: previewListing.color },
+        { label: "Състояние", value: formatConditionLabel(previewListing.condition), icon: ShieldCheck },
+        { label: "Еко стандарт", value: formatEuroStandardLabel(previewListing.euro_standard), icon: Leaf },
+        { label: "Цвят", value: previewListing.color, icon: Palette },
       ].filter((spec) => spec.value)
     : [];
   const previewStatusLabel = getPreviewStatusLabel(previewTab);
@@ -1979,12 +2074,18 @@ const MyAdsPage: React.FC = () => {
 
                   {previewSpecs.length > 0 && (
                     <div style={styles.previewSpecs}>
-                      {previewSpecs.map((spec) => (
-                        <div key={spec.label} style={styles.previewSpec}>
-                          <div style={styles.previewSpecLabel}>{spec.label}</div>
-                          <div style={styles.previewSpecValue}>{spec.value}</div>
-                        </div>
-                      ))}
+                      {previewSpecs.map((spec) => {
+                        const Icon = spec.icon;
+                        return (
+                          <div key={spec.label} style={styles.previewSpec}>
+                            <div style={styles.previewSpecHeader}>
+                              <Icon size={14} style={styles.previewSpecIcon} />
+                              <div style={styles.previewSpecLabel}>{spec.label}</div>
+                            </div>
+                            <div style={styles.previewSpecValue}>{spec.value}</div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
 
@@ -2035,6 +2136,7 @@ const MyAdsPage: React.FC = () => {
                 onClick={() => {
                   setActiveTab(tab.id as TabType);
                   setCurrentPage(1);
+                  setModelFilter("all");
                 }}
                 style={{
                   ...styles.tab,
@@ -2064,6 +2166,32 @@ const MyAdsPage: React.FC = () => {
             );
           })}
         </div>
+
+        {showModelFilter && (
+          <div style={styles.filterRow}>
+            <div style={styles.filterLabel}>Филтър по модел</div>
+            <div style={styles.filterControls}>
+              <select
+                value={selectedModel}
+                onChange={(e) => {
+                  setModelFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                style={styles.filterSelect}
+              >
+                <option value="all">Всички модели</option>
+                {modelOptions.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div style={styles.filterCount}>
+              Показва {filteredListings.length} от {currentListings.length}
+            </div>
+          </div>
+        )}
 
         {currentListings.length === 0 ? (
           <div style={styles.emptyState}>
@@ -2109,66 +2237,90 @@ const MyAdsPage: React.FC = () => {
               </a>
             )}
           </div>
-        ) : (
-          <>
-          <div style={styles.listingsGrid}>
-            {paginatedListings.map((listing, index) => {
-            const statusLabel = getPreviewStatusLabel(activeTab);
-            const fallbackTitle = `${listing.brand || ""} ${listing.model || ""}`.trim();
-            const listingTitle = (listing.title || fallbackTitle || "Без заглавие").trim();
-            const subtitleParts = [
-              listing.year_from ? `${listing.year_from} г.` : "",
-              listing.city || "",
-              formatConditionLabel(listing.condition),
-            ].filter(Boolean);
-            const subtitle = subtitleParts.join(" · ");
-            const createdLabel = formatDate(listing.created_at);
-            const updatedLabel =
-              listing.updated_at && listing.updated_at !== listing.created_at
-                ? formatDate(listing.updated_at)
-                : "";
-            const descriptionSnippet = getShortDescription(listing.description);
-            const isTopActive =
-              listing.listing_type === "top" &&
-              activeTab !== "expired" &&
-              (!listing.top_expires_at ||
-                (Number.isFinite(new Date(listing.top_expires_at).getTime()) &&
-                  new Date(listing.top_expires_at).getTime() > currentTimeMs));
-            const topRemainingLabel = isTopActive ? getTopRemainingLabel(listing) : "";
-            const priceValue = Number(listing.price);
-            const priceLabel =
-              Number.isFinite(priceValue) && priceValue > 0
-                ? `${priceValue.toLocaleString("bg-BG")} €`
-                : "Цена не е зададена";
-            const latestPriceHistory = listing.price_history?.[0];
-            const latestDeltaValue = latestPriceHistory ? Number(latestPriceHistory.delta) : Number.NaN;
-            const showPriceChange = Number.isFinite(latestDeltaValue) && latestDeltaValue !== 0;
-            const priceChangeDirection = latestDeltaValue > 0 ? "up" : "down";
-            const priceChangeLabel = showPriceChange
-              ? `${Math.abs(latestDeltaValue).toLocaleString("bg-BG")} €`
-              : "";
-            const PriceChangeIcon = priceChangeDirection === "up" ? TrendingUp : TrendingDown;
-            const statusBadgeStyle =
-              statusLabel === "Изтекла"
-                ? { ...styles.statusBadge, ...styles.statusBadgeExpired }
-                : styles.statusBadge;
-            const chips = [
-              listing.fuel ? `Гориво: ${formatFuelLabel(listing.fuel)}` : "",
-              listing.gearbox ? `Кутия: ${formatGearboxLabel(listing.gearbox)}` : "",
-              Number.isFinite(listing.mileage) && listing.mileage > 0
-                ? `Пробег: ${listing.mileage.toLocaleString("bg-BG")} км`
-                : "",
-              Number.isFinite(listing.power) && listing.power > 0
-                ? `Мощност: ${listing.power} к.с.`
-                : "",
-              Number.isFinite(listing.displacement) && listing.displacement > 0
-                ? `Кубатура: ${listing.displacement} cc`
-                : "",
-              listing.euro_standard && listing.euro_standard !== "0"
-                ? `Еко: ${formatEuroStandardLabel(listing.euro_standard)}`
-                : "",
-              listing.color ? `Цвят: ${listing.color}` : "",
-            ].filter(Boolean) as string[];
+        ) : !hasFilteredListings ? (
+            <div style={styles.filterEmpty}>
+              Няма обяви за избрания модел.
+            </div>
+          ) : (
+            <>
+              <div style={styles.listingsGrid}>
+                {paginatedListings.map((listing, index) => {
+                  const statusLabel = getPreviewStatusLabel(activeTab);
+                  const fallbackTitle = `${listing.brand || ""} ${listing.model || ""}`.trim();
+                  const listingTitle = (listing.title || fallbackTitle || "Без заглавие").trim();
+                  const subtitleParts = [
+                    listing.year_from ? `${listing.year_from} г.` : "",
+                    listing.city || "",
+                    formatConditionLabel(listing.condition),
+                  ].filter(Boolean);
+                  const subtitle = subtitleParts.join(" · ");
+                  const createdLabel = formatDate(listing.created_at);
+                  const updatedLabel =
+                    listing.updated_at && listing.updated_at !== listing.created_at
+                      ? formatDate(listing.updated_at)
+                      : "";
+                  const descriptionSnippet = getShortDescription(listing.description);
+                  const isTopActive =
+                    listing.listing_type === "top" &&
+                    activeTab !== "expired" &&
+                    (!listing.top_expires_at ||
+                      (Number.isFinite(new Date(listing.top_expires_at).getTime()) &&
+                        new Date(listing.top_expires_at).getTime() > currentTimeMs));
+                  const topRemainingLabel = isTopActive ? getTopRemainingLabel(listing) : "";
+                  const priceValue = Number(listing.price);
+                  const priceLabel =
+                    Number.isFinite(priceValue) && priceValue > 0
+                      ? `${priceValue.toLocaleString("bg-BG")} €`
+                      : "Цена не е зададена";
+                  const latestPriceHistory = listing.price_history?.[0];
+                  const latestDeltaValue = latestPriceHistory ? Number(latestPriceHistory.delta) : Number.NaN;
+                  const showPriceChange = Number.isFinite(latestDeltaValue) && latestDeltaValue !== 0;
+                  const priceChangeDirection = latestDeltaValue > 0 ? "up" : "down";
+                  const priceChangeLabel = showPriceChange
+                    ? `${Math.abs(latestDeltaValue).toLocaleString("bg-BG")} €`
+                    : "";
+                  const PriceChangeIcon = priceChangeDirection === "up" ? TrendingUp : TrendingDown;
+                  const statusBadgeStyle =
+                    statusLabel === "Изтекла"
+                      ? { ...styles.statusBadge, ...styles.statusBadgeExpired }
+                      : styles.statusBadge;
+                  const chips = [
+                    { label: "Гориво", value: formatFuelLabel(listing.fuel), icon: Fuel },
+                    { label: "Кутия", value: formatGearboxLabel(listing.gearbox), icon: Settings },
+                    {
+                      label: "Пробег",
+                      value:
+                        Number.isFinite(listing.mileage) && listing.mileage > 0
+                          ? `${listing.mileage.toLocaleString("bg-BG")} км`
+                          : "",
+                      icon: Gauge,
+                    },
+                    {
+                      label: "Мощност",
+                      value:
+                        Number.isFinite(listing.power) && listing.power > 0
+                          ? `${listing.power} к.с.`
+                          : "",
+                      icon: Zap,
+                    },
+                    {
+                      label: "Кубатура",
+                      value:
+                        Number.isFinite(listing.displacement) && listing.displacement > 0
+                          ? `${listing.displacement} cc`
+                          : "",
+                      icon: Ruler,
+                    },
+                    {
+                      label: "Еко",
+                value:
+                  listing.euro_standard && listing.euro_standard !== "0"
+                    ? formatEuroStandardLabel(listing.euro_standard)
+                    : "",
+                icon: Leaf,
+              },
+              { label: "Цвят", value: listing.color, icon: Palette },
+            ].filter((chip) => chip.value);
             const visibleChips = chips.slice(0, 6);
             const isNewListing = isListingNew(listing.created_at);
             const cardImage = getCardImageSources(listing);
@@ -2277,14 +2429,18 @@ const MyAdsPage: React.FC = () => {
 
                 {visibleChips.length > 0 && (
                   <div style={styles.listingChips}>
-                    {visibleChips.map((chip, index) => (
-                      <span
-                        key={`${listing.id}-chip-${index}`}
-                        style={styles.listingChip}
-                      >
-                        {chip}
-                      </span>
-                    ))}
+                    {visibleChips.map((chip, index) => {
+                      const Icon = chip.icon;
+                      return (
+                        <span
+                          key={`${listing.id}-chip-${index}`}
+                          style={styles.listingChip}
+                        >
+                          <Icon size={12} style={styles.listingChipIcon} />
+                          {chip.label}: {chip.value}
+                        </span>
+                      );
+                    })}
                   </div>
                 )}
 

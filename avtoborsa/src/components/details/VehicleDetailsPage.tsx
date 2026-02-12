@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Clock, ImageOff, MapPin } from 'lucide-react';
 import RezonGallery from './RezonGallery';
@@ -54,6 +54,7 @@ interface CarListing {
   user_email: string;
   seller_name?: string;
   seller_type?: string;
+  seller_created_at?: string;
   created_at?: string;
   updated_at?: string;
   view_count?: number;
@@ -197,7 +198,7 @@ const VehicleDetailsPage: React.FC = () => {
         const token = localStorage.getItem('authToken');
         const headers: Record<string, string> = {};
         if (token) {
-          headers['Authorization'] = `Token ${token}`;
+          headers['Authorization'] = `Bearer ${token}`;
         }
 
         const response = await fetch(
@@ -664,8 +665,9 @@ const VehicleDetailsPage: React.FC = () => {
     similarMetaItem: {
       padding: '4px 8px',
       borderRadius: 999,
-      background: '#f8fafc',
-      border: '1px solid #e2e8f0',
+      background: '#ecfdf5',
+      border: '1px solid #bbf7d0',
+      color: '#111827',
     },
     similarCity: {
       fontSize: 12,
@@ -894,6 +896,8 @@ const VehicleDetailsPage: React.FC = () => {
             sellerName={sellerName}
             sellerEmail={listing.user_email}
             phone={listing.phone}
+            sellerType={listing.seller_type}
+            sellerCreatedAt={listing.seller_created_at}
             showSellerAvatar={isBusinessSeller}
             listingId={listing.id}
             isMobile={false}
@@ -913,6 +917,8 @@ const VehicleDetailsPage: React.FC = () => {
           sellerName={sellerName}
           sellerEmail={listing.user_email}
           phone={listing.phone}
+          sellerType={listing.seller_type}
+          sellerCreatedAt={listing.seller_created_at}
           showSellerAvatar={isBusinessSeller}
           listingId={listing.id}
           isMobile={true}

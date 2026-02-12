@@ -303,7 +303,7 @@ const PublishPage: React.FC = () => {
 
           const response = await fetch("http://localhost:8000/api/my-listings/", {
             headers: {
-              Authorization: `Token ${token}`,
+              Authorization: `Bearer ${token}`,
             },
           });
 
@@ -732,7 +732,7 @@ const PublishPage: React.FC = () => {
 
         const response = await fetch(`http://localhost:8000/api/listings/${editId}/`, {
           headers: {
-            Authorization: `Token ${token}`,
+            Authorization: `Bearer ${token}`,
           },
         });
 
@@ -843,7 +843,7 @@ const PublishPage: React.FC = () => {
         {
           method: isEditMode ? "PATCH" : "POST",
           headers: {
-            Authorization: `Token ${token}`,
+            Authorization: `Bearer ${token}`,
           },
           body: formDataToSend,
         }
@@ -878,7 +878,7 @@ const PublishPage: React.FC = () => {
           const token = localStorage.getItem("authToken");
           if (token) {
             const meRes = await fetch("http://localhost:8000/api/auth/me/", {
-              headers: { Authorization: `Token ${token}` },
+              headers: { Authorization: `Bearer ${token}` },
             });
             if (meRes.ok) {
               const meData = await meRes.json();
@@ -900,7 +900,7 @@ const PublishPage: React.FC = () => {
         await fetch(`http://localhost:8000/api/listings/${editingListingId}/upload-images/`, {
           method: "POST",
           headers: {
-            Authorization: `Token ${token}`,
+            Authorization: `Bearer ${token}`,
           },
           body: imagesData,
         });

@@ -27,7 +27,8 @@ class PrivateUserSerializer(serializers.ModelSerializer):
         user = User.objects.create_user(
             username=email,
             email=email,
-            password=password
+            password=password,
+            is_active=False
         )
         
         # Create PrivateUser profile
@@ -71,7 +72,8 @@ class BusinessUserSerializer(serializers.ModelSerializer):
         user = User.objects.create_user(
             username=username,
             email=email,
-            password=password
+            password=password,
+            is_active=False
         )
         
         # Create BusinessUser profile

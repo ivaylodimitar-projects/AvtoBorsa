@@ -1,6 +1,5 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
 
 const CITIES = [
   "София", "Пловдив", "Варна", "Бургас", "Русе", "Стара Загора", "Плевен",
@@ -12,7 +11,6 @@ const CITIES = [
 
 const BusinessProfilePage: React.FC = () => {
   const navigate = useNavigate();
-  const { setUserFromToken } = useAuth();
   const [formData, setFormData] = useState({
     dealerName: "",
     city: "",
@@ -150,17 +148,35 @@ const BusinessProfilePage: React.FC = () => {
 
         if (response.ok) {
           const data = await response.json();
-          setSuccessMessage(data.message);
-          // Store the auth token and set user
-          if (data.token && data.user) {
-            setUserFromToken(data.user, data.token);
-          }
-          alert(data.message);
-          navigate("/");
+          setSuccessMessage(data.message || "Регистрацията е успешна. Изпратихме ти имейл за потвърждение.");
+          setErrors({});
+          setFormData({
+            dealerName: "",
+            city: "",
+            address: "",
+            phone: "",
+            email: "",
+            website: "",
+            username: "",
+            password: "",
+            confirmPassword: "",
+            companyName: "",
+            registrationAddress: "",
+            mol: "",
+            bulstat: "",
+            vatNumber: "",
+            adminName: "",
+            adminPhone: "",
+            description: "",
+          });
         } else {
           const errorData = await response.json();
           console.error("Backend error response:", errorData);
-          setErrors(errorData);
+          if (errorData?.error) {
+            setErrors({ submit: errorData.error });
+          } else {
+            setErrors(errorData);
+          }
         }
       } catch (error) {
         setErrors({ submit: "Грешка при свързване със сървъра" });
@@ -172,44 +188,99 @@ const BusinessProfilePage: React.FC = () => {
   };
 
   const styles: Record<string, React.CSSProperties> = {
-    page: { minHeight: "100vh", background: "#f7f7f7", width: "100%", boxSizing: "border-box" },
-    container: { maxWidth: 1100, margin: "0 auto", padding: "32px 20px", boxSizing: "border-box" },
+    page: { minHeight: "100vh", background: "linear-gradient(180deg, #f8fafc 0%, #eef2f7 60%, #f8fafc 100%)", width: "100%", boxSizing: "border-box" },
+    container: { maxWidth: 1100, margin: "0 auto", padding: "36px 20px", boxSizing: "border-box" },
     header: {
-      background: "linear-gradient(135deg, #667eea 0%, #4f5f89 100%)",
+      background: "linear-gradient(135deg, #0f766e 0%, #0b5f58 55%, #0f766e 100%)",
       padding: "28px",
-      borderRadius: 14,
+      borderRadius: 18,
       marginBottom: 28,
       color: "#fff",
-      boxShadow: "0 6px 20px rgba(79,95,137,0.12)",
+      boxShadow: "0 20px 40px rgba(15,118,110,0.18)",
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
       gap: 16,
       flexWrap: "wrap",
+      border: "1px solid rgba(15,118,110,0.25)",
     },
     headerLeft: { display: "flex", gap: 16, alignItems: "center" },
-    headerTitle: { fontSize: 26, fontWeight: 800, margin: 0 },
+    headerTitle: { fontSize: 26, fontWeight: 800, margin: 0, fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif" },
     headerSubtitle: { fontSize: 14, margin: 0, opacity: 0.95 },
-    formCard: { width: "100%", background: "#fff", borderRadius: 12, padding: 20, boxShadow: "0 6px 18px rgba(15,23,42,0.06)", boxSizing: "border-box" },
-    section: { marginBottom: 20, paddingBottom: 18, borderBottom: "1px solid #eef2f7" },
-    sectionTitle: { fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 12 },
+    formCard: { width: "100%", background: "#fff", borderRadius: 18, padding: 24, boxShadow: "0 16px 40px rgba(15,23,42,0.08)", boxSizing: "border-box", border: "1px solid #e5e7eb" },
+    section: { marginBottom: 20, paddingBottom: 18, borderBottom: "1px solid #e2e8f0" },
+    sectionTitle: { fontSize: 15, fontWeight: 700, color: "#0f766e", marginBottom: 12, fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif" },
     grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 },
     gridResponsive: { display: "grid", gridTemplateColumns: "1fr", gap: 12 },
     formRow: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 },
-    label: { fontSize: 13, fontWeight: 600, color: "#374151" },
-    input: { padding: "12px 14px", border: "1px solid #e6e9ef", borderRadius: 10, fontSize: 14, width: "100%", boxSizing: "border-box", outline: "none", transition: "box-shadow 0.15s, border-color 0.15s", background: "#fff", color: "#111827" },
+    label: { fontSize: 13, fontWeight: 600, color: "#334155" },
+    input: { padding: "12px 14px", border: "1px solid #e2e8f0", borderRadius: 10, fontSize: 14, width: "100%", boxSizing: "border-box", outline: "none", transition: "box-shadow 0.15s, border-color 0.15s", background: "#fff", color: "#111827" },
     errorText: { fontSize: 12, color: "#ef4444", marginTop: 6 },
-    footNote: { fontSize: 12, color: "#6b7280", marginTop: 10 },
+    footNote: { fontSize: 12, color: "#64748b", marginTop: 10 },
     submitRow: { display: "flex", gap: 12, marginTop: 14, alignItems: "center", flexWrap: "wrap" },
-    primaryButton: { padding: "12px 22px", background: "linear-gradient(135deg,#667eea 0%,#4f5f89 100%)", color: "#fff", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 700, cursor: "pointer", boxShadow: "0 8px 24px rgba(102,126,234,0.18)" },
-    ghostButton: { padding: "10px 18px", background: "transparent", border: "1px solid #e6e9ef", borderRadius: 10, fontSize: 14, cursor: "pointer", color: "#374151" },
-    smallNote: { fontSize: 12, color: "#9ca3af" },
+    primaryButton: { padding: "12px 22px", background: "#0f766e", color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: "pointer", boxShadow: "0 8px 24px rgba(15,118,110,0.24)" },
+    ghostButton: { padding: "10px 18px", background: "transparent", border: "1px solid #cbd5f5", borderRadius: 12, fontSize: 14, cursor: "pointer", color: "#0f766e" },
+    smallNote: { fontSize: 12, color: "#ff0000" },
+    errorBanner: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "12px 14px",
+      background: "#fef2f2",
+      border: "1px solid #fecaca",
+      borderRadius: 12,
+      fontSize: 13,
+      color: "#991b1b",
+      marginBottom: 18,
+    },
+    successBanner: {
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      padding: "12px 14px",
+      background: "#ecfdf5",
+      border: "1px solid #bbf7d0",
+      borderRadius: 12,
+      fontSize: 13,
+      color: "#0f766e",
+      marginBottom: 18,
+    },
+    successIcon: {
+      width: 30,
+      height: 30,
+      borderRadius: 10,
+      background: "rgba(16,185,129,0.2)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: "#0f766e",
+      flexShrink: 0,
+    },
+    successTitle: { fontSize: 13, fontWeight: 700, color: "#0f766e", marginBottom: 2 },
+    successText: { fontSize: 12, color: "#475569", lineHeight: 1.5 },
+    successButton: {
+      background: "#0f766e",
+      color: "#fff",
+      border: "none",
+      borderRadius: 10,
+      padding: "8px 14px",
+      fontSize: 12,
+      fontWeight: 700,
+      cursor: "pointer",
+    },
     // responsive tweaks via inline <style> below
   };
 
   return (
     <div style={styles.page}>
       <style>{`
+        .business-form input:focus,
+        .business-form select:focus,
+        .business-form textarea:focus {
+          border-color: #0f766e !important;
+          box-shadow: 0 0 0 3px rgba(15,118,110,0.12);
+        }
+
         @media (max-width: 768px) {
           .business-grid-2 { grid-template-columns: 1fr !important; }
           .business-header { padding: 20px !important; }
@@ -223,12 +294,40 @@ const BusinessProfilePage: React.FC = () => {
             <div style={{ width: 56, height: 56, borderRadius: 12, background: "rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 22 }}>Б</div>
             <div>
               <h1 style={styles.headerTitle}>Бизнес профил</h1>
-              <p style={styles.headerSubtitle}>Попълни информацията на твоя бизнес. Всички полета остават непроменени — само изгледът е обновен.</p>
+              <p style={styles.headerSubtitle}>Попълни информацията на твоя бизнес. Ще получиш имейл за потвърждение на акаунта.</p>
             </div>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="business-form" style={styles.formCard}>
+          {errors.submit && (
+            <div style={styles.errorBanner}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <circle cx="12" cy="12" r="10" />
+                <line x1="15" y1="9" x2="9" y2="15" />
+                <line x1="9" y1="9" x2="15" y2="15" />
+              </svg>
+              <span>{errors.submit}</span>
+            </div>
+          )}
+
+          {successMessage && (
+            <div style={styles.successBanner}>
+              <div style={styles.successIcon}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={styles.successTitle}>Провери пощата си</div>
+                <div style={styles.successText}>{successMessage}</div>
+              </div>
+              <button type="button" style={styles.successButton} onClick={() => navigate("/auth")}>
+                Вход
+              </button>
+            </div>
+          )}
+
           {/* Име и контакти */}
           <div style={{ ...styles.section }}>
             <h2 style={styles.sectionTitle}>Име и контакти</h2>
@@ -236,7 +335,7 @@ const BusinessProfilePage: React.FC = () => {
             <div style={styles.formRow}>
               <label style={styles.label}>Име на дилъра *</label>
               <input
-                style={{ ...styles.input, borderColor: errors.dealerName ? "#fca5a5" : "#e6e9ef" }}
+                style={{ ...styles.input, borderColor: errors.dealerName ? "#fca5a5" : "#e2e8f0" }}
                 type="text"
                 name="dealerName"
                 placeholder="Име на дилъра"
@@ -250,7 +349,7 @@ const BusinessProfilePage: React.FC = () => {
               <div style={styles.formRow}>
                 <label style={styles.label}>Местоположение *</label>
                 <select
-                  style={{ ...styles.input, borderColor: errors.city ? "#fca5a5" : "#e6e9ef" }}
+                  style={{ ...styles.input, borderColor: errors.city ? "#fca5a5" : "#e2e8f0" }}
                   name="city"
                   value={formData.city}
                   onChange={handleChange}
@@ -266,7 +365,7 @@ const BusinessProfilePage: React.FC = () => {
               <div style={styles.formRow}>
                 <label style={styles.label}>Адрес *</label>
                 <input
-                  style={{ ...styles.input, borderColor: errors.address ? "#fca5a5" : "#e6e9ef" }}
+                  style={{ ...styles.input, borderColor: errors.address ? "#fca5a5" : "#e2e8f0" }}
                   type="text"
                   name="address"
                   placeholder="Град, улица, номер"
@@ -281,7 +380,7 @@ const BusinessProfilePage: React.FC = () => {
               <div style={styles.formRow}>
                 <label style={styles.label}>Телефон *</label>
                 <input
-                  style={{ ...styles.input, borderColor: errors.phone ? "#fca5a5" : "#e6e9ef" }}
+                  style={{ ...styles.input, borderColor: errors.phone ? "#fca5a5" : "#e2e8f0" }}
                   type="tel"
                   name="phone"
                   placeholder="+359 88 123 4567"
@@ -294,7 +393,7 @@ const BusinessProfilePage: React.FC = () => {
               <div style={styles.formRow}>
                 <label style={styles.label}>Email *</label>
                 <input
-                  style={{ ...styles.input, borderColor: errors.email ? "#fca5a5" : "#e6e9ef" }}
+                  style={{ ...styles.input, borderColor: errors.email ? "#fca5a5" : "#e2e8f0" }}
                   type="email"
                   name="email"
                   placeholder="company@email.com"
@@ -319,14 +418,14 @@ const BusinessProfilePage: React.FC = () => {
               <label style={styles.label}>Потребителско име *</label>
               <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
                 <input
-                  style={{ ...styles.input, borderColor: errors.username ? "#fca5a5" : "#e6e9ef", flex: 1 }}
+                  style={{ ...styles.input, borderColor: errors.username ? "#fca5a5" : "#e2e8f0", flex: 1 }}
                   type="text"
                   name="username"
                   placeholder="username"
                   value={formData.username}
                   onChange={handleChange}
                 />
-                <span style={{ fontSize: 13, color: "#6b7280", paddingBottom: 10 }}>.mobile.bg</span>
+                <span style={{ fontSize: 13, color: "#6b7280", paddingBottom: 10 }}>.kar.bg</span>
               </div>
               {errors.username && <span style={styles.errorText}>{errors.username}</span>}
             </div>
@@ -335,7 +434,7 @@ const BusinessProfilePage: React.FC = () => {
               <div style={styles.formRow}>
                 <label style={styles.label}>Парола *</label>
                 <input
-                  style={{ ...styles.input, borderColor: errors.password ? "#fca5a5" : "#e6e9ef" }}
+                  style={{ ...styles.input, borderColor: errors.password ? "#fca5a5" : "#e2e8f0" }}
                   type="password"
                   name="password"
                   placeholder="Въведи парола"
@@ -348,7 +447,7 @@ const BusinessProfilePage: React.FC = () => {
               <div style={styles.formRow}>
                 <label style={styles.label}>Потвърди парола *</label>
                 <input
-                  style={{ ...styles.input, borderColor: errors.confirmPassword ? "#fca5a5" : "#e6e9ef" }}
+                  style={{ ...styles.input, borderColor: errors.confirmPassword ? "#fca5a5" : "#e2e8f0" }}
                   type="password"
                   name="confirmPassword"
                   placeholder="Потвърди паролата"
@@ -367,25 +466,25 @@ const BusinessProfilePage: React.FC = () => {
             <div className="business-grid-2" style={styles.grid2}>
               <div style={styles.formRow}>
                 <label style={styles.label}>Фирма *</label>
-                <input style={{ ...styles.input, borderColor: errors.companyName ? "#fca5a5" : "#e6e9ef" }} type="text" name="companyName" placeholder="Име на фирмата" value={formData.companyName} onChange={handleChange} />
+                <input style={{ ...styles.input, borderColor: errors.companyName ? "#fca5a5" : "#e2e8f0" }} type="text" name="companyName" placeholder="Име на фирмата" value={formData.companyName} onChange={handleChange} />
                 {errors.companyName && <span style={styles.errorText}>{errors.companyName}</span>}
               </div>
 
               <div style={styles.formRow}>
                 <label style={styles.label}>Адресна регистрация *</label>
-                <input style={{ ...styles.input, borderColor: errors.registrationAddress ? "#fca5a5" : "#e6e9ef" }} type="text" name="registrationAddress" placeholder="Адрес на регистрация" value={formData.registrationAddress} onChange={handleChange} />
+                <input style={{ ...styles.input, borderColor: errors.registrationAddress ? "#fca5a5" : "#e2e8f0" }} type="text" name="registrationAddress" placeholder="Адрес на регистрация" value={formData.registrationAddress} onChange={handleChange} />
                 {errors.registrationAddress && <span style={styles.errorText}>{errors.registrationAddress}</span>}
               </div>
 
               <div style={styles.formRow}>
                 <label style={styles.label}>МОЛ *</label>
-                <input style={{ ...styles.input, borderColor: errors.mol ? "#fca5a5" : "#e6e9ef" }} type="text" name="mol" placeholder="Материално отговорно лице" value={formData.mol} onChange={handleChange} />
+                <input style={{ ...styles.input, borderColor: errors.mol ? "#fca5a5" : "#e2e8f0" }} type="text" name="mol" placeholder="Материално отговорно лице" value={formData.mol} onChange={handleChange} />
                 {errors.mol && <span style={styles.errorText}>{errors.mol}</span>}
               </div>
 
               <div style={styles.formRow}>
                 <label style={styles.label}>БУЛСТАТ *</label>
-                <input style={{ ...styles.input, borderColor: errors.bulstat ? "#fca5a5" : "#e6e9ef" }} type="text" name="bulstat" placeholder="БУЛСТАТ номер" value={formData.bulstat} onChange={handleChange} />
+                <input style={{ ...styles.input, borderColor: errors.bulstat ? "#fca5a5" : "#e2e8f0" }} type="text" name="bulstat" placeholder="БУЛСТАТ номер" value={formData.bulstat} onChange={handleChange} />
                 {errors.bulstat && <span style={styles.errorText}>{errors.bulstat}</span>}
               </div>
             </div>
@@ -403,13 +502,13 @@ const BusinessProfilePage: React.FC = () => {
             <div className="business-grid-2" style={styles.grid2}>
               <div style={styles.formRow}>
                 <label style={styles.label}>Име и Фамилия *</label>
-                <input style={{ ...styles.input, borderColor: errors.adminName ? "#fca5a5" : "#e6e9ef" }} type="text" name="adminName" placeholder="Име и Фамилия" value={formData.adminName} onChange={handleChange} />
+                <input style={{ ...styles.input, borderColor: errors.adminName ? "#fca5a5" : "#e2e8f0" }} type="text" name="adminName" placeholder="Име и Фамилия" value={formData.adminName} onChange={handleChange} />
                 {errors.adminName && <span style={styles.errorText}>{errors.adminName}</span>}
               </div>
 
               <div style={styles.formRow}>
                 <label style={styles.label}>Мобилен телефон *</label>
-                <input style={{ ...styles.input, borderColor: errors.adminPhone ? "#fca5a5" : "#e6e9ef" }} type="tel" name="adminPhone" placeholder="+359 88 123 4567" value={formData.adminPhone} onChange={handleChange} />
+                <input style={{ ...styles.input, borderColor: errors.adminPhone ? "#fca5a5" : "#e2e8f0" }} type="tel" name="adminPhone" placeholder="+359 88 123 4567" value={formData.adminPhone} onChange={handleChange} />
                 {errors.adminPhone && <span style={styles.errorText}>{errors.adminPhone}</span>}
               </div>
             </div>

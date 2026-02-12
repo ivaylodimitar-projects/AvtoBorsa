@@ -280,6 +280,7 @@ class CarListingSerializer(serializers.ModelSerializer):
     # Seller information
     seller_name = serializers.SerializerMethodField()
     seller_type = serializers.SerializerMethodField()
+    seller_created_at = serializers.SerializerMethodField()
     price_history = serializers.SerializerMethodField()
     # Handle image uploads during creation
     images_upload = serializers.ListField(
@@ -295,9 +296,10 @@ class CarListingSerializer(serializers.ModelSerializer):
             'year_from', 'month', 'vin', 'price', 'location_country', 'location_region', 'city',
             'fuel', 'fuel_display', 'gearbox', 'gearbox_display', 'mileage', 'color', 'condition', 'condition_display', 'power', 'displacement', 'euro_standard',
             'description', 'phone', 'email', 'features', 'listing_type', 'listing_type_display', 'top_expires_at', 'view_count',
-            'is_draft', 'is_active', 'is_archived', 'created_at', 'updated_at', 'images', 'image_url', 'is_favorited', 'seller_name', 'seller_type', 'price_history', 'images_upload'
+            'is_draft', 'is_active', 'is_archived', 'created_at', 'updated_at', 'images', 'image_url', 'is_favorited',
+            'seller_name', 'seller_type', 'seller_created_at', 'price_history', 'images_upload'
         ]
-        read_only_fields = ['id', 'slug', 'user', 'user_email', 'created_at', 'updated_at', 'images', 'image_url', 'is_favorited', 'is_draft', 'is_active', 'fuel_display', 'gearbox_display', 'condition_display', 'category_display', 'listing_type_display', 'seller_name', 'seller_type', 'price_history', 'top_expires_at', 'view_count']
+        read_only_fields = ['id', 'slug', 'user', 'user_email', 'created_at', 'updated_at', 'images', 'image_url', 'is_favorited', 'is_draft', 'is_active', 'fuel_display', 'gearbox_display', 'condition_display', 'category_display', 'listing_type_display', 'seller_name', 'seller_type', 'seller_created_at', 'price_history', 'top_expires_at', 'view_count']
 
     def get_fuel_display(self, obj):
         """Return display name for fuel"""
@@ -396,6 +398,11 @@ class CarListingSerializer(serializers.ModelSerializer):
         elif hasattr(user, 'private_profile'):
             return 'private'
         return 'unknown'
+
+    def get_seller_created_at(self, obj):
+        """Return account creation date for the seller."""
+        user = obj.user
+        return user.date_joined if user and user.date_joined else None
 
     def get_price_history(self, obj):
         history = obj.price_history.order_by('-changed_at')[:20]

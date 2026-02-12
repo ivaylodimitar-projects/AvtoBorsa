@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useRef, useMemo, useState } from 'react';
+﻿import React, { memo, useEffect, useRef, useMemo, useState } from 'react';
 import { Image } from 'lucide-react';
 
 interface Image {

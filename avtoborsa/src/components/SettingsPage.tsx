@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Lock, Trash2, Wallet, User } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -55,7 +55,7 @@ const SettingsPage: React.FC = () => {
       setLoadingTransactions(true);
       try {
         const res = await fetch(`${API_BASE_URL}/api/payments/transactions/`, {
-          headers: { Authorization: `Token ${token}` },
+          headers: { Authorization: `Bearer ${token}` },
         });
         if (!res.ok) {
           setTransactions([]);
@@ -98,7 +98,7 @@ const SettingsPage: React.FC = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           old_password: oldPassword,
@@ -141,7 +141,7 @@ const SettingsPage: React.FC = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
       });
@@ -183,7 +183,7 @@ const SettingsPage: React.FC = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Token ${token}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ password: deletePassword }),
       });

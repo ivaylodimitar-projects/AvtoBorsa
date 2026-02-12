@@ -19,10 +19,10 @@ const ProfileTypePage: React.FC = () => {
           transition: background 0.2s ease, box-shadow 0.2s ease;
         }
         .profile-card-btn:hover {
-          box-shadow: 0 4px 14px rgba(0,102,204,0.35);
+          box-shadow: 0 10px 24px rgba(15,118,110,0.28);
         }
         .profile-card-btn-business:hover {
-          box-shadow: 0 4px 14px rgba(102,126,234,0.35);
+          box-shadow: 0 10px 24px rgba(15,118,110,0.22);
         }
 
         /* Tablet (768px - 1023px) */
@@ -85,14 +85,14 @@ const ProfileTypePage: React.FC = () => {
             className="profile-card-interactive"
             style={{
               ...styles.card,
-              borderColor: hoveredCard === "private" ? "#0066cc" : "#eef2f7",
+              borderColor: hoveredCard === "private" ? "#0f766e" : "#e5e7eb",
             }}
             onMouseEnter={() => setHoveredCard("private")}
             onMouseLeave={() => setHoveredCard(null)}
           >
             <div style={styles.cardBody} className="profile-card-body">
-              <div style={{ ...styles.cardIconWrap, background: "rgba(0,102,204,0.08)" }} className="profile-card-icon-wrap">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0066cc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <div style={{ ...styles.cardIconWrap, background: "rgba(15,118,110,0.12)" }} className="profile-card-icon-wrap">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0f766e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                   <circle cx="12" cy="7" r="4" />
                 </svg>
@@ -105,15 +105,15 @@ const ProfileTypePage: React.FC = () => {
 
               <div style={styles.featuresList}>
                 <div style={styles.featureItem} className="profile-feature-item">
-                  <span style={{ ...styles.featureCheck, color: "#0066cc" }}>&#10003;</span>
+                  <span style={{ ...styles.featureCheck, color: "#0f766e" }}>&#10003;</span>
                   Публикувай до 5 обяви
                 </div>
                 <div style={styles.featureItem} className="profile-feature-item">
-                  <span style={{ ...styles.featureCheck, color: "#0066cc" }}>&#10003;</span>
+                  <span style={{ ...styles.featureCheck, color: "#0f766e" }}>&#10003;</span>
                   Безплатна регистрация
                 </div>
                 <div style={styles.featureItem} className="profile-feature-item">
-                  <span style={{ ...styles.featureCheck, color: "#0066cc" }}>&#10003;</span>
+                  <span style={{ ...styles.featureCheck, color: "#0f766e" }}>&#10003;</span>
                   Бързо и лесно управление
                 </div>
               </div>
@@ -137,14 +137,14 @@ const ProfileTypePage: React.FC = () => {
             className="profile-card-interactive"
             style={{
               ...styles.card,
-              borderColor: hoveredCard === "business" ? "#667eea" : "#eef2f7",
+              borderColor: hoveredCard === "business" ? "#0b5f58" : "#e5e7eb",
             }}
             onMouseEnter={() => setHoveredCard("business")}
             onMouseLeave={() => setHoveredCard(null)}
           >
             <div style={styles.cardBody} className="profile-card-body">
-              <div style={{ ...styles.cardIconWrap, background: "rgba(102,126,234,0.08)" }} className="profile-card-icon-wrap">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#667eea" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <div style={{ ...styles.cardIconWrap, background: "rgba(13,148,136,0.12)" }} className="profile-card-icon-wrap">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0b5f58" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
                   <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
                 </svg>
@@ -157,15 +157,15 @@ const ProfileTypePage: React.FC = () => {
 
               <div style={styles.featuresList}>
                 <div style={styles.featureItem} className="profile-feature-item">
-                  <span style={{ ...styles.featureCheck, color: "#667eea" }}>&#10003;</span>
+                  <span style={{ ...styles.featureCheck, color: "#0b5f58" }}>&#10003;</span>
                   Неограничен брой обяви
                 </div>
                 <div style={styles.featureItem} className="profile-feature-item">
-                  <span style={{ ...styles.featureCheck, color: "#667eea" }}>&#10003;</span>
+                  <span style={{ ...styles.featureCheck, color: "#0b5f58" }}>&#10003;</span>
                   Фирмен профил с лого
                 </div>
                 <div style={styles.featureItem} className="profile-feature-item">
-                  <span style={{ ...styles.featureCheck, color: "#667eea" }}>&#10003;</span>
+                  <span style={{ ...styles.featureCheck, color: "#0b5f58" }}>&#10003;</span>
                   Разширена статистика
                 </div>
               </div>
@@ -206,7 +206,7 @@ const ProfileTypePage: React.FC = () => {
 const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: "100vh",
-    background: "#f5f5f5",
+    background: "linear-gradient(180deg, #f8fafc 0%, #eef2f7 60%, #f8fafc 100%)",
     width: "100%",
     boxSizing: "border-box",
   },
@@ -219,13 +219,14 @@ const styles: Record<string, React.CSSProperties> = {
 
   // Hero
   hero: {
-    background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)",
-    borderRadius: 14,
+    background: "linear-gradient(135deg, #0f766e 0%, #0b5f58 55%, #0f766e 100%)",
+    borderRadius: 18,
     padding: "28px",
     marginBottom: 28,
-    boxShadow: "0 6px 20px rgba(15,23,42,0.15)",
+    boxShadow: "0 20px 40px rgba(15,118,110,0.18)",
     position: "relative",
     overflow: "hidden",
+    border: "1px solid rgba(15,118,110,0.25)",
   },
   heroContent: {
     display: "flex",
@@ -238,7 +239,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: 52,
     height: 52,
     borderRadius: 12,
-    background: "rgba(255,255,255,0.1)",
+    background: "rgba(255,255,255,0.18)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -251,10 +252,11 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#fff",
     margin: 0,
     lineHeight: 1.2,
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
   },
   heroSubtitle: {
     fontSize: 14,
-    color: "rgba(255,255,255,0.65)",
+    color: "rgba(255,255,255,0.78)",
     margin: "4px 0 0",
   },
 
@@ -268,9 +270,9 @@ const styles: Record<string, React.CSSProperties> = {
   // Card
   card: {
     background: "#fff",
-    borderRadius: 14,
-    border: "2px solid #eef2f7",
-    boxShadow: "0 4px 16px rgba(15,23,42,0.06)",
+    borderRadius: 16,
+    border: "1px solid #e5e7eb",
+    boxShadow: "0 16px 34px rgba(15,23,42,0.08)",
     overflow: "hidden",
   },
   cardBody: {
@@ -292,6 +294,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     color: "#111827",
     margin: "0 0 8px",
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
   },
   cardDesc: {
     fontSize: 14,
@@ -325,10 +328,10 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     justifyContent: "center",
     padding: "13px 24px",
-    background: "#0066cc",
+    background: "#0f766e",
     color: "#fff",
     border: "none",
-    borderRadius: 10,
+    borderRadius: 12,
     fontSize: 15,
     fontWeight: 700,
     cursor: "pointer",
@@ -341,10 +344,10 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     justifyContent: "center",
     padding: "13px 24px",
-    background: "linear-gradient(135deg, #667eea 0%, #4f5f89 100%)",
+    background: "linear-gradient(135deg, #0f766e 0%, #0b5f58 100%)",
     color: "#fff",
     border: "none",
-    borderRadius: 10,
+    borderRadius: 12,
     fontSize: 15,
     fontWeight: 700,
     cursor: "pointer",
@@ -360,7 +363,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 14,
   },
   loginLink: {
-    color: "#0066cc",
+    color: "#0f766e",
     fontWeight: 600,
     cursor: "pointer",
     textDecoration: "none",

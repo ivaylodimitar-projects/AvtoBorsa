@@ -1058,24 +1058,6 @@ export default function LandingPage() {
         </section>
 
         {/* CTA */}
-        <section style={styles.cta}>
-          <div style={styles.ctaInner} className="cta-inner">
-            <div>
-              <h3 style={styles.h3}>Пусни обява за 2 минути</h3>
-              <p style={styles.ctaText}>
-                Снимки, описание, цена — готово. Удобно за телефон, бързо за публикуване.
-              </p>
-            </div>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }} className="cta-buttons">
-              <button style={styles.primaryBtnWide} type="button">
-                + Пусни обява
-              </button>
-              <button style={styles.secondaryBtn} type="button">
-                Виж как работи
-              </button>
-            </div>
-          </div>
-        </section>
       </main>
     </div>
   );

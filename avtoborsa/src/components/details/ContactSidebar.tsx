@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import {
   Phone,
   Heart,
@@ -23,6 +23,8 @@ interface ContactSidebarProps {
   sellerName: string;
   sellerEmail: string;
   phone: string;
+  sellerType?: string;
+  sellerCreatedAt?: string;
   showSellerAvatar?: boolean;
   updatedLabel?: string | null;
   updatedAt?: string;
@@ -44,6 +46,8 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
   sellerName,
   sellerEmail,
   phone,
+  sellerType,
+  sellerCreatedAt,
   showSellerAvatar = true,
   updatedLabel,
   updatedAt,
@@ -57,7 +61,6 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
   const [isFavorite, setIsFavorite] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [phoneRevealed, setPhoneRevealed] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [showPriceHistoryTooltip, setShowPriceHistoryTooltip] = useState(false);
   const shareMenuRef = useRef<HTMLDivElement | null>(null);
@@ -71,7 +74,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
 
         const response = await fetch(
           `http://localhost:8000/api/my-favorites/`,
-          { headers: { 'Authorization': `Token ${token}` } }
+          { headers: { 'Authorization': `Bearer ${token}` } }
         );
         if (response.ok) {
           const data = await response.json();
@@ -101,7 +104,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
       const response = await fetch(endpoint, {
         method: isFavorite ? 'DELETE' : 'POST',
         headers: {
-          'Authorization': `Token ${token}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
@@ -155,12 +158,6 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
     return () => document.removeEventListener('mousedown', handleOutside);
   }, [showShareMenu]);
 
-  const maskPhone = (p: string) => {
-    const cleaned = p.replace(/\D/g, '');
-    if (cleaned.length < 6) return p;
-    return cleaned.slice(0, 4) + ' *** ' + cleaned.slice(-2);
-  };
-
   const EUR_TO_BGN = 1.9558;
   const priceInBGN = (price * EUR_TO_BGN).toFixed(2);
   const priceHistoryPreview = priceHistory.slice(0, 5);
@@ -205,7 +202,15 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
     return date.toLocaleTimeString('bg-BG', { hour: '2-digit', minute: '2-digit' });
   };
 
+  const formatAccountDate = (dateString?: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('bg-BG', { day: 'numeric', month: 'short', year: 'numeric' });
+  };
+
   const updatedTimeLabel = formatClockTime(updatedAt);
+  const sellerSinceLabel = sellerType === 'business' ? formatAccountDate(sellerCreatedAt) : '';
   const viewCountValue = Number.isFinite(viewCount ?? Number.NaN) ? Number(viewCount) : null;
 
   const shareUrl = window.location.href;
@@ -339,13 +344,13 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
         {/* Title + ID */}
         <div style={{ padding: '20px 20px 16px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
-            <h2
-              style={{
-                fontSize: 17,
-                fontWeight: 700,
-                color: '#333',
-                margin: '0 0 6px',
-                lineHeight: 1.35,
+              <h2
+                style={{
+                  fontSize: 19,
+                  fontWeight: 800,
+                  color: '#333',
+                  margin: '0 0 6px',
+                  lineHeight: 1.35,
                 wordBreak: 'break-word',
                 fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
                 flex: 1,
@@ -458,27 +463,27 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
         </div>
 
         {/* Location */}
-        <div style={{ padding: '0 20px 16px', fontSize: 13, color: '#6b7280' }}>
+        <div style={{ padding: '0 20px 16px', fontSize: 13, color: '#111827' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <MapPin size={14} color="#9ca3af" />
+            <MapPin size={14} color="#111827" />
             Намира се в {city}
           </div>
           {updatedLabel && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, color: '#64748b' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, color: '#f97316' }}>
               <Clock size={13} color="#f97316" />
               <span>
                 Редактирана {updatedLabel}
               </span>
               {updatedTimeLabel && (
-                <span style={{ color: '#94a3b8', fontWeight: 600 }}>
+                <span style={{ color: '#f97316', fontWeight: 600 }}>
                   · {updatedTimeLabel}ч.
                 </span>
               )}
             </div>
           )}
           {viewCountValue !== null && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, color: '#111827' }}>
-              <Eye size={13} color="#111827" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, color: '#0f766e' }}>
+              <Eye size={13} color="#0f766e" />
               Обявата е видяна {viewCountValue.toLocaleString('bg-BG')} {viewCountValue === 1 ? 'път' : 'пъти'}
             </div>
           )}
@@ -499,7 +504,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
               style={{
                 fontSize: 24,
                 fontWeight: 800,
-                color: '#0f766e',
+                color: 'rgb(51, 51, 51)',
                 fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
               }}
             >
@@ -566,83 +571,114 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 2 }}>
-                Телефон
+                Телефон за връзка
               </div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#111827', fontFamily: 'inherit' }}>
-                {phoneRevealed ? phone : maskPhone(phone)}
+              <a
+                href={`tel:${phone}`}
+                style={{
+                  fontSize: 18,
+                  fontWeight: 800,
+                  color: 'rgb(51, 51, 51)',
+                  letterSpacing: '0.4px',
+                  textDecoration: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                {phone}
+              </a>
+              <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, marginTop: 2 }}>
+                Натисни за директно обаждане
               </div>
             </div>
           </div>
-          {!phoneRevealed ? (
-            <button
-              onClick={() => setPhoneRevealed(true)}
-              style={{
-                width: '100%',
-                padding: '10px',
-                background: '#0f766e',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = '#0b5f58')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = '#0f766e')}
-            >
-              Покажи телефона
-            </button>
-          ) : (
-            <a
-              href={`tel:${phone}`}
-              style={{
-                display: 'block',
-                width: '100%',
-                padding: '10px',
-                background: '#0f766e',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer',
-                textAlign: 'center',
-                textDecoration: 'none',
-                boxSizing: 'border-box',
-              }}
-            >
-              Обади се
-            </a>
-          )}
-        </div>
-
-        {/* Email link */}
-        <div style={{ padding: '0 20px 16px' }}>
           <a
-            href={`mailto:${sellerEmail}`}
+            href={`tel:${phone}`}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
+              display: 'block',
               width: '100%',
-              padding: '12px',
-              background: '#fff7ed',
-              color: '#d97706',
-              border: '1px solid #fed7aa',
-              borderRadius: 10,
+              padding: '10px',
+              background: '#0f766e',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 8,
               fontSize: 13,
-              fontWeight: 600,
+              fontWeight: 700,
               cursor: 'pointer',
+              textAlign: 'center',
               textDecoration: 'none',
               boxSizing: 'border-box',
               transition: 'all 0.2s ease',
             }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#0b5f58')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = '#0f766e')}
           >
-            <Mail size={15} />
-            Изпрати E-mail до продавача
+            Обади се сега
           </a>
+        </div>
+
+        {/* Email link + Seller Info */}
+        <div style={{ padding: '0 20px 16px' }}>
+          <div
+            style={{
+              marginTop: 10,
+              padding: 12,
+              background: '#f8fafc',
+              borderRadius: 10,
+              border: '1px solid #eef2f7',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {showSellerAvatar && (
+                <div
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #0f766e 0%, #0b5f58 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#fff',
+                    fontSize: 16,
+                    fontWeight: 700,
+                    flexShrink: 0,
+                  }}
+                >
+                  {initials || <User size={18} />}
+                </div>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: '#111827',
+                    marginBottom: 4,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
+                  }}
+                >
+                  {sellerName}
+                </div>
+                {(city || '').trim() !== '' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#6b7280', fontSize: 12 }}>
+                    <MapPin size={12} />
+                    {city}
+                  </div>
+                )}
+                {sellerSinceLabel && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#94a3b8', fontSize: 12, marginTop: 4 }}>
+                    <Clock size={12} />
+                    Потребител в Kar.bg от {sellerSinceLabel}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Action Buttons */}
@@ -836,101 +872,6 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
         </div>
       </div>
 
-      {/* Seller Card */}
-      <div
-        style={{
-          background: '#fff',
-          borderRadius: 14,
-          border: '1px solid #eef2f7',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-          padding: 20,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
-          {showSellerAvatar && (
-            <div
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #0f766e 0%, #0b5f58 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-                fontSize: 18,
-                fontWeight: 700,
-                flexShrink: 0,
-              }}
-            >
-              {initials || <User size={20} />}
-            </div>
-          )}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: 14,
-                fontWeight: 700,
-                color: '#333',
-                marginBottom: 2,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
-              }}
-            >
-              {sellerName}
-            </div>
-            <div
-              style={{
-                fontSize: 12,
-                color: '#6b7280',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-            >
-              <MapPin size={12} />
-              {city}
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '10px 12px',
-            background: '#f8fafc',
-            borderRadius: 8,
-            border: '1px solid #eef2f7',
-          }}
-        >
-          <Clock size={14} color="#9ca3af" />
-          <span style={{ fontSize: 12, color: '#6b7280' }}>
-            В АвтоБорса
-          </span>
-        </div>
-
-        <div style={{ marginTop: 12 }}>
-          <a
-            href={`mailto:${sellerEmail}`}
-            style={{
-              fontSize: 13,
-              color: '#0f766e',
-              textDecoration: 'none',
-              fontWeight: 500,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-          >
-            <Mail size={13} />
-            {sellerEmail}
-          </a>
-        </div>
-      </div>
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+﻿import React, { useState, useRef, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -68,7 +68,7 @@ const ProfileMenu: React.FC = () => {
           const statusResponse = await fetch(
             `${API_BASE_URL}/api/payments/session-status/?session_id=${encodeURIComponent(sessionId)}`,
             {
-              headers: { Authorization: `Token ${token}` },
+              headers: { Authorization: `Bearer ${token}` },
             }
           );
 
@@ -93,7 +93,7 @@ const ProfileMenu: React.FC = () => {
         }
 
         const meResponse = await fetch(`${API_BASE_URL}/api/auth/me/`, {
-          headers: { Authorization: `Token ${token}` },
+          headers: { Authorization: `Bearer ${token}` },
         });
         if (meResponse.ok) {
           const meData = await meResponse.json();
@@ -122,7 +122,7 @@ const ProfileMenu: React.FC = () => {
         const token = localStorage.getItem("authToken");
         if (!token) return;
         const response = await fetch(`${API_BASE_URL}/api/auth/me/`, {
-          headers: { Authorization: `Token ${token}` },
+          headers: { Authorization: `Bearer ${token}` },
         });
         if (response.ok) {
           const meData = await response.json();
@@ -155,7 +155,7 @@ const ProfileMenu: React.FC = () => {
 
       const response = await fetch("http://localhost:8000/api/auth/profile/upload-photo/", {
         method: "POST",
-        headers: { Authorization: `Token ${token}` },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
 
@@ -167,7 +167,7 @@ const ProfileMenu: React.FC = () => {
         setTimeout(async () => {
           try {
             const dealersRes = await fetch("http://localhost:8000/api/auth/dealers/", {
-              headers: { Authorization: `Token ${token}` },
+              headers: { Authorization: `Bearer ${token}` },
             });
             if (dealersRes.ok) {
               const dealers = (await dealersRes.json()) as DealerProfile[];
@@ -377,6 +377,12 @@ const ProfileMenu: React.FC = () => {
       color: "#6b7280",
       marginTop: 2,
     },
+    photoSince: {
+      fontSize: 11,
+      color: "#94a3b8",
+      marginTop: 4,
+      fontWeight: 600,
+    },
   };
 
   const initial =
@@ -387,6 +393,13 @@ const ProfileMenu: React.FC = () => {
     "?";
   const fullName = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
   const isBusiness = user.userType === "business";
+  const createdAtLabel = user.created_at
+    ? new Date(user.created_at).toLocaleDateString("bg-BG", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : null;
 
   return (
     <>
@@ -470,6 +483,9 @@ const ProfileMenu: React.FC = () => {
                     {isBusiness ? "Бизнес профил" : "Частен профил"}
                     {uploadingPhoto && " — качване..."}
                   </div>
+                  {createdAtLabel && (
+                    <div style={styles.photoSince}>Потребител от {createdAtLabel}</div>
+                  )}
                 </div>
                 <button
                   style={styles.closeBtn}

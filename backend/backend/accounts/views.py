@@ -2,9 +2,15 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.conf import settings
+from django.core.mail import send_mail
+from django.core.cache import cache
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.contrib.auth.tokens import default_token_generator
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.parsers import MultiPartParser, FormParser
 from backend.listings.models import get_expiry_cutoff
 from .serializers import (
@@ -12,6 +18,27 @@ from .serializers import (
     UserBalanceSerializer, DealerListSerializer, DealerDetailSerializer
 )
 from .models import PrivateUser, BusinessUser, UserProfile
+
+
+def send_verification_email(user: User) -> None:
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    token = default_token_generator.make_token(user)
+    base_url = settings.FRONTEND_BASE_URL.rstrip("/")
+    verify_url = f"{base_url}/verify-email?uid={uid}&token={token}"
+    subject = "Потвърдете акаунта си в Kar.bg"
+    message = (
+        "Здравейте,\n\n"
+        "Благодарим за регистрацията в Kar.bg. Моля, потвърдете акаунта си чрез линка по-долу:\n"
+        f"{verify_url}\n\n"
+        "Ако не сте вие, игнорирайте този имейл.\n"
+    )
+    send_mail(
+        subject,
+        message,
+        settings.DEFAULT_FROM_EMAIL,
+        [user.email],
+        fail_silently=False,
+    )
 
 
 @api_view(['POST'])
@@ -23,18 +50,12 @@ def register_private_user(request):
         if serializer.is_valid():
             try:
                 user = serializer.save()
-                # Create token for the user
-                token, created = Token.objects.get_or_create(user=user.user)
+                send_verification_email(user.user)
                 return Response(
                     {
-                        'message': 'Профилът е създаден успешно',
+                        'message': 'Регистрацията е успешна. Изпратихме ти имейл за потвърждение.',
                         'email': serializer.validated_data['email'],
-                        'token': token.key,
-                        'user': {
-                            'id': user.user.id,
-                            'email': user.email,
-                            'userType': 'private'
-                        }
+                        'verification_required': True,
                     },
                     status=status.HTTP_201_CREATED
                 )
@@ -61,10 +82,17 @@ def login(request):
 
     # Try to authenticate with email
     try:
-        user = User.objects.get(email=email)
-        user = authenticate(username=user.username, password=password)
+        user_obj = User.objects.get(email=email)
     except User.DoesNotExist:
-        user = None
+        user_obj = None
+
+    if user_obj and user_obj.check_password(password) and not user_obj.is_active:
+        return Response(
+            {'error': 'Акаунтът не е потвърден. Проверете пощата си.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    user = authenticate(username=user_obj.username, password=password) if user_obj else None
 
     if user is None:
         return Response(
@@ -72,8 +100,7 @@ def login(request):
             status=status.HTTP_401_UNAUTHORIZED
         )
 
-    # Get or create token
-    token, created = Token.objects.get_or_create(user=user)
+    refresh = RefreshToken.for_user(user)
 
     # Determine user type
     user_type = 'private'
@@ -82,14 +109,29 @@ def login(request):
         'email': user.email,
         'first_name': user.first_name,
         'last_name': user.last_name,
+        'created_at': user.date_joined,
     }
 
     if hasattr(user, 'business_profile'):
         user_type = 'business'
         user_data['username'] = user.business_profile.username
+        if user.business_profile.profile_image:
+            user_data['profile_image_url'] = request.build_absolute_uri(
+                user.business_profile.profile_image.url
+            )
+
+    # Get user balance
+    try:
+        profile = UserProfile.objects.get(user=user)
+        balance = float(profile.balance)
+    except UserProfile.DoesNotExist:
+        balance = 0.0
+
+    user_data['balance'] = balance
 
     return Response({
-        'token': token.key,
+        'access': str(refresh.access_token),
+        'refresh': str(refresh),
         'user': {
             **user_data,
             'userType': user_type
@@ -101,8 +143,6 @@ def login(request):
 @permission_classes([IsAuthenticated])
 def logout(request):
     """API endpoint for user logout"""
-    # Delete the token
-    request.user.auth_token.delete()
     return Response(
         {'message': 'Logout successful'},
         status=status.HTTP_200_OK
@@ -120,6 +160,7 @@ def get_current_user(request):
         'email': user.email,
         'first_name': user.first_name,
         'last_name': user.last_name,
+        'created_at': user.date_joined,
     }
 
     if hasattr(user, 'business_profile'):
@@ -153,24 +194,114 @@ def register_business_user(request):
         serializer = BusinessUserSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
-            # Create token for the user
-            token, created = Token.objects.get_or_create(user=user.user)
+            send_verification_email(user.user)
             return Response(
                 {
-                    'message': 'Бизнес профилът е създаден успешно',
+                    'message': 'Регистрацията е успешна. Изпратихме ти имейл за потвърждение.',
                     'dealer_name': serializer.validated_data['dealer_name'],
                     'username': serializer.validated_data['username'],
-                    'token': token.key,
-                    'user': {
-                        'id': user.user.id,
-                        'email': user.email,
-                        'username': user.username,
-                        'userType': 'business'
-                    }
+                    'verification_required': True,
                 },
                 status=status.HTTP_201_CREATED
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def password_reset_request(request):
+    email = request.data.get('email')
+    if not email:
+        return Response({'error': 'Email е задължителен.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    email_normalized = str(email).strip().lower()
+    cooldown_seconds = getattr(settings, 'PASSWORD_RESET_COOLDOWN_SECONDS', 60)
+    cache_key = f"password-reset:{email_normalized}"
+    if cache.get(cache_key):
+        return Response(
+            {
+                'error': f'Моля, изчакай {cooldown_seconds} секунди преди нов опит.',
+                'retry_after': cooldown_seconds,
+            },
+            status=status.HTTP_429_TOO_MANY_REQUESTS
+        )
+
+    cache.set(cache_key, True, timeout=cooldown_seconds)
+
+    user = User.objects.filter(email=email_normalized).first()
+    if user:
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        base_url = settings.FRONTEND_BASE_URL.rstrip("/")
+        reset_url = f"{base_url}/reset-password?uid={uid}&token={token}"
+        subject = "Смяна на парола в Kar.bg"
+        message = (
+            "Здравейте,\n\n"
+            "Получихме заявка за смяна на парола. Ако това сте вие, използвайте линка по-долу:\n"
+            f"{reset_url}\n\n"
+            "Ако не сте вие, игнорирайте този имейл.\n"
+        )
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL,
+            [user.email],
+            fail_silently=False,
+        )
+
+    return Response(
+        {'message': 'Ако този имейл съществува, ще получиш инструкции за смяна на парола.'},
+        status=status.HTTP_200_OK
+    )
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def password_reset_confirm(request):
+    uidb64 = request.data.get('uid')
+    token = request.data.get('token')
+    new_password = request.data.get('new_password')
+
+    if not uidb64 or not token or not new_password:
+        return Response({'error': 'Липсва информация за смяна на парола.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        uid = urlsafe_base64_decode(uidb64).decode()
+        user = User.objects.get(pk=uid)
+    except (User.DoesNotExist, ValueError, TypeError, OverflowError):
+        return Response({'error': 'Невалиден линк за смяна на парола.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not default_token_generator.check_token(user, token):
+        return Response({'error': 'Линкът е невалиден или изтекъл.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    user.set_password(new_password)
+    user.save(update_fields=['password'])
+    return Response({'message': 'Паролата е сменена успешно.'}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def verify_email(request):
+    uidb64 = request.query_params.get('uid')
+    token = request.query_params.get('token')
+    if not uidb64 or not token:
+        return Response({'error': 'Невалиден линк за потвърждение.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        uid = urlsafe_base64_decode(uidb64).decode()
+        user = User.objects.get(pk=uid)
+    except (User.DoesNotExist, ValueError, TypeError, OverflowError):
+        return Response({'error': 'Невалиден линк за потвърждение.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if user.is_active:
+        return Response({'message': 'Акаунтът вече е потвърден.'}, status=status.HTTP_200_OK)
+
+    if default_token_generator.check_token(user, token):
+        user.is_active = True
+        user.save(update_fields=['is_active'])
+        return Response({'message': 'Акаунтът е потвърден успешно.'}, status=status.HTTP_200_OK)
+
+    return Response({'error': 'Линкът е невалиден или изтекъл.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])

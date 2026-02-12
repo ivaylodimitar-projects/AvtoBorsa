@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -55,83 +55,64 @@ const AuthPage: React.FC = () => {
           transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
         .auth-input:focus {
-          border-color: #0066cc !important;
-          box-shadow: 0 0 0 3px rgba(0,102,204,0.1);
+          border-color: #0f766e !important;
+          box-shadow: 0 0 0 3px rgba(15,118,110,0.15);
           outline: none;
         }
         .auth-submit-btn {
           transition: background 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
         }
         .auth-submit-btn:hover:not(:disabled) {
-          box-shadow: 0 4px 14px rgba(0,102,204,0.35);
+          background: #0b5f58 !important;
+          box-shadow: 0 4px 10px rgba(15,118,110,0.18);
         }
         .auth-toggle-link {
           transition: color 0.15s ease;
         }
         .auth-toggle-link:hover {
-          color: #004a99 !important;
+          color: #0b5f58 !important;
         }
 
         /* Tablet (768px - 1023px) */
         @media (min-width: 768px) and (max-width: 1023px) {
           .auth-outer { padding: 24px 16px !important; }
-          .auth-hero { padding: 24px !important; }
-          .auth-hero-title { font-size: 24px !important; }
+          .auth-header-title { font-size: 22px !important; }
         }
 
         /* Mobile Large (640px - 767px) */
         @media (min-width: 640px) and (max-width: 767px) {
           .auth-outer { padding: 20px 12px !important; }
-          .auth-hero { padding: 22px 18px !important; margin-bottom: 20px !important; }
-          .auth-hero-title { font-size: 22px !important; }
-          .auth-hero-subtitle { font-size: 13px !important; }
           .auth-form-card { padding: 24px !important; }
+          .auth-header-title { font-size: 21px !important; }
+          .auth-header-subtitle { font-size: 13px !important; }
         }
 
         /* Mobile Small (< 640px) */
         @media (max-width: 639px) {
           .auth-outer { padding: 16px 8px !important; }
-          .auth-hero { padding: 20px 16px !important; margin-bottom: 18px !important; }
-          .auth-hero-title { font-size: 20px !important; }
-          .auth-hero-subtitle { font-size: 12px !important; }
-          .auth-hero-icon { width: 44px !important; height: 44px !important; }
-          .auth-hero-icon svg { width: 18px !important; height: 18px !important; }
           .auth-form-card { padding: 20px !important; }
-          .auth-section-title { font-size: 14px !important; }
           .auth-label { font-size: 12px !important; }
           .auth-input { font-size: 13px !important; padding: 10px 12px !important; }
           .auth-submit-btn { font-size: 14px !important; padding: 11px 20px !important; }
+          .auth-header-title { font-size: 20px !important; }
+          .auth-header-subtitle { font-size: 12px !important; }
         }
       `}</style>
 
       <div style={styles.outer} className="auth-outer">
-        {/* Hero Header */}
-        <div style={styles.hero} className="auth-hero">
-          <div style={styles.heroContent}>
-            <div style={styles.heroIcon} className="auth-hero-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
-            </div>
-            <div>
-              <h1 style={styles.heroTitle} className="auth-hero-title">
-                {isLogin ? "Влизане в профил" : "Регистрация"}
-              </h1>
-              <p style={styles.heroSubtitle} className="auth-hero-subtitle">
-                {isLogin
-                  ? "Влез в акаунта си за достъп до обявите"
-                  : "Създай нов акаунт за публикуване на обяви"}
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* Form Card */}
         <form style={styles.formCard} className="auth-form-card" onSubmit={handleSubmit}>
-          <h2 style={styles.sectionTitle} className="auth-section-title">
-            {isLogin ? "Данни за вход" : "Данни за регистрация"}
-          </h2>
+          <div style={styles.header}>
+            <div style={styles.headerBadge}>Kar.bg</div>
+            <h1 style={styles.headerTitle} className="auth-header-title">
+              {isLogin ? "Вход" : "Регистрация"}
+            </h1>
+            <p style={styles.headerSubtitle} className="auth-header-subtitle">
+              {isLogin
+                ? "Влез, за да управляваш профила си."
+                : "Създай профил за публикуване на обяви."}
+            </p>
+          </div>
 
           {errors.submit && (
             <div style={styles.errorBanner}>
@@ -150,7 +131,7 @@ const AuthPage: React.FC = () => {
               className="auth-input"
               style={{
                 ...styles.input,
-                borderColor: errors.email ? "#fca5a5" : "#e6e9ef",
+                borderColor: errors.email ? "#fca5a5" : "#e2e8f0",
               }}
               type="email"
               name="email"
@@ -167,7 +148,7 @@ const AuthPage: React.FC = () => {
               className="auth-input"
               style={{
                 ...styles.input,
-                borderColor: errors.password ? "#fca5a5" : "#e6e9ef",
+                borderColor: errors.password ? "#fca5a5" : "#e2e8f0",
               }}
               type="password"
               name="password"
@@ -185,6 +166,8 @@ const AuthPage: React.FC = () => {
                 className="auth-toggle-link"
                 role="button"
                 tabIndex={0}
+                onClick={() => navigate("/forgot-password")}
+                onKeyDown={(e) => e.key === "Enter" && navigate("/forgot-password")}
               >
                 Забравена парола?
               </span>
@@ -261,75 +244,59 @@ const AuthPage: React.FC = () => {
 const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: "100vh",
-    background: "#f5f5f5",
+    background: "#f8fafc",
     width: "100%",
     boxSizing: "border-box",
   },
   outer: {
     maxWidth: 520,
     margin: "0 auto",
-    padding: "32px 20px",
+    padding: "40px 20px",
     boxSizing: "border-box",
   },
 
-  // Hero
-  hero: {
-    background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)",
-    borderRadius: 14,
-    padding: "28px",
-    marginBottom: 24,
-    boxShadow: "0 6px 20px rgba(15,23,42,0.15)",
-    position: "relative",
-    overflow: "hidden",
+  // Header
+  header: {
+    marginBottom: 20,
+    paddingBottom: 18,
+    borderBottom: "1px solid #e2e8f0",
   },
-  heroContent: {
-    display: "flex",
+  headerBadge: {
+    display: "inline-flex",
     alignItems: "center",
-    gap: 16,
-    position: "relative",
-    zIndex: 1,
+    padding: "4px 10px",
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+    color: "#0f766e",
+    background: "#ecfdf5",
+    border: "1px solid #bbf7d0",
+    marginBottom: 10,
   },
-  heroIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 12,
-    background: "rgba(255,255,255,0.1)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    color: "#fff",
-    flexShrink: 0,
-  },
-  heroTitle: {
-    fontSize: 26,
+  headerTitle: {
+    fontSize: 24,
     fontWeight: 800,
-    color: "#fff",
+    color: "#0f172a",
     margin: 0,
     lineHeight: 1.2,
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
   },
-  heroSubtitle: {
+  headerSubtitle: {
     fontSize: 14,
-    color: "rgba(255,255,255,0.65)",
-    margin: "4px 0 0",
+    color: "#64748b",
+    margin: "6px 0 0",
   },
 
   // Form card
   formCard: {
     background: "#fff",
-    borderRadius: 14,
-    padding: 32,
-    boxShadow: "0 4px 16px rgba(15,23,42,0.06)",
-    border: "1px solid #eef2f7",
+    borderRadius: 12,
+    padding: 28,
+    boxShadow: "0 12px 30px rgba(15,23,42,0.08)",
+    border: "1px solid #e5e7eb",
     boxSizing: "border-box",
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: 700,
-    color: "#111827",
-    marginTop: 0,
-    marginBottom: 20,
-    paddingBottom: 14,
-    borderBottom: "1px solid #eef2f7",
   },
 
   // Error
@@ -356,11 +323,11 @@ const styles: Record<string, React.CSSProperties> = {
   label: {
     fontSize: 13,
     fontWeight: 600,
-    color: "#374151",
+    color: "#334155",
   },
   input: {
     padding: "12px 14px",
-    border: "1px solid #e6e9ef",
+    border: "1px solid #e2e8f0",
     borderRadius: 10,
     fontSize: 14,
     fontFamily: "inherit",
@@ -379,7 +346,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   forgotLink: {
     fontSize: 13,
-    color: "#0066cc",
+    color: "#0f766e",
     cursor: "pointer",
     fontWeight: 500,
   },
@@ -391,10 +358,10 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     width: "100%",
     padding: "13px 24px",
-    background: "#0066cc",
+    background: "#0f766e",
     color: "#fff",
     border: "none",
-    borderRadius: 10,
+    borderRadius: 12,
     fontSize: 15,
     fontWeight: 700,
     cursor: "pointer",
@@ -411,7 +378,7 @@ const styles: Record<string, React.CSSProperties> = {
   dividerLine: {
     flex: 1,
     height: 1,
-    background: "#eef2f7",
+    background: "#e2e8f0",
   },
   dividerText: {
     fontSize: 12,
@@ -435,12 +402,12 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     justifyContent: "center",
     background: "none",
-    border: "1px solid #e6e9ef",
+    border: "1px solid #cbd5f5",
     borderRadius: 10,
     padding: "10px 22px",
     fontSize: 14,
     fontWeight: 600,
-    color: "#0066cc",
+    color: "#0f766e",
     cursor: "pointer",
     fontFamily: "inherit",
   },

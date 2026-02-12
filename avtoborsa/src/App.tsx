@@ -9,6 +9,9 @@ import PrivateProfilePage from './components/PrivateProfilePage'
 import BusinessProfilePage from './components/BusinessProfilePage'
 import SettingsPage from './components/SettingsPage'
 import AuthPage from './components/AuthPage'
+import VerifyEmailPage from './components/VerifyEmailPage'
+import ForgotPasswordPage from './components/ForgotPasswordPage'
+import ResetPasswordPage from './components/ResetPasswordPage'
 import MyAdsPage from './components/MyAdsPage'
 import VehicleDetailsPage from './components/details/VehicleDetailsPage'
 import SearchPage from './components/SearchPage'
@@ -29,6 +32,9 @@ function App() {
         <Route path="/profile/business" element={<BusinessProfilePage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/auth" element={<AuthPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/my-ads" element={<MyAdsPage />} />
         <Route path="/details/:slug" element={<VehicleDetailsPage />} />
       </Routes>

@@ -1,10 +1,8 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
 
 const PrivateProfilePage: React.FC = () => {
   const navigate = useNavigate();
-  const { setUserFromToken } = useAuth();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -65,18 +63,19 @@ const PrivateProfilePage: React.FC = () => {
           }),
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          setSuccessMessage(data.message);
-          if (data.token && data.user) {
-            setUserFromToken(data.user, data.token);
-          }
-          alert(data.message);
-          navigate("/");
-        } else {
+          if (response.ok) {
+            const data = await response.json();
+            setSuccessMessage(data.message || "Регистрацията е успешна. Изпратихме ти имейл за потвърждение.");
+            setErrors({});
+            setFormData({ email: "", password: "", confirmPassword: "" });
+          } else {
           const errorData = await response.json();
           console.error("Backend error response:", errorData);
-          setErrors(errorData);
+          if (errorData?.error) {
+            setErrors({ submit: errorData.error });
+          } else {
+            setErrors(errorData);
+          }
         }
       } catch (error) {
         setErrors({ submit: "Грешка при свързване със сървъра" });
@@ -94,15 +93,15 @@ const PrivateProfilePage: React.FC = () => {
           transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
         .priv-input:focus {
-          border-color: #0066cc !important;
-          box-shadow: 0 0 0 3px rgba(0,102,204,0.1);
+          border-color: #0f766e !important;
+          box-shadow: 0 0 0 3px rgba(15,118,110,0.15);
           outline: none;
         }
         .priv-submit-btn {
           transition: background 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
         }
         .priv-submit-btn:hover:not(:disabled) {
-          box-shadow: 0 4px 14px rgba(0,102,204,0.35);
+          box-shadow: 0 10px 24px rgba(15,118,110,0.28);
         }
         .priv-submit-btn:disabled {
           opacity: 0.6;
@@ -112,8 +111,8 @@ const PrivateProfilePage: React.FC = () => {
           transition: border-color 0.15s ease, color 0.15s ease;
         }
         .priv-ghost-btn:hover {
-          border-color: #0066cc !important;
-          color: #004a99 !important;
+          border-color: #0f766e !important;
+          color: #0b5f58 !important;
         }
 
         /* Tablet (768px - 1023px) */
@@ -177,7 +176,7 @@ const PrivateProfilePage: React.FC = () => {
           {/* Email Section */}
           <div style={styles.section}>
             <h2 style={styles.sectionTitle} className="priv-section-title">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0066cc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8, verticalAlign: "middle" }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f766e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8, verticalAlign: "middle" }}>
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                 <polyline points="22,6 12,13 2,6" />
               </svg>
@@ -195,13 +194,30 @@ const PrivateProfilePage: React.FC = () => {
               </div>
             )}
 
+            {successMessage && (
+              <div style={styles.successBanner}>
+                <div style={styles.successIcon}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={styles.successTitle}>Провери пощата си</div>
+                  <div style={styles.successText}>{successMessage}</div>
+                </div>
+                <button type="button" style={styles.successButton} onClick={() => navigate("/auth")}>
+                  Вход
+                </button>
+              </div>
+            )}
+
             <div style={styles.formRow}>
               <label style={styles.label} className="priv-label">Email *</label>
               <input
                 className="priv-input"
                 style={{
                   ...styles.input,
-                  borderColor: errors.email ? "#fca5a5" : "#e6e9ef",
+                  borderColor: errors.email ? "#fca5a5" : "#e2e8f0",
                 }}
                 type="email"
                 name="email"
@@ -216,7 +232,7 @@ const PrivateProfilePage: React.FC = () => {
           {/* Password Section */}
           <div style={styles.section}>
             <h2 style={styles.sectionTitle} className="priv-section-title">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0066cc" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8, verticalAlign: "middle" }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f766e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 8, verticalAlign: "middle" }}>
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
@@ -230,7 +246,7 @@ const PrivateProfilePage: React.FC = () => {
                   className="priv-input"
                   style={{
                     ...styles.input,
-                    borderColor: errors.password ? "#fca5a5" : "#e6e9ef",
+                    borderColor: errors.password ? "#fca5a5" : "#e2e8f0",
                   }}
                   type="password"
                   name="password"
@@ -247,7 +263,7 @@ const PrivateProfilePage: React.FC = () => {
                   className="priv-input"
                   style={{
                     ...styles.input,
-                    borderColor: errors.confirmPassword ? "#fca5a5" : "#e6e9ef",
+                    borderColor: errors.confirmPassword ? "#fca5a5" : "#e2e8f0",
                   }}
                   type="password"
                   name="confirmPassword"
@@ -315,26 +331,27 @@ const PrivateProfilePage: React.FC = () => {
 const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: "100vh",
-    background: "#f5f5f5",
+    background: "linear-gradient(180deg, #f8fafc 0%, #eef2f7 60%, #f8fafc 100%)",
     width: "100%",
     boxSizing: "border-box",
   },
   outer: {
-    maxWidth: 620,
+    maxWidth: 760,
     margin: "0 auto",
-    padding: "32px 20px",
+    padding: "36px 20px",
     boxSizing: "border-box",
   },
 
   // Hero
   hero: {
-    background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)",
-    borderRadius: 14,
+    background: "linear-gradient(135deg, #0f766e 0%, #0b5f58 55%, #0f766e 100%)",
+    borderRadius: 18,
     padding: "28px",
     marginBottom: 24,
-    boxShadow: "0 6px 20px rgba(15,23,42,0.15)",
+    boxShadow: "0 20px 40px rgba(15,118,110,0.18)",
     position: "relative",
     overflow: "hidden",
+    border: "1px solid rgba(15,118,110,0.25)",
   },
   heroContent: {
     display: "flex",
@@ -347,7 +364,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: 52,
     height: 52,
     borderRadius: 12,
-    background: "rgba(255,255,255,0.1)",
+    background: "rgba(255,255,255,0.18)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -360,20 +377,21 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#fff",
     margin: 0,
     lineHeight: 1.2,
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
   },
   heroSubtitle: {
     fontSize: 14,
-    color: "rgba(255,255,255,0.65)",
+    color: "rgba(255,255,255,0.78)",
     margin: "4px 0 0",
   },
 
   // Form card
   formCard: {
     background: "#fff",
-    borderRadius: 14,
+    borderRadius: 18,
     padding: 32,
-    boxShadow: "0 4px 16px rgba(15,23,42,0.06)",
-    border: "1px solid #eef2f7",
+    boxShadow: "0 16px 40px rgba(15,23,42,0.08)",
+    border: "1px solid #e5e7eb",
     boxSizing: "border-box",
   },
 
@@ -381,16 +399,17 @@ const styles: Record<string, React.CSSProperties> = {
   section: {
     marginBottom: 24,
     paddingBottom: 24,
-    borderBottom: "1px solid #eef2f7",
+    borderBottom: "1px solid #e2e8f0",
   },
   sectionTitle: {
     fontSize: 15,
     fontWeight: 700,
-    color: "#111827",
+    color: "#0f766e",
     marginTop: 0,
     marginBottom: 16,
     display: "flex",
     alignItems: "center",
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
   },
 
   // Error
@@ -417,11 +436,11 @@ const styles: Record<string, React.CSSProperties> = {
   label: {
     fontSize: 13,
     fontWeight: 600,
-    color: "#374151",
+    color: "#334155",
   },
   input: {
     padding: "12px 14px",
-    border: "1px solid #e6e9ef",
+    border: "1px solid #e2e8f0",
     borderRadius: 10,
     fontSize: 14,
     fontFamily: "inherit",
@@ -445,7 +464,7 @@ const styles: Record<string, React.CSSProperties> = {
 
   hint: {
     fontSize: 12,
-    color: "#9ca3af",
+    color: "#94a3b8",
     marginTop: 10,
     marginBottom: 0,
   },
@@ -461,10 +480,10 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     justifyContent: "center",
     padding: "13px 28px",
-    background: "#0066cc",
+    background: "#0f766e",
     color: "#fff",
     border: "none",
-    borderRadius: 10,
+    borderRadius: 12,
     fontSize: 15,
     fontWeight: 700,
     cursor: "pointer",
@@ -477,18 +496,18 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     padding: "12px 22px",
     background: "transparent",
-    border: "1px solid #e6e9ef",
-    borderRadius: 10,
+    border: "1px solid #cbd5f5",
+    borderRadius: 12,
     fontSize: 14,
     fontWeight: 600,
     cursor: "pointer",
-    color: "#374151",
+    color: "#0f766e",
     fontFamily: "inherit",
   },
 
   requiredNote: {
     fontSize: 12,
-    color: "#9ca3af",
+    color: "#94a3b8",
     marginTop: 14,
     marginBottom: 0,
   },
@@ -498,12 +517,56 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: "center",
     marginTop: 24,
     paddingTop: 20,
-    borderTop: "1px solid #eef2f7",
+    borderTop: "1px solid #e2e8f0",
     fontSize: 14,
   },
   loginLink: {
-    color: "#0066cc",
+    color: "#0f766e",
     fontWeight: 600,
+    cursor: "pointer",
+  },
+  successBanner: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    padding: "12px 14px",
+    background: "#ecfdf5",
+    border: "1px solid #bbf7d0",
+    borderRadius: 12,
+    fontSize: 13,
+    color: "#0f766e",
+    marginBottom: 18,
+  },
+  successIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    background: "rgba(16,185,129,0.2)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#0f766e",
+    flexShrink: 0,
+  },
+  successTitle: {
+    fontSize: 13,
+    fontWeight: 700,
+    color: "#0f766e",
+    marginBottom: 2,
+  },
+  successText: {
+    fontSize: 12,
+    color: "#475569",
+    lineHeight: 1.5,
+  },
+  successButton: {
+    background: "#0f766e",
+    color: "#fff",
+    border: "none",
+    borderRadius: 10,
+    padding: "8px 14px",
+    fontSize: 12,
+    fontWeight: 700,
     cursor: "pointer",
   },
 };

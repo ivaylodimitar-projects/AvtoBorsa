@@ -438,7 +438,7 @@ const SearchPage: React.FC = () => {
       const response = await fetch(`http://localhost:8000/api/listings/${listingId}/${endpoint}/`, {
         method: isFavorited ? "DELETE" : "POST",
         headers: {
-          Authorization: `Token ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -590,10 +590,10 @@ const SearchPage: React.FC = () => {
     results: { display: "flex", flexDirection: "column", gap: 16 },
     item: {
       background: "#fff",
-      borderRadius: 10,
+      borderRadius: 6,
       overflow: "hidden",
-      border: "none",
-      boxShadow: "0 2px 8px rgba(15, 23, 42, 0.06)",
+      border: "1px solid #e0e0e0",
+      boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
       display: "flex",
       flexDirection: "column" as const,
       cursor: "pointer",
@@ -739,8 +739,8 @@ const SearchPage: React.FC = () => {
           )}
           <p style={{ fontSize: 15, color: "#555", margin: "16px 0 0 0", fontWeight: 500 }}>
             1 - 20 от общо{" "}
-            <strong style={{ color: "#0066cc" }}>{totalListings}</strong> намерени обяви за{" "}
-            <strong style={{ color: "#0066cc" }}>{listingsScopeLabel}</strong>
+            <strong style={{ color: "rgb(15, 118, 110)" }}>{totalListings}</strong> намерени обяви за{" "}
+            <strong style={{ color: "rgb(15, 118, 110)" }}>{listingsScopeLabel}</strong>
           </p>
         </div>
 

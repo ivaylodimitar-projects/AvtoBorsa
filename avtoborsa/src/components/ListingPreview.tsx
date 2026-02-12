@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { CheckCircle2, ImageOff } from "lucide-react";
 import { formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 

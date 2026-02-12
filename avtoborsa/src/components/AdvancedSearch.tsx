@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+﻿import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronDown, Search, Bookmark, Lock } from "lucide-react";
 import { BrandSelector } from "./BrandSelector";
@@ -330,7 +330,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       height: 48px;
       border: none;
       border-radius: 14px;
-      background: #115e59;
+      background: rgb(15, 118, 110);
       color: #fff;
       font-size: 16px;
       font-weight: 700;
