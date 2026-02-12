@@ -1,13 +1,19 @@
 from datetime import timedelta
+import io
+import os
 
+from PIL import Image as PILImage, ImageOps
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.files.base import ContentFile
 from django.utils import timezone
 from django.utils.text import slugify
 
 LISTING_EXPIRY_DAYS = 30
 TOP_LISTING_DURATION_DAYS = 14
+CAR_IMAGE_THUMBNAIL_SIZE = (280, 194)
+CAR_IMAGE_THUMBNAIL_QUALITY = 82
 
 
 def get_expiry_cutoff(now=None):
@@ -252,6 +258,7 @@ class CarImage(models.Model):
     """Model for storing images for car listings"""
     listing = models.ForeignKey(CarListing, on_delete=models.CASCADE, related_name='images')
     image = models.ImageField(upload_to='car_listings/%Y/%m/%d/')
+    thumbnail = models.ImageField(upload_to='car_listings/thumbs/%Y/%m/%d/', null=True, blank=True)
     order = models.IntegerField(default=0)
     is_cover = models.BooleanField(default=False, help_text="Mark this image as the cover/main image for the listing")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -263,6 +270,57 @@ class CarImage(models.Model):
 
     def __str__(self):
         return f"Image for {self.listing.title}"
+
+    def _build_thumbnail_content(self):
+        if not self.image:
+            return None
+        try:
+            self.image.open('rb')
+            with PILImage.open(self.image) as source:
+                source = source.convert('RGB')
+                resampling = getattr(PILImage, 'Resampling', PILImage)
+                thumb = ImageOps.fit(
+                    source,
+                    CAR_IMAGE_THUMBNAIL_SIZE,
+                    method=resampling.LANCZOS,
+                    centering=(0.5, 0.5),
+                )
+                buffer = io.BytesIO()
+                thumb.save(
+                    buffer,
+                    format='WEBP',
+                    quality=CAR_IMAGE_THUMBNAIL_QUALITY,
+                    optimize=True,
+                )
+                return ContentFile(buffer.getvalue())
+        except Exception:
+            return None
+        finally:
+            try:
+                self.image.close()
+            except Exception:
+                pass
+
+    def save(self, *args, **kwargs):
+        should_generate_thumbnail = bool(self.image)
+        if self.pk and should_generate_thumbnail:
+            previous = CarImage.objects.filter(pk=self.pk).values('image', 'thumbnail').first()
+            if previous and str(previous.get('image') or '') == str(self.image.name or '') and previous.get('thumbnail'):
+                should_generate_thumbnail = False
+
+        super().save(*args, **kwargs)
+
+        if not should_generate_thumbnail:
+            return
+
+        thumbnail_content = self._build_thumbnail_content()
+        if not thumbnail_content:
+            return
+
+        image_name = os.path.basename(self.image.name or f'listing-{self.pk}')
+        base_name, _ = os.path.splitext(image_name)
+        self.thumbnail.save(f'{base_name}_sm.webp', thumbnail_content, save=False)
+        super().save(update_fields=['thumbnail'])
 
 
 class Favorite(models.Model):

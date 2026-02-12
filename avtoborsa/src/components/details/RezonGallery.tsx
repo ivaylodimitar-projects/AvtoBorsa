@@ -33,10 +33,9 @@ const MainCarouselImage = memo<{
       width: '100%',
       height: '100%',
       objectFit: 'cover',
+      objectPosition: 'center',
+      imageRendering: 'auto',
       display: 'block',
-      willChange: 'opacity',
-      backfaceVisibility: 'hidden',
-      transform: 'translateZ(0)',
     }}
   />
 ));

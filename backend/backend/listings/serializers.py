@@ -27,7 +27,7 @@ class CarImageSerializer(serializers.ModelSerializer):
     """Serializer for car images"""
     class Meta:
         model = CarImage
-        fields = ['id', 'image', 'order', 'is_cover', 'created_at']
+        fields = ['id', 'image', 'thumbnail', 'order', 'is_cover', 'created_at']
         read_only_fields = ['id', 'created_at']
 
 
@@ -59,7 +59,9 @@ class CarListingLiteSerializer(serializers.ModelSerializer):
             return _normalize_media_path(first_image)
         images = list(obj.images.all()[:1])
         if images:
-            return _normalize_media_path(images[0].image.url)
+            image_obj = images[0]
+            source_url = image_obj.thumbnail.url if image_obj.thumbnail else image_obj.image.url
+            return _normalize_media_path(source_url)
         return None
 
     def _resolve_price_change(self, obj):
@@ -138,7 +140,8 @@ class CarListingListSerializer(serializers.ModelSerializer):
     def _build_image_url(self, image_obj):
         if not image_obj or not image_obj.image:
             return None
-        return _normalize_media_path(image_obj.image.url)
+        source_url = image_obj.thumbnail.url if image_obj.thumbnail else image_obj.image.url
+        return _normalize_media_path(source_url)
 
     def get_images(self, obj):
         return [

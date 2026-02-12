@@ -39,7 +39,6 @@ const PRESET_AMOUNTS: PresetAmount[] = [
   { value: 25, label: "Популярен", tag: "Най-често" },
   { value: 50, label: "Стандарт", tag: "Най-добра стойност" },
   { value: 100, label: "Про", tag: "За активни" },
-  { value: 200, label: "Бизнес", tag: "Максимум" },
 ];
 
 const BONUS_OPTIONS: BonusOption[] = [
@@ -91,6 +90,12 @@ const parseAmount = (value: string) => {
 
 const roundToCents = (value: number) => Math.round(value * 100) / 100;
 
+const getAutoBonusIdForAmount = (amountValue: number) => {
+  const eligibleBonuses = BONUS_OPTIONS.slice()
+    .sort((a, b) => b.minAmount - a.minAmount)
+    .filter((option) => amountValue >= option.minAmount);
+  return eligibleBonuses[0]?.id ?? BONUS_OPTIONS[0].id;
+};
 const extractErrorMessage = (payload: unknown, fallback: string): string => {
   if (!payload || typeof payload !== "object") {
     return fallback;
@@ -129,9 +134,9 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
     .find((option) => amountValue > 0 && amountValue < option.minAmount);
 
   useEffect(() => {
-    const current = BONUS_OPTIONS.find((option) => option.id === selectedBonusId);
-    if (current && current.minAmount > 0 && amountValue < current.minAmount) {
-      setSelectedBonusId(BONUS_OPTIONS[0].id);
+    const autoBonusId = getAutoBonusIdForAmount(amountValue);
+    if (autoBonusId !== selectedBonusId) {
+      setSelectedBonusId(autoBonusId);
     }
   }, [amountValue, selectedBonusId]);
 
@@ -147,7 +152,9 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
       return;
     }
     setAmount(normalized);
-    setActivePreset(null);
+    const parsed = parseAmount(normalized);
+    const matchedPreset = PRESET_AMOUNTS.find((preset) => preset.value === parsed)?.value ?? null;
+    setActivePreset(matchedPreset);
     setError("");
   };
 

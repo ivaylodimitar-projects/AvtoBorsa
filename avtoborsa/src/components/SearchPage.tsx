@@ -537,6 +537,14 @@ const SearchPage: React.FC = () => {
   }, [searchParams]);
 
   const totalListings = totalCount ?? results.length;
+  const listingsScopeLabel = useMemo(() => {
+    const brand = (searchParams.get("brand") || "").trim();
+    const model = (searchParams.get("model") || "").trim();
+
+    if (brand && model) return `${brand} / ${model}`;
+    if (brand) return brand;
+    return "автомобили и джипове";
+  }, [searchParams]);
   const skeletonRows = useMemo(() => Array.from({ length: PAGE_SIZE }, (_, idx) => idx), []);
 
   const visiblePages = useMemo(() => {
@@ -596,8 +604,15 @@ const SearchPage: React.FC = () => {
     },
     itemRow: { display: "flex", alignItems: "stretch" },
     itemPhoto: { width: 280, flexShrink: 0, display: "flex", flexDirection: "column" as const, background: "#fff" },
-    photoMain: { height: 210, position: "relative" as const, overflow: "hidden", background: "linear-gradient(135deg, #e2e8f0 0%, #cbd5f5 100%)" },
-    itemImage: { width: "100%", height: "100%", objectFit: "cover" },
+    photoMain: { height: 194, position: "relative" as const, overflow: "hidden", background: "linear-gradient(135deg, #e2e8f0 0%, #cbd5f5 100%)" },
+    itemImage: {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+      objectPosition: "center",
+      imageRendering: "auto",
+      display: "block",
+    },
     itemPhotoOverlay: { position: "absolute" as const, top: 0, right: 0, bottom: 0, left: 0, display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 12, background: "linear-gradient(to top, rgba(15, 23, 42, 0.45), transparent)", zIndex: 1 },
     topBadge: { position: "absolute" as const, top: 10, left: 10, background: "linear-gradient(135deg, #ef4444, #dc2626)", color: "#fff", padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: 0.3, textTransform: "uppercase" as const, boxShadow: "0 4px 10px rgba(220, 38, 38, 0.3)", zIndex: 2 },
     newBadge: { position: "absolute" as const, left: 10, background: "linear-gradient(135deg, #10b981, #059669)", color: "#fff", padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: 0.3, textTransform: "uppercase" as const, boxShadow: "0 4px 10px rgba(5, 150, 105, 0.35)", zIndex: 2 },
@@ -608,7 +623,7 @@ const SearchPage: React.FC = () => {
     thumbImage: { width: "100%", height: "100%", objectFit: "cover" },
     thumbPlaceholder: { color: "#94a3b8" },
     thumbMore: { background: "#e2e8f0", color: "#334155", fontSize: 12, fontWeight: 700 },
-    itemText: { flex: 1, display: "flex", alignItems: "stretch", minHeight: 210 },
+    itemText: { flex: 1, display: "flex", alignItems: "stretch", minHeight: 194 },
     itemMain: { flex: 1, padding: 20, display: "flex", flexDirection: "column" as const, gap: 12 },
     itemHeader: { marginBottom: 4 },
     itemTitle: { fontSize: 20, fontWeight: 700, color: "#111827", marginBottom: 10, textDecoration: "none", lineHeight: 1.3 },
@@ -688,7 +703,7 @@ const SearchPage: React.FC = () => {
       position: "relative" as const,
     },
     skeletonPhoto: { width: 280, flexShrink: 0, display: "flex", flexDirection: "column" as const },
-    skeletonImage: { width: "100%", height: 210, ...skeletonBase },
+    skeletonImage: { width: "100%", height: 194, ...skeletonBase },
     skeletonThumb: { width: "100%", aspectRatio: "4 / 3", borderRadius: 10, ...skeletonBase },
     skeletonMain: { flex: 1, padding: 20, display: "flex", flexDirection: "column" as const, gap: 12 },
     skeletonSide: { width: 240, padding: 16, borderLeft: "1px solid #e2e8f0", background: "#f8fafc", display: "flex", flexDirection: "column" as const, gap: 10 },
@@ -723,7 +738,9 @@ const SearchPage: React.FC = () => {
             </div>
           )}
           <p style={{ fontSize: 15, color: "#555", margin: "16px 0 0 0", fontWeight: 500 }}>
-            Намерени обяви: <strong style={{ color: "rgb(15, 118, 110)" }}>{totalListings}</strong>
+            1 - 20 от общо{" "}
+            <strong style={{ color: "#0066cc" }}>{totalListings}</strong> намерени обяви за{" "}
+            <strong style={{ color: "#0066cc" }}>{listingsScopeLabel}</strong>
           </p>
         </div>
 

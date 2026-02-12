@@ -13,7 +13,7 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction as db_transaction
 from django.db.models import Q, OuterRef, Subquery, Case, When, Value, IntegerField, F
 from django.db.models import Prefetch
-from django.db.models.functions import Substr
+from django.db.models.functions import Substr, Coalesce
 from django.core.cache import cache
 from django.utils.cache import patch_cache_control, patch_vary_headers
 from django.utils import timezone
@@ -345,17 +345,23 @@ class CarListingViewSet(viewsets.ModelViewSet):
         if self.action == "list":
             lite = (self.request.query_params.get("lite") or "").lower()
             compact = (self.request.query_params.get("compact") or "").lower()
+            first_thumbnail_subquery = CarImage.objects.filter(
+                listing_id=OuterRef('pk')
+            ).order_by('-is_cover', 'order', 'id').values('thumbnail')[:1]
             first_image_subquery = CarImage.objects.filter(
                 listing_id=OuterRef('pk')
             ).order_by('-is_cover', 'order', 'id').values('image')[:1]
             image_prefetch = Prefetch(
                 'images',
-                queryset=CarImage.objects.only('id', 'image', 'order', 'is_cover', 'listing_id').order_by('order')
+                queryset=CarImage.objects.only('id', 'image', 'thumbnail', 'order', 'is_cover', 'listing_id').order_by('order')
             )
 
             if lite in {"1", "true", "yes"}:
                 queryset = queryset.annotate(
-                    first_image=Subquery(first_image_subquery)
+                    first_image=Coalesce(
+                        Subquery(first_thumbnail_subquery),
+                        Subquery(first_image_subquery),
+                    )
                 ).only(
                     'id', 'slug', 'brand', 'model', 'year_from', 'price', 'mileage',
                     'fuel', 'power', 'city', 'created_at', 'listing_type'
@@ -363,7 +369,10 @@ class CarListingViewSet(viewsets.ModelViewSet):
             elif compact in {"1", "true", "yes"}:
                 queryset = queryset.annotate(
                     description_preview=Substr('description', 1, 220),
-                    first_image=Subquery(first_image_subquery)
+                    first_image=Coalesce(
+                        Subquery(first_thumbnail_subquery),
+                        Subquery(first_image_subquery),
+                    )
                 ).select_related(
                     'user',
                     'user__business_profile',
@@ -809,6 +818,9 @@ def latest_listings(request):
 
     _demote_expired_top_listings()
     cutoff = get_expiry_cutoff()
+    first_thumbnail_subquery = CarImage.objects.filter(
+        listing_id=OuterRef('pk')
+    ).order_by('-is_cover', 'order', 'id').values('thumbnail')[:1]
     first_image_subquery = CarImage.objects.filter(
         listing_id=OuterRef('pk')
     ).order_by('-is_cover', 'order', 'id').values('image')[:1]
@@ -829,7 +841,10 @@ def latest_listings(request):
                 default=Value(1),
                 output_field=IntegerField(),
             ),
-            first_image=Subquery(first_image_subquery),
+            first_image=Coalesce(
+                Subquery(first_thumbnail_subquery),
+                Subquery(first_image_subquery),
+            ),
             last_price_change_delta=Subquery(latest_price_change.values('delta')[:1]),
             last_price_change_at=Subquery(latest_price_change.values('changed_at')[:1]),
         )

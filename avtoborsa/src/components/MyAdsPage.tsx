@@ -26,6 +26,12 @@ import {
   formatFuelLabel,
   formatGearboxLabel,
 } from "../utils/listingLabels";
+import {
+  readMyAdsCache,
+  writeMyAdsCache,
+  invalidateMyAdsCache,
+} from "../utils/myAdsCache";
+import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 
 interface CarListing {
   id: number;
@@ -51,7 +57,7 @@ interface CarListing {
   displacement: number;
   euro_standard: string;
   description: string;
-  images: Array<{ id: number; image: string }>;
+  images: Array<{ id: number; image: string; thumbnail?: string | null }>;
   image_url?: string;
   created_at: string;
   updated_at?: string;
@@ -74,6 +80,11 @@ interface Favorite {
   created_at: string;
 }
 
+type PreviewImageSource = {
+  full: string;
+  thumb: string;
+};
+
 type TabType = "active" | "archived" | "drafts" | "liked" | "top" | "expired";
 type ListingType = "normal" | "top";
 // Change this value to control how long the "Нова" badge remains visible.
@@ -93,6 +104,7 @@ const globalCss = `
 const MyAdsPage: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated, user, updateBalance } = useAuth();
+  const getImageUrl = useImageUrl();
   const [activeListings, setActiveListings] = useState<CarListing[]>([]);
   const [archivedListings, setArchivedListings] = useState<CarListing[]>([]);
   const [draftListings, setDraftListings] = useState<CarListing[]>([]);
@@ -127,6 +139,19 @@ const MyAdsPage: React.FC = () => {
 
   useEffect(() => {
     if (!isAuthenticated) {
+      invalidateMyAdsCache();
+      setIsLoading(false);
+      return;
+    }
+
+    const cachedPayload = readMyAdsCache<CarListing>(user?.id);
+    if (cachedPayload) {
+      setActiveListings(cachedPayload.activeListings);
+      setArchivedListings(cachedPayload.archivedListings);
+      setDraftListings(cachedPayload.draftListings);
+      setExpiredListings(cachedPayload.expiredListings);
+      setLikedListings(cachedPayload.likedListings);
+      setError(null);
       setIsLoading(false);
       return;
     }
@@ -169,11 +194,20 @@ const MyAdsPage: React.FC = () => {
         setDraftListings(draftsData);
         setExpiredListings(expiredData);
         // Extract listings from favorites (which have a nested listing property)
-        setLikedListings(favoritesData.map((fav: Favorite) => fav.listing));
+        const likedFromFavorites = favoritesData.map((fav: Favorite) => fav.listing);
+        setLikedListings(likedFromFavorites);
+        writeMyAdsCache<CarListing>(user?.id, {
+          activeListings: activeData,
+          archivedListings: archivedData,
+          draftListings: draftsData,
+          expiredListings: expiredData,
+          likedListings: likedFromFavorites,
+        });
         setError(null);
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : "An error occurred";
         setError(errorMsg);
+        invalidateMyAdsCache(user?.id);
         setActiveListings([]);
         setArchivedListings([]);
         setDraftListings([]);
@@ -185,7 +219,7 @@ const MyAdsPage: React.FC = () => {
     };
 
     fetchUserListings();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user?.id]);
 
   // Toast notification effect
   useEffect(() => {
@@ -225,6 +259,7 @@ const MyAdsPage: React.FC = () => {
   };
 
   const goToEdit = (listing: CarListing) => {
+    invalidateMyAdsCache(user?.id);
     navigate(`/publish?edit=${listing.id}`, { state: { listing } });
   };
 
@@ -239,12 +274,45 @@ const MyAdsPage: React.FC = () => {
     setPreviewTab(null);
   };
 
-  const getPreviewImages = (listing: CarListing) => {
-    const images = (listing.images || [])
-      .map((img) => img.image)
-      .filter((img) => !!img);
-    const cover = listing.image_url ? [listing.image_url] : [];
-    return Array.from(new Set([...cover, ...images]));
+  const getCardImageSources = (listing: CarListing) => {
+    const coverImage = (listing.images || []).find((img) => Boolean(img.image));
+    const fullRaw = (listing.image_url || coverImage?.image || coverImage?.thumbnail || "").trim();
+    const thumbRaw = (coverImage?.thumbnail || "").trim();
+    const displayRaw = (thumbRaw || fullRaw).trim();
+    const full = fullRaw ? getImageUrl(fullRaw) : "";
+    const thumb = thumbRaw ? getImageUrl(thumbRaw) : full;
+    const display = displayRaw ? getImageUrl(displayRaw) : "";
+    if (!display) {
+      return { display: "", full: "", thumb: "" };
+    }
+    return { display, full, thumb };
+  };
+
+  const getPreviewImages = (listing: CarListing): PreviewImageSource[] => {
+    const orderedImages = listing.images || [];
+    const resolved: PreviewImageSource[] = [];
+    const seen = new Set<string>();
+
+    const pushImage = (fullCandidate?: string | null, thumbCandidate?: string | null) => {
+      const fullRaw = (fullCandidate || thumbCandidate || "").trim();
+      const full = fullRaw ? getImageUrl(fullRaw) : "";
+      if (!full || seen.has(full)) return;
+      seen.add(full);
+      const thumbRaw = (thumbCandidate || fullCandidate || "").trim();
+      const thumb = thumbRaw ? getImageUrl(thumbRaw) : full;
+      resolved.push({ full, thumb: thumb || full });
+    };
+
+    if (listing.image_url) {
+      const coverMatch = orderedImages.find((img) => img.image === listing.image_url);
+      pushImage(listing.image_url, coverMatch?.thumbnail);
+    }
+
+    orderedImages.forEach((img) => {
+      pushImage(img.image, img.thumbnail || img.image);
+    });
+
+    return resolved;
   };
 
   const getPreviewStatusLabel = (tab: TabType | null) => {
@@ -371,6 +439,7 @@ const MyAdsPage: React.FC = () => {
         updatedListing,
         ...prev.filter((l) => l.id !== listingId),
       ]);
+      invalidateMyAdsCache(user?.id);
       showToast(
         listingType === "top"
           ? "Обявата е публикувана отново като ТОП!"
@@ -427,6 +496,7 @@ const MyAdsPage: React.FC = () => {
       setActiveListings((prev) =>
         prev.map((l) => (l.id === listingId ? updatedListing : l))
       );
+      invalidateMyAdsCache(user?.id);
       showToast(
         listingType === "top"
           ? "Обявата е промотирана до ТОП!"
@@ -495,6 +565,7 @@ const MyAdsPage: React.FC = () => {
       if (listing) {
         setArchivedListings((prev) => [listing, ...prev]);
       }
+      invalidateMyAdsCache(user?.id);
       showToast("Обявата е архивирана успешно!");
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Failed to archive listing";
@@ -532,6 +603,7 @@ const MyAdsPage: React.FC = () => {
       if (listing) {
         setActiveListings((prev) => [listing, ...prev]);
       }
+      invalidateMyAdsCache(user?.id);
       showToast("Обявата е активирана успешно!");
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Failed to unarchive listing";
@@ -566,6 +638,7 @@ const MyAdsPage: React.FC = () => {
       setDraftListings((prev) => prev.filter((l) => l.id !== listingId));
       setExpiredListings((prev) => prev.filter((l) => l.id !== listingId));
       setLikedListings((prev) => prev.filter((l) => l.id !== listingId));
+      invalidateMyAdsCache(user?.id);
       setDeleteConfirm(null);
       showToast("Обявата е изтрита успешно!");
     } catch (err) {
@@ -591,6 +664,7 @@ const MyAdsPage: React.FC = () => {
 
       // Optimistic UI update
       setLikedListings((prev) => prev.filter((l) => l.id !== listingId));
+      invalidateMyAdsCache(user?.id);
       showToast("Премахнато от любими!");
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Failed to remove from favorites";
@@ -988,6 +1062,8 @@ const MyAdsPage: React.FC = () => {
     width: "100%",
     height: "100%",
     objectFit: "cover" as const,
+    objectPosition: "center" as const,
+    imageRendering: "auto" as const,
     display: "block",
   },
   previewPlaceholder: {
@@ -1023,6 +1099,8 @@ const MyAdsPage: React.FC = () => {
     width: "100%",
     height: "100%",
     objectFit: "cover" as const,
+    objectPosition: "center" as const,
+    imageRendering: "auto" as const,
     display: "block",
   },
   previewInfo: {
@@ -1172,6 +1250,8 @@ const MyAdsPage: React.FC = () => {
     width: "100%",
     height: "100%",
     objectFit: "cover",
+    objectPosition: "center",
+    imageRendering: "auto",
     display: "block",
   },
   listingMediaOverlay: {
@@ -1558,7 +1638,7 @@ const MyAdsPage: React.FC = () => {
       : "Можеш да промениш типа по всяко време.";
   const isPreviewTab = activeTab === "archived" || activeTab === "expired" || activeTab === "drafts";
   const previewImages = previewListing ? getPreviewImages(previewListing) : [];
-  const previewImage = previewImages[previewImageIndex] || "";
+  const previewImage = previewImages[previewImageIndex]?.full || "";
   const previewPriceValue = previewListing ? Number(previewListing.price) : Number.NaN;
   const previewPriceLabel =
     Number.isFinite(previewPriceValue) && previewPriceValue > 0
@@ -1836,6 +1916,9 @@ const MyAdsPage: React.FC = () => {
                         src={previewImage}
                         alt={previewListing.title || `${previewListing.brand} ${previewListing.model}`}
                         style={styles.previewImage}
+                        loading="eager"
+                        decoding="async"
+                        fetchPriority="high"
                       />
                     ) : (
                       <div style={styles.previewPlaceholder}>
@@ -1847,9 +1930,9 @@ const MyAdsPage: React.FC = () => {
 
                   {previewImages.length > 1 && (
                     <div style={styles.previewThumbs}>
-                      {previewImages.map((src, idx) => (
+                      {previewImages.map((previewSource, idx) => (
                         <button
-                          key={`${src}-${idx}`}
+                          key={`${previewSource.full}-${idx}`}
                           type="button"
                           style={{
                             ...styles.previewThumbButton,
@@ -1861,7 +1944,13 @@ const MyAdsPage: React.FC = () => {
                           }}
                           aria-label={`Снимка ${idx + 1}`}
                         >
-                          <img src={src} alt={`Снимка ${idx + 1}`} style={styles.previewThumb} />
+                          <img
+                            src={previewSource.thumb}
+                            alt={`Снимка ${idx + 1}`}
+                            style={styles.previewThumb}
+                            loading="lazy"
+                            decoding="async"
+                          />
                         </button>
                       ))}
                     </div>
@@ -2023,7 +2112,7 @@ const MyAdsPage: React.FC = () => {
         ) : (
           <>
           <div style={styles.listingsGrid}>
-            {paginatedListings.map((listing) => {
+            {paginatedListings.map((listing, index) => {
             const statusLabel = getPreviewStatusLabel(activeTab);
             const fallbackTitle = `${listing.brand || ""} ${listing.model || ""}`.trim();
             const listingTitle = (listing.title || fallbackTitle || "Без заглавие").trim();
@@ -2082,6 +2171,8 @@ const MyAdsPage: React.FC = () => {
             ].filter(Boolean) as string[];
             const visibleChips = chips.slice(0, 6);
             const isNewListing = isListingNew(listing.created_at);
+            const cardImage = getCardImageSources(listing);
+            const isPriorityImage = index < 4;
 
             return (
             <div
@@ -2122,11 +2213,14 @@ const MyAdsPage: React.FC = () => {
                 {statusLabel && (
                   <div style={statusBadgeStyle}>{statusLabel}</div>
                 )}
-                {listing.image_url ? (
+                {cardImage.display ? (
                   <img
-                    src={listing.image_url}
+                    src={cardImage.display}
                     alt={listingTitle}
                     style={styles.listingImage}
+                    loading={isPriorityImage ? "eager" : "lazy"}
+                    decoding="async"
+                    fetchPriority={isPriorityImage ? "high" : "low"}
                   />
                 ) : (
                   <div style={styles.listingPlaceholder}>
@@ -2713,3 +2807,4 @@ const MyAdsPage: React.FC = () => {
 };
 
 export default MyAdsPage;
+

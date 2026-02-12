@@ -47,8 +47,7 @@ const isTopListing = (listing: CarListing) => {
 
 const NEW_LISTING_BADGE_MINUTES = 10;
 const NEW_LISTING_BADGE_WINDOW_MS = NEW_LISTING_BADGE_MINUTES * 60 * 1000;
-const LATEST_LISTINGS_CACHE_KEY = "latestListingsLiteV3";
-const LATEST_LISTINGS_CACHE_TTL_MS = 60_000;
+let latestListingsTabCache: CarListing[] | null = null;
 
 type Fuel = "Бензин" | "Дизел" | "Газ/Бензин" | "Хибрид" | "Електро";
 type Gearbox = "Ръчна" | "Автоматик";
@@ -167,32 +166,25 @@ export default function LandingPage() {
   const getImageUrl = useImageUrl();
 
   // Latest listings
-  const [latestListings, setLatestListings] = useState<CarListing[]>([]);
-  const [listingsLoading, setListingsLoading] = useState(true);
+  const [latestListings, setLatestListings] = useState<CarListing[]>(
+    () => latestListingsTabCache ?? []
+  );
+  const [listingsLoading, setListingsLoading] = useState(
+    () => latestListingsTabCache === null
+  );
 
   useEffect(() => {
     const controller = new AbortController();
-    let hasValidCache = false;
 
-    const cachedRaw = sessionStorage.getItem(LATEST_LISTINGS_CACHE_KEY);
-    if (cachedRaw) {
-      try {
-        const cached = JSON.parse(cachedRaw) as { ts: number; data: CarListing[] };
-        if (cached?.data && Date.now() - cached.ts < LATEST_LISTINGS_CACHE_TTL_MS) {
-          hasValidCache = true;
-          setLatestListings(cached.data);
-          setListingsLoading(false);
-        }
-      } catch (err) {
-        console.warn("Failed to parse latest listings cache:", err);
-      }
+    if (latestListingsTabCache !== null) {
+      setLatestListings(latestListingsTabCache);
+      setListingsLoading(false);
+      return () => controller.abort();
     }
 
     const fetchLatest = async () => {
       try {
-        if (!hasValidCache) {
-          setListingsLoading(true);
-        }
+        setListingsLoading(true);
         const latestResponse = await fetch(
           "http://localhost:8000/api/listings/latest/",
           { signal: controller.signal }
@@ -216,10 +208,7 @@ export default function LandingPage() {
         }
 
         setLatestListings(latest);
-        sessionStorage.setItem(
-          LATEST_LISTINGS_CACHE_KEY,
-          JSON.stringify({ ts: Date.now(), data: latest })
-        );
+        latestListingsTabCache = latest;
       } catch (err) {
         if (!controller.signal.aborted) {
           console.error("Error fetching latest listings:", err);
@@ -840,8 +829,8 @@ export default function LandingPage() {
                       style={{
                         borderRadius: 10,
                         overflow: "hidden",
-                        border: isTop ? "2px solid #dc2626" : "1px solid #eef2f7",
-                        background: "#fff",
+                        border: isTop ? "#dc2626" : "1px solid #eef2f7",
+                        background: "linear-gradient(rgb(248, 250, 252) 0%, rgb(241, 245, 249) 100%)",
                         boxShadow: "0 2px 8px rgba(15,23,42,0.06)",
                         display: "flex",
                         flexDirection: "column",
@@ -866,7 +855,14 @@ export default function LandingPage() {
                           <img
                             src={listingImageUrl}
                             alt={`${listing.brand} ${listing.model}`}
-                            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                              objectPosition: "center",
+                              imageRendering: "auto",
+                              display: "block",
+                            }}
                             loading={isAboveFold ? "eager" : "lazy"}
                             decoding="async"
                             fetchPriority={isAboveFold ? "high" : "low"}
