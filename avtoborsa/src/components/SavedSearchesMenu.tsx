@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bookmark, Trash2, X } from "lucide-react";
 import { useSavedSearches } from "../hooks/useSavedSearches";
+import { getCriteriaMainCategoryLabel } from "../constants/mobileBgData";
 
 const SavedSearchesMenu: React.FC = () => {
   const navigate = useNavigate();
@@ -132,6 +133,12 @@ const SavedSearchesMenu: React.FC = () => {
       fontSize: 11,
       color: "#999",
     },
+    searchCategory: {
+      fontSize: 12,
+      color: "#0f766e",
+      fontWeight: 600,
+      marginBottom: 4,
+    },
     deleteBtn: {
       background: "none",
       border: "none",
@@ -209,6 +216,11 @@ const SavedSearchesMenu: React.FC = () => {
                   >
                     <div style={styles.searchItemContent}>
                       <div style={styles.searchName}>{search.name}</div>
+                      {(search.mainCategoryLabel || getCriteriaMainCategoryLabel(search.criteria)) && (
+                        <div style={styles.searchCategory}>
+                          {(search.mainCategoryLabel || getCriteriaMainCategoryLabel(search.criteria)) as string}
+                        </div>
+                      )}
                       <div style={styles.searchDate}>
                         {new Date(search.timestamp).toLocaleDateString("bg-BG", {
                           day: "numeric",

@@ -7,6 +7,12 @@ import { useRecentSearches } from "../hooks/useRecentSearches";
 import type { RecentSearch } from "../hooks/useRecentSearches";
 import { useSavedSearches } from "../hooks/useSavedSearches";
 import type { SavedSearch } from "../hooks/useSavedSearches";
+import { groupOptionsByInitial, sortUniqueOptions } from "../utils/alphabeticalOptions";
+import {
+  getBrandOptionsByMainCategory,
+  getMainCategoryFromTopmenu,
+  getModelOptionsByMainCategory,
+} from "../constants/mobileBgData";
 
 interface SearchCriteria {
   mainCategory?: string;
@@ -236,8 +242,6 @@ const INDUSTRIAL_TYPE_OPTIONS = [
   "Трамбовки",
   "Челен товарач",
 ];
-const FORKLIFT_TYPE_OPTIONS = ["Електрокар", "Мотокар"];
-const CARAVAN_TYPE_OPTIONS = ["Каравана", "Кемпер"];
 const BOAT_TYPE_OPTIONS = [
   "Ветроходна лодка",
   "Джет",
@@ -250,8 +254,6 @@ const TRAILER_TYPE_OPTIONS = ["За автомобил", "За камион", "�
 const EQUIPMENT_TYPE_OPTIONS_BY_MAIN_CATEGORY: Record<string, string[]> = {
   "6": AGRI_TYPE_OPTIONS,
   "7": INDUSTRIAL_TYPE_OPTIONS,
-  "8": FORKLIFT_TYPE_OPTIONS,
-  "9": CARAVAN_TYPE_OPTIONS,
   a: BOAT_TYPE_OPTIONS,
   b: TRAILER_TYPE_OPTIONS,
 };
@@ -689,9 +691,50 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     [searchCriteria.region]
   );
 
-  const availableModels = useMemo(
-    () => (searchCriteria.brand && models[searchCriteria.brand] ? models[searchCriteria.brand] : []),
-    [searchCriteria.brand, models]
+  const brandMainCategory = useMemo(() => {
+    if (isWheelsCategory) {
+      return getMainCategoryFromTopmenu(searchCriteria.wheelFor || "1") || "1";
+    }
+    if (isPartsCategory) {
+      return getMainCategoryFromTopmenu(searchCriteria.partFor || "1") || "1";
+    }
+    if (isAccessoriesCategory || isBuyOrServicesCategory) {
+      return getMainCategoryFromTopmenu(searchCriteria.classifiedFor || "1") || "1";
+    }
+    return mainCategory || "1";
+  }, [
+    isAccessoriesCategory,
+    isBuyOrServicesCategory,
+    isPartsCategory,
+    isWheelsCategory,
+    mainCategory,
+    searchCriteria.classifiedFor,
+    searchCriteria.partFor,
+    searchCriteria.wheelFor,
+  ]);
+
+  const availableBrands = useMemo(() => {
+    const dynamicOptions = getBrandOptionsByMainCategory(brandMainCategory);
+    if (dynamicOptions.length > 0) return dynamicOptions;
+    return brands;
+  }, [brandMainCategory, brands]);
+
+  const sortedAvailableBrands = useMemo(
+    () => sortUniqueOptions(availableBrands),
+    [availableBrands]
+  );
+
+  const selectedBrand = searchCriteria.brand || searchCriteria.agriBrand;
+  const availableModels = useMemo(() => {
+    if (!selectedBrand) return [];
+    const dynamicOptions = getModelOptionsByMainCategory(brandMainCategory, selectedBrand);
+    if (dynamicOptions.length > 0) return dynamicOptions;
+    return models[selectedBrand] || [];
+  }, [brandMainCategory, models, selectedBrand]);
+
+  const groupedAvailableModels = useMemo(
+    () => groupOptionsByInitial(sortUniqueOptions(availableModels)),
+    [availableModels]
   );
   const wheelPcdOptions = useMemo(
     () => WHEEL_PCD_OPTIONS_BY_BOLTS[searchCriteria.wheelBolts] || [],
@@ -836,8 +879,18 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     }
 
     if (isEquipmentCategory) {
-      if (searchCriteria.agriType) query.marka = searchCriteria.agriType;
-      if (searchCriteria.agriBrand) query.model = searchCriteria.agriBrand;
+      const equipmentBrand = searchCriteria.brand || searchCriteria.agriBrand;
+      if (searchCriteria.agriType) {
+        if (isAgroCategory || isIndustrialCategory) {
+          query.equipmentType = searchCriteria.agriType;
+        } else if (isBoatsCategory) {
+          query.boatCategory = searchCriteria.agriType;
+        } else if (isTrailersCategory) {
+          query.trailerCategory = searchCriteria.agriType;
+        }
+      }
+      if (equipmentBrand) query.marka = equipmentBrand;
+      if (searchCriteria.model) query.model = searchCriteria.model;
       if (searchCriteria.region) query.locat = searchCriteria.region;
       if (searchCriteria.city) query.locatc = searchCriteria.city;
       if (searchCriteria.maxPrice) query.price1 = searchCriteria.maxPrice;
@@ -1134,12 +1187,13 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       gap: 5px;
     }
     .adv-label {
-      font-size: 10.5px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      color: #475569;
+      font-size: 11.5px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      color: #111111;
       text-transform: uppercase;
       padding-left: 2px;
+      line-height: 1.25;
     }
     .adv-select,
     .adv-input {
@@ -1689,7 +1743,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                   handleInputChange("brand", brand);
                   handleInputChange("model", "");
                 }}
-                brands={brands}
+                brands={sortedAvailableBrands}
                 placeholder="Всички"
               />
             </div>
@@ -1704,8 +1758,12 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                   disabled={!searchCriteria.brand}
                 >
                   <option value="">{searchCriteria.brand ? "Всички" : "Избери марка първо"}</option>
-                  {availableModels.map((model) => (
-                    <option key={model} value={model}>{model}</option>
+                  {groupedAvailableModels.map((group) => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.options.map((model) => (
+                        <option key={model} value={model}>{model}</option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
                 {!searchCriteria.brand && (
@@ -1832,30 +1890,65 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
           <div className="adv-search-grid">
             {renderMainCategoryField()}
 
-            <div className="adv-field">
-              <label className="adv-label">ВИД ТЕХНИКА</label>
-              <select
-                value={searchCriteria.agriType}
-                onChange={(e) => handleInputChange("agriType", e.target.value)}
-                className="adv-select"
-              >
-                <option value="">Всички</option>
-                {equipmentTypeOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {equipmentTypeOptions.length > 0 && (
+              <div className="adv-field">
+                <label className="adv-label">
+                  {isAgroCategory || isIndustrialCategory ? "ВИД ТЕХНИКА" : "КАТЕГОРИЯ"}
+                </label>
+                <select
+                  value={searchCriteria.agriType}
+                  onChange={(e) => handleInputChange("agriType", e.target.value)}
+                  className="adv-select"
+                >
+                  <option value="">Всички</option>
+                  {equipmentTypeOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="adv-field">
               <label className="adv-label">МАРКА</label>
               <BrandSelector
-                value={searchCriteria.agriBrand}
-                onChange={(brand) => handleInputChange("agriBrand", brand)}
-                brands={brands}
+                value={searchCriteria.brand}
+                onChange={(brand) => {
+                  handleInputChange("brand", brand);
+                  handleInputChange("model", "");
+                }}
+                brands={sortedAvailableBrands}
                 placeholder="Всички"
               />
+            </div>
+
+            <div className="adv-field">
+              <label className="adv-label">МОДЕЛ</label>
+              <div style={{ position: "relative" }}>
+                <select
+                  value={searchCriteria.model}
+                  onChange={(e) => handleInputChange("model", e.target.value)}
+                  className={`adv-select ${!searchCriteria.brand ? "adv-select--disabled" : ""}`}
+                  disabled={!searchCriteria.brand}
+                >
+                  <option value="">{searchCriteria.brand ? "Всички" : "Избери марка първо"}</option>
+                  {groupedAvailableModels.map((group) => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.options.map((model) => (
+                        <option key={model} value={model}>
+                          {model}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                {!searchCriteria.brand && (
+                  <span className="adv-lock-icon" title="Избери марка първо">
+                    <Lock size={14} />
+                  </span>
+                )}
+              </div>
             </div>
 
             <div className="adv-field">
@@ -2142,7 +2235,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                   handleInputChange("brand", brand);
                   handleInputChange("model", "");
                 }}
-                brands={brands}
+                brands={sortedAvailableBrands}
                 placeholder="Всички марки"
               />
             </div>
@@ -2158,8 +2251,12 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                   disabled={!searchCriteria.brand}
                 >
                   <option value="">{searchCriteria.brand ? "Всички модели" : "Избери марка първо"}</option>
-                  {availableModels.map((model) => (
-                    <option key={model} value={model}>{model}</option>
+                  {groupedAvailableModels.map((group) => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.options.map((model) => (
+                        <option key={model} value={model}>{model}</option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
                 {!searchCriteria.brand && (
@@ -2488,7 +2585,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                             handleInputChange("brand", brand);
                             handleInputChange("model", "");
                           }}
-                          brands={brands}
+                          brands={sortedAvailableBrands}
                           placeholder="Всички"
                         />
                       </div>
@@ -2502,10 +2599,14 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                             disabled={!searchCriteria.brand}
                           >
                             <option value="">{searchCriteria.brand ? "Всички" : "Избери марка първо"}</option>
-                            {availableModels.map((model) => (
-                              <option key={model} value={model}>
-                                {model}
-                              </option>
+                            {groupedAvailableModels.map((group) => (
+                              <optgroup key={group.label} label={group.label}>
+                                {group.options.map((model) => (
+                                  <option key={model} value={model}>
+                                    {model}
+                                  </option>
+                                ))}
+                              </optgroup>
                             ))}
                           </select>
                           {!searchCriteria.brand && (
@@ -2671,7 +2772,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                             handleInputChange("brand", brand);
                             handleInputChange("model", "");
                           }}
-                          brands={brands}
+                          brands={sortedAvailableBrands}
                           placeholder="Всички"
                         />
                       </div>
@@ -2685,10 +2786,14 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                             disabled={!searchCriteria.brand}
                           >
                             <option value="">{searchCriteria.brand ? "Всички" : "Избери марка първо"}</option>
-                            {availableModels.map((model) => (
-                              <option key={model} value={model}>
-                                {model}
-                              </option>
+                            {groupedAvailableModels.map((group) => (
+                              <optgroup key={group.label} label={group.label}>
+                                {group.options.map((model) => (
+                                  <option key={model} value={model}>
+                                    {model}
+                                  </option>
+                                ))}
+                              </optgroup>
                             ))}
                           </select>
                           {!searchCriteria.brand && (

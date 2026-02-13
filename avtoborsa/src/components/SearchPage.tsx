@@ -21,6 +21,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 import { formatConditionLabel, formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
+import { getMainCategoryFromTopmenu, getMainCategoryLabel } from "../constants/mobileBgData";
 
 type CarListing = {
   id: number;
@@ -52,6 +53,8 @@ type CarListing = {
   description?: string;
   category?: string;
   category_display?: string;
+  main_category?: string;
+  main_category_display?: string;
   condition?: string;
   condition_display?: string;
   created_at: string;
@@ -475,75 +478,271 @@ const SearchPage: React.FC = () => {
     const listingAgeMs = currentTimeMs - createdAtMs;
     return listingAgeMs >= 0 && listingAgeMs <= NEW_LISTING_BADGE_WINDOW_MS;
   };
-
   // Build search criteria display
   const searchCriteriaDisplay = useMemo(() => {
     const criteria: string[] = [];
 
-    // Basic filters
-    const brand = searchParams.get("brand");
-    const model = searchParams.get("model");
-    const category = searchParams.get("category");
-    const yearFrom = searchParams.get("yearFrom");
-    const yearTo = searchParams.get("yearTo");
-    const maxPrice = searchParams.get("maxPrice");
-    const priceFrom = searchParams.get("priceFrom");
-    const priceTo = searchParams.get("priceTo");
-    const fuel = searchParams.get("fuel");
-    const gearbox = searchParams.get("gearbox");
+    const getParam = (...keys: string[]) => {
+      for (const key of keys) {
+        const value = (searchParams.get(key) || "").trim();
+        if (value) return value;
+      }
+      return "";
+    };
 
-    // Detailed filters
-    const mileageFrom = searchParams.get("mileageFrom");
-    const mileageTo = searchParams.get("mileageTo");
-    const engineFrom = searchParams.get("engineFrom");
-    const engineTo = searchParams.get("engineTo");
-    const region = searchParams.get("region");
-    const color = searchParams.get("color");
-    const condition = searchParams.get("condition");
+    const addCriterion = (label: string, value: string) => {
+      const normalized = value.trim();
+      if (!normalized) return;
+      criteria.push(`${label}: ${normalized}`);
+    };
 
-    if (brand) criteria.push(`Марка: ${brand}`);
-    if (model) criteria.push(`Модел: ${model}`);
-    if (category) criteria.push(`Тип: ${category}`);
+    const addRangeCriterion = (label: string, fromValue: string, toValue: string, suffix = "") => {
+      if (!fromValue && !toValue) return;
+      const range = `${fromValue || "0"} - ${toValue || "∞"}${suffix}`;
+      criteria.push(`${label}: ${range}`);
+    };
+
+    const wheelOfferTypeLabels: Record<string, string> = {
+      "1": "Гуми",
+      "2": "Джанти",
+      "3": "Гуми с джанти",
+    };
+    const sellerTypeLabels: Record<string, string> = {
+      "1": "Частни лица",
+      "2": "Търговци",
+    };
+    const nupStateLabels: Record<string, string> = {
+      "1": "Нов",
+      "0": "Употребяван",
+      "3": "Повреден/ударен",
+      "2": "За части",
+    };
+
+    const mainCategory = getParam("main_category", "mainCategory");
+    const mainCategoryLabel = getMainCategoryLabel(mainCategory || "1") || "Категория";
+    const marka = getParam("marka");
+    const brand = getParam("brand");
+    const model = getParam("model");
+    const category = getParam("category");
+    const year = getParam("year");
+    const yearFrom = getParam("yearFrom");
+    const yearTo = getParam("yearTo");
+    const maxPrice = getParam("maxPrice", "price1");
+    const priceFrom = getParam("priceFrom");
+    const priceTo = getParam("priceTo");
+    const currency = getParam("currency");
+    const region = getParam("region", "locat");
+    const city = getParam("city", "locatc");
+    const topmenu = getParam("topmenu");
+    const topmenuMainCategory = getMainCategoryFromTopmenu(topmenu);
+    const topmenuLabel = getMainCategoryLabel(topmenuMainCategory);
+    const sort = getParam("sortBy", "sort");
+    const sellerType = getParam("sellerType");
+    const condition = getParam("condition");
+    const nup = getParam("nup");
+
+    addCriterion("Категория", mainCategoryLabel);
+    if (topmenuLabel && ["w", "u", "v", "y", "z"].includes(mainCategory)) {
+      addCriterion("За", topmenuLabel);
+    }
 
     if (yearFrom || yearTo) {
       const yearRange = `${yearFrom || "всички"} - ${yearTo || "всички"}`;
       criteria.push(`Година: ${yearRange}`);
+    } else if (year) {
+      addCriterion("Година от", year);
     }
 
     if (maxPrice) {
-      criteria.push(`Цена: до €${maxPrice}`);
+      criteria.push(`Цена: до ${currency || "EUR"} ${maxPrice}`);
     } else if (priceFrom || priceTo) {
-      const priceRange = `€${priceFrom || "0"} - €${priceTo || "∞"}`;
+      const activeCurrency = currency || "EUR";
+      const priceRange = `${activeCurrency} ${priceFrom || "0"} - ${activeCurrency} ${priceTo || "∞"}`;
       criteria.push(`Цена: ${priceRange}`);
     }
 
-    if (mileageFrom || mileageTo) {
-      const mileageRange = `${mileageFrom || "0"} - ${mileageTo || "∞"}`;
-      criteria.push(`Пробег: ${mileageRange} км`);
+    addCriterion("Регион", region);
+    addCriterion("Град", city);
+    if (sort) addCriterion("Подредба", sort);
+
+    if (condition) {
+      addCriterion("Състояние", formatConditionLabel(condition));
+    } else if (nup) {
+      const states = Array.from(new Set(String(nup).split("").map((flag) => nupStateLabels[flag]).filter(Boolean)));
+      if (states.length > 0) {
+        addCriterion("Състояние", states.join(", "));
+      }
     }
 
-    if (engineFrom || engineTo) {
-      const engineRange = `${engineFrom || "0"} - ${engineTo || "∞"}`;
-      criteria.push(`Мощност: ${engineRange} к.с.`);
+    if (currency) addCriterion("Валута", currency);
+    if (getParam("taxCredit") === "1") addCriterion("Данъчен кредит", "Да");
+    if (["1", "true", "True"].includes(getParam("hasPhoto"))) addCriterion("Снимка", "Само със снимка");
+    if (["1", "true", "True"].includes(getParam("hasVideo"))) addCriterion("Видео/VR360", "Само с видео");
+    if (sellerType && sellerTypeLabels[sellerType]) addCriterion("Тип обяви", sellerTypeLabels[sellerType]);
+
+    if (mainCategory === "w") {
+      addCriterion("Марка авто", brand || marka);
+      addCriterion("Модел авто", model);
+      const wheelOfferType = getParam("twrubr");
+      addCriterion("Оферта", wheelOfferTypeLabels[wheelOfferType] || wheelOfferType);
+      addCriterion("Марка джанти", getParam("wheelBrand"));
+      addCriterion("Материал", getParam("wheelMaterial"));
+      addCriterion("Болтове", getParam("wheelBolts"));
+      addCriterion("PCD", getParam("wheelPcd"));
+      addCriterion("Централен отвор", getParam("wheelCenterBore"));
+      addCriterion("Офсет /ET/", getParam("wheelOffset"));
+      addCriterion("Ширина", getParam("wheelWidth"));
+      addCriterion("Диаметър", getParam("wheelDiameter"));
+      addCriterion("Брой", getParam("wheelCount"));
+      addCriterion("Вид", getParam("wheelType"));
+      return criteria;
     }
 
-    if (region) criteria.push(`Регион: ${region}`);
-    if (fuel) criteria.push(`Гориво: ${formatFuelLabel(fuel)}`);
-    if (gearbox) criteria.push(`Скоростна кутия: ${formatGearboxLabel(gearbox)}`);
-    if (color) criteria.push(`Цвят: ${color}`);
-    if (condition) criteria.push(`Състояние: ${formatConditionLabel(condition)}`);
+    if (mainCategory === "u") {
+      addCriterion("Марка", brand || marka);
+      addCriterion("Модел", model);
+      addCriterion("Категория част", getParam("partrub"));
+      addCriterion("Част", getParam("partelem"));
+      return criteria;
+    }
+
+    if (mainCategory === "v") {
+      addCriterion("Категория аксесоар", marka);
+      return criteria;
+    }
+
+    if (mainCategory === "y" || mainCategory === "z") {
+      addCriterion("Категория", category);
+      return criteria;
+    }
+
+    if (mainCategory === "6" || mainCategory === "7") {
+      const explicitEquipmentType = getParam("equipmentType");
+      const legacyEquipmentType = explicitEquipmentType ? "" : marka;
+      const equipmentType = explicitEquipmentType || legacyEquipmentType;
+      const equipmentBrand = brand || (explicitEquipmentType ? marka : model);
+      const equipmentModel = explicitEquipmentType ? model : "";
+
+      addCriterion("Вид техника", equipmentType);
+      addCriterion("Марка", equipmentBrand);
+      addCriterion("Модел", equipmentModel);
+      addRangeCriterion("Мощност", getParam("engineFrom"), getParam("engineTo"), " к.с.");
+      addCriterion("Цвят", getParam("color"));
+      return criteria;
+    }
+
+    addCriterion("Марка", brand || marka);
+    addCriterion("Модел", model);
+    if (mainCategory === "a") addCriterion("Категория лодка", getParam("boatCategory"));
+    if (mainCategory === "b") addCriterion("Категория ремарке", getParam("trailerCategory"));
+    addCriterion("Тип", category);
+    const fuelOrEngineType = getParam("fuel");
+    if (mainCategory === "1") {
+      addCriterion("Гориво", formatFuelLabel(fuelOrEngineType));
+      addCriterion("Скоростна кутия", formatGearboxLabel(getParam("gearbox")));
+    } else {
+      addCriterion("Вид двигател", fuelOrEngineType);
+    }
+    addCriterion("Трансмисия", getParam("transmission"));
+    addCriterion("Евростандарт", getParam("euroStandard"));
+    addRangeCriterion("Пробег", getParam("mileageFrom"), getParam("mileageTo"), " км");
+    addRangeCriterion("Мощност", getParam("engineFrom"), getParam("engineTo"), " к.с.");
+    addRangeCriterion("Оси", getParam("axlesFrom"), getParam("axlesTo"));
+    addRangeCriterion("Места", getParam("seatsFrom"), getParam("seatsTo"));
+    addRangeCriterion("Товароносимост", getParam("loadFrom"), getParam("loadTo"), " кг");
+    addRangeCriterion("Кубатура", getParam("displacementFrom"), getParam("displacementTo"), " куб.см.");
+    addRangeCriterion("Товароподемност", getParam("liftCapacityFrom"), getParam("liftCapacityTo"), " кг");
+    addRangeCriterion("Часове", getParam("hoursFrom"), getParam("hoursTo"));
+    addRangeCriterion("Спални места", getParam("bedsFrom"), getParam("bedsTo"));
+    addRangeCriterion("Дължина", getParam("lengthFrom"), getParam("lengthTo"), " м");
+    addRangeCriterion("Ширина", getParam("widthFrom"), getParam("widthTo"), " м");
+    addRangeCriterion("Газене", getParam("draftFrom"), getParam("draftTo"), " м");
+    addRangeCriterion("Брой двигатели", getParam("engineCountFrom"), getParam("engineCountTo"));
+    addCriterion("Материал", getParam("material"));
+    if (["1", "true", "True"].includes(getParam("hasToilet"))) addCriterion("Тоалетна", "Да");
+    if (["1", "true", "True"].includes(getParam("hasHeating"))) addCriterion("Отопление", "Да");
+    if (["1", "true", "True"].includes(getParam("hasAirConditioning"))) addCriterion("Климатик", "Да");
+    addCriterion("Екстри лодка", getParam("boatFeatures").split(",").filter(Boolean).join(", "));
+    addCriterion("Екстри ремарке", getParam("trailerFeatures").split(",").filter(Boolean).join(", "));
+    addCriterion("Цвят", getParam("color"));
 
     return criteria;
   }, [searchParams]);
 
   const totalListings = totalCount ?? results.length;
   const listingsScopeLabel = useMemo(() => {
-    const brand = (searchParams.get("brand") || "").trim();
-    const model = (searchParams.get("model") || "").trim();
+    const getParam = (...keys: string[]) => {
+      for (const key of keys) {
+        const value = (searchParams.get(key) || "").trim();
+        if (value) return value;
+      }
+      return "";
+    };
 
-    if (brand && model) return `${brand} / ${model}`;
-    if (brand) return brand;
-    return "автомобили и джипове";
+    const mainCategory = getParam("main_category", "mainCategory");
+    const mainCategoryLabel = getMainCategoryLabel(mainCategory || "1") || "Обяви";
+    const topmenu = getParam("topmenu");
+    const topmenuLabel = getMainCategoryLabel(getMainCategoryFromTopmenu(topmenu));
+
+    if (mainCategory === "6" || mainCategory === "7") {
+      const marka = getParam("marka");
+      const model = getParam("model");
+      const explicitEquipmentType = getParam("equipmentType");
+      const equipmentType = explicitEquipmentType || (!explicitEquipmentType ? marka : "");
+      const equipmentBrand = getParam("brand") || (explicitEquipmentType ? marka : model);
+      const equipmentModel = explicitEquipmentType ? model : "";
+      const parts = [mainCategoryLabel];
+      if (equipmentType) parts.push(equipmentType);
+      if (equipmentBrand && equipmentModel) {
+        parts.push(`${equipmentBrand} / ${equipmentModel}`);
+      } else if (equipmentBrand) {
+        parts.push(equipmentBrand);
+      }
+      return parts.join(" • ");
+    }
+
+    if (mainCategory === "v") {
+      const accessoryCategory = getParam("marka");
+      return accessoryCategory ? `${mainCategoryLabel} • ${accessoryCategory}` : mainCategoryLabel;
+    }
+
+    if (mainCategory === "y" || mainCategory === "z") {
+      const category = getParam("category");
+      if (category && topmenuLabel) return `${mainCategoryLabel} • ${category} • за ${topmenuLabel}`;
+      if (category) return `${mainCategoryLabel} • ${category}`;
+      return mainCategoryLabel;
+    }
+
+    if (mainCategory === "a") {
+      const boatCategory = getParam("boatCategory");
+      const brand = getParam("brand", "marka");
+      const model = getParam("model");
+      if (boatCategory && brand) return `${mainCategoryLabel} • ${boatCategory} • ${brand}${model ? ` / ${model}` : ""}`;
+      if (boatCategory) return `${mainCategoryLabel} • ${boatCategory}`;
+      if (brand && model) return `${mainCategoryLabel} • ${brand} / ${model}`;
+      if (brand) return `${mainCategoryLabel} • ${brand}`;
+      return mainCategoryLabel;
+    }
+
+    if (mainCategory === "b") {
+      const trailerCategory = getParam("trailerCategory");
+      const brand = getParam("brand", "marka");
+      const model = getParam("model");
+      if (trailerCategory && brand) return `${mainCategoryLabel} • ${trailerCategory} • ${brand}${model ? ` / ${model}` : ""}`;
+      if (trailerCategory) return `${mainCategoryLabel} • ${trailerCategory}`;
+      if (brand && model) return `${mainCategoryLabel} • ${brand} / ${model}`;
+      if (brand) return `${mainCategoryLabel} • ${brand}`;
+      return mainCategoryLabel;
+    }
+
+    const brand = getParam("brand", "marka");
+    const model = getParam("model");
+    if (brand && model) return `${mainCategoryLabel} • ${brand} / ${model}`;
+    if (brand) return `${mainCategoryLabel} • ${brand}`;
+    if (topmenuLabel && ["w", "u", "v", "y", "z"].includes(mainCategory)) {
+      return `${mainCategoryLabel} • за ${topmenuLabel}`;
+    }
+    return mainCategoryLabel;
   }, [searchParams]);
   const skeletonRows = useMemo(() => Array.from({ length: PAGE_SIZE }, (_, idx) => idx), []);
 
@@ -625,9 +824,38 @@ const SearchPage: React.FC = () => {
     thumbMore: { background: "#e2e8f0", color: "#334155", fontSize: 12, fontWeight: 700 },
     itemText: { flex: 1, display: "flex", alignItems: "stretch", minHeight: 194 },
     itemMain: { flex: 1, padding: 20, display: "flex", flexDirection: "column" as const, gap: 12 },
-    itemHeader: { marginBottom: 4 },
-    itemTitle: { fontSize: 20, fontWeight: 700, color: "#111827", marginBottom: 10, textDecoration: "none", lineHeight: 1.3 },
-    itemPrice: { fontSize: 24, fontWeight: 700, color: "#0f766e", marginBottom: 4 },
+    itemHeader: {
+      marginBottom: 4,
+      display: "flex",
+      alignItems: "flex-start",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    itemHeaderMain: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      minWidth: 0,
+      flexWrap: "wrap" as const,
+    },
+    itemCategoryBadge: {
+      display: "inline-flex",
+      alignItems: "center",
+      padding: "3px 10px",
+      borderRadius: 999,
+      fontSize: 11,
+      fontWeight: 700,
+      background: "#ecfdf5",
+      color: "#15803d",
+      border: "1px solid #bbf7d0",
+      width: "fit-content",
+      whiteSpace: "nowrap" as const,
+      maxWidth: 220,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+    },
+    itemTitle: { fontSize: 20, fontWeight: 700, color: "#111827", marginBottom: 0, textDecoration: "none", lineHeight: 1.3 },
+    itemPrice: { fontSize: 24, fontWeight: 700, color: "#0f766e", marginBottom: 4, textAlign: "right" as const, flexShrink: 0 },
     itemPriceSmall: { fontSize: 13, color: "#64748b", fontWeight: 500 },
     priceChangeBadge: {
       display: "inline-flex",
@@ -946,19 +1174,24 @@ const SearchPage: React.FC = () => {
                       <div style={styles.itemText}>
                         <div style={styles.itemMain}>
                           <div style={styles.itemHeader}>
-                            <a
-                              href={`/details/${listing.slug}`}
-                              style={styles.itemTitle}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (e.defaultPrevented) return;
-                                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) return;
-                                e.preventDefault();
-                                openListing(listing.slug);
-                              }}
-                            >
-                              {listing.brand} {listing.model}
-                            </a>
+                            <div style={styles.itemHeaderMain}>
+                              <a
+                                href={`/details/${listing.slug}`}
+                                style={styles.itemTitle}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (e.defaultPrevented) return;
+                                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) return;
+                                  e.preventDefault();
+                                  openListing(listing.slug);
+                                }}
+                              >
+                                {listing.brand} {listing.model}
+                              </a>
+                              <div style={styles.itemCategoryBadge}>
+                                {listing.main_category_display || getMainCategoryLabel(listing.main_category || "") || "Категория"}
+                              </div>
+                            </div>
                             <div style={styles.itemPrice}>
                               € {listing.price.toLocaleString("bg-BG")}
                               {showPriceChange && (

@@ -48,7 +48,7 @@ interface CarListing {
   description: string;
   phone: string;
   email: string;
-  features: string[];
+  features: string[] | string;
   images: CarImage[];
   image_url?: string;
   user_email: string;
@@ -239,45 +239,59 @@ const VehicleDetailsPage: React.FC = () => {
       setIsSimilarLoading(true);
       setSimilarError(null);
       try {
-        const params = new URLSearchParams();
-        params.set('compact', '1');
-        params.set('page', '1');
-        params.set('page_size', '8');
-        if (listing.brand) params.set('brand', listing.brand);
-        if (listing.model) params.set('model', listing.model);
-
-        const response = await fetch(`http://localhost:8000/api/listings/?${params.toString()}`, {
-          signal: controller.signal,
-        });
-        if (!response.ok) {
-          throw new Error('Грешка при зареждане на подобни обяви.');
-        }
-        const data = await response.json();
-        let results: SimilarListing[] = Array.isArray(data.results) ? data.results : [];
-        results = results.filter((item) => item.id !== listing.id);
-
-        if (results.length < 3 && listing.brand) {
-          const fallbackParams = new URLSearchParams();
-          fallbackParams.set('compact', '1');
-          fallbackParams.set('page', '1');
-          fallbackParams.set('page_size', '8');
-          fallbackParams.set('brand', listing.brand);
-
-          const fallbackResponse = await fetch(
-            `http://localhost:8000/api/listings/?${fallbackParams.toString()}`,
-            { signal: controller.signal }
-          );
-          if (fallbackResponse.ok) {
-            const fallbackData = await fallbackResponse.json();
-            const fallbackResults: SimilarListing[] = Array.isArray(fallbackData.results) ? fallbackData.results : [];
-            const merged = new Map<number, SimilarListing>();
-            results.forEach((item) => merged.set(item.id, item));
-            fallbackResults
-              .filter((item) => item.id !== listing.id)
-              .forEach((item) => merged.set(item.id, item));
-            results = Array.from(merged.values());
+        const buildBaseParams = () => {
+          const params = new URLSearchParams();
+          params.set('compact', '1');
+          params.set('page', '1');
+          params.set('page_size', '12');
+          if (listing.main_category) {
+            params.set('main_category', String(listing.main_category));
           }
+          return params;
+        };
+
+        const fetchBy = async (filters: Record<string, string | undefined>) => {
+          const params = buildBaseParams();
+          Object.entries(filters).forEach(([key, value]) => {
+            if (!value) return;
+            params.set(key, value);
+          });
+
+          const response = await fetch(`http://localhost:8000/api/listings/?${params.toString()}`, {
+            signal: controller.signal,
+          });
+          if (!response.ok) {
+            throw new Error('Грешка при зареждане на подобни обяви.');
+          }
+
+          const data = await response.json();
+          const results: SimilarListing[] = Array.isArray(data.results) ? data.results : [];
+          return results.filter((item) => item.id !== listing.id);
+        };
+
+        const merged = new Map<number, SimilarListing>();
+        const pushUnique = (items: SimilarListing[]) => {
+          items.forEach((item) => {
+            if (!merged.has(item.id)) {
+              merged.set(item.id, item);
+            }
+          });
+        };
+
+        // 1) Same model
+        if (listing.brand && listing.model) {
+          pushUnique(await fetchBy({ brand: listing.brand, model: listing.model }));
         }
+        // 2) Same brand in the same main category
+        if (merged.size < 6 && listing.brand) {
+          pushUnique(await fetchBy({ brand: listing.brand }));
+        }
+        // 3) Other models from the same main category
+        if (merged.size < 6) {
+          pushUnique(await fetchBy({}));
+        }
+
+        const results = Array.from(merged.values());
 
         if (!isCancelled) {
           setSimilarListings(results.slice(0, 6));
@@ -298,7 +312,7 @@ const VehicleDetailsPage: React.FC = () => {
       isCancelled = true;
       controller.abort();
     };
-  }, [listing?.id, listing?.brand, listing?.model]);
+  }, [listing?.id, listing?.brand, listing?.model, listing?.main_category]);
 
   const scrollSimilar = useCallback((direction: 'left' | 'right') => {
     const container = similarScrollRef.current;
@@ -698,12 +712,26 @@ const VehicleDetailsPage: React.FC = () => {
     );
   }
 
-  const title = `${listing.year_from} ${listing.brand} ${listing.model}`;
+  const baseTitle = (listing.title || `${listing.brand} ${listing.model}`).trim() || "Обява";
+  const hasLeadingYear = /^\d{4}\b/.test(baseTitle);
+  const includeYearInTitle = new Set(['1', '3', '4', '5', '6', '7', '8', '9', 'a', 'b']).has(
+    String(listing.main_category || '')
+  );
+  const title =
+    includeYearInTitle && listing.year_from && !hasLeadingYear
+      ? `${listing.year_from} ${baseTitle}`
+      : baseTitle;
   const sellerName = listing.seller_name || 'Частно лице';
   const isBusinessSeller = listing.seller_type === 'business';
   const cityLabel = listing.city || listing.location_region || 'Град';
   const updatedLabel = listing.updated_at ? getRelativeTime(listing.updated_at) : null;
   const priceHistory = listing.price_history || [];
+  const hasFeaturePayload = Array.isArray(listing.features)
+    ? listing.features.length > 0
+    : typeof listing.features === 'string'
+      ? listing.features.trim() !== '' && listing.features.trim() !== '[]'
+      : false;
+  const showEquipmentSection = String(listing.main_category || '') === '1' || hasFeaturePayload;
   const routeSegments = [cityLabel, sellerName, title].filter(Boolean);
   const isNewListing = (() => {
     if (!listing.created_at) return false;
@@ -771,8 +799,11 @@ const VehicleDetailsPage: React.FC = () => {
             <h2 style={styles.descriptionTitle}>Описание</h2>
             <p style={styles.description}>{listing.description}</p>
           </div>
-          {listing.features && listing.features.length > 0 && (
-            <EquipmentSection features={listing.features} />
+          {showEquipmentSection && (
+            <EquipmentSection
+              features={listing.features}
+              mainCategory={String(listing.main_category || "")}
+            />
           )}
           <div style={styles.similarSection}>
             <div style={styles.similarHeader}>
@@ -820,7 +851,7 @@ const VehicleDetailsPage: React.FC = () => {
                       : '—';
                   const powerValue = typeof item.power === 'string' ? Number(item.power) : item.power;
                   const powerLabel =
-                    Number.isFinite(powerValue) && powerValue > 0
+                    typeof powerValue === 'number' && Number.isFinite(powerValue) && powerValue > 0
                       ? `${powerValue} к.с.`
                       : '—';
                   const yearLabel = item.year_from ? `${item.year_from} г.` : '—';

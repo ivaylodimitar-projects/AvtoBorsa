@@ -6,6 +6,25 @@ import { useRecentSearches } from "../hooks/useRecentSearches";
 import { useSavedSearches } from "../hooks/useSavedSearches";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 import { CAR_BRANDS, CAR_MODELS } from "../constants/carBrandModels";
+import { APP_MAIN_CATEGORY_OPTIONS } from "../constants/mobileBgData";
+import type { IconType } from "react-icons";
+import {
+  FaCarSide,
+  FaCircleNotch,
+  FaToolbox,
+  FaShuttleVan,
+  FaTruck,
+  FaMotorcycle,
+  FaTractor,
+  FaIndustry,
+  FaWarehouse,
+  FaCaravan,
+  FaShip,
+  FaTrailer,
+  FaPuzzlePiece,
+  FaShoppingCart,
+  FaWrench,
+} from "react-icons/fa";
 
 type CarListing = {
   id: number;
@@ -89,23 +108,24 @@ const GEARBOX: Gearbox[] = ["Ръчна", "Автоматик"];
 
 const MODELS: Record<string, string[]> = CAR_MODELS;
 
-const CATEGORIES = [
-  { value: "1", label: "Автомобили и Джипове" },
-  { value: "w", label: "Гуми и джанти" },
-  { value: "u", label: "Части" },
-  { value: "3", label: "Бусове" },
-  { value: "4", label: "Камиони" },
-  { value: "5", label: "Мотоциклети" },
-  { value: "6", label: "Селскостопански" },
-  { value: "7", label: "Индустриални" },
-  { value: "8", label: "Кари" },
-  { value: "9", label: "Каравани" },
-  { value: "a", label: "Яхти и Лодки" },
-  { value: "b", label: "Ремаркета" },
-  { value: "v", label: "Аксесоари" },
-  { value: "y", label: "Купува" },
-  { value: "z", label: "Услуги" },
-];
+const CATEGORIES = APP_MAIN_CATEGORY_OPTIONS;
+const CATEGORY_ICONS: Record<string, IconType> = {
+  "1": FaCarSide,
+  w: FaCircleNotch,
+  u: FaToolbox,
+  "3": FaShuttleVan,
+  "4": FaTruck,
+  "5": FaMotorcycle,
+  "6": FaTractor,
+  "7": FaIndustry,
+  "8": FaWarehouse,
+  "9": FaCaravan,
+  a: FaShip,
+  b: FaTrailer,
+  v: FaPuzzlePiece,
+  y: FaShoppingCart,
+  z: FaWrench,
+};
 
 function clampNumber(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -380,33 +400,80 @@ export default function LandingPage() {
             border-bottom: none;
           }
         }
+
+        /* Category buttons: isolate from global button defaults (blue focus/hover border). */
+        .category-pill-btn {
+          box-sizing: border-box;
+          outline: none !important;
+          opacity: 1 !important;
+        }
+        .category-pill-btn:hover {
+          border-color: #9ab8b8 !important;
+          opacity: 1 !important;
+        }
+        .category-pill-btn:active {
+          opacity: 1 !important;
+        }
+        .category-pill-btn:focus,
+        .category-pill-btn:focus-visible {
+          outline: none !important;
+          border-color: #0f766e !important;
+          box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.22) !important;
+        }
+        .category-pill-btn.category-pill-btn--active {
+          border-color: #0f766e !important;
+        }
       `}</style>
 
       <main style={styles.main}>
         <div id="search" style={styles.searchBlock}>
-          <div className="catsRow formShowGrid" style={styles.mainCategoryRow}>
-            {CATEGORIES.map((mainCategory) => {
-              const isActive = category === mainCategory.value;
-              return (
-                <button
-                  key={mainCategory.value}
-                  id={`ptico_${mainCategory.value}`}
-                  type="button"
-                  data-title={mainCategory.label}
-                  className={`cat${mainCategory.value}${isActive ? " active" : ""}`}
-                  style={{
-                    ...styles.mainCategoryButton,
-                    ...(isActive ? styles.mainCategoryButtonActive : {}),
-                  }}
-                  onClick={() => setCategory(mainCategory.value)}
-                  aria-pressed={isActive}
-                  title={mainCategory.label}
-                >
-                  {mainCategory.label}
-                </button>
-              );
-            })}
+          <div style={styles.mainCategoryWrap}>
+            <div style={styles.mainCategoryHeader}>
+              <span style={styles.mainCategoryLabel}>Категория</span>
+              <span style={styles.mainCategoryHint}>Избери тип обява за по-точни филтри</span>
+            </div>
+
+            <div className="catsRow formShowGrid category-grid" style={styles.mainCategoryRow}>
+              {CATEGORIES.map((mainCategory) => {
+                const isActive = category === mainCategory.value;
+                const Icon = CATEGORY_ICONS[mainCategory.value] || FaCarSide;
+
+                return (
+                  <button
+                    key={mainCategory.value}
+                    id={`ptico_${mainCategory.value}`}
+                    type="button"
+                    data-title={mainCategory.label}
+                    className={`category-pill-btn cat${mainCategory.value}${isActive ? " active category-pill-btn--active" : ""}`}
+                    style={{
+                      ...styles.mainCategoryButton,
+                      ...(isActive ? styles.mainCategoryButtonActive : {}),
+                    }}
+                    onClick={() => setCategory(mainCategory.value)}
+                    aria-pressed={isActive}
+                    title={mainCategory.label}
+                  >
+                    <span
+                      style={{
+                        ...styles.mainCategoryIconWrap,
+                        ...(isActive
+                          ? {
+                              background: "rgba(255,255,255,0.18)",
+                              color: "#ffffff",
+                              border: "1px solid rgba(255,255,255,0.34)",
+                            }
+                          : {}),
+                      }}
+                    >
+                      <Icon size={17} />
+                    </span>
+                    <span style={styles.mainCategoryText}>{mainCategory.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
+
           <AdvancedSearch
             onSearch={handleAdvancedSearch}
             brands={BRANDS}
@@ -1201,35 +1268,79 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#fafafa",
   },
   searchBlock: { marginBottom: 32 },
-  mainCategoryRow: {
+  mainCategoryWrap: {
+    marginBottom: 14,
+    background: "linear-gradient(180deg, #ffffff 0%, #f8fbfb 100%)",
+    border: "1px solid #dbe9e9",
+    borderRadius: 14,
+    padding: "12px",
+    boxShadow: "0 8px 18px rgba(15, 23, 42, 0.06)",
+  },
+  mainCategoryHeader: {
     display: "flex",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: 10,
+    marginBottom: 10,
     flexWrap: "wrap",
+  },
+  mainCategoryLabel: {
+    fontSize: 14,
+    color: "#000000",
+    fontWeight: 600,
+  },
+  mainCategoryHint: {
+    fontSize: 12,
+    color: "#64748b",
+    fontWeight: 500,
+  },
+  mainCategoryRow: {
+    display: "grid",
+    gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
     gap: 8,
-    marginBottom: 12,
-    background: "#ffffff",
-    border: "1px solid #e2e8f0",
-    borderRadius: 12,
-    padding: "10px 12px",
-    boxShadow: "0 3px 10px rgba(15, 23, 42, 0.06)",
   },
   mainCategoryButton: {
-    border: "1px solid #d1d5db",
-    background: "#f8fafc",
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: "#d4e3e3",
+    background: "#ffffff",
     color: "#334155",
-    borderRadius: 999,
-    padding: "8px 12px",
+    borderRadius: 10,
+    padding: "8px 10px",
     cursor: "pointer",
     fontSize: 13,
     fontWeight: 700,
     lineHeight: 1.2,
-    whiteSpace: "nowrap",
+    minHeight: 50,
     transition: "all 0.2s ease",
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    textAlign: "left",
+    width: "100%",
   },
   mainCategoryButtonActive: {
-    background: "#0f766e",
+    background: "linear-gradient(135deg, #0f766e 0%, #0d9488 100%)",
+    borderWidth: 1,
+    borderStyle: "solid",
     borderColor: "#0f766e",
     color: "#ffffff",
-    boxShadow: "0 4px 12px rgba(15, 118, 110, 0.24)",
+    boxShadow: "0 7px 16px rgba(15, 118, 110, 0.26)",
+  },
+  mainCategoryIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "#ecfeff",
+    color: "#0f766e",
+    flexShrink: 0,
+  },
+  mainCategoryText: {
+    whiteSpace: "normal",
+    wordBreak: "break-word",
   },
   searchTitle: {
     fontWeight: 700,
@@ -1577,6 +1688,7 @@ const globalCss = `
   /* Desktop (1200px+) */
   @media (min-width: 1201px) {
     body { font-size: 16px; }
+    .category-grid { grid-template-columns: repeat(5, minmax(0,1fr)) !important; }
     .search-grid { grid-template-columns: repeat(4, minmax(0,1fr)) !important; }
     .cards-grid { grid-template-columns: repeat(4, minmax(0,1fr)) !important; }
     .info-grid { grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
@@ -1585,6 +1697,7 @@ const globalCss = `
   /* Tablet Large (1024px - 1200px) */
   @media (min-width: 1024px) and (max-width: 1200px) {
     body { font-size: 15px; }
+    .category-grid { grid-template-columns: repeat(4, minmax(0,1fr)) !important; }
     .search-grid { grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
     .cards-grid { grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
     .info-grid { grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
@@ -1593,6 +1706,7 @@ const globalCss = `
   /* Tablet (768px - 1023px) */
   @media (min-width: 768px) and (max-width: 1023px) {
     body { font-size: 15px; }
+    .category-grid { grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
     .search-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
     .cards-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
     .info-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
@@ -1602,6 +1716,7 @@ const globalCss = `
   /* Mobile Large (640px - 767px) */
   @media (min-width: 640px) and (max-width: 767px) {
     body { font-size: 14px; }
+    .category-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
     .search-grid { grid-template-columns: 1fr !important; }
     .cards-grid { grid-template-columns: 1fr !important; }
     .info-grid { grid-template-columns: 1fr !important; }
@@ -1611,6 +1726,7 @@ const globalCss = `
   /* Mobile Small (< 640px) */
   @media (max-width: 639px) {
     body { font-size: 14px; }
+    .category-grid { grid-template-columns: 1fr !important; }
     .search-grid { grid-template-columns: 1fr !important; }
     .cards-grid { grid-template-columns: 1fr !important; }
     .info-grid { grid-template-columns: 1fr !important; }

@@ -1,21 +1,35 @@
 ﻿import React, { useState } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
-import { CAR_FEATURES } from '../../constants/carFeatures';
+import { CAR_FEATURE_GROUPS, normalizeCarFeatureLabel } from '../../constants/carFeatures';
+import { HEAVY_FEATURE_GROUPS } from '../../constants/heavyFeatures';
 
 interface EquipmentSectionProps {
-  features: string[];
+  features: string[] | string;
+  mainCategory?: string | null;
 }
 
-const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features }) => {
+const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features, mainCategory }) => {
+  const featureGroups = React.useMemo(
+    () => (mainCategory === '3' || mainCategory === '4' ? HEAVY_FEATURE_GROUPS : CAR_FEATURE_GROUPS),
+    [mainCategory]
+  );
+
+  const initialExpandedCategories = React.useMemo(() => {
+    const state: Record<string, boolean> = { неразпределени: true };
+    featureGroups.forEach((group) => {
+      state[group.key] = true;
+    });
+    return state;
+  }, [featureGroups]);
+
   const [expandedCategories, setExpandedCategories] = useState<
     Record<string, boolean>
-  >({
-    безопасност: true,
-    комфорт: true,
-    други: true,
-    неразпределени: true,
-  });
+  >(initialExpandedCategories);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  React.useEffect(() => {
+    setExpandedCategories(initialExpandedCategories);
+  }, [initialExpandedCategories]);
 
   React.useEffect(() => {
     const handleResize = () => {
@@ -55,7 +69,6 @@ const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features }) => {
       fontSize: isMobile ? 13 : 14,
       fontWeight: 700,
       color: '#333',
-      textTransform: 'capitalize',
       wordBreak: 'break-word',
       fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
     },
@@ -97,13 +110,15 @@ const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features }) => {
   };
 
   const normalizedFeatures = Array.isArray(features)
-    ? Array.from(new Set(features.filter(Boolean)))
+    ? Array.from(new Set(features.map((feature) => normalizeCarFeatureLabel(feature)).filter(Boolean)))
     : (() => {
         if (typeof features === 'string') {
           try {
             const parsed = JSON.parse(features);
             return Array.isArray(parsed)
-              ? Array.from(new Set(parsed.filter(Boolean)))
+              ? Array.from(
+                  new Set(parsed.map((feature) => normalizeCarFeatureLabel(feature)).filter(Boolean))
+                )
               : [];
           } catch {
             return [];
@@ -115,18 +130,18 @@ const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features }) => {
 
   return (
     <div style={styles.container}>
-      {Object.entries(CAR_FEATURES).map(([category, categoryFeatures]) => {
+      {featureGroups.map((group) => {
         const categoryFeaturesList = normalizedFeatures.filter((f) =>
-          categoryFeatures.includes(f)
+          group.items.includes(f)
         );
         categoryFeaturesList.forEach((feature) => usedFeatures.add(feature));
-        const isExpanded = expandedCategories[category];
+        const isExpanded = expandedCategories[group.key] ?? true;
 
         return (
-          <div key={category}>
+          <div key={group.key}>
             <div
               style={styles.categoryHeader}
-              onClick={() => toggleCategory(category)}
+              onClick={() => toggleCategory(group.key)}
               onMouseEnter={(e) =>
                 (e.currentTarget.style.background = '#f0f0f0')
               }
@@ -134,7 +149,7 @@ const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features }) => {
                 (e.currentTarget.style.background = '#f9f9f9')
               }
             >
-              <span style={styles.categoryTitle}>{category}</span>
+              <span style={styles.categoryTitle}>{group.title}</span>
               <div
                 style={{
                   display: 'flex',

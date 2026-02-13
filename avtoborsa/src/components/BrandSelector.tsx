@@ -1,5 +1,6 @@
 ﻿import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
+import { groupOptionsByInitial, sortUniqueOptions } from "../utils/alphabeticalOptions";
 
 interface BrandSelectorProps {
   value: string;
@@ -26,8 +27,13 @@ export const BrandSelector: React.FC<BrandSelectorProps> = ({
     const filtered = brands.filter((brand) =>
       brand.toLowerCase().includes(searchTerm.toLowerCase())
     );
-    setFilteredBrands(filtered);
+    setFilteredBrands(sortUniqueOptions(filtered));
   }, [searchTerm, brands]);
+
+  const groupedFilteredBrands = React.useMemo(
+    () => groupOptionsByInitial(filteredBrands),
+    [filteredBrands]
+  );
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -50,6 +56,13 @@ export const BrandSelector: React.FC<BrandSelectorProps> = ({
     onChange("");
     setSearchTerm("");
     setIsOpen(false);
+  };
+
+  const formatGroupLabel = (label: string): string => {
+    if (label === "0-9" || label === "#") {
+      return `Група ${label}`;
+    }
+    return `${label}`;
   };
 
   return (
@@ -184,29 +197,47 @@ export const BrandSelector: React.FC<BrandSelectorProps> = ({
           )}
 
           {/* All Brands */}
-          {filteredBrands.length > 0 ? (
-            filteredBrands.map((brand) => (
-              <div
-                key={brand}
-                onClick={() => handleSelect(brand)}
-                style={{
-                  padding: "10px 12px",
-                  cursor: "pointer",
-                  background: value === brand ? "#e3f2fd" : "#fff",
-                  color: value === brand ? "#0066cc" : "#333",
-                  fontWeight: value === brand ? "600" : "400",
-                  borderBottom: "1px solid #f0f0f0",
-                  transition: "background 0.2s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "#f5f5f5";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = value === brand ? "#e3f2fd" : "#fff";
-                }}
-              >
-                {brand}
-              </div>
+          {groupedFilteredBrands.length > 0 ? (
+            groupedFilteredBrands.map((group) => (
+              <React.Fragment key={group.label}>
+                <div
+                  style={{
+                    padding: "7px 12px",
+                    fontSize: "12px",
+                    fontWeight: "800",
+                    letterSpacing: "0.06em",
+                    color: "#111111",
+                    textTransform: "uppercase",
+                    background: "#f1f5f9",
+                    borderBottom: "1px solid #eef2f7",
+                  }}
+                >
+                  {formatGroupLabel(group.label)}
+                </div>
+                {group.options.map((brand) => (
+                  <div
+                    key={brand}
+                    onClick={() => handleSelect(brand)}
+                    style={{
+                      padding: "10px 12px",
+                      cursor: "pointer",
+                      background: value === brand ? "#e3f2fd" : "#fff",
+                      color: value === brand ? "#0066cc" : "#333",
+                      fontWeight: value === brand ? "600" : "400",
+                      borderBottom: "1px solid #f0f0f0",
+                      transition: "background 0.2s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#f5f5f5";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = value === brand ? "#e3f2fd" : "#fff";
+                    }}
+                  >
+                    {brand}
+                  </div>
+                ))}
+              </React.Fragment>
             ))
           ) : (
             <div style={{ padding: "12px", textAlign: "center", color: "#999" }}>

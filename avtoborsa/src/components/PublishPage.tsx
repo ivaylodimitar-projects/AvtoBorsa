@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
@@ -19,11 +19,23 @@ import AdvancedImageUpload from "./AdvancedImageUpload";
 import FormFieldWithTooltip from "./FormFieldWithTooltip";
 import ListingPreview from "./ListingPreview";
 import ListingQualityIndicator from "./ListingQualityIndicator";
-import { CAR_BRANDS, CAR_MODELS } from "../constants/carBrandModels";
-
-const BRANDS = CAR_BRANDS;
-
-const MODELS = CAR_MODELS;
+import { CAR_FEATURE_GROUPS, normalizeCarFeatures } from "../constants/carFeatures";
+import { HEAVY_FEATURE_GROUPS } from "../constants/heavyFeatures";
+import { groupOptionsByInitial, sortUniqueOptions } from "../utils/alphabeticalOptions";
+import {
+  APP_MAIN_CATEGORY_OPTIONS,
+  CLASSIFIED_FOR_OPTIONS as MOBILE_CLASSIFIED_FOR_OPTIONS,
+  getAccessoryCategories,
+  getBrandOptionsByMainCategory,
+  getMainCategoryLabel as getMobileMainCategoryLabel,
+  getModelOptionsByMainCategory,
+  getPartCategories,
+  getPartElements,
+  getTopmenuFromMainCategory,
+  getWheelOfferTypeOptions,
+  getWheelPcdOptions,
+  type AppMainCategory,
+} from "../constants/mobileBgData";
 
 const BULGARIA_REGIONS = [
   { value: "Благоевград", label: "обл. Благоевград" },
@@ -57,22 +69,7 @@ const BULGARIA_REGIONS = [
   { value: "Извън страната", label: "Извън страната" },
 ];
 
-type MainCategoryKey =
-  | "1"
-  | "w"
-  | "u"
-  | "3"
-  | "4"
-  | "5"
-  | "6"
-  | "7"
-  | "8"
-  | "9"
-  | "a"
-  | "b"
-  | "v"
-  | "y"
-  | "z";
+type MainCategoryKey = AppMainCategory;
 
 interface PublishFormData {
   mainCategory: MainCategoryKey;
@@ -150,37 +147,10 @@ interface PublishFormData {
   buyServiceCategory: string;
 }
 
-const MAIN_CATEGORY_OPTIONS: Array<{ value: MainCategoryKey; label: string }> = [
-  { value: "1", label: "Автомобили и Джипове" },
-  { value: "w", label: "Гуми и джанти" },
-  { value: "u", label: "Части" },
-  { value: "3", label: "Бусове" },
-  { value: "4", label: "Камиони" },
-  { value: "5", label: "Мотоциклети" },
-  { value: "6", label: "Селскостопански" },
-  { value: "7", label: "Индустриални" },
-  { value: "8", label: "Кари" },
-  { value: "9", label: "Каравани" },
-  { value: "a", label: "Яхти и Лодки" },
-  { value: "b", label: "Ремаркета" },
-  { value: "v", label: "Аксесоари" },
-  { value: "y", label: "Купува" },
-  { value: "z", label: "Услуги" },
-];
+const MAIN_CATEGORY_OPTIONS: Array<{ value: MainCategoryKey; label: string }> =
+  APP_MAIN_CATEGORY_OPTIONS as Array<{ value: MainCategoryKey; label: string }>;
 
-const CLASSIFIED_FOR_OPTIONS = [
-  { value: "1", label: "Автомобили и Джипове" },
-  { value: "3", label: "Бусове" },
-  { value: "4", label: "Камиони" },
-  { value: "5", label: "Мотоциклети" },
-  { value: "6", label: "Селскостопански" },
-  { value: "7", label: "Индустриални" },
-  { value: "8", label: "Кари" },
-  { value: "9", label: "Каравани" },
-  { value: "10", label: "Яхти и Лодки" },
-  { value: "11", label: "Ремаркета" },
-  { value: "12", label: "Велосипеди" },
-];
+const CLASSIFIED_FOR_OPTIONS = MOBILE_CLASSIFIED_FOR_OPTIONS;
 
 const CONDITION_OPTIONS = [
   { value: "0", label: "Нов" },
@@ -532,6 +502,7 @@ const buildNumericOptions = (
 const HEAVY_AXLE_OPTIONS = buildNumericOptions(1, 8);
 const HEAVY_SEAT_OPTIONS = buildNumericOptions(1, 80);
 const HEAVY_LOAD_OPTIONS = buildNumericOptions(500, 50000, 500);
+const MONTH_OPTIONS = Array.from({ length: 12 }, (_, idx) => String(idx + 1));
 const FORKLIFT_LOAD_OPTIONS = buildNumericOptions(500, 10000, 250);
 const FORKLIFT_HOUR_OPTIONS = buildNumericOptions(0, 50000, 500);
 const CARAVAN_BED_OPTIONS = buildNumericOptions(1, 10);
@@ -565,13 +536,181 @@ const requiresBrandAndModel = (mainCategory: MainCategoryKey) =>
 
 const requiresPrice = (mainCategory: MainCategoryKey) => !CATEGORIES_WITHOUT_PRICE.has(mainCategory);
 
-const supportsCarFeatures = (mainCategory: MainCategoryKey) => mainCategory === "1";
+const isHeavyMainCategory = (mainCategory: MainCategoryKey) =>
+  mainCategory === "3" || mainCategory === "4";
+
+const getFeatureGroupsByMainCategory = (mainCategory: MainCategoryKey) => {
+  if (mainCategory === "1") return CAR_FEATURE_GROUPS;
+  if (isHeavyMainCategory(mainCategory)) return HEAVY_FEATURE_GROUPS;
+  return [];
+};
+
+const supportsFeaturesStep = (mainCategory: MainCategoryKey) =>
+  getFeatureGroupsByMainCategory(mainCategory).length > 0;
 
 const getMainCategoryLabel = (mainCategory: MainCategoryKey) =>
-  MAIN_CATEGORY_OPTIONS.find((option) => option.value === mainCategory)?.label || "Обява";
+  getMobileMainCategoryLabel(mainCategory) || "Обява";
 
 const getBuyServiceCategoryOptions = (mainCategory: MainCategoryKey) =>
   mainCategory === "y" ? BUY_CATEGORY_OPTIONS : SERVICE_CATEGORY_OPTIONS;
+
+const mapEngineTypeToFuelValue = (engineType: string): string => {
+  const normalized = engineType.trim().toLocaleLowerCase("bg-BG");
+  if (!normalized) return "benzin";
+  if (normalized.includes("дизел")) return "dizel";
+  if (normalized.includes("електр")) return "elektro";
+  if (normalized.includes("хибрид")) return "hibrid";
+  if (normalized.includes("газ") || normalized.includes("метан")) return "gaz_benzin";
+  return "benzin";
+};
+
+const mapTransmissionToGearboxValue = (transmission: string): string => {
+  const normalized = transmission.trim().toLocaleLowerCase("bg-BG");
+  if (!normalized) return "ruchna";
+  if (normalized.includes("автомат")) return "avtomatik";
+  return "ruchna";
+};
+
+const getClassifiedForLabel = (topmenu: string): string => {
+  const normalized = topmenu.trim();
+  if (!normalized) return "";
+  return CLASSIFIED_FOR_OPTIONS.find((option) => option.value === normalized)?.label || normalized;
+};
+
+const getWheelOfferTypeLabel = (wheelFor: string, offerType: string, defaultTopmenu: string): string => {
+  const normalizedOffer = offerType.trim();
+  if (!normalizedOffer) return "";
+  const options = getWheelOfferTypeOptions(wheelFor || defaultTopmenu);
+  const option = options.find(
+    (entry) => entry.value === normalizedOffer || entry.label === normalizedOffer
+  );
+  return option?.label || normalizedOffer;
+};
+
+const joinTitleParts = (...parts: Array<string | null | undefined>): string =>
+  parts
+    .map((part) => (part || "").trim())
+    .filter(Boolean)
+    .join(" ");
+
+const normalizeCarTitleSuffix = (rawTitle: string, brand: string, model: string): string => {
+  const title = rawTitle.trim();
+  if (!title) return "";
+
+  const base = joinTitleParts(brand, model);
+  if (!base) return title;
+
+  const loweredTitle = title.toLocaleLowerCase("bg-BG");
+  const loweredBase = base.toLocaleLowerCase("bg-BG");
+
+  if (loweredTitle === loweredBase) {
+    return "";
+  }
+
+  if (loweredTitle.startsWith(loweredBase)) {
+    let suffix = title.slice(base.length).trim();
+    suffix = suffix.replace(/^[-:|,]+/, "").trim();
+    return suffix;
+  }
+
+  return title;
+};
+
+const getFallbackBrandModel = (
+  data: PublishFormData,
+  defaultClassifiedTopmenu: string
+): { brand: string; model: string } => {
+  const classifiedLabel = getClassifiedForLabel(defaultClassifiedTopmenu);
+
+  switch (data.mainCategory) {
+    case "w": {
+      const wheelForLabel = getClassifiedForLabel(data.wheelFor || defaultClassifiedTopmenu);
+      const offerLabel =
+        getWheelOfferTypeLabel(data.wheelFor, data.wheelOfferType, defaultClassifiedTopmenu) ||
+        "Гуми/джанти";
+      return {
+        brand: data.wheelBrand.trim() || offerLabel,
+        model: wheelForLabel || classifiedLabel || "Обява",
+      };
+    }
+    case "u": {
+      const partForLabel = getClassifiedForLabel(data.partFor || defaultClassifiedTopmenu);
+      return {
+        brand: data.partCategory.trim() || "Авточасти",
+        model: data.partElement.trim() || partForLabel || "Обява",
+      };
+    }
+    case "v": {
+      const accessoryForLabel = getClassifiedForLabel(data.classifiedFor || defaultClassifiedTopmenu);
+      return {
+        brand: data.accessoryCategory.trim() || "Аксесоари",
+        model: accessoryForLabel || classifiedLabel || "Обява",
+      };
+    }
+    case "y":
+    case "z": {
+      const categoryLabel = data.mainCategory === "y" ? "Купува" : "Услуга";
+      const serviceForLabel = getClassifiedForLabel(data.classifiedFor || defaultClassifiedTopmenu);
+      return {
+        brand: data.buyServiceCategory.trim() || categoryLabel,
+        model: serviceForLabel || classifiedLabel || "Обява",
+      };
+    }
+    default:
+      return {
+        brand: getMainCategoryLabel(data.mainCategory),
+        model: "Обява",
+      };
+  }
+};
+
+const buildListingTitle = (data: PublishFormData, defaultClassifiedTopmenu: string): string => {
+  const categoryLabel = getMainCategoryLabel(data.mainCategory);
+
+  switch (data.mainCategory) {
+    case "1": {
+      const baseCarTitle = joinTitleParts(data.brand, data.model);
+      const optionalSuffix = normalizeCarTitleSuffix(data.title, data.brand, data.model);
+      return joinTitleParts(baseCarTitle, optionalSuffix) || `${categoryLabel} обява`;
+    }
+    case "w": {
+      const wheelForLabel = getClassifiedForLabel(data.wheelFor || defaultClassifiedTopmenu);
+      const offerLabel =
+        getWheelOfferTypeLabel(data.wheelFor, data.wheelOfferType, defaultClassifiedTopmenu) ||
+        "Гуми/джанти";
+      const mainPart = joinTitleParts(offerLabel, data.wheelBrand);
+      return joinTitleParts(mainPart, wheelForLabel ? `за ${wheelForLabel}` : "") || `${categoryLabel} обява`;
+    }
+    case "u": {
+      const partForLabel = getClassifiedForLabel(data.partFor || defaultClassifiedTopmenu);
+      const partBase = data.partElement.trim() || data.partCategory.trim() || "Авточаст";
+      const partCategoryTag =
+        data.partElement.trim() && data.partCategory.trim() ? `(${data.partCategory.trim()})` : "";
+      return (
+        joinTitleParts(partBase, partCategoryTag, partForLabel ? `за ${partForLabel}` : "") ||
+        `${categoryLabel} обява`
+      );
+    }
+    case "v": {
+      const accessoryForLabel = getClassifiedForLabel(data.classifiedFor || defaultClassifiedTopmenu);
+      return (
+        joinTitleParts(data.accessoryCategory || "Аксесоари", accessoryForLabel ? `за ${accessoryForLabel}` : "") ||
+        `${categoryLabel} обява`
+      );
+    }
+    case "y":
+    case "z": {
+      const actionLabel = data.mainCategory === "y" ? "Купува" : "Услуга";
+      const serviceForLabel = getClassifiedForLabel(data.classifiedFor || defaultClassifiedTopmenu);
+      return (
+        joinTitleParts(actionLabel, data.buyServiceCategory, serviceForLabel ? `за ${serviceForLabel}` : "") ||
+        `${categoryLabel} обява`
+      );
+    }
+    default:
+      return joinTitleParts(data.brand, data.model) || `${categoryLabel} обява`;
+  }
+};
 
 const createInitialFormData = (): PublishFormData => ({
   mainCategory: "1",
@@ -600,7 +739,7 @@ const createInitialFormData = (): PublishFormData => ({
   pictures: [],
   features: [],
   listingType: "normal",
-  wheelFor: "",
+  wheelFor: getTopmenuFromMainCategory("1") || "1",
   wheelOfferType: "",
   wheelBrand: "",
   wheelMaterial: "",
@@ -612,7 +751,7 @@ const createInitialFormData = (): PublishFormData => ({
   wheelDiameter: "",
   wheelCount: "",
   wheelType: "",
-  partFor: "",
+  partFor: getTopmenuFromMainCategory("1") || "1",
   partCategory: "",
   partElement: "",
   partYearFrom: "",
@@ -644,7 +783,7 @@ const createInitialFormData = (): PublishFormData => ({
   trailerLoad: "",
   trailerAxles: "",
   trailerFeatures: [],
-  classifiedFor: "",
+  classifiedFor: getTopmenuFromMainCategory("1") || "1",
   accessoryCategory: "",
   buyServiceCategory: "",
 });
@@ -661,43 +800,19 @@ const PublishPage: React.FC = () => {
   const location = useLocation();
   const { isAuthenticated, isLoading: authLoading, user, updateBalance } = useAuth();
   const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: 30 }, (_, i) => currentYear - i);
+  const years = Array.from({ length: currentYear - 1950 + 1 }, (_, i) => currentYear - i);
   const TOP_LISTING_PRICE_EUR = 3;
 
   const [loading, setLoading] = useState(false);
   const [loadingListing, setLoadingListing] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
-  const [userListingsCount, setUserListingsCount] = useState(0);
   const [showTopConfirm, setShowTopConfirm] = useState(false);
 
-  // Check authentication on mount and fetch user's listings count
+  // Check authentication on mount
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       navigate("/auth");
-    } else if (!authLoading && isAuthenticated) {
-      // Fetch user's active listings count
-      const fetchListingsCount = async () => {
-        try {
-          const token = localStorage.getItem("authToken");
-          if (!token) return;
-
-          const response = await fetch("http://localhost:8000/api/my-listings/", {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            setUserListingsCount(Array.isArray(data) ? data.length : 0);
-          }
-        } catch (err) {
-          console.error("Error fetching listings count:", err);
-        }
-      };
-
-      fetchListingsCount();
     }
   }, [isAuthenticated, authLoading, navigate]);
 
@@ -708,6 +823,102 @@ const PublishPage: React.FC = () => {
   }, [toast]);
 
   const [formData, setFormData] = useState<PublishFormData>(createInitialFormData());
+  const defaultClassifiedTopmenu = getTopmenuFromMainCategory("1") || "1";
+
+  const availableBrandOptions = useMemo(() => {
+    const options = getBrandOptionsByMainCategory(formData.mainCategory);
+    return options.length > 0 ? options : getBrandOptionsByMainCategory("1");
+  }, [formData.mainCategory]);
+
+  const groupedBrandOptions = useMemo(
+    () => groupOptionsByInitial(sortUniqueOptions(availableBrandOptions)),
+    [availableBrandOptions]
+  );
+
+  const availableModelOptions = useMemo(() => {
+    if (!formData.brand) return [];
+    return getModelOptionsByMainCategory(formData.mainCategory, formData.brand);
+  }, [formData.brand, formData.mainCategory]);
+
+  const groupedModelOptions = useMemo(
+    () => groupOptionsByInitial(sortUniqueOptions(availableModelOptions)),
+    [availableModelOptions]
+  );
+
+  const wheelOfferTypeOptions = useMemo(() => {
+    const options = getWheelOfferTypeOptions(formData.wheelFor || defaultClassifiedTopmenu);
+    if (options.length > 0) return options;
+    return WHEEL_OFFER_TYPE_OPTIONS.map((label, index) => ({
+      value: String(index + 1),
+      label,
+    }));
+  }, [defaultClassifiedTopmenu, formData.wheelFor]);
+
+  const partCategoryOptions = useMemo(() => {
+    const options = getPartCategories(formData.partFor || defaultClassifiedTopmenu);
+    return options.length > 0 ? options : PART_CATEGORY_OPTIONS;
+  }, [defaultClassifiedTopmenu, formData.partFor]);
+
+  const partElementOptions = useMemo(() => {
+    const options = getPartElements(
+      formData.partFor || defaultClassifiedTopmenu,
+      formData.partCategory
+    );
+    return options.length > 0 ? options : PART_ELEMENT_OPTIONS;
+  }, [defaultClassifiedTopmenu, formData.partCategory, formData.partFor]);
+
+  const accessoryCategoryOptions = useMemo(() => {
+    const options = getAccessoryCategories(formData.classifiedFor || defaultClassifiedTopmenu);
+    return options.length > 0 ? options : ACCESSORY_CATEGORY_OPTIONS;
+  }, [defaultClassifiedTopmenu, formData.classifiedFor]);
+
+  const wheelPcdOptions = useMemo(() => {
+    const options = getWheelPcdOptions(formData.wheelBolts);
+    return options.length > 0 ? options : WHEEL_PCD_OPTIONS;
+  }, [formData.wheelBolts]);
+
+  const featureCategories = useMemo(
+    () =>
+      getFeatureGroupsByMainCategory(formData.mainCategory).map((group) => ({
+        id: group.key,
+        title: group.title,
+        description: group.description,
+        items: group.items,
+      })),
+    [formData.mainCategory]
+  );
+
+  useEffect(() => {
+    setFormData((prev) => {
+      if (!prev.partCategory) return prev;
+      if (partCategoryOptions.includes(prev.partCategory)) return prev;
+      return { ...prev, partCategory: "", partElement: "" };
+    });
+  }, [partCategoryOptions]);
+
+  useEffect(() => {
+    setFormData((prev) => {
+      if (!prev.partElement) return prev;
+      if (partElementOptions.includes(prev.partElement)) return prev;
+      return { ...prev, partElement: "" };
+    });
+  }, [partElementOptions]);
+
+  useEffect(() => {
+    setFormData((prev) => {
+      if (!prev.accessoryCategory) return prev;
+      if (accessoryCategoryOptions.includes(prev.accessoryCategory)) return prev;
+      return { ...prev, accessoryCategory: "" };
+    });
+  }, [accessoryCategoryOptions]);
+
+  useEffect(() => {
+    setFormData((prev) => {
+      if (!prev.wheelOfferType) return prev;
+      if (wheelOfferTypeOptions.some((option) => option.value === prev.wheelOfferType)) return prev;
+      return { ...prev, wheelOfferType: "" };
+    });
+  }, [wheelOfferTypeOptions]);
 
   useEffect(() => {
     if (!user?.email) return;
@@ -775,7 +986,7 @@ const PublishPage: React.FC = () => {
       icon: <Image size={16} />,
       description: "Качи снимки",
     },
-    ...(supportsCarFeatures(formData.mainCategory)
+    ...(supportsFeaturesStep(formData.mainCategory)
       ? [
           {
             key: "features" as const,
@@ -813,124 +1024,6 @@ const PublishPage: React.FC = () => {
       setCurrentStep(totalSteps);
     }
   }, [currentStep, totalSteps]);
-
-  // Car features/extras grouped by category
-  const FEATURE_CATEGORIES = [
-    {
-      id: "safety",
-      title: "Безопасност",
-      description: "Въздушни възглавници и системи за предупреждение",
-      items: [
-        "Всички подушки",
-        "Странични подушки",
-        "Предни подушки",
-        "Задни подушки",
-        "Система за предупреждение при сблъсък",
-        "Система за следене на пътната лента",
-        "Система за разпознаване на пътни знаци",
-        "Система за контрол на налягането на гумите",
-      ],
-    },
-    {
-      id: "protection",
-      title: "Защита",
-      description: "Стабилност, сцепление и контрол",
-      items: [
-        "Система за стабилност",
-        "ABS",
-        "ESP",
-        "Тракшън контрол",
-        "Система за контрол на стабилност",
-        "Система за контрол на стабилността",
-        "Система за помощ при спиране",
-        "Система за контрол на тягата",
-        "Система за контрол на динамиката",
-        "Система за контрол на скоростта",
-        "Система за помощ при катерене",
-        "Система за помощ при спускане",
-      ],
-    },
-    {
-      id: "comfort",
-      title: "Комфорт",
-      description: "Климат, седалки и удобства",
-      items: [
-        "Климатик",
-        "Автоматичен климатик",
-        "Електрически прозорци",
-        "Електрически огледала",
-        "Круиз контрол",
-        "Адаптивен круиз контрол",
-        "Отопляемо предно стъкло",
-        "Отопляемо задно стъкло",
-        "Отопляеми седалки",
-        "Масаж на седалки",
-        "Вентилирани седалки",
-        "Памет на седалки",
-        "Електрически седалки",
-        "Регулируемо волан",
-        "Волан с отопление",
-      ],
-    },
-    {
-      id: "interior",
-      title: "Интериор",
-      description: "Материали и ергономия",
-      items: [
-        "Кожен салон",
-        "Волан с управление",
-        "Спортен волан",
-        "Кожен волан",
-      ],
-    },
-    {
-      id: "exterior",
-      title: "Екстериор",
-      description: "Дизайн и външни елементи",
-      items: [
-        "Панорамен покрив",
-        "Люк",
-        "Тонирани стъкла",
-        "Алуминиеви джанти",
-        "Спортни джанти",
-        "Спортен пакет",
-      ],
-    },
-    {
-      id: "parking",
-      title: "Паркиране",
-      description: "Камери и асистенти",
-      items: [
-        "Паркинг сензори",
-        "Камера за паркиране",
-        "Помощ при паркиране",
-      ],
-    },
-    {
-      id: "lighting",
-      title: "Осветление",
-      description: "Фарове и дневни светлини",
-      items: [
-        "Автоматични светлини",
-        "Дневни светлини",
-        "LED светлини",
-        "Ксенонови светлини",
-        "Лазерни светлини",
-      ],
-    },
-    {
-      id: "multimedia",
-      title: "Мултимедия и свързаност",
-      description: "Навигация и връзка",
-      items: [
-        "Навигация",
-        "Bluetooth",
-        "USB",
-        "AUX",
-        "Мултимедия",
-      ],
-    },
-  ];
 
   const updateFormField = <K extends keyof PublishFormData>(key: K, value: PublishFormData[K]) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
@@ -971,7 +1064,32 @@ const PublishPage: React.FC = () => {
     const inputElement = e.target as HTMLInputElement;
     const nextValue =
       inputElement.type === "checkbox" ? inputElement.checked : (e.target as HTMLInputElement).value;
-    updateFormField(key, nextValue as PublishFormData[typeof key]);
+
+    setFormData((prev) => {
+      const next = { ...prev, [key]: nextValue } as PublishFormData;
+
+      if (key === "brand") {
+        next.model = "";
+      }
+      if (key === "partFor") {
+        next.partCategory = "";
+        next.partElement = "";
+      }
+      if (key === "partCategory") {
+        next.partElement = "";
+      }
+      if (key === "classifiedFor") {
+        next.accessoryCategory = "";
+      }
+      if (key === "wheelFor") {
+        next.wheelOfferType = "";
+      }
+      if (key === "wheelBolts") {
+        next.wheelPcd = "";
+      }
+
+      return next;
+    });
   };
 
   const handleListingTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1061,6 +1179,14 @@ const PublishPage: React.FC = () => {
     }
 
     if (mainCategory === "3" || mainCategory === "4") {
+      requirements.details.push(
+        { key: "transmission", label: "Трансмисия" },
+        { key: "mileage", label: "Пробег" },
+        { key: "heavyAxles", label: "Брой оси" },
+        { key: "heavySeats", label: "Брой места" },
+        { key: "heavyLoad", label: "Товароносимост" },
+        { key: "heavyEuroStandard", label: "Евростандарт" }
+      );
       requirements.details.push({ key: "engineType", label: "Вид двигател" });
     }
 
@@ -1130,7 +1256,7 @@ const PublishPage: React.FC = () => {
     setShowTopConfirm(false);
   };
 
-  const normalizeFeatures = (raw: unknown): string[] => {
+  const normalizeStringList = (raw: unknown): string[] => {
     if (Array.isArray(raw)) return raw.filter(Boolean);
     if (typeof raw === "string") {
       try {
@@ -1159,6 +1285,15 @@ const PublishPage: React.FC = () => {
     if (["1", "2", "3", "4", "5", "6"].includes(normalized)) return normalized;
     const idx = HEAVY_EURO_STANDARD_OPTIONS.indexOf(normalized);
     return idx >= 0 ? String(idx + 1) : normalized;
+  };
+
+  const normalizeWheelOfferTypeValue = (value: string, topmenu: string): string => {
+    const normalized = value.trim();
+    if (!normalized) return "";
+    const options = getWheelOfferTypeOptions(topmenu || defaultClassifiedTopmenu);
+    if (options.some((option) => option.value === normalized)) return normalized;
+    const byLabel = options.find((option) => option.label === normalized);
+    return byLabel?.value || normalized;
   };
 
   const getValidAccessToken = async (): Promise<string | null> => {
@@ -1234,13 +1369,29 @@ const PublishPage: React.FC = () => {
   };
 
   const applyListingToForm = (data: any) => {
+    const normalizedMainCategory = normalizeMainCategory(data.main_category ?? data.mainCategory ?? "1");
+    const rawBrand = toStringOrEmpty(data.brand);
+    const rawModel = toStringOrEmpty(data.model);
+    const rawTitle = toStringOrEmpty(data.title);
+    const normalizedTitle =
+      normalizedMainCategory === "1"
+        ? normalizeCarTitleSuffix(rawTitle, rawBrand, rawModel)
+        : rawTitle;
+
+    const normalizedWheelFor =
+      toStringOrEmpty(data.wheel_for ?? data.wheelFor) || defaultClassifiedTopmenu;
+    const normalizedPartFor =
+      toStringOrEmpty(data.part_for ?? data.partFor) || defaultClassifiedTopmenu;
+    const normalizedClassifiedFor =
+      toStringOrEmpty(data.classified_for ?? data.classifiedFor) || defaultClassifiedTopmenu;
+
     const nextFormData: PublishFormData = {
       ...createInitialFormData(),
-      mainCategory: normalizeMainCategory(data.main_category ?? data.mainCategory ?? "1"),
+      mainCategory: normalizedMainCategory,
       category: toStringOrEmpty(data.category),
-      title: toStringOrEmpty(data.title),
-      brand: toStringOrEmpty(data.brand),
-      model: toStringOrEmpty(data.model),
+      title: normalizedTitle,
+      brand: rawBrand,
+      model: rawModel,
       yearFrom: toStringOrEmpty(data.year_from ?? data.yearFrom),
       month: toStringOrEmpty(data.month),
       vin: toStringOrEmpty(data.vin),
@@ -1260,10 +1411,13 @@ const PublishPage: React.FC = () => {
       phone: toStringOrEmpty(data.phone),
       email: user?.email || toStringOrEmpty(data.email),
       pictures: [],
-      features: normalizeFeatures(data.features),
+      features: normalizeCarFeatures(data.features),
       listingType: data.listing_type === "top" || data.listingType === "top" ? "top" : "normal",
-      wheelFor: toStringOrEmpty(data.wheel_for ?? data.wheelFor),
-      wheelOfferType: toStringOrEmpty(data.offer_type ?? data.wheelOfferType),
+      wheelFor: normalizedWheelFor,
+      wheelOfferType: normalizeWheelOfferTypeValue(
+        toStringOrEmpty(data.offer_type ?? data.wheelOfferType),
+        normalizedWheelFor
+      ),
       wheelBrand: toStringOrEmpty(data.wheel_brand ?? data.wheelBrand),
       wheelMaterial: toStringOrEmpty(data.material ?? data.wheelMaterial),
       wheelBolts: toStringOrEmpty(data.bolts ?? data.wheelBolts),
@@ -1274,7 +1428,7 @@ const PublishPage: React.FC = () => {
       wheelDiameter: toStringOrEmpty(data.diameter ?? data.wheelDiameter),
       wheelCount: toStringOrEmpty(data.count ?? data.wheelCount),
       wheelType: toStringOrEmpty(data.wheel_type ?? data.wheelType),
-      partFor: toStringOrEmpty(data.part_for ?? data.partFor),
+      partFor: normalizedPartFor,
       partCategory: toStringOrEmpty(data.part_category ?? data.partCategory),
       partElement: toStringOrEmpty(data.part_element ?? data.partElement),
       partYearFrom: toStringOrEmpty(data.part_year_from ?? data.partYearFrom),
@@ -1301,12 +1455,12 @@ const PublishPage: React.FC = () => {
       boatWidth: toStringOrEmpty(data.width_m ?? data.boatWidth),
       boatDraft: toStringOrEmpty(data.draft_m ?? data.boatDraft),
       boatHours: toStringOrEmpty(data.boat_hours ?? data.boatHours ?? data.hours),
-      boatFeatures: normalizeFeatures(data.boat_features ?? data.boatFeatures),
+      boatFeatures: normalizeStringList(data.boat_features ?? data.boatFeatures),
       trailerCategory: toStringOrEmpty(data.trailer_category ?? data.trailerCategory),
       trailerLoad: toStringOrEmpty(data.trailer_load ?? data.trailerLoad ?? data.load_kg),
       trailerAxles: toStringOrEmpty(data.trailer_axles ?? data.trailerAxles ?? data.axles),
-      trailerFeatures: normalizeFeatures(data.trailer_features ?? data.trailerFeatures),
-      classifiedFor: toStringOrEmpty(data.classified_for ?? data.classifiedFor),
+      trailerFeatures: normalizeStringList(data.trailer_features ?? data.trailerFeatures),
+      classifiedFor: normalizedClassifiedFor,
       accessoryCategory: toStringOrEmpty(data.accessory_category ?? data.accessoryCategory),
       buyServiceCategory: toStringOrEmpty(data.buy_service_category ?? data.buyServiceCategory),
     };
@@ -1369,16 +1523,26 @@ const PublishPage: React.FC = () => {
   };
   const coverPreview =
     images.find((img) => img.isCover)?.preview || existingCoverImage || undefined;
-  const previewTitle =
-    (requiresBrandAndModel(formData.mainCategory)
-      ? `${formData.brand} ${formData.model}`.trim()
-      : "") || `${getMainCategoryLabel(formData.mainCategory)} обява`;
+  const previewTitle = buildListingTitle(formData, defaultClassifiedTopmenu);
   const previewYear =
     formData.mainCategory === "u" ? formData.partYearFrom : formData.yearFrom;
   const previewPrice = requiresPrice(formData.mainCategory) ? formData.price : "";
-  const previewMileage = formData.mainCategory === "1" ? formData.mileage : "";
-  const previewFuel = formData.mainCategory === "1" ? formData.fuel : "";
-  const previewGearbox = formData.mainCategory === "1" ? formData.gearbox : "";
+  const previewMileage =
+    formData.mainCategory === "1" || isHeavyMainCategory(formData.mainCategory)
+      ? formData.mileage
+      : "";
+  const previewFuel =
+    formData.mainCategory === "1"
+      ? formData.fuel
+      : isHeavyMainCategory(formData.mainCategory)
+        ? mapEngineTypeToFuelValue(formData.engineType)
+        : "";
+  const previewGearbox =
+    formData.mainCategory === "1"
+      ? formData.gearbox
+      : isHeavyMainCategory(formData.mainCategory)
+        ? mapTransmissionToGearboxValue(formData.transmission)
+        : "";
   const stepMissingFields = getMissingFields(currentStep, formData);
   const validationMessage = formatMissingMessage(stepMissingFields);
   const isNextDisabled = currentStep < totalSteps && stepMissingFields.length > 0;
@@ -1476,15 +1640,6 @@ const PublishPage: React.FC = () => {
 
     setLoading(true);
 
-    // Check if private user has reached the 3 advert limit
-    if (!isEditMode && user?.userType !== "business" && userListingsCount >= 3) {
-      setErrors({
-        submit: "Можете да публикувате максимум 3 активни обяви. Моля, изтрийте или архивирайте някоя от вашите обяви, за да добавите нова.",
-      });
-      setLoading(false);
-      return;
-    }
-
     try {
       const formDataToSend = new FormData();
       const appendIfValue = (key: string, value: unknown) => {
@@ -1494,13 +1649,13 @@ const PublishPage: React.FC = () => {
         formDataToSend.append(key, normalized);
       };
 
-      const fallbackBrand = getMainCategoryLabel(formData.mainCategory);
+      const fallbackBrandModel = getFallbackBrandModel(formData, defaultClassifiedTopmenu);
       const normalizedBrand = requiresBrandAndModel(formData.mainCategory)
         ? formData.brand.trim()
-        : fallbackBrand;
+        : fallbackBrandModel.brand;
       const normalizedModel = requiresBrandAndModel(formData.mainCategory)
         ? formData.model.trim()
-        : "Обява";
+        : fallbackBrandModel.model;
       const normalizedYearSource =
         formData.mainCategory === "u"
           ? formData.partYearFrom.trim()
@@ -1509,11 +1664,21 @@ const PublishPage: React.FC = () => {
             : "";
       const normalizedYear = normalizedYearSource || String(currentYear);
       const normalizedFuel =
-        formData.mainCategory === "1" ? formData.fuel || "benzin" : "benzin";
+        formData.mainCategory === "1"
+          ? formData.fuel || "benzin"
+          : isHeavyMainCategory(formData.mainCategory)
+            ? mapEngineTypeToFuelValue(formData.engineType)
+            : "benzin";
       const normalizedGearbox =
-        formData.mainCategory === "1" ? formData.gearbox || "ruchna" : "ruchna";
+        formData.mainCategory === "1"
+          ? formData.gearbox || "ruchna"
+          : isHeavyMainCategory(formData.mainCategory)
+            ? mapTransmissionToGearboxValue(formData.transmission)
+            : "ruchna";
       const normalizedMileage =
-        formData.mainCategory === "1" ? formData.mileage || "0" : "0";
+        formData.mainCategory === "1" || isHeavyMainCategory(formData.mainCategory)
+          ? formData.mileage || "0"
+          : "0";
       const normalizedPrice = requiresPrice(formData.mainCategory)
         ? formData.price || "0"
         : "0";
@@ -1521,10 +1686,7 @@ const PublishPage: React.FC = () => {
         formData.locationCountry === "Извън страната"
           ? formData.city || "Извън страната"
           : formData.city || "Непосочен";
-      const normalizedTitle =
-        formData.mainCategory === "1"
-          ? `${normalizedBrand} ${normalizedModel}`.trim()
-          : `${getMainCategoryLabel(formData.mainCategory)} обява`;
+      const normalizedTitle = buildListingTitle(formData, defaultClassifiedTopmenu);
       const normalizedDescription =
         formData.description?.trim() || `${getMainCategoryLabel(formData.mainCategory)} обява`;
       const normalizedEmail = user?.email || formData.email || "";
@@ -1556,8 +1718,13 @@ const PublishPage: React.FC = () => {
       appendIfValue("email", normalizedEmail);
       appendIfValue("listing_type", formData.listingType);
 
-      if (formData.features.length > 0) {
-        formDataToSend.append("features", JSON.stringify(formData.features));
+      const normalizedCarFeatures = formData.features
+        .map((feature) => feature.trim())
+        .filter(Boolean);
+      if (normalizedCarFeatures.length > 0) {
+        normalizedCarFeatures.forEach((feature) => formDataToSend.append("features", feature));
+      } else {
+        formDataToSend.append("features", "[]");
       }
 
       switch (formData.mainCategory) {
@@ -1621,19 +1788,27 @@ const PublishPage: React.FC = () => {
           appendIfValue("width_m", formData.boatWidth);
           appendIfValue("draft_m", formData.boatDraft);
           appendIfValue("hours", formData.boatHours);
-          formData.boatFeatures
+          const normalizedBoatFeatures = formData.boatFeatures
             .map((feature) => feature.trim())
-            .filter(Boolean)
-            .forEach((feature) => formDataToSend.append("boat_features", feature));
+            .filter(Boolean);
+          if (normalizedBoatFeatures.length > 0) {
+            normalizedBoatFeatures.forEach((feature) => formDataToSend.append("boat_features", feature));
+          } else if (isEditMode) {
+            formDataToSend.append("boat_features", "[]");
+          }
           break;
         case "b":
           appendIfValue("trailer_category", formData.trailerCategory);
           appendIfValue("load_kg", formData.trailerLoad);
           appendIfValue("axles", formData.trailerAxles);
-          formData.trailerFeatures
+          const normalizedTrailerFeatures = formData.trailerFeatures
             .map((feature) => feature.trim())
-            .filter(Boolean)
-            .forEach((feature) => formDataToSend.append("trailer_features", feature));
+            .filter(Boolean);
+          if (normalizedTrailerFeatures.length > 0) {
+            normalizedTrailerFeatures.forEach((feature) => formDataToSend.append("trailer_features", feature));
+          } else if (isEditMode) {
+            formDataToSend.append("trailer_features", "[]");
+          }
           break;
         case "v":
           appendIfValue("classified_for", formData.classifiedFor);
@@ -2596,10 +2771,14 @@ const PublishPage: React.FC = () => {
                         required
                       >
                         <option value="">Избери марка</option>
-                        {BRANDS.map((brand) => (
-                          <option key={brand} value={brand}>
-                            {brand}
-                          </option>
+                        {groupedBrandOptions.map((group) => (
+                          <optgroup key={group.label} label={group.label}>
+                            {group.options.map((brand) => (
+                              <option key={brand} value={brand}>
+                                {brand}
+                              </option>
+                            ))}
+                          </optgroup>
                         ))}
                       </select>
                     </FormFieldWithTooltip>
@@ -2620,13 +2799,15 @@ const PublishPage: React.FC = () => {
                         <option value="">
                           {formData.brand ? "Избери модел" : "Избери марка първо"}
                         </option>
-                        {formData.brand && MODELS[formData.brand as keyof typeof MODELS]
-                          ? MODELS[formData.brand as keyof typeof MODELS].map((model: string) => (
+                        {groupedModelOptions.map((group) => (
+                          <optgroup key={group.label} label={group.label}>
+                            {group.options.map((model) => (
                               <option key={model} value={model}>
                                 {model}
                               </option>
-                            ))
-                          : null}
+                            ))}
+                          </optgroup>
+                        ))}
                       </select>
                     </FormFieldWithTooltip>
 
@@ -2650,6 +2831,26 @@ const PublishPage: React.FC = () => {
                         ))}
                       </select>
                     </FormFieldWithTooltip>
+
+                    {formData.mainCategory === "1" && (
+                      <FormFieldWithTooltip
+                        label="Кратък текст към заглавието"
+                        tooltip="По избор: добавя се след Марка + Модел (напр. Facelift, 4x4, Реален пробег)"
+                      >
+                        <input
+                          style={styles.input}
+                          type="text"
+                          name="title"
+                          value={formData.title}
+                          onChange={handleChange}
+                          maxLength={80}
+                          placeholder="По избор"
+                        />
+                        <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>
+                          Заглавие: {buildListingTitle(formData, defaultClassifiedTopmenu)}
+                        </div>
+                      </FormFieldWithTooltip>
+                    )}
                   </>
                 )}
 
@@ -2681,9 +2882,9 @@ const PublishPage: React.FC = () => {
                         required
                       >
                         <option value="">Избери тип</option>
-                        {WHEEL_OFFER_TYPE_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
+                        {wheelOfferTypeOptions.map((option) => (
+                          <option key={option.value || "all"} value={option.value}>
+                            {option.label}
                           </option>
                         ))}
                       </select>
@@ -2735,7 +2936,7 @@ const PublishPage: React.FC = () => {
                         required
                       >
                         <option value="">Избери</option>
-                        {PART_CATEGORY_OPTIONS.map((option) => (
+                        {partCategoryOptions.map((option) => (
                           <option key={option} value={option}>
                             {option}
                           </option>
@@ -2751,7 +2952,7 @@ const PublishPage: React.FC = () => {
                         onChange={handleChange}
                       >
                         <option value="">Избери</option>
-                        {PART_ELEMENT_OPTIONS.map((option) => (
+                        {partElementOptions.map((option) => (
                           <option key={option} value={option}>
                             {option}
                           </option>
@@ -2821,7 +3022,7 @@ const PublishPage: React.FC = () => {
                         required
                       >
                         <option value="">Избери</option>
-                        {ACCESSORY_CATEGORY_OPTIONS.map((option) => (
+                        {accessoryCategoryOptions.map((option) => (
                           <option key={option} value={option}>
                             {option}
                           </option>
@@ -2830,7 +3031,6 @@ const PublishPage: React.FC = () => {
                     </FormFieldWithTooltip>
                   </>
                 )}
-
                 {(formData.mainCategory === "y" || formData.mainCategory === "z") && (
                   <>
                     <FormFieldWithTooltip
@@ -3013,7 +3213,7 @@ const PublishPage: React.FC = () => {
                     <FormFieldWithTooltip label="Междуболтово разстояние (PCD)">
                       <select style={styles.input} name="wheelPcd" value={formData.wheelPcd} onChange={handleChange}>
                         <option value="">Избери</option>
-                        {WHEEL_PCD_OPTIONS.map((option) => (
+                        {wheelPcdOptions.map((option) => (
                           <option key={option} value={option}>
                             {option}
                           </option>
@@ -3106,8 +3306,41 @@ const PublishPage: React.FC = () => {
 
                 {(formData.mainCategory === "3" || formData.mainCategory === "4") && (
                   <>
+                    <FormFieldWithTooltip label="Пробег (км)" required>
+                      <input
+                        style={styles.input}
+                        type="number"
+                        min="0"
+                        name="mileage"
+                        value={formData.mileage}
+                        onChange={handleChange}
+                        required
+                      />
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Кубатура (куб. см.)">
+                      <input
+                        style={styles.input}
+                        type="number"
+                        min="0"
+                        name="displacement"
+                        value={formData.displacement}
+                        onChange={handleChange}
+                      />
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Месец на производство">
+                      <select style={styles.input} name="month" value={formData.month} onChange={handleChange}>
+                        <option value="">Избери</option>
+                        {MONTH_OPTIONS.map((monthOption) => (
+                          <option key={monthOption} value={monthOption}>
+                            {monthOption}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
                     <FormFieldWithTooltip label="Брой оси">
-                      <select style={styles.input} name="heavyAxles" value={formData.heavyAxles} onChange={handleChange}>
+                      <select style={styles.input} name="heavyAxles" value={formData.heavyAxles} onChange={handleChange} required>
                         <option value="">Избери</option>
                         {HEAVY_AXLE_OPTIONS.map((option) => (
                           <option key={option} value={option}>
@@ -3118,7 +3351,7 @@ const PublishPage: React.FC = () => {
                     </FormFieldWithTooltip>
 
                     <FormFieldWithTooltip label="Брой места">
-                      <select style={styles.input} name="heavySeats" value={formData.heavySeats} onChange={handleChange}>
+                      <select style={styles.input} name="heavySeats" value={formData.heavySeats} onChange={handleChange} required>
                         <option value="">Избери</option>
                         {HEAVY_SEAT_OPTIONS.map((option) => (
                           <option key={option} value={option}>
@@ -3129,7 +3362,7 @@ const PublishPage: React.FC = () => {
                     </FormFieldWithTooltip>
 
                     <FormFieldWithTooltip label="Товароносимост (кг)">
-                      <select style={styles.input} name="heavyLoad" value={formData.heavyLoad} onChange={handleChange}>
+                      <select style={styles.input} name="heavyLoad" value={formData.heavyLoad} onChange={handleChange} required>
                         <option value="">Избери</option>
                         {HEAVY_LOAD_OPTIONS.map((option) => (
                           <option key={option} value={option}>
@@ -3173,6 +3406,7 @@ const PublishPage: React.FC = () => {
                         name="transmission"
                         value={formData.transmission}
                         onChange={handleChange}
+                        required
                       >
                         <option value="">Избери</option>
                         {TRANSMISSION_OPTIONS.map((option) => (
@@ -3189,6 +3423,7 @@ const PublishPage: React.FC = () => {
                         name="heavyEuroStandard"
                         value={formData.heavyEuroStandard}
                         onChange={handleChange}
+                        required
                       >
                         <option value="">Избери</option>
                         {HEAVY_EURO_STANDARD_OPTIONS.map((option) => (
@@ -3600,7 +3835,19 @@ const PublishPage: React.FC = () => {
                     </select>
                   </FormFieldWithTooltip>
                 )}
-
+                {!["y", "z", "u", "v", "w"].includes(formData.mainCategory) && (
+                  <FormFieldWithTooltip label="VIN номер">
+                    <input
+                      style={styles.input}
+                      type="text"
+                      name="vin"
+                      value={formData.vin}
+                      onChange={handleChange}
+                      maxLength={17}
+                      placeholder="напр. WDB12345678901234"
+                    />
+                  </FormFieldWithTooltip>
+                )}
                 {(formData.mainCategory === "y" || formData.mainCategory === "z") && (
                   <div style={{ gridColumn: "1 / -1", color: "#666", fontSize: 14 }}>
                     За тази категория няма допълнителни технически полета.
@@ -3670,10 +3917,12 @@ const PublishPage: React.FC = () => {
                 Екстри и опции
               </h2>
               <p style={{ color: "#666", marginBottom: 16, fontSize: 14 }}>
-                Избери всички екстри и опции, които има автомобилът
+                {isHeavyMainCategory(formData.mainCategory)
+                  ? "Избери всички екстри и опции, които има бусът/камионът"
+                  : "Избери всички екстри и опции, които има автомобилът"}
               </p>
               <div className="feature-groups">
-                {FEATURE_CATEGORIES.map((group) => {
+                {featureCategories.map((group) => {
                   const selectedCount = group.items.filter((feature) =>
                     formData.features.includes(feature)
                   ).length;

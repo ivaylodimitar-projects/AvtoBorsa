@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getMainCategoryLabel } from "../constants/mobileBgData";
 
 export interface RecentSearch {
   id: string;
@@ -66,10 +67,21 @@ export const useRecentSearches = () => {
 
 const generateSearchLabel = (criteria: Record<string, any>): string => {
   const parts: string[] = [];
+  const mainCategoryCode = String(criteria.mainCategory || criteria.main_category || "").trim();
+  const mainCategoryLabel = getMainCategoryLabel(mainCategoryCode);
+
+  if (mainCategoryLabel) {
+    parts.push(mainCategoryLabel);
+  }
 
   // Brand and Model
-  if (criteria.brand) {
-    parts.push(criteria.brand);
+  if (criteria.equipmentType) {
+    parts.push(`Вид: ${criteria.equipmentType}`);
+  }
+
+  const brand = criteria.brand || criteria.marka;
+  if (brand) {
+    parts.push(brand);
     if (criteria.model) parts.push(criteria.model);
   }
 

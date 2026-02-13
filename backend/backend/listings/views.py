@@ -226,6 +226,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
 
         brand = get_param('brand', 'marka')
         model = get_param('model')
+        equipment_type = get_param('equipmentType')
 
         # Price filters
         price_from = to_float(get_param('priceFrom'))
@@ -249,16 +250,33 @@ class CarListingViewSet(viewsets.ModelViewSet):
         if year_to is not None:
             queryset = queryset.filter(year_from__lte=year_to)
 
-        if main_category in {'6', '7'} and brand:
+        if main_category in {'6', '7'}:
             related_name = 'agri_details__equipment_type' if main_category == '6' else 'industrial_details__equipment_type'
-            queryset = queryset.filter(**{f'{related_name}__icontains': brand})
+            # Preferred mode:
+            # - equipmentType => detail equipment_type
+            # - marka/brand => listing brand
+            # - model => listing model
+            # Legacy mode (kept for old saved searches):
+            # - marka => equipment_type
+            # - model => listing brand
+            if equipment_type:
+                queryset = queryset.filter(**{f'{related_name}__icontains': equipment_type})
+                if brand:
+                    queryset = queryset.filter(brand__icontains=brand)
+                if model:
+                    queryset = queryset.filter(model__icontains=model)
+            else:
+                if brand:
+                    queryset = queryset.filter(**{f'{related_name}__icontains': brand})
+                if model:
+                    queryset = queryset.filter(brand__icontains=model)
         elif main_category == 'v' and brand:
             queryset = queryset.filter(accessories_details__accessory_category__icontains=brand)
-        elif brand:
-            queryset = queryset.filter(brand__icontains=brand)
-
-        if model:
-            queryset = queryset.filter(model__icontains=model)
+        else:
+            if brand:
+                queryset = queryset.filter(brand__icontains=brand)
+            if model:
+                queryset = queryset.filter(model__icontains=model)
 
         # Location filters
         region = get_param('region', 'locat')
@@ -490,6 +508,9 @@ class CarListingViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(caravan_details__has_air_conditioning=True)
 
         if main_category == 'a':
+            boat_category = get_param('boatCategory')
+            if boat_category:
+                queryset = queryset.filter(boats_details__boat_category__icontains=boat_category)
             engine_count_from = to_int(get_param('engineCountFrom'))
             if engine_count_from is not None:
                 queryset = queryset.filter(boats_details__engine_count__gte=engine_count_from)
@@ -518,6 +539,9 @@ class CarListingViewSet(viewsets.ModelViewSet):
                     queryset = queryset.filter(boats_details__features__contains=[feature])
 
         if main_category == 'b':
+            trailer_category = get_param('trailerCategory')
+            if trailer_category:
+                queryset = queryset.filter(trailers_details__trailer_category__icontains=trailer_category)
             load_from = to_int(get_param('loadFrom'))
             if load_from is not None:
                 queryset = queryset.filter(trailers_details__load_kg__gte=load_from)
@@ -645,9 +669,9 @@ class CarListingViewSet(viewsets.ModelViewSet):
                     'user__business_profile',
                     'user__private_profile'
                 ).only(
-                    'id', 'slug', 'brand', 'model', 'year_from', 'price', 'mileage',
-                    'fuel', 'gearbox', 'power', 'city',
-                    'category', 'condition', 'created_at', 'listing_type',
+                    'id', 'slug', 'main_category', 'brand', 'model', 'year_from', 'price', 'mileage',
+                    'fuel', 'gearbox', 'power', 'location_country', 'city',
+                    'category', 'condition', 'created_at', 'updated_at', 'listing_type',
                     'user_id', 'user__email',
                     'user__business_profile__dealer_name',
                     'user__private_profile__id'
@@ -660,9 +684,9 @@ class CarListingViewSet(viewsets.ModelViewSet):
                     'user__business_profile',
                     'user__private_profile'
                 ).only(
-                    'id', 'slug', 'brand', 'model', 'year_from', 'price', 'mileage',
-                    'fuel', 'gearbox', 'power', 'city',
-                    'category', 'condition', 'created_at', 'listing_type',
+                    'id', 'slug', 'main_category', 'brand', 'model', 'year_from', 'price', 'mileage',
+                    'fuel', 'gearbox', 'power', 'location_country', 'city',
+                    'category', 'condition', 'created_at', 'updated_at', 'listing_type',
                     'is_active', 'is_draft', 'is_archived',
                     'user_id', 'user__email',
                     'user__business_profile__dealer_name',
@@ -695,22 +719,6 @@ class CarListingViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Create listing and associate with current user"""
         _demote_expired_top_listings()
-        # Check if user has reached the 3 advert limit
-        cutoff = get_expiry_cutoff()
-        active_listings_count = CarListing.objects.filter(
-            user=self.request.user,
-            is_active=True,
-            is_draft=False,
-            is_archived=False,
-            created_at__gte=cutoff
-        ).count()
-
-        if not _is_business_user(self.request.user) and active_listings_count >= 3:
-            raise ValidationError(
-                "ÐœÐ¾Ð¶ÐµÑ‚Ðµ Ð´Ð° Ð¿ÑƒÐ±Ð»Ð¸ÐºÑƒÐ²Ð°Ñ‚Ðµ Ð¼Ð°ÐºÑÐ¸Ð¼ÑƒÐ¼ 3 Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¸ Ð¾Ð±ÑÐ²Ð¸. "
-                "ÐœÐ¾Ð»Ñ, Ð¸Ð·Ñ‚Ñ€Ð¸Ð¹Ñ‚Ðµ Ð¸Ð»Ð¸ Ð°Ñ€Ñ…Ð¸Ð²Ð¸Ñ€Ð°Ð¹Ñ‚Ðµ Ð½ÑÐºÐ¾Ñ Ð¾Ñ‚ Ð²Ð°ÑˆÐ¸Ñ‚Ðµ Ð¾Ð±ÑÐ²Ð¸, Ð·Ð° Ð´Ð° Ð´Ð¾Ð±Ð°Ð²Ð¸Ñ‚Ðµ Ð½Ð¾Ð²Ð°."
-            )
-
         listing_type = serializer.validated_data.get("listing_type", "normal")
         with db_transaction.atomic():
             if listing_type == "top":
@@ -829,24 +837,6 @@ def archive_listing(request, listing_id):
 def unarchive_listing(request, listing_id):
     """Unarchive a listing"""
     listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
-    cutoff = get_expiry_cutoff()
-    active_count = CarListing.objects.filter(
-        user=request.user,
-        is_active=True,
-        is_draft=False,
-        is_archived=False,
-        created_at__gte=cutoff
-    ).exclude(id=listing.id).count()
-
-    if not _is_business_user(request.user) and active_count >= 3:
-        return Response(
-            {
-                "detail": "ÐœÐ¾Ð¶ÐµÑ‚Ðµ Ð´Ð° Ð¸Ð¼Ð°Ñ‚Ðµ Ð¼Ð°ÐºÑÐ¸Ð¼ÑƒÐ¼ 3 Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¸ Ð¾Ð±ÑÐ²Ð¸. "
-                          "ÐœÐ¾Ð»Ñ, Ð°Ñ€Ñ…Ð¸Ð²Ð¸Ñ€Ð°Ð¹Ñ‚Ðµ Ð¸Ð»Ð¸ Ð¸Ð·Ñ‚Ñ€Ð¸Ð¹Ñ‚Ðµ Ð½ÑÐºÐ¾Ñ Ð¾Ñ‚ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¸Ñ‚Ðµ."
-            },
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
     listing.is_archived = False
     listing.is_active = True
     listing.created_at = timezone.now()
@@ -876,28 +866,9 @@ def republish_listing(request, listing_id):
     listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
     listing_type = request.data.get('listing_type')
 
-    # Enforce active listings limit (exclude the current listing)
-    cutoff = get_expiry_cutoff()
-    active_count = CarListing.objects.filter(
-        user=request.user,
-        is_active=True,
-        is_draft=False,
-        is_archived=False,
-        created_at__gte=cutoff
-    ).exclude(id=listing.id).count()
-
-    if not _is_business_user(request.user) and active_count >= 3:
-        return Response(
-            {
-                "detail": "ÐœÐ¾Ð¶ÐµÑ‚Ðµ Ð´Ð° Ð¸Ð¼Ð°Ñ‚Ðµ Ð¼Ð°ÐºÑÐ¸Ð¼ÑƒÐ¼ 3 Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¸ Ð¾Ð±ÑÐ²Ð¸. "
-                          "ÐœÐ¾Ð»Ñ, Ð°Ñ€Ñ…Ð¸Ð²Ð¸Ñ€Ð°Ð¹Ñ‚Ðµ Ð¸Ð»Ð¸ Ð¸Ð·Ñ‚Ñ€Ð¸Ð¹Ñ‚Ðµ Ð½ÑÐºÐ¾Ñ Ð¾Ñ‚ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¸Ñ‚Ðµ."
-            },
-            status=status.HTTP_400_BAD_REQUEST
-        )
-
     if listing_type not in ['top', 'normal']:
         return Response(
-            {"detail": "ÐÐµÐ²Ð°Ð»Ð¸Ð´ÐµÐ½ Ñ‚Ð¸Ð¿ Ð½Ð° Ð¾Ð±ÑÐ²Ð°Ñ‚Ð°."},
+            {"detail": "Невалиден тип на обявата."},
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -930,7 +901,7 @@ def update_listing_type(request, listing_id):
 
     if listing_type not in ['top', 'normal']:
         return Response(
-            {"detail": "ÐÐµÐ²Ð°Ð»Ð¸Ð´ÐµÐ½ Ñ‚Ð¸Ð¿ Ð½Ð° Ð¾Ð±ÑÐ²Ð°Ñ‚Ð°."},
+            {"detail": "Невалиден тип на обявата."},
             status=status.HTTP_400_BAD_REQUEST
         )
 

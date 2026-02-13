@@ -1,5 +1,6 @@
 ﻿from rest_framework import serializers
 from django.conf import settings
+import json
 from .models import (
     CarListing,
     CarImage,
@@ -121,6 +122,7 @@ class CarListingLiteSerializer(serializers.ModelSerializer):
 
 class CarListingListSerializer(serializers.ModelSerializer):
     """Optimized serializer for search/list pages."""
+    main_category_display = serializers.SerializerMethodField()
     fuel_display = serializers.SerializerMethodField()
     gearbox_display = serializers.SerializerMethodField()
     condition_display = serializers.SerializerMethodField()
@@ -137,7 +139,7 @@ class CarListingListSerializer(serializers.ModelSerializer):
     class Meta:
         model = CarListing
         fields = [
-            'id', 'slug', 'brand', 'model', 'year_from', 'price', 'mileage', 'power', 'location_country', 'city',
+            'id', 'slug', 'main_category', 'main_category_display', 'brand', 'model', 'year_from', 'price', 'mileage', 'power', 'location_country', 'city',
             'fuel', 'fuel_display', 'gearbox', 'gearbox_display',
             'category', 'category_display', 'condition', 'condition_display',
             'description_preview', 'created_at', 'updated_at',
@@ -182,6 +184,9 @@ class CarListingListSerializer(serializers.ModelSerializer):
 
     def get_fuel_display(self, obj):
         return obj.get_fuel_display()
+
+    def get_main_category_display(self, obj):
+        return obj.get_main_category_display()
 
     def get_gearbox_display(self, obj):
         return obj.get_gearbox_display()
@@ -273,7 +278,7 @@ class CarListingSearchCompactSerializer(CarListingListSerializer):
     class Meta:
         model = CarListing
         fields = [
-            'id', 'slug', 'brand', 'model', 'year_from', 'price', 'mileage', 'power', 'location_country', 'city',
+            'id', 'slug', 'main_category', 'main_category_display', 'brand', 'model', 'year_from', 'price', 'mileage', 'power', 'location_country', 'city',
             'fuel_display', 'gearbox_display', 'category_display', 'condition_display',
             'description_preview', 'created_at', 'updated_at',
             'listing_type', 'listing_type_display',
@@ -316,9 +321,9 @@ DETAIL_FIELDS_BY_MAIN_CATEGORY = {
     '9': ['beds', 'length_m', 'has_toilet', 'has_heating', 'has_air_conditioning'],
     'a': [
         'boat_category', 'engine_type', 'engine_count', 'material',
-        'length_m', 'width_m', 'draft_m', 'hours', 'features',
+        'length_m', 'width_m', 'draft_m', 'hours',
     ],
-    'b': ['trailer_category', 'load_kg', 'axles', 'features'],
+    'b': ['trailer_category', 'load_kg', 'axles'],
     'v': ['classified_for', 'accessory_category'],
     'y': ['classified_for', 'buy_category'],
     'z': ['classified_for', 'service_category'],
@@ -530,7 +535,27 @@ class CarListingSerializer(serializers.ModelSerializer):
         ]
 
     def to_internal_value(self, data):
-        mutable_data = data.copy() if hasattr(data, "copy") else dict(data)
+        if hasattr(data, "getlist"):
+            always_list_keys = {
+                "images_upload",
+                "features",
+                "boat_features",
+                "trailer_features",
+                "boatFeatures",
+                "trailerFeatures",
+            }
+            mutable_data = {}
+            for key in data.keys():
+                values = data.getlist(key)
+                if not values:
+                    continue
+                if key in always_list_keys or len(values) > 1:
+                    mutable_data[key] = list(values)
+                else:
+                    mutable_data[key] = values[0]
+        else:
+            mutable_data = data.copy() if hasattr(data, "copy") else dict(data)
+
         camel_to_snake = {
             "mainCategory": "main_category",
             "yearFrom": "year_from",
@@ -596,6 +621,68 @@ class CarListingSerializer(serializers.ModelSerializer):
         ]:
             if mutable_data.get(numeric_key, None) == "":
                 mutable_data[numeric_key] = None
+
+        def normalize_list_field(raw_value):
+            if raw_value in (None, ""):
+                return None
+
+            if isinstance(raw_value, (list, tuple)):
+                return [str(item).strip() for item in raw_value if str(item).strip()]
+
+            if isinstance(raw_value, str):
+                text = raw_value.strip()
+                if not text:
+                    return []
+
+                try:
+                    parsed = json.loads(text)
+                    if isinstance(parsed, list):
+                        return [str(item).strip() for item in parsed if str(item).strip()]
+                    if isinstance(parsed, str):
+                        return [parsed.strip()] if parsed.strip() else []
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    pass
+
+                if "," in text:
+                    return [item.strip() for item in text.split(",") if item.strip()]
+                return [text]
+
+            return None
+
+        list_key_aliases = {
+            "features": ["features"],
+            "boat_features": ["boat_features", "boatFeatures"],
+            "trailer_features": ["trailer_features", "trailerFeatures"],
+        }
+
+        for list_key, aliases in list_key_aliases.items():
+            values_from_multipart = None
+            if hasattr(data, "getlist"):
+                for alias in aliases:
+                    alias_values = data.getlist(alias)
+                    if alias_values:
+                        values_from_multipart = alias_values
+                        break
+
+            if values_from_multipart:
+                if len(values_from_multipart) > 1:
+                    mutable_data[list_key] = [
+                        str(item).strip()
+                        for item in values_from_multipart
+                        if str(item).strip()
+                    ]
+                    continue
+                raw_value = values_from_multipart[0]
+            else:
+                raw_value = None
+                for alias in aliases:
+                    if alias in mutable_data:
+                        raw_value = mutable_data.get(alias)
+                        break
+
+            normalized_list = normalize_list_field(raw_value)
+            if normalized_list is not None:
+                mutable_data[list_key] = normalized_list
 
         return super().to_internal_value(mutable_data)
 

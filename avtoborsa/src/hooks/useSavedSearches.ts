@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
+import { getCriteriaMainCategoryCode, getMainCategoryLabel } from "../constants/mobileBgData";
 
 export interface SavedSearch {
   id: string;
   name: string;
   criteria: Record<string, any>;
+  mainCategoryCode?: string;
+  mainCategoryLabel?: string;
   timestamp: number;
 }
 
@@ -12,12 +15,22 @@ const STORAGE_KEY = "saved_searches";
 export const useSavedSearches = () => {
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
 
+  const normalizeSavedSearch = (raw: SavedSearch): SavedSearch => {
+    const mainCategoryCode = getCriteriaMainCategoryCode(raw.criteria);
+    const mainCategoryLabel = getMainCategoryLabel(mainCategoryCode);
+    return {
+      ...raw,
+      mainCategoryCode: mainCategoryCode || raw.mainCategoryCode || "",
+      mainCategoryLabel: mainCategoryLabel || raw.mainCategoryLabel || "",
+    };
+  };
+
   const readStoredSearches = (): SavedSearch[] => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return [];
     try {
       const parsed = JSON.parse(stored);
-      return Array.isArray(parsed) ? parsed : [];
+      return Array.isArray(parsed) ? parsed.map((item) => normalizeSavedSearch(item)) : [];
     } catch (e) {
       console.error("Error loading saved searches:", e);
       return [];
@@ -50,10 +63,14 @@ export const useSavedSearches = () => {
   }, []);
 
   const saveSearch = (name: string, criteria: Record<string, any>) => {
+    const mainCategoryCode = getCriteriaMainCategoryCode(criteria);
+    const mainCategoryLabel = getMainCategoryLabel(mainCategoryCode);
     const newSearch: SavedSearch = {
       id: Date.now().toString(),
       name,
       criteria,
+      mainCategoryCode: mainCategoryCode || "",
+      mainCategoryLabel: mainCategoryLabel || "",
       timestamp: Date.now(),
     };
 
