@@ -12,11 +12,11 @@ import {
   User,
   Building2,
   BadgeCheck,
-  Tag,
-  CheckCircle2,
   HelpCircle,
   ImageOff,
-  Search,
+  TrendingUp,
+  TrendingDown,
+  PencilLine,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
@@ -35,6 +35,7 @@ type CarListing = {
   gearbox: string;
   gearbox_display: string;
   power: number;
+  location_country?: string;
   city: string;
   image_url?: string;
   images?: Array<{
@@ -54,8 +55,14 @@ type CarListing = {
   condition?: string;
   condition_display?: string;
   created_at: string;
+  updated_at?: string;
   seller_name?: string;
   seller_type?: string;
+  price_change?: {
+    delta: number | string;
+    direction?: string;
+    changed_at?: string;
+  };
   listing_type?: "top" | "normal" | string | number;
   listing_type_display?: string;
   is_top?: boolean;
@@ -95,11 +102,6 @@ const SearchPage: React.FC = () => {
   const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
   const getImageUrl = useImageUrl();
 
-  const currentPage = useMemo(() => {
-    const rawPage = Number(searchParams.get("page") || "1");
-    return Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
-  }, [searchParams]);
-
   const baseQueryString = useMemo(() => {
     const params = new URLSearchParams(searchParams);
     params.delete("page");
@@ -108,13 +110,39 @@ const SearchPage: React.FC = () => {
   }, [searchParams]);
 
   const queryKey = baseQueryString;
+  const pageRestoreKey = useMemo(() => `searchPage:${queryKey || "all"}`, [queryKey]);
+  const storedPage = useMemo(() => {
+    try {
+      const raw = sessionStorage.getItem(pageRestoreKey);
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : null;
+    } catch {
+      return null;
+    }
+  }, [pageRestoreKey]);
+
+  const currentPage = useMemo(() => {
+    const rawPage = Number(searchParams.get("page") || "");
+    if (Number.isFinite(rawPage) && rawPage > 0) {
+      return Math.floor(rawPage);
+    }
+    if (storedPage !== null) {
+      return storedPage;
+    }
+    return 1;
+  }, [searchParams, storedPage]);
+
   const currentListings = pageCache[currentPage] || prefetchCacheRef.current[currentPage] || [];
   const prefetchTokenRef = useRef(0);
   const prevQueryKeyRef = useRef<string | null>(null);
   const activeQueryRef = useRef(queryKey);
+  const scrollRestoreKey = useMemo(
+    () => `searchScroll:${queryKey || "all"}:${currentPage}`,
+    [queryKey, currentPage]
+  );
 
   // Format relative time
-  const getRelativeTime = (dateString: string) => {
+  const getRelativeTime = (dateString: string, label = "Публикувана") => {
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -126,13 +154,13 @@ const SearchPage: React.FC = () => {
     if (diffDays > 30) {
       return date.toLocaleDateString("bg-BG", { day: "numeric", month: "long", year: "numeric" });
     } else if (diffDays > 0) {
-      return `Публикувана преди ${diffDays} ${diffDays === 1 ? "ден" : "дни"}`;
+      return `${label} преди ${diffDays} ${diffDays === 1 ? "ден" : "дни"}`;
     } else if (diffHours > 0) {
-      return `Публикувана преди ${diffHours} ${diffHours === 1 ? "час" : "часа"}`;
+      return `${label} преди ${diffHours} ${diffHours === 1 ? "час" : "часа"}`;
     } else if (diffMins > 0) {
-      return `Публикувана преди ${diffMins} ${diffMins === 1 ? "минута" : "минути"}`;
+      return `${label} преди ${diffMins} ${diffMins === 1 ? "минута" : "минути"}`;
     } else {
-      return "Публикувана току-що";
+      return `${label} току-що`;
     }
   };
 
@@ -145,14 +173,66 @@ const SearchPage: React.FC = () => {
   }, [queryKey]);
 
   useEffect(() => {
-    const pageParam = searchParams.get("page");
-    const parsedPage = Number(pageParam || "1");
-    if (!pageParam || !Number.isFinite(parsedPage) || parsedPage < 1) {
-      const params = new URLSearchParams(searchParams);
-      params.set("page", "1");
-      setSearchParams(params, { replace: true });
+    if (!Number.isFinite(currentPage) || currentPage < 1) return;
+    try {
+      sessionStorage.setItem(pageRestoreKey, String(currentPage));
+    } catch {
+      // ignore storage errors
     }
-  }, [searchParams, setSearchParams]);
+  }, [currentPage, pageRestoreKey]);
+
+  const persistScrollPosition = useCallback(() => {
+    try {
+      sessionStorage.setItem(
+        scrollRestoreKey,
+        JSON.stringify({ y: window.scrollY || 0, ts: Date.now() })
+      );
+    } catch {
+      // ignore storage errors
+    }
+  }, [scrollRestoreKey]);
+
+  useEffect(() => {
+    if (!hasLoadedPrimary || isLoading) return;
+    let payload: { y?: number } | null = null;
+    try {
+      const raw = sessionStorage.getItem(scrollRestoreKey);
+      if (raw) {
+        payload = JSON.parse(raw) as { y?: number };
+      }
+    } catch {
+      payload = null;
+    }
+    if (!payload || typeof payload.y !== "number" || payload.y <= 0) return;
+
+    const targetY = payload.y;
+    const attemptRestore = () => {
+      window.scrollTo(0, targetY);
+    };
+    requestAnimationFrame(() => {
+      attemptRestore();
+      window.setTimeout(attemptRestore, 60);
+      window.setTimeout(attemptRestore, 220);
+    });
+    sessionStorage.removeItem(scrollRestoreKey);
+  }, [scrollRestoreKey, hasLoadedPrimary, isLoading, currentListings.length]);
+
+  const openListing = useCallback(
+    (slug: string) => {
+      persistScrollPosition();
+      navigate(`/details/${slug}`);
+    },
+    [navigate, persistScrollPosition]
+  );
+
+  useEffect(() => {
+    const pageParam = searchParams.get("page");
+    const parsedPage = Number(pageParam || "");
+    if (pageParam && Number.isFinite(parsedPage) && parsedPage > 0) return;
+    const params = new URLSearchParams(searchParams);
+    params.set("page", String(currentPage));
+    setSearchParams(params, { replace: true });
+  }, [searchParams, setSearchParams, currentPage]);
 
   useEffect(() => {
     if (prevQueryKeyRef.current && prevQueryKeyRef.current !== queryKey) {
@@ -328,12 +408,13 @@ const SearchPage: React.FC = () => {
   }, [hasLoadedPrimary, currentPage, totalPages, queryKey, loadPage]);
 
   useEffect(() => {
+    if (totalCount === null) return;
     if (totalPages > 0 && currentPage > totalPages) {
       const params = new URLSearchParams(searchParams);
       params.set("page", String(totalPages));
       setSearchParams(params, { replace: true });
     }
-  }, [currentPage, totalPages, searchParams, setSearchParams]);
+  }, [currentPage, totalPages, totalCount, searchParams, setSearchParams]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -357,7 +438,7 @@ const SearchPage: React.FC = () => {
       const response = await fetch(`http://localhost:8000/api/listings/${listingId}/${endpoint}/`, {
         method: isFavorited ? "DELETE" : "POST",
         headers: {
-          Authorization: `Token ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -397,8 +478,7 @@ const SearchPage: React.FC = () => {
 
   // Build search criteria display
   const searchCriteriaDisplay = useMemo(() => {
-    const criteria: Record<string, string> = {};
-
+    const criteria: string[] = [];
 
     // Basic filters
     const brand = searchParams.get("brand");
@@ -421,42 +501,50 @@ const SearchPage: React.FC = () => {
     const color = searchParams.get("color");
     const condition = searchParams.get("condition");
 
-    if (brand) criteria["Марка"] = brand;
-    if (model) criteria["Модел"] = model;
-    if (category) criteria["Тип"] = category;
+    if (brand) criteria.push(`Марка: ${brand}`);
+    if (model) criteria.push(`Модел: ${model}`);
+    if (category) criteria.push(`Тип: ${category}`);
 
     if (yearFrom || yearTo) {
       const yearRange = `${yearFrom || "всички"} - ${yearTo || "всички"}`;
-      criteria["Година"] = yearRange;
+      criteria.push(`Година: ${yearRange}`);
     }
 
     if (maxPrice) {
-      criteria["Цена"] = `до €${maxPrice}`;
+      criteria.push(`Цена: до €${maxPrice}`);
     } else if (priceFrom || priceTo) {
       const priceRange = `€${priceFrom || "0"} - €${priceTo || "∞"}`;
-      criteria["Цена"] = priceRange;
+      criteria.push(`Цена: ${priceRange}`);
     }
 
     if (mileageFrom || mileageTo) {
       const mileageRange = `${mileageFrom || "0"} - ${mileageTo || "∞"}`;
-      criteria["Пробег"] = `${mileageRange} км`;
+      criteria.push(`Пробег: ${mileageRange} км`);
     }
 
     if (engineFrom || engineTo) {
       const engineRange = `${engineFrom || "0"} - ${engineTo || "∞"}`;
-      criteria["Мощност"] = `${engineRange} к.с.`;
+      criteria.push(`Мощност: ${engineRange} к.с.`);
     }
 
-    if (region) criteria["Регион"] = region;
-    if (fuel) criteria["Гориво"] = formatFuelLabel(fuel);
-    if (gearbox) criteria["Скоростна кутия"] = formatGearboxLabel(gearbox);
-    if (color) criteria["Цвят"] = color;
-    if (condition) criteria["Състояние"] = formatConditionLabel(condition);
+    if (region) criteria.push(`Регион: ${region}`);
+    if (fuel) criteria.push(`Гориво: ${formatFuelLabel(fuel)}`);
+    if (gearbox) criteria.push(`Скоростна кутия: ${formatGearboxLabel(gearbox)}`);
+    if (color) criteria.push(`Цвят: ${color}`);
+    if (condition) criteria.push(`Състояние: ${formatConditionLabel(condition)}`);
 
     return criteria;
   }, [searchParams]);
 
   const totalListings = totalCount ?? results.length;
+  const listingsScopeLabel = useMemo(() => {
+    const brand = (searchParams.get("brand") || "").trim();
+    const model = (searchParams.get("model") || "").trim();
+
+    if (brand && model) return `${brand} / ${model}`;
+    if (brand) return brand;
+    return "автомобили и джипове";
+  }, [searchParams]);
   const skeletonRows = useMemo(() => Array.from({ length: PAGE_SIZE }, (_, idx) => idx), []);
 
   const visiblePages = useMemo(() => {
@@ -496,26 +584,35 @@ const SearchPage: React.FC = () => {
     page: { minHeight: "100vh", background: "#f4f6f9", width: "100%", paddingTop: 20, paddingBottom: 40 },
     container: { width: "100%", maxWidth: 1200, margin: "0 auto", padding: "0 20px" },
     header: { marginBottom: 24, background: "#fff", padding: 24, borderRadius: 10, boxShadow: "0 6px 18px rgba(15, 23, 42, 0.08)" },
-    title: { fontSize: 26, fontWeight: "bold", color: "#0f172a", margin: "0 0 16px 0" },
+    title: { fontSize: 28, fontWeight: 700, color: "#0f172a", margin: "0 0 16px 0" },
     criteria: { display: "flex", flexWrap: "wrap", gap: 12, marginTop: 16 },
     criteriaTag: { background: "#f1f5f9", padding: "8px 14px", borderRadius: 20, fontSize: 13, color: "#475569", fontWeight: 600 },
     results: { display: "flex", flexDirection: "column", gap: 16 },
     item: {
       background: "#fff",
-      borderRadius: 10,
+      borderRadius: 6,
       overflow: "hidden",
-      border: "none",
-      boxShadow: "0 2px 8px rgba(15, 23, 42, 0.06)",
+      border: "1px solid #e0e0e0",
+      boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
       display: "flex",
+      flexDirection: "column" as const,
       cursor: "pointer",
       transition: "transform 0.25s ease, box-shadow 0.25s ease",
       position: "relative" as const,
       contentVisibility: "auto",
       containIntrinsicSize: "340px",
     },
+    itemRow: { display: "flex", alignItems: "stretch" },
     itemPhoto: { width: 280, flexShrink: 0, display: "flex", flexDirection: "column" as const, background: "#fff" },
-    photoMain: { height: 210, position: "relative" as const, overflow: "hidden", background: "linear-gradient(135deg, #e2e8f0 0%, #cbd5f5 100%)" },
-    itemImage: { width: "100%", height: "100%", objectFit: "cover" },
+    photoMain: { height: 194, position: "relative" as const, overflow: "hidden", background: "linear-gradient(135deg, #e2e8f0 0%, #cbd5f5 100%)" },
+    itemImage: {
+      width: "100%",
+      height: "100%",
+      objectFit: "cover",
+      objectPosition: "center",
+      imageRendering: "auto",
+      display: "block",
+    },
     itemPhotoOverlay: { position: "absolute" as const, top: 0, right: 0, bottom: 0, left: 0, display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 12, background: "linear-gradient(to top, rgba(15, 23, 42, 0.45), transparent)", zIndex: 1 },
     topBadge: { position: "absolute" as const, top: 10, left: 10, background: "linear-gradient(135deg, #ef4444, #dc2626)", color: "#fff", padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: 0.3, textTransform: "uppercase" as const, boxShadow: "0 4px 10px rgba(220, 38, 38, 0.3)", zIndex: 2 },
     newBadge: { position: "absolute" as const, left: 10, background: "linear-gradient(135deg, #10b981, #059669)", color: "#fff", padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: 0.3, textTransform: "uppercase" as const, boxShadow: "0 4px 10px rgba(5, 150, 105, 0.35)", zIndex: 2 },
@@ -526,19 +623,64 @@ const SearchPage: React.FC = () => {
     thumbImage: { width: "100%", height: "100%", objectFit: "cover" },
     thumbPlaceholder: { color: "#94a3b8" },
     thumbMore: { background: "#e2e8f0", color: "#334155", fontSize: 12, fontWeight: 700 },
-    itemText: { flex: 1, display: "flex", alignItems: "stretch", minHeight: 210 },
+    itemText: { flex: 1, display: "flex", alignItems: "stretch", minHeight: 194 },
     itemMain: { flex: 1, padding: 20, display: "flex", flexDirection: "column" as const, gap: 12 },
     itemHeader: { marginBottom: 4 },
     itemTitle: { fontSize: 20, fontWeight: 700, color: "#111827", marginBottom: 10, textDecoration: "none", lineHeight: 1.3 },
     itemPrice: { fontSize: 24, fontWeight: 700, color: "#0f766e", marginBottom: 4 },
     itemPriceSmall: { fontSize: 13, color: "#64748b", fontWeight: 500 },
-    itemParams: { display: "flex", flexWrap: "wrap", gap: 8, fontSize: 13, color: "#475569", alignItems: "center" },
-    itemParam: { display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 999, fontSize: 13, color: "#475569", fontWeight: 600 },
-    paramIcon: { color: "#64748b" },
-    itemDescription: { fontSize: 14, color: "#475569", lineHeight: 1.6, marginBottom: 0, maxHeight: 68, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as any },
+    priceChangeBadge: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      padding: "4px 10px",
+      borderRadius: 999,
+      fontSize: 12,
+      fontWeight: 800,
+      marginLeft: 10,
+      lineHeight: 1,
+    },
+    priceChangeUp: { background: "#fee2e2", color: "#dc2626", border: "1px solid #fecaca" },
+    priceChangeDown: { background: "#dcfce7", color: "#16a34a", border: "1px solid #bbf7d0" },
+    priceChangeText: { fontWeight: 800 },
+    itemParams: { display: "flex", flexWrap: "wrap", gap: 8, fontSize: 13, color: "#111827", alignItems: "center" },
+    itemParam: { display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px", background: "#ecfdf5", border: "1px solid #99f6e4", borderRadius: 999, fontSize: 13, color: "#111827", fontWeight: 700 },
+    paramIcon: { color: "#0f766e" },
+    itemParamValueBlack: { color: "#111827" },
+    itemDescription: {
+      fontSize: 14.5,
+      color: "#0f172a",
+      lineHeight: 1.65,
+      marginBottom: 0,
+      maxHeight: 96,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      display: "-webkit-box",
+      WebkitLineClamp: 4,
+      WebkitBoxOrient: "vertical" as any,
+      background: "linear-gradient(90deg, rgba(15,23,42,0.06), rgba(15,23,42,0.01))",
+      borderLeft: "3px solid rgb(15, 118, 110)",
+      padding: "10px 12px",
+      borderRadius: 10,
+      fontWeight: 600,
+    },
     itemSide: { width: 240, padding: 16, background: "linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)", borderLeft: "1px solid #e2e8f0", display: "flex", flexDirection: "column" as const, gap: 12 },
     sideSection: { display: "flex", flexDirection: "column" as const, gap: 8 },
     sideTitle: { fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 0.6, textTransform: "uppercase" as const },
+    sideTitleLocation: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#f97316",
+      letterSpacing: 0.6,
+      textTransform: "uppercase" as const,
+    },
+    sideTitleSeller: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "rgb(15, 118, 110)",
+      letterSpacing: 0.6,
+      textTransform: "uppercase" as const,
+    },
     sideDivider: { height: 1, background: "#e2e8f0", width: "100%" },
     metaRow: { display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#334155", fontWeight: 600 },
     metaIcon: { color: "#64748b" },
@@ -561,7 +703,7 @@ const SearchPage: React.FC = () => {
       position: "relative" as const,
     },
     skeletonPhoto: { width: 280, flexShrink: 0, display: "flex", flexDirection: "column" as const },
-    skeletonImage: { width: "100%", height: 210, ...skeletonBase },
+    skeletonImage: { width: "100%", height: 194, ...skeletonBase },
     skeletonThumb: { width: "100%", aspectRatio: "4 / 3", borderRadius: 10, ...skeletonBase },
     skeletonMain: { flex: 1, padding: 20, display: "flex", flexDirection: "column" as const, gap: 12 },
     skeletonSide: { width: 240, padding: 16, borderLeft: "1px solid #e2e8f0", background: "#f8fafc", display: "flex", flexDirection: "column" as const, gap: 10 },
@@ -588,15 +730,17 @@ const SearchPage: React.FC = () => {
       <div style={styles.container}>
         <div style={styles.header}>
           <h1 style={styles.title}>Резултати от търсене</h1>
-          {Object.keys(searchCriteriaDisplay).length > 0 && (
+          {searchCriteriaDisplay.length > 0 && (
             <div style={styles.criteria}>
-              {Object.entries(searchCriteriaDisplay).map(([key, value]) => (
-                <span key={key} style={styles.criteriaTag}>{key}: {value}</span>
+              {searchCriteriaDisplay.map((criterion, idx) => (
+                <span key={idx} style={styles.criteriaTag}>{criterion}</span>
               ))}
             </div>
           )}
-          <p style={{ fontSize: 16, color: "#555", margin: "16px 0 0 0",  borderBottom: "3px solid rgb(15, 118, 110)", fontWeight: "bold" }}>
-            1 - 20 от общо <strong style={{ color: "#0066cc" }}>{totalListings}</strong> намерени обяви за {searchCriteriaDisplay["Марка"] || "търсените критерии"}
+          <p style={{ fontSize: 15, color: "#555", margin: "16px 0 0 0", fontWeight: 500 }}>
+            1 - 20 от общо{" "}
+            <strong style={{ color: "rgb(15, 118, 110)" }}>{totalListings}</strong> намерени обяви за{" "}
+            <strong style={{ color: "rgb(15, 118, 110)" }}>{listingsScopeLabel}</strong>
           </p>
         </div>
 
@@ -648,10 +792,35 @@ const SearchPage: React.FC = () => {
                   const isTop = isTopListing(listing);
                   const isNewListing = isListingNew(listing.created_at);
                   const isPriorityImage = index < 3;
-                  const categoryLabel = listing.category_display || listing.category;
-                  const conditionLabel = listing.condition_display || listing.condition;
-                  const sellerLabel = listing.seller_name || "Не е посочено";
-                  const locationLabel = listing.city || "Не е посочено";
+                  const sellerLabel = listing.seller_name || "Частно лице";
+                  const locationLabel =
+                    [listing.location_country, listing.city].filter(Boolean).join(", ") || "Не е посочено";
+                  const updatedLabel =
+                    listing.updated_at && listing.updated_at !== listing.created_at
+                      ? getRelativeTime(listing.updated_at, "Редактирана")
+                      : null;
+                  const priceChangeDirection = listing.price_change?.direction;
+                  const priceChangeDeltaRaw = listing.price_change?.delta;
+                  const priceChangeDeltaValue =
+                    typeof priceChangeDeltaRaw === "string" ? Number(priceChangeDeltaRaw) : priceChangeDeltaRaw;
+                  const priceChangeResolvedDirection =
+                    priceChangeDirection === "up" || priceChangeDirection === "down"
+                      ? priceChangeDirection
+                      : typeof priceChangeDeltaValue === "number"
+                        ? priceChangeDeltaValue > 0
+                          ? "up"
+                          : priceChangeDeltaValue < 0
+                            ? "down"
+                            : "same"
+                        : "same";
+                  const showPriceChange =
+                    priceChangeResolvedDirection === "up" ||
+                    priceChangeResolvedDirection === "down";
+                  const PriceChangeIcon = priceChangeResolvedDirection === "up" ? TrendingUp : TrendingDown;
+                  const priceChangeLabel =
+                    typeof priceChangeDeltaValue === "number" && Number.isFinite(priceChangeDeltaValue)
+                      ? `${priceChangeDeltaValue > 0 ? "+" : "-"}${Math.abs(priceChangeDeltaValue).toLocaleString("bg-BG")} €`
+                      : null;
               const sellerTypeLabel =
                 listing.seller_type === "business"
                   ? "Търговец"
@@ -691,8 +860,9 @@ const SearchPage: React.FC = () => {
                     key={listing.id}
                     className="search-result-item"
                     style={styles.item}
-                    onClick={() => navigate(`/details/${listing.slug}`)}
+                    onClick={() => openListing(listing.slug)}
                   >
+                    <div style={styles.itemRow}>
                       <div style={styles.itemPhoto}>
                         <div style={styles.photoMain}>
                           {isTop && <div style={styles.topBadge}>Топ обява</div>}
@@ -776,11 +946,40 @@ const SearchPage: React.FC = () => {
                       <div style={styles.itemText}>
                         <div style={styles.itemMain}>
                           <div style={styles.itemHeader}>
-                            <a href={`/details/${listing.slug}`} style={styles.itemTitle} onClick={(e) => e.stopPropagation()}>
+                            <a
+                              href={`/details/${listing.slug}`}
+                              style={styles.itemTitle}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (e.defaultPrevented) return;
+                                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) return;
+                                e.preventDefault();
+                                openListing(listing.slug);
+                              }}
+                            >
                               {listing.brand} {listing.model}
                             </a>
                             <div style={styles.itemPrice}>
                               € {listing.price.toLocaleString("bg-BG")}
+                              {showPriceChange && (
+                                <span
+                                  style={{
+                                    ...styles.priceChangeBadge,
+                                    ...(priceChangeResolvedDirection === "up" ? styles.priceChangeUp : styles.priceChangeDown),
+                                  }}
+                                  title={
+                                    priceChangeResolvedDirection === "up"
+                                      ? "Повишена цена"
+                                      : "Намалена цена"
+                                  }
+                                >
+                                  <PriceChangeIcon size={14} />
+                                  <span style={styles.priceChangeText}>
+                                    {priceChangeResolvedDirection === "up" ? "Повишена" : "Намалена"}
+                                  </span>
+                                  {priceChangeLabel && <span>{priceChangeLabel}</span>}
+                                </span>
+                              )}
                               <div style={styles.itemPriceSmall}>
                                 {(listing.price * 1.96).toLocaleString("bg-BG", { maximumFractionDigits: 2 })} лв.
                               </div>
@@ -789,7 +988,7 @@ const SearchPage: React.FC = () => {
                           <div style={styles.itemParams}>
                             <span style={styles.itemParam}>
                               <Calendar size={16} style={styles.paramIcon} />
-                              {listing.year_from} г.
+                              <span style={styles.itemParamValueBlack}>{listing.year_from} г.</span>
                             </span>
                             <span style={styles.itemParam}>
                               <Gauge size={16} style={styles.paramIcon} />
@@ -801,7 +1000,7 @@ const SearchPage: React.FC = () => {
                             </span>
                             <span style={styles.itemParam}>
                               <Zap size={16} style={styles.paramIcon} />
-                              {listing.power} к.с.
+                              <span style={styles.itemParamValueBlack}>{listing.power} к.с.</span>
                             </span>
                             <span style={styles.itemParam}>
                               <Settings size={16} style={styles.paramIcon} />
@@ -814,22 +1013,22 @@ const SearchPage: React.FC = () => {
                         </div>
                         <div style={styles.itemSide}>
                           <div style={styles.sideSection}>
-                            <div style={styles.sideTitle}>Локация</div>
+                            <div style={styles.sideTitleLocation}>Локация</div>
                             <div style={styles.metaRow}>
                               <MapPin size={16} style={styles.metaIcon} />
-                              <span style={!listing.city ? styles.metaMuted : undefined}>{locationLabel}</span>
-                            </div>
-                            <div style={styles.metaRow}>
-                              <Clock size={16} style={styles.metaIcon} />
-                              <span>{getRelativeTime(listing.created_at)}</span>
+                              <span style={!locationLabel || locationLabel === "Не е посочено" ? styles.metaMuted : undefined}>
+                                {locationLabel}
+                              </span>
                             </div>
                           </div>
                           <div style={styles.sideDivider} />
                           <div style={styles.sideSection}>
-                            <div style={styles.sideTitle}>Продавач</div>
+                            <div style={styles.sideTitleSeller}>Продавач</div>
                             <div style={styles.metaRow}>
                               <User size={16} style={styles.metaIcon} />
-                              <span style={!listing.seller_name ? styles.metaMuted : undefined}>{sellerLabel}</span>
+                              <span style={!listing.seller_name ? styles.metaMuted : undefined}>
+                                {sellerLabel}
+                              </span>
                             </div>
                             <div style={styles.metaRow}>
                               <SellerTypeIcon size={16} style={styles.metaIcon} />
@@ -840,14 +1039,17 @@ const SearchPage: React.FC = () => {
                           <div style={styles.sideSection}>
                             <div style={styles.sideTitle}>Детайли</div>
                             <div style={styles.metaRow}>
-                              <Tag size={16} style={styles.metaIcon} />
-                              <span style={!categoryLabel ? styles.metaMuted : undefined}>{categoryLabel || "Не е посочено"}</span>
+                              <Clock size={16} style={styles.metaIcon} />
+                              <span>{getRelativeTime(listing.created_at, "Публикувана")}</span>
                             </div>
-                            <div style={styles.metaRow}>
-                              <CheckCircle2 size={16} style={styles.metaIcon} />
-                              <span style={!conditionLabel ? styles.metaMuted : undefined}>{conditionLabel || "Не е посочено"}</span>
-                            </div>
+                            {updatedLabel && (
+                              <div style={styles.metaRow}>
+                                <PencilLine size={16} style={styles.metaIcon} />
+                                <span>{updatedLabel}</span>
+                              </div>
+                            )}
                           </div>
+                        </div>
                         </div>
                     </div>
                   </div>
