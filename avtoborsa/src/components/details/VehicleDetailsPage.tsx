@@ -739,7 +739,13 @@ const VehicleDetailsPage: React.FC = () => {
       <div style={styles.content}>
         <div style={styles.mainContent}>
           <RezonGallery
-            images={listing.images}
+            images={
+              Array.isArray(listing.images) && listing.images.length > 0
+                ? listing.images
+                : listing.image_url
+                  ? [{ id: -1, image: listing.image_url }]
+                  : []
+            }
             title={title}
             isMobile={isMobile}
             showTopBadge={isTopListing(listing)}

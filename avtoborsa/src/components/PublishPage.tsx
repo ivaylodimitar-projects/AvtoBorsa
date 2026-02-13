@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
@@ -19,222 +19,11 @@ import AdvancedImageUpload from "./AdvancedImageUpload";
 import FormFieldWithTooltip from "./FormFieldWithTooltip";
 import ListingPreview from "./ListingPreview";
 import ListingQualityIndicator from "./ListingQualityIndicator";
+import { CAR_BRANDS, CAR_MODELS } from "../constants/carBrandModels";
 
-const BRANDS = [
-  "Audi", "BMW", "Mercedes-Benz", "Volkswagen", "Opel", "Ford", "Toyota", 
-  "Honda", "Peugeot", "Renault", "Skoda", "Hyundai", "Kia", "Nissan", 
-  "Citroen", "Fiat", "Lexus", "Mazda", "Subaru", "Jaguar", "Land Rover", 
-  "Alfa Romeo", "Porsche", "Tesla", "Mini", "Chrysler", "Mitsubishi", 
-  "Suzuki", "Volvo", "Dacia", "Chevrolet", "Buick", "Lincoln", "Ram", 
-  "Cadillac", "GMC", "Rivian", "Polestar", "Acura", "Infiniti", "Maserati", 
-  "Bentley", "Rolls Royce", "Aston Martin", "Ferrari", "Lamborghini", 
-  "AC", "AITO", "Abarth", "Aixam", "Alpina", "Aonew", "Aro", "Asia", 
-  "Avatr", "Austin", "BAIC", "BAW", "BENTU", "BYD", "Berliner", "Bertone", 
-  "Borgward", "Brilliance", "Bugatti", "Berliner", "Bertone", "Borgward", 
-  "Brilliance", "Bugatti", "Bugatti", "Buick", "Carbodies", "Changan", 
-  "Chery", "Chevrolet", "Chrysler", "Citroen", "Corvette", "Cupra", "DFSK", 
-  "DONGFENG", "DR Automobiles", "DS", "Daewoo", "Daihatsu", "Daimler", "Datsun", 
-  "Denza", "Dkw", "Dodge", "Dr", "Eagle", "Exceed", "FSO", "FangChengBau", 
-  "Fisker", "Foton", "GMC", "Gonow", "Great Wall", "Heinkel", "Hillman", 
-  "Haval", "HongQi", "Hummer", "Ineos Grenadier", "Innocenti", "Isuzu", 
-  "Iveco", "JAC", "JAS", "Jaguar", "Jeep", "Jinpeng", "Jmev", "Jpx", "KGM", 
-  "Kia", "Lada", "Laforza", "Lamborghini", "Lancia", "Land Rover", "Landwind", 
-  "Leapmotor", "Li Auto", "Lifan", "Lotus", "Lucid Air", "LynkCo", "Mahindra", 
-  "Maple", "Matra", "Maxus", "Maybach", "McLaren", "Mercury", "Mg", "Microcar", 
-  "Microlino", "Morgan", "Moskvich", "NIO", "Nissan", "Oldsmobile", "Peugeot", 
-  "Pgo", "Plymouth", "Polestar", "Polonez", "Pontiac", "Proton", "Qoros", "Renault", 
-  "Renault Samsung", "Rieju", "Rivian", "Rolls-Royce", "Rover", "SECMA", "SH auto", 
-  "SIN CARS", "SWM", "Saab", "Samand", "Santana", "Saturn", "Scion", "Seat", "Seres", 
-  "Shatenet", "Shuanghuan", "Simca", "Smart", "SsangYong", "Subaru", "Suzuki", 
-  "Talbot", "Tata", "Tatra", "Tavria", "Tazzari", "TelStar", "Tempo", "Terberg", 
-  "Today Sunshine", "Tofas", "Togg", "Trabant", "Triumph", "Uaz", "VROMOS", "VW", 
-  "VinFast", "Vmoto", "Volga", "Voyah", "Warszawa", "Wartburg", "Wey", "Wiesmann", 
-  "Xiaomi", "Xinkai", "Xinshun", "Xpeng", "Yogomo", "Zastava", "Zaz", "Zeekr", 
-   "Победа", "София", "Чайка", "Други"
-];
+const BRANDS = CAR_BRANDS;
 
-
-const MODELS = {
-  "Audi": [
-    "A1", "A3", "A3 Sportback", "A4", "A4 Avant", "A5", "A5 Sportback", "A6", "A6 Avant", 
-    "A7", "A7 Sportback", "A8", "Q3", "Q5", "Q5 Sportback", "Q7", "Q8", "RS Q8", "RS3", 
-    "RS4", "RS5", "RS7", "RS5 Sportback", "R8", "S3", "S4", "S5", "S6", "S7", "S8", 
-    "SQ5", "SQ7", "SQ8", "Q2", "e-tron", "Q4 e-tron", "e-tron GT", "R8 V10"
-  ],
-  "BMW": [
-    "114", "116", "118", "120", "123", "125", "128", "130", "135", "140", "1500", "1600", 
-    "1602", "1800", "1M", "2 Active Tourer", "2 Gran Coupe", "2 Gran Tourer", "2000", "2002", 
-    "216", "218", "220", "220 d", "225", "228", "230", "235", "240", "2800", "315", "316", 
-    "318", "320", "323", "324", "325", "328", "330", "335", "340", "3gt", "418", "420", 
-    "425", "428", "430", "435", "440", "5 Gran Turismo", "501", "518", "520", "523", "524", 
-    "525", "528", "530", "530E", "535", "540", "545", "550", "6 GT", "620", "628", "630", 
-    "633", "635", "640", "645", "650", "700", "721", "723", "725", "728", "730", "732", 
-    "733", "735", "740", "745", "750", "760", "840", "850", "Izetta", "M Coupé", "M135", 
-    "M140", "M2", "M3", "M4", "M5", "M6", "M8", "X1", "X2", "X3", "X4", "X5", "X5M", "X6", 
-    "X7", "XM", "Z1", "Z3", "Z4", "Z8", "i3", "i4", "i5", "i7", "i8", "iX", "iX1", "iX2", 
-    "iX3"
-  ],
-  "Mercedes-Benz": [
-    "A-Class", "A-Class Sedan", "B-Class", "C-Class", "C-Class Sedan", "C-Class Coupe", 
-    "C-Class Cabriolet", "C220", "C250", "C300", "C350", "C63", "E-Class", "E-Class Sedan", 
-    "E-Class Coupe", "E-Class Cabriolet", "E-Class All-Terrain", "E53 AMG", "E63 AMG", 
-    "EQS", "S-Class", "S-Class Sedan", "S-Class Coupe", "S-Class Cabriolet", "G-Class", 
-    "G-Wagon", "GLA", "GLB", "GLC", "GLC Coupe", "GLE", "GLE Coupe", "GLS", "AMG GT", 
-    "V-Class", "CLA", "CLA Coupe", "V-Class", "SLC", "A45 AMG", "C63 AMG", "G63 AMG", 
-    "A-Class Hatchback", "C-Class Estate", "C-Class Wagon"
-  ],
-  "Volkswagen": [
-    "Golf", "Golf R", "Golf GTI", "Golf Sportsvan", "Golf Estate", "Golf Variant", "Passat", 
-    "Passat Alltrack", "Tiguan", "Tiguan Allspace", "Touareg", "Polo", "Polo GTI", "Arteon", 
-    "Arteon R", "ID.3", "ID.4", "ID. Buzz", "ID.7", "Jetta", "Jetta GLI", "Touran", "T-Roc", 
-    "Passat GTE"
-  ],
-  "Opel": [
-    "Astra", "Astra GTC", "Astra Sports Tourer", "Corsa", "Corsa-e", "Corsa OPC", "Mokka", 
-    "Mokka X", "Mokka-e", "Grandland", "Grandland X", "Insignia", "Insignia Sports Tourer", 
-    "Insignia GSi", "Zafira", "Zafira Life", "Vivaro", "Combo", "Astra-e", "Crossland", 
-    "Corsa-e"
-  ],
-  "Ford": [
-    "Fiesta", "Focus", "Focus ST", "Focus RS", "Mondeo", "Kuga", "Mustang", "Explorer", 
-    "EcoSport", "Puma", "Ranger", "F-150", "F-250", "F-350", "F-450", "Expedition", 
-    "Maverick", "Transit", "F-550", "Fusion", "C-MAX", "Mustang Mach-E", "Transit Connect"
-  ],
-  "Toyota": [
-    "Corolla", "Corolla Hatchback", "Camry", "RAV4", "Hilux", "Tacoma", "Yaris", "Auris", 
-    "C-HR", "Prius", "Land Cruiser", "Land Cruiser Prado", "Sequoia", "Sienna", "4Runner", 
-    "Tundra", "Mirai", "Avalon", "Venza", "Lexus RX", "Lexus NX", "Lexus ES"
-  ],
-  "Honda": [
-    "Civic", "Civic Sedan", "Civic Coupe", "Civic Hatchback", "Civic Type R", "Accord", 
-    "CR-V", "Pilot", "HR-V", "Insight", "Odyssey", "Passport", "Ridgeline", "Fit", 
-    "Accord Hybrid", "CR-V Hybrid", "Ridgeline Black Edition", "Passport TrailSport"
-  ],
-  "Peugeot": [
-    "208", "2008", "308", "3008", "5008", "508", "Partner", "Rifter", "Expert", "Traveller", 
-    "508 GT", "3008 GT", "308 GT", "208 GT", "508 SW", "308 SW"
-  ],
-  "Renault": [
-    "Clio", "Megane", "Captur", "Kadjar", "Talisman", "Koleos", "Zoe", "Twizy", "Scenic", 
-    "Kangoo", "Clio RS", "Megane RS", "Kadjar GT Line", "Zoe Electric", "Talisman Estate"
-  ],
-  "Skoda": [
-    "Octavia", "Octavia RS", "Superb", "Superb iV", "Fabia", "Kodiaq", "Karoq", "Kamiq", 
-    "Rapid", "Scala", "Citigo", "Kodiaq RS", "Superb Sportline"
-  ],
-  "Hyundai": [
-    "i10", "i20", "i30", "i40", "Kona", "Tucson", "Santa Fe", "Palisade", "Elantra", "Sonata", 
-    "Ioniq", "Ioniq 5", "Ioniq 6", "Kona EV", "Santa Fe Hybrid", "Tucson Plug-in Hybrid", 
-    "Kona N", "Elantra N"
-  ],
-  "Kia": [
-    "Picanto", "Stonic", "Ceed", "Ceed SW", "Sportage", "Seltos", "Sorento", "Niro", "Niro EV", 
-    "Stinger", "XCeed", "Soul", "Tucson", "Niro PHEV", "Sportage PHEV"
-  ],
-  "Nissan": [
-    "Micra", "Juke", "Leaf", "Qashqai", "X-Trail", "Rogue", "Navara", "Murano", "Pathfinder", 
-    "Ariya", "370Z", "Maxima", "Versa", "Frontier", "Murano Platinum"
-  ],
-  "Citroen": [
-    "C3", "C4", "C5", "Berlingo", "C3 Aircross", "C4 Cactus", "SpaceTourer", "Grand C4 Spacetourer", 
-    "C5 Aircross"
-  ],
-  "Fiat": [
-    "500", "Panda", "Tipo", "500X", "500L", "Punto", "Freemont", "Qubo", "Panda 4x4", "500e"
-  ],
-  "Lexus": [
-    "IS", "GS", "RX", "NX", "ES", "UX", "LX", "LC", "RX 350", "RX 450h", "NX 300h", "UX 250h", "LX 570"
-  ],
-  "Mazda": [
-    "CX-3", "CX-5", "CX-9", "Mazda 2", "Mazda 3", "Mazda 6", "MX-5", "CX-50", "CX-60"
-  ],
-  "Subaru": [
-    "Impreza", "Outback", "Forester", "XV", "BRZ", "Crosstrek", "WRX", "Ascent", "Legacy"
-  ],
-  "Jaguar": [
-    "XE", "XF", "XJ", "F-Type", "I-Pace", "F-Pace", "E-Pace"
-  ],
-  "Land Rover": [
-    "Defender", "Discovery", "Range Rover", "Evoque", "Sport", "Discovery Sport", "Range Rover Sport"
-  ],
-  "Alfa Romeo": [
-    "Giulia", "Stelvio", "MiTo", "4C", "Giulietta"
-  ],
-  "Porsche": [
-    "911", "Cayenne", "Macan", "Panamera", "Taycan", "Cayman", "Boxster", "Taycan Cross Turismo"
-  ],
-  "Tesla": [
-    "Model S", "Model 3", "Model X", "Model Y", "Cybertruck", "Roadster"
-  ],
-  "Mini": [
-    "Cooper", "Countryman", "Clubman", "Convertible", "Paceman"
-  ],
-  "Chrysler": [
-    "300C", "Voyager", "Pacifica", "Saratoga"
-  ],
-  "Mitsubishi": [
-    "Outlander", "ASX", "Lancer", "Pajero", "Eclipse Cross"
-  ],
-  "Suzuki": [
-    "Swift", "Vitara", "Ignis", "S-Cross", "Baleno", "Celerio", "Jimny"
-  ],
-  "Volvo": [
-    "S60", "S90", "V60", "V90", "XC40", "XC60", "XC90"
-  ],
-  "Dacia": [
-    "Duster", "Spring", "Lodgy", "Dokker", "Sandero", "Logan"
-  ],
-  "Chevrolet": [
-    "Cruze", "Malibu", "Traverse", "Tahoe", "Silverado", "Camaro", "Equinox", "Impala"
-  ],
-  "Buick": [
-    "Enclave", "Encore", "Regal", "LaCrosse", "Verano"
-  ],
-  "Lincoln": [
-    "Navigator", "Continental", "MKZ", "Aviator", "Corsair"
-  ],
-  "Ram": [
-    "1500", "2500", "3500", "ProMaster", "Ram Rebel", "Laramie"
-  ],
-  "Cadillac": [
-    "Escalade", "XT5", "XT6", "CT4", "CT5", "CTS"
-  ],
-  "GMC": [
-    "Sierra", "Canyon", "Yukon", "Terrain"
-  ],
-  "Rivian": [
-    "R1T", "R1S"
-  ],
-  "Polestar": [
-    "Polestar 1", "Polestar 2"
-  ],
-  "Acura": [
-    "TLX", "MDX", "RDX", "ILX", "NSX"
-  ],
-  "Infiniti": [
-    "Q50", "Q60", "QX50", "QX60", "QX80"
-  ],
-  "Maserati": [
-    "Ghibli", "Levante", "Quattroporte", "GranTurismo"
-  ],
-  "Bentley": [
-    "Continental GT", "Flying Spur", "Bentayga"
-  ],
-  "Rolls Royce": [
-    "Phantom", "Cullinan", "Ghost", "Dawn", "Wraith"
-  ],
-  "Aston Martin": [
-    "Vantage", "DB11", "DBX", "Vanquish"
-  ],
-  "Ferrari": [
-    "488 GTB", "812 Superfast", "Portofino", "Roma", "F8 Tributo"
-  ],
-  "Lamborghini": [
-    "Aventador", "Huracan", "Urus", "Gallardo"
-  ]
-};
-
-
+const MODELS = CAR_MODELS;
 
 const BULGARIA_REGIONS = [
   { value: "Благоевград", label: "обл. Благоевград" },
@@ -267,6 +56,598 @@ const BULGARIA_REGIONS = [
   { value: "Ямбол", label: "обл. Ямбол" },
   { value: "Извън страната", label: "Извън страната" },
 ];
+
+type MainCategoryKey =
+  | "1"
+  | "w"
+  | "u"
+  | "3"
+  | "4"
+  | "5"
+  | "6"
+  | "7"
+  | "8"
+  | "9"
+  | "a"
+  | "b"
+  | "v"
+  | "y"
+  | "z";
+
+interface PublishFormData {
+  mainCategory: MainCategoryKey;
+  category: string;
+  title: string;
+  brand: string;
+  model: string;
+  yearFrom: string;
+  month: string;
+  vin: string;
+  locationCountry: string;
+  locationRegion: string;
+  price: string;
+  city: string;
+  fuel: string;
+  gearbox: string;
+  mileage: string;
+  color: string;
+  condition: string;
+  power: string;
+  displacement: string;
+  euroStandard: string;
+  description: string;
+  phone: string;
+  email: string;
+  pictures: File[];
+  features: string[];
+  listingType: "normal" | "top";
+  wheelFor: string;
+  wheelOfferType: string;
+  wheelBrand: string;
+  wheelMaterial: string;
+  wheelBolts: string;
+  wheelPcd: string;
+  wheelCenterBore: string;
+  wheelOffset: string;
+  wheelWidth: string;
+  wheelDiameter: string;
+  wheelCount: string;
+  wheelType: string;
+  partFor: string;
+  partCategory: string;
+  partElement: string;
+  partYearFrom: string;
+  partYearTo: string;
+  heavyAxles: string;
+  heavySeats: string;
+  heavyLoad: string;
+  transmission: string;
+  engineType: string;
+  heavyEuroStandard: string;
+  motoDisplacement: string;
+  equipmentType: string;
+  forkliftLoad: string;
+  forkliftHours: string;
+  caravanBeds: string;
+  caravanLength: string;
+  caravanHasToilet: boolean;
+  caravanHasHeating: boolean;
+  caravanHasAc: boolean;
+  boatCategory: string;
+  boatEngineCount: string;
+  boatMaterial: string;
+  boatLength: string;
+  boatWidth: string;
+  boatDraft: string;
+  boatHours: string;
+  boatFeatures: string[];
+  trailerCategory: string;
+  trailerLoad: string;
+  trailerAxles: string;
+  trailerFeatures: string[];
+  classifiedFor: string;
+  accessoryCategory: string;
+  buyServiceCategory: string;
+}
+
+const MAIN_CATEGORY_OPTIONS: Array<{ value: MainCategoryKey; label: string }> = [
+  { value: "1", label: "Автомобили и Джипове" },
+  { value: "w", label: "Гуми и джанти" },
+  { value: "u", label: "Части" },
+  { value: "3", label: "Бусове" },
+  { value: "4", label: "Камиони" },
+  { value: "5", label: "Мотоциклети" },
+  { value: "6", label: "Селскостопански" },
+  { value: "7", label: "Индустриални" },
+  { value: "8", label: "Кари" },
+  { value: "9", label: "Каравани" },
+  { value: "a", label: "Яхти и Лодки" },
+  { value: "b", label: "Ремаркета" },
+  { value: "v", label: "Аксесоари" },
+  { value: "y", label: "Купува" },
+  { value: "z", label: "Услуги" },
+];
+
+const CLASSIFIED_FOR_OPTIONS = [
+  { value: "1", label: "Автомобили и Джипове" },
+  { value: "3", label: "Бусове" },
+  { value: "4", label: "Камиони" },
+  { value: "5", label: "Мотоциклети" },
+  { value: "6", label: "Селскостопански" },
+  { value: "7", label: "Индустриални" },
+  { value: "8", label: "Кари" },
+  { value: "9", label: "Каравани" },
+  { value: "10", label: "Яхти и Лодки" },
+  { value: "11", label: "Ремаркета" },
+  { value: "12", label: "Велосипеди" },
+];
+
+const CONDITION_OPTIONS = [
+  { value: "0", label: "Нов" },
+  { value: "1", label: "Употребяван" },
+  { value: "2", label: "Повреден/ударен" },
+  { value: "3", label: "За части" },
+];
+
+const CAR_FUEL_OPTIONS = [
+  { value: "benzin", label: "Бензин" },
+  { value: "dizel", label: "Дизел" },
+  { value: "gaz_benzin", label: "Газ/Бензин" },
+  { value: "hibrid", label: "Хибрид" },
+  { value: "elektro", label: "Електро" },
+];
+
+const CAR_GEARBOX_OPTIONS = [
+  { value: "ruchna", label: "Ръчна" },
+  { value: "avtomatik", label: "Автоматик" },
+];
+
+const ENGINE_TYPE_OPTIONS = [
+  "Без двигател",
+  "Бензинов",
+  "Дизелов",
+  "Електрически",
+  "Хибриден",
+  "Plug-in хибрид",
+  "Газ",
+  "Водород",
+];
+
+const TRANSMISSION_OPTIONS = ["Ръчна", "Автоматична", "Полуавтоматична"];
+
+const HEAVY_EURO_STANDARD_OPTIONS = [
+  "Евро 1",
+  "Евро 2",
+  "Евро 3",
+  "Евро 4",
+  "Евро 5",
+  "Евро 6",
+];
+
+const COLOR_OPTIONS = [
+  "Бял",
+  "Черен",
+  "Сив",
+  "Сребърен",
+  "Син",
+  "Червен",
+  "Зелен",
+  "Жълт",
+  "Оранжев",
+  "Кафяв",
+  "Бежов",
+  "Златист",
+  "Виолетов",
+  "Бордо",
+];
+
+const WHEEL_OFFER_TYPE_OPTIONS = ["Гуми", "Джанти", "Гуми с джанти"];
+const WHEEL_MATERIAL_OPTIONS = ["алуминиеви", "магнезиеви", "железни", "други"];
+const WHEEL_BOLT_OPTIONS = ["3", "4", "5", "6", "8", "9", "10", "12"];
+const WHEEL_TYPE_OPTIONS = ["Неразглобяеми", "Разглобяеми"];
+const WHEEL_BRAND_OPTIONS = [
+  "OEM",
+  "AEZ",
+  "Alutec",
+  "ATS",
+  "BBS",
+  "Borbet",
+  "Dezent",
+  "Dotz",
+  "Enkei",
+  "Fondmetal",
+  "MAK",
+  "Momo",
+  "MSW",
+  "OZ",
+  "Rial",
+  "Ronal",
+  "Rota",
+  "TSW",
+  "Други",
+];
+const WHEEL_PCD_OPTIONS = [
+  "3x98",
+  "4x98",
+  "4x100",
+  "4x108",
+  "5x100",
+  "5x108",
+  "5x110",
+  "5x112",
+  "5x114.3",
+  "5x120",
+  "5x127",
+  "6x139.7",
+];
+const WHEEL_CENTER_BORE_OPTIONS = [
+  "56.1",
+  "57.1",
+  "60.1",
+  "63.4",
+  "64.1",
+  "65.1",
+  "66.1",
+  "66.6",
+  "67.1",
+  "70.1",
+  "71.6",
+  "72.6",
+  "73.1",
+  "74.1",
+];
+const WHEEL_OFFSET_OPTIONS = [
+  "-30-20",
+  "-20-10",
+  "-10-0",
+  "0-10",
+  "10-20",
+  "20-30",
+  "30-40",
+  "40-50",
+  "50-60",
+  "60-70",
+  "70-80",
+  "80-90",
+  "90-100",
+];
+const WHEEL_WIDTH_OPTIONS = [
+  "3.5",
+  "4.0",
+  "4.5",
+  "5.0",
+  "5.5",
+  "6.0",
+  "6.5",
+  "7.0",
+  "7.5",
+  "8.0",
+  "8.5",
+  "9.0",
+  "9.5",
+  "10.0",
+  "10.5",
+  "11.0",
+  "11.5",
+  "12.0",
+  "13.0",
+  "14.0",
+];
+const WHEEL_DIAMETER_OPTIONS = [
+  "10",
+  "11",
+  "12",
+  "13",
+  "14",
+  "15",
+  "15.5",
+  "16",
+  "16.5",
+  "17",
+  "17.5",
+  "18",
+  "19",
+  "19.5",
+  "20",
+  "21",
+  "22",
+  "22.5",
+  "23",
+  "24",
+  "26",
+  "28",
+];
+const WHEEL_COUNT_OPTIONS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
+
+const PART_CATEGORY_OPTIONS = [
+  "Ауспуси, Гърнета",
+  "Газови и метанови уредби",
+  "Горивна система",
+  "Двигател",
+  "Електрическа система",
+  "Запалителна система",
+  "Интериор и аксесоари",
+  "Климатична система",
+  "Консумативи",
+  "Кормилна система",
+  "Окачване",
+  "Охладителна система",
+  "Рама и Каросерия",
+  "Ремъци, Ролки, Вериги",
+  "Светлини",
+  "Спирачна система",
+  "Трансмисия",
+  "Филтри",
+  "Ходова част",
+];
+
+const PART_ELEMENT_OPTIONS = [
+  "Двигател",
+  "Скоростна кутия",
+  "Турбо",
+  "Стартер",
+  "Алтернатор",
+  "Инжектори",
+  "Дюзи",
+  "Окачване",
+  "Амортисьори",
+  "Спирачни апарати",
+  "Фарове",
+  "Стопове",
+  "Броня",
+  "Калник",
+  "Врата",
+  "Седалки",
+  "Табло",
+  "Огледало",
+  "Радиатор",
+  "Други",
+];
+
+const ACCESSORY_CATEGORY_OPTIONS = [
+  "CD, DVD",
+  "LED крушки и светлини",
+  "Xenon",
+  "Авто крушки",
+  "Акумулатори",
+  "Аларми и централно заключване",
+  "Вериги за сняг",
+  "Видеорегистратори",
+  "Инструменти",
+  "Интериорни аксесоари",
+  "Навигация",
+  "Парктроници",
+  "Седалки - обикновени, спортни",
+  "Спойлери, брони и аксесоари към тях",
+  "Стелки",
+  "Тасове",
+  "Тонколони",
+  "Усилватели",
+  "Фолио",
+  "Чистачки",
+  "Други",
+];
+
+const BUY_CATEGORY_OPTIONS = [
+  "Автомобил",
+  "АВТОЧАСТИ",
+  "Бус",
+  "Джанти",
+  "Джип",
+  "Други",
+  "Едрогабаритни каросерийни части",
+  "За двигатели",
+  "За електрическа система",
+  "Инструменти",
+  "Камион",
+  "Осветление",
+  "РАЗНИ",
+  "Седалки - обикновени, спортни",
+  "Трактор",
+  "Щори",
+];
+
+const SERVICE_CATEGORY_OPTIONS = [
+  "Rent a car",
+  "Taxi",
+  "Автоаларми",
+  "Автоклиматици",
+  "Автоключарски",
+  "Автомивки",
+  "Автопарк",
+  "Автотапицерски",
+  "Автотенекеджийски и автобояджийски",
+  "Административни",
+  "Вулканизатор, баланс на гуми",
+  "Застраховки",
+  "Изкупуване на коли за скраб",
+  "Лизинг",
+  "Мобилна смяна на гуми/джанти",
+  "Пастиране",
+  "Полиране",
+  "Пътна помощ",
+  "Ремонт на двигатели",
+  "Ремонт на ел. инсталации",
+  "Ремонт на изпускателна система",
+  "Ремонт на ходова част",
+  "Сервизни услуги",
+  "Товарни превози",
+  "Тунинг",
+  "Шофьорски курсове",
+];
+
+const EQUIPMENT_TYPE_OPTIONS = [
+  "Трактор",
+  "Комбайн",
+  "Пръскачка",
+  "Сеялка",
+  "Косачка",
+  "Багер",
+  "Булдозер",
+  "Валяк",
+  "Грейдер",
+  "Телехендлер",
+  "Кран",
+  "Друго",
+];
+
+const BOAT_CATEGORY_OPTIONS = [
+  "Яхта",
+  "Лодка",
+  "Катер",
+  "Джет",
+  "Надуваема лодка",
+  "Рибарска лодка",
+  "Понтон",
+  "Други",
+];
+
+const BOAT_MATERIAL_OPTIONS = [
+  "Алуминий",
+  "Желязо",
+  "Пластмаса",
+  "Дърво",
+  "Бетон",
+  "Кевлар",
+  "PVC",
+  "Hypalon",
+  "Стъклопласт",
+];
+
+const TRAILER_CATEGORY_OPTIONS = ["За автомобил", "За камион", "За трактор", "Полуремарке"];
+
+const buildNumericOptions = (
+  from: number,
+  to: number,
+  step = 1,
+  fractionDigits = 0
+): string[] => {
+  const options: string[] = [];
+  for (let value = from; value <= to + Number.EPSILON; value += step) {
+    options.push(value.toFixed(fractionDigits));
+  }
+  return options;
+};
+
+const HEAVY_AXLE_OPTIONS = buildNumericOptions(1, 8);
+const HEAVY_SEAT_OPTIONS = buildNumericOptions(1, 80);
+const HEAVY_LOAD_OPTIONS = buildNumericOptions(500, 50000, 500);
+const FORKLIFT_LOAD_OPTIONS = buildNumericOptions(500, 10000, 250);
+const FORKLIFT_HOUR_OPTIONS = buildNumericOptions(0, 50000, 500);
+const CARAVAN_BED_OPTIONS = buildNumericOptions(1, 10);
+const CARAVAN_LENGTH_OPTIONS = buildNumericOptions(3, 12, 0.5, 1);
+const BOAT_ENGINE_COUNT_OPTIONS = buildNumericOptions(1, 4);
+const BOAT_LENGTH_OPTIONS = buildNumericOptions(2, 20, 0.5, 1);
+const BOAT_WIDTH_OPTIONS = buildNumericOptions(1, 6, 0.5, 1);
+const BOAT_DRAFT_OPTIONS = buildNumericOptions(0.2, 4, 0.2, 1);
+const BOAT_HOUR_OPTIONS = buildNumericOptions(0, 20000, 500);
+const TRAILER_LOAD_OPTIONS = buildNumericOptions(500, 50000, 500);
+const TRAILER_AXLE_OPTIONS = buildNumericOptions(1, 8);
+
+const CAR_CATEGORY_OPTIONS = [
+  { value: "van", label: "Ван" },
+  { value: "jeep", label: "Джип" },
+  { value: "cabriolet", label: "Кабрио" },
+  { value: "wagon", label: "Комби" },
+  { value: "coupe", label: "Купе" },
+  { value: "minivan", label: "Миниван" },
+  { value: "pickup", label: "Пикап" },
+  { value: "sedan", label: "Седан" },
+  { value: "stretch_limo", label: "Стреч лимузина" },
+  { value: "hatchback", label: "Хечбек" },
+];
+
+const CATEGORIES_WITHOUT_BRAND_AND_MODEL = new Set<MainCategoryKey>(["w", "u", "v", "y", "z"]);
+const CATEGORIES_WITHOUT_PRICE = new Set<MainCategoryKey>(["y", "z"]);
+
+const requiresBrandAndModel = (mainCategory: MainCategoryKey) =>
+  !CATEGORIES_WITHOUT_BRAND_AND_MODEL.has(mainCategory);
+
+const requiresPrice = (mainCategory: MainCategoryKey) => !CATEGORIES_WITHOUT_PRICE.has(mainCategory);
+
+const supportsCarFeatures = (mainCategory: MainCategoryKey) => mainCategory === "1";
+
+const getMainCategoryLabel = (mainCategory: MainCategoryKey) =>
+  MAIN_CATEGORY_OPTIONS.find((option) => option.value === mainCategory)?.label || "Обява";
+
+const getBuyServiceCategoryOptions = (mainCategory: MainCategoryKey) =>
+  mainCategory === "y" ? BUY_CATEGORY_OPTIONS : SERVICE_CATEGORY_OPTIONS;
+
+const createInitialFormData = (): PublishFormData => ({
+  mainCategory: "1",
+  category: "",
+  title: "",
+  brand: "",
+  model: "",
+  yearFrom: "",
+  month: "",
+  vin: "",
+  locationCountry: "",
+  locationRegion: "",
+  price: "",
+  city: "",
+  fuel: "",
+  gearbox: "",
+  mileage: "",
+  color: "",
+  condition: "0",
+  power: "",
+  displacement: "",
+  euroStandard: "",
+  description: "",
+  phone: "",
+  email: "",
+  pictures: [],
+  features: [],
+  listingType: "normal",
+  wheelFor: "",
+  wheelOfferType: "",
+  wheelBrand: "",
+  wheelMaterial: "",
+  wheelBolts: "",
+  wheelPcd: "",
+  wheelCenterBore: "",
+  wheelOffset: "",
+  wheelWidth: "",
+  wheelDiameter: "",
+  wheelCount: "",
+  wheelType: "",
+  partFor: "",
+  partCategory: "",
+  partElement: "",
+  partYearFrom: "",
+  partYearTo: "",
+  heavyAxles: "",
+  heavySeats: "",
+  heavyLoad: "",
+  transmission: "",
+  engineType: "",
+  heavyEuroStandard: "",
+  motoDisplacement: "",
+  equipmentType: "",
+  forkliftLoad: "",
+  forkliftHours: "",
+  caravanBeds: "",
+  caravanLength: "",
+  caravanHasToilet: false,
+  caravanHasHeating: false,
+  caravanHasAc: false,
+  boatCategory: "",
+  boatEngineCount: "",
+  boatMaterial: "",
+  boatLength: "",
+  boatWidth: "",
+  boatDraft: "",
+  boatHours: "",
+  boatFeatures: [],
+  trailerCategory: "",
+  trailerLoad: "",
+  trailerAxles: "",
+  trailerFeatures: [],
+  classifiedFor: "",
+  accessoryCategory: "",
+  buyServiceCategory: "",
+});
 
 interface ImageItem {
   file: File;
@@ -326,43 +707,112 @@ const PublishPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  const [formData, setFormData] = useState({
-    mainCategory: "1",
-    category: "",
-    title: "",
-    brand: "",
-    model: "",
-    yearFrom: "",
-    month: "",
-    vin: "",
-    locationCountry: "",
-    locationRegion: "",
-    price: "",
-    city: "",
-    fuel: "",
-    gearbox: "",
-    mileage: "",
-    color: "",
-    condition: "0",
-    power: "",
-    displacement: "",
-    euroStandard: "",
-    description: "",
-    phone: "",
-    email: "",
-    pictures: [] as File[],
-    features: [] as string[],
-    listingType: "normal",
-  });
+  const [formData, setFormData] = useState<PublishFormData>(createInitialFormData());
+
+  useEffect(() => {
+    if (!user?.email) return;
+    setFormData((prev) =>
+      prev.email === user.email
+        ? prev
+        : {
+            ...prev,
+            email: user.email,
+          }
+    );
+  }, [user?.email]);
 
   const initialFormSnapshotRef = useRef<string | null>(null);
   const [images, setImages] = useState<ImageItem[]>([]);
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 8;
   const formRef = useRef<HTMLFormElement>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingListingId, setEditingListingId] = useState<number | null>(null);
   const [existingCoverImage, setExistingCoverImage] = useState<string | null>(null);
+
+  type PublishStepKey =
+    | "basic"
+    | "details"
+    | "pricing"
+    | "images"
+    | "features"
+    | "description"
+    | "contact"
+    | "listingType";
+
+  type StepRequirement = {
+    key: keyof PublishFormData;
+    label: string;
+    when?: (data: PublishFormData) => boolean;
+  };
+
+  const publishSteps: Array<{
+    key: PublishStepKey;
+    label: string;
+    icon: React.ReactNode;
+    description: string;
+  }> = [
+    {
+      key: "basic",
+      label: "Основна информация",
+      icon: <ClipboardList size={16} />,
+      description: "Категория и основни данни",
+    },
+    {
+      key: "details",
+      label: "Детайли",
+      icon: <Settings2 size={16} />,
+      description: "Параметри по категория",
+    },
+    {
+      key: "pricing",
+      label: "Цена и локация",
+      icon: <Wallet size={16} />,
+      description: "Цена и местоположение",
+    },
+    {
+      key: "images",
+      label: "Снимки",
+      icon: <Image size={16} />,
+      description: "Качи снимки",
+    },
+    ...(supportsCarFeatures(formData.mainCategory)
+      ? [
+          {
+            key: "features" as const,
+            label: "Екстри",
+            icon: <Sparkles size={16} />,
+            description: "Опции и екстри",
+          },
+        ]
+      : []),
+    {
+      key: "description",
+      label: "Описание",
+      icon: <FileText size={16} />,
+      description: "Описание",
+    },
+    {
+      key: "contact",
+      label: "Контакт",
+      icon: <Phone size={16} />,
+      description: "Телефон",
+    },
+    {
+      key: "listingType",
+      label: "Тип обява",
+      icon: <Sparkles size={16} />,
+      description: "Топ или нормална",
+    },
+  ];
+
+  const totalSteps = publishSteps.length;
+  const currentStepKey = publishSteps[currentStep - 1]?.key ?? "basic";
+
+  useEffect(() => {
+    if (currentStep > totalSteps) {
+      setCurrentStep(totalSteps);
+    }
+  }, [currentStep, totalSteps]);
 
   // Car features/extras grouped by category
   const FEATURE_CATEGORIES = [
@@ -482,71 +932,184 @@ const PublishPage: React.FC = () => {
     },
   ];
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+  const updateFormField = <K extends keyof PublishFormData>(key: K, value: PublishFormData[K]) => {
+    setFormData((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const resetForMainCategory = (
+    mainCategory: MainCategoryKey,
+    previous: PublishFormData
+  ): PublishFormData => {
+    const next = createInitialFormData();
+    return {
+      ...next,
+      mainCategory,
+      description: previous.description,
+      phone: previous.phone,
+      email: previous.email,
+      locationCountry: previous.locationCountry,
+      locationRegion: previous.locationRegion,
+      city: previous.city,
+      listingType: previous.listingType,
+    };
+  };
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
+    const { name } = e.target;
+    const key = name as keyof PublishFormData;
+
+    if (key === "mainCategory") {
+      const selectedMainCategory = (e.target as HTMLSelectElement).value as MainCategoryKey;
+      setFormData((prev) => resetForMainCategory(selectedMainCategory, prev));
+      setCurrentStep(1);
+      setErrors({});
+      return;
+    }
+
+    const inputElement = e.target as HTMLInputElement;
+    const nextValue =
+      inputElement.type === "checkbox" ? inputElement.checked : (e.target as HTMLInputElement).value;
+    updateFormField(key, nextValue as PublishFormData[typeof key]);
   };
 
   const handleListingTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+    const value = e.target.value as PublishFormData["listingType"];
     if (value === "top" && formData.listingType !== "top") {
       setShowTopConfirm(true);
       return;
     }
-    setFormData((prev) => ({ ...prev, listingType: value }));
+    updateFormField("listingType", value);
   };
 
-  const REQUIRED_FIELDS_BY_STEP: Record<
-    number,
-    Array<{
-      key: keyof typeof formData;
-      label: string;
-      when?: (data: typeof formData) => boolean;
-    }>
-  > = {
-    1: [
-      { key: "brand", label: "Марка" },
-      { key: "model", label: "Модел" },
-      { key: "yearFrom", label: "Година" },
-    ],
-    2: [
-      { key: "fuel", label: "Гориво" },
-      { key: "gearbox", label: "Скоростна кутия" },
-      { key: "mileage", label: "Пробег" },
-    ],
-    3: [
-      { key: "price", label: "Цена" },
+  const getRequiredFieldsByStep = (
+    mainCategory: MainCategoryKey
+  ): Record<PublishStepKey, StepRequirement[]> => {
+    const pricingRequirements: StepRequirement[] = [
       { key: "locationCountry", label: "Регион" },
       {
         key: "city",
         label: "Град",
         when: (data) => !!data.locationCountry && data.locationCountry !== "Извън страната",
       },
-    ],
-    6: [{ key: "description", label: "Описание" }],
-    7: [
-      { key: "phone", label: "Телефон" },
-      { key: "email", label: "Имейл" },
-    ],
+    ];
+
+    if (requiresPrice(mainCategory)) {
+      pricingRequirements.unshift({ key: "price", label: "Цена" });
+    }
+
+    const requirements: Record<PublishStepKey, StepRequirement[]> = {
+      basic: [{ key: "mainCategory", label: "Основна категория" }],
+      details: [],
+      pricing: pricingRequirements,
+      images: [],
+      features: [],
+      description: [{ key: "description", label: "Описание" }],
+      contact: [
+        { key: "phone", label: "Телефон" },
+        { key: "email", label: "Имейл" },
+      ],
+      listingType: [],
+    };
+
+    if (requiresBrandAndModel(mainCategory)) {
+      requirements.basic.push(
+        { key: "brand", label: "Марка" },
+        { key: "model", label: "Модел" },
+        { key: "yearFrom", label: "Година" }
+      );
+    }
+
+    if (mainCategory === "w") {
+      requirements.basic.push(
+        { key: "wheelFor", label: "Гуми/джанти за" },
+        { key: "wheelOfferType", label: "Тип оферта" }
+      );
+    }
+
+    if (mainCategory === "u") {
+      requirements.basic.push(
+        { key: "partFor", label: "Части за" },
+        { key: "partCategory", label: "Категория на частта" }
+      );
+    }
+
+    if (mainCategory === "v") {
+      requirements.basic.push(
+        { key: "classifiedFor", label: "Аксесоари за" },
+        { key: "accessoryCategory", label: "Категория" }
+      );
+    }
+
+    if (mainCategory === "y" || mainCategory === "z") {
+      requirements.basic.push(
+        {
+          key: "classifiedFor",
+          label: mainCategory === "y" ? "Купува за" : "Услуга за",
+        },
+        { key: "buyServiceCategory", label: "Категория" }
+      );
+    }
+
+    if (mainCategory === "1") {
+      requirements.details.push(
+        { key: "fuel", label: "Гориво" },
+        { key: "gearbox", label: "Скоростна кутия" },
+        { key: "mileage", label: "Пробег" }
+      );
+    }
+
+    if (mainCategory === "3" || mainCategory === "4") {
+      requirements.details.push({ key: "engineType", label: "Вид двигател" });
+    }
+
+    if (mainCategory === "5") {
+      requirements.details.push({ key: "motoDisplacement", label: "Кубатура" });
+    }
+
+    if (mainCategory === "6" || mainCategory === "7") {
+      requirements.details.push({ key: "equipmentType", label: "Вид техника" });
+    }
+
+    if (mainCategory === "8") {
+      requirements.details.push({ key: "engineType", label: "Вид двигател" });
+    }
+
+    if (mainCategory === "9") {
+      requirements.details.push({ key: "caravanBeds", label: "Брой спални места" });
+    }
+
+    if (mainCategory === "a") {
+      requirements.details.push({ key: "boatCategory", label: "Категория" });
+    }
+
+    if (mainCategory === "b") {
+      requirements.details.push({ key: "trailerCategory", label: "Категория" });
+    }
+
+    return requirements;
   };
 
-  const getMissingFields = (step: number, data: typeof formData) => {
-    const fields = REQUIRED_FIELDS_BY_STEP[step] ?? [];
+  const isFieldMissing = (value: unknown) => {
+    if (Array.isArray(value)) return value.length === 0;
+    if (typeof value === "boolean") return false;
+    return String(value ?? "").trim().length === 0;
+  };
+
+  const getMissingFields = (step: number, data: PublishFormData) => {
+    const stepKey = publishSteps[step - 1]?.key;
+    if (!stepKey) return [];
+    const requiredByStep = getRequiredFieldsByStep(data.mainCategory);
+    const fields = requiredByStep[stepKey] ?? [];
     return fields
       .filter((field) => (field.when ? field.when(data) : true))
-      .filter((field) => {
-        const value = data[field.key];
-        if (Array.isArray(value)) return value.length === 0;
-        return String(value ?? "").trim().length === 0;
-      })
+      .filter((field) => isFieldMissing(data[field.key]))
       .map((field) => field.label);
   };
 
-  const getFirstInvalidStep = (data: typeof formData) => {
-    const steps = Object.keys(REQUIRED_FIELDS_BY_STEP)
-      .map((step) => Number(step))
-      .sort((a, b) => a - b);
-    for (const step of steps) {
+  const getFirstInvalidStep = (data: PublishFormData) => {
+    for (let step = 1; step <= totalSteps; step += 1) {
       const missing = getMissingFields(step, data);
       if (missing.length > 0) {
         return { step, missing };
@@ -567,7 +1130,7 @@ const PublishPage: React.FC = () => {
     setShowTopConfirm(false);
   };
 
-  const normalizeFeatures = (raw: any): string[] => {
+  const normalizeFeatures = (raw: unknown): string[] => {
     if (Array.isArray(raw)) return raw.filter(Boolean);
     if (typeof raw === "string") {
       try {
@@ -580,63 +1143,172 @@ const PublishPage: React.FC = () => {
     return [];
   };
 
-  const normalizeFormSnapshot = (data: typeof formData) =>
-    JSON.stringify({
-      mainCategory: data.mainCategory ?? "",
-      category: data.category ?? "",
-      title: data.title ?? "",
-      brand: data.brand ?? "",
-      model: data.model ?? "",
-      yearFrom: data.yearFrom ?? "",
-      month: data.month ?? "",
-      vin: data.vin ?? "",
-      locationCountry: data.locationCountry ?? "",
-      locationRegion: data.locationRegion ?? "",
-      price: data.price ?? "",
-      city: data.city ?? "",
-      fuel: data.fuel ?? "",
-      gearbox: data.gearbox ?? "",
-      mileage: data.mileage ?? "",
-      color: data.color ?? "",
-      condition: data.condition ?? "",
-      power: data.power ?? "",
-      displacement: data.displacement ?? "",
-      euroStandard: data.euroStandard ?? "",
-      description: data.description ?? "",
-      phone: data.phone ?? "",
-      email: data.email ?? "",
+  const toStringOrEmpty = (value: unknown): string => {
+    if (value === null || value === undefined) return "";
+    return String(value);
+  };
+
+  const toBoolean = (value: unknown): boolean => {
+    if (value === true || value === "true" || value === "1" || value === 1) return true;
+    return false;
+  };
+
+  const normalizeCarEuroStandard = (value: string): string => {
+    const normalized = value.trim();
+    if (!normalized) return "";
+    if (["1", "2", "3", "4", "5", "6"].includes(normalized)) return normalized;
+    const idx = HEAVY_EURO_STANDARD_OPTIONS.indexOf(normalized);
+    return idx >= 0 ? String(idx + 1) : normalized;
+  };
+
+  const getValidAccessToken = async (): Promise<string | null> => {
+    const ACCESS_TOKEN_KEY = "authToken";
+    const REFRESH_TOKEN_KEY = "refreshToken";
+    const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+    if (!accessToken) return null;
+
+    try {
+      const probeResponse = await fetch("http://localhost:8000/api/auth/me/", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (probeResponse.ok) {
+        return accessToken;
+      }
+
+      if (probeResponse.status !== 401 && probeResponse.status !== 403) {
+        return accessToken;
+      }
+
+      const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+      if (!refreshToken) {
+        localStorage.removeItem(ACCESS_TOKEN_KEY);
+        return null;
+      }
+
+      const refreshResponse = await fetch("http://localhost:8000/api/auth/token/refresh/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ refresh: refreshToken }),
+      });
+
+      if (!refreshResponse.ok) {
+        localStorage.removeItem(ACCESS_TOKEN_KEY);
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
+        return null;
+      }
+
+      const refreshData = await refreshResponse.json();
+      const nextAccessToken = typeof refreshData?.access === "string" ? refreshData.access : "";
+      if (!nextAccessToken) {
+        localStorage.removeItem(ACCESS_TOKEN_KEY);
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
+        return null;
+      }
+
+      localStorage.setItem(ACCESS_TOKEN_KEY, nextAccessToken);
+      return nextAccessToken;
+    } catch {
+      return accessToken;
+    }
+  };
+
+  const normalizeMainCategory = (value: unknown): MainCategoryKey => {
+    const rawValue = String(value ?? "1");
+    const exists = MAIN_CATEGORY_OPTIONS.some((option) => option.value === rawValue);
+    return exists ? (rawValue as MainCategoryKey) : "1";
+  };
+
+  const normalizeFormSnapshot = (data: PublishFormData) => {
+    const { pictures: _pictures, ...rest } = data;
+    return JSON.stringify({
+      ...rest,
       features: [...data.features].sort(),
-      listingType: data.listingType ?? "normal",
+      boatFeatures: [...data.boatFeatures].sort(),
+      trailerFeatures: [...data.trailerFeatures].sort(),
     });
+  };
 
   const applyListingToForm = (data: any) => {
-    const nextFormData = {
-      mainCategory: data.main_category ?? data.mainCategory ?? "1",
-      category: data.category ?? "",
-      title: data.title ?? "",
-      brand: data.brand ?? "",
-      model: data.model ?? "",
-      yearFrom: data.year_from ? String(data.year_from) : data.yearFrom ?? "",
-      month: data.month ? String(data.month) : data.month ?? "",
-      vin: data.vin ?? "",
-      locationCountry: data.location_country ?? data.locationCountry ?? "",
-      locationRegion: data.location_region ?? data.locationRegion ?? "",
-      price: data.price != null && data.price !== "" ? String(data.price) : "",
-      city: data.city ?? "",
-      fuel: data.fuel ?? "",
-      gearbox: data.gearbox ?? "",
-      mileage: data.mileage != null && data.mileage !== "" ? String(data.mileage) : "",
-      color: data.color ?? "",
-      condition: data.condition ?? "0",
-      power: data.power != null && data.power !== "" ? String(data.power) : "",
-      displacement: data.displacement != null && data.displacement !== "" ? String(data.displacement) : "",
-      euroStandard: data.euro_standard ?? data.euroStandard ?? "",
-      description: data.description ?? "",
-      phone: data.phone ?? "",
-      email: data.email ?? "",
+    const nextFormData: PublishFormData = {
+      ...createInitialFormData(),
+      mainCategory: normalizeMainCategory(data.main_category ?? data.mainCategory ?? "1"),
+      category: toStringOrEmpty(data.category),
+      title: toStringOrEmpty(data.title),
+      brand: toStringOrEmpty(data.brand),
+      model: toStringOrEmpty(data.model),
+      yearFrom: toStringOrEmpty(data.year_from ?? data.yearFrom),
+      month: toStringOrEmpty(data.month),
+      vin: toStringOrEmpty(data.vin),
+      locationCountry: toStringOrEmpty(data.location_country ?? data.locationCountry),
+      locationRegion: toStringOrEmpty(data.location_region ?? data.locationRegion),
+      price: toStringOrEmpty(data.price),
+      city: toStringOrEmpty(data.city),
+      fuel: toStringOrEmpty(data.fuel),
+      gearbox: toStringOrEmpty(data.gearbox),
+      mileage: toStringOrEmpty(data.mileage),
+      color: toStringOrEmpty(data.color),
+      condition: toStringOrEmpty(data.condition || "0"),
+      power: toStringOrEmpty(data.power),
+      displacement: toStringOrEmpty(data.displacement),
+      euroStandard: normalizeCarEuroStandard(toStringOrEmpty(data.euro_standard ?? data.euroStandard)),
+      description: toStringOrEmpty(data.description),
+      phone: toStringOrEmpty(data.phone),
+      email: user?.email || toStringOrEmpty(data.email),
       pictures: [],
       features: normalizeFeatures(data.features),
-      listingType: data.listing_type ?? data.listingType ?? "normal",
+      listingType: data.listing_type === "top" || data.listingType === "top" ? "top" : "normal",
+      wheelFor: toStringOrEmpty(data.wheel_for ?? data.wheelFor),
+      wheelOfferType: toStringOrEmpty(data.offer_type ?? data.wheelOfferType),
+      wheelBrand: toStringOrEmpty(data.wheel_brand ?? data.wheelBrand),
+      wheelMaterial: toStringOrEmpty(data.material ?? data.wheelMaterial),
+      wheelBolts: toStringOrEmpty(data.bolts ?? data.wheelBolts),
+      wheelPcd: toStringOrEmpty(data.pcd ?? data.wheelPcd),
+      wheelCenterBore: toStringOrEmpty(data.center_bore ?? data.wheelCenterBore),
+      wheelOffset: toStringOrEmpty(data.offset ?? data.wheelOffset),
+      wheelWidth: toStringOrEmpty(data.width ?? data.wheelWidth),
+      wheelDiameter: toStringOrEmpty(data.diameter ?? data.wheelDiameter),
+      wheelCount: toStringOrEmpty(data.count ?? data.wheelCount),
+      wheelType: toStringOrEmpty(data.wheel_type ?? data.wheelType),
+      partFor: toStringOrEmpty(data.part_for ?? data.partFor),
+      partCategory: toStringOrEmpty(data.part_category ?? data.partCategory),
+      partElement: toStringOrEmpty(data.part_element ?? data.partElement),
+      partYearFrom: toStringOrEmpty(data.part_year_from ?? data.partYearFrom),
+      partYearTo: toStringOrEmpty(data.part_year_to ?? data.partYearTo),
+      heavyAxles: toStringOrEmpty(data.axles ?? data.heavyAxles),
+      heavySeats: toStringOrEmpty(data.seats ?? data.heavySeats),
+      heavyLoad: toStringOrEmpty(data.load_kg ?? data.heavyLoad),
+      transmission: toStringOrEmpty(data.transmission),
+      engineType: toStringOrEmpty(data.engine_type ?? data.engineType),
+      heavyEuroStandard: toStringOrEmpty(data.heavy_euro_standard ?? data.heavyEuroStandard),
+      motoDisplacement: toStringOrEmpty(data.displacement_cc ?? data.motoDisplacement),
+      equipmentType: toStringOrEmpty(data.equipment_type ?? data.equipmentType),
+      forkliftLoad: toStringOrEmpty(data.lift_capacity_kg ?? data.forkliftLoad),
+      forkliftHours: toStringOrEmpty(data.hours ?? data.forkliftHours),
+      caravanBeds: toStringOrEmpty(data.beds ?? data.caravanBeds),
+      caravanLength: toStringOrEmpty(data.length_m ?? data.caravanLength),
+      caravanHasToilet: toBoolean(data.has_toilet ?? data.caravanHasToilet),
+      caravanHasHeating: toBoolean(data.has_heating ?? data.caravanHasHeating),
+      caravanHasAc: toBoolean(data.has_air_conditioning ?? data.caravanHasAc),
+      boatCategory: toStringOrEmpty(data.boat_category ?? data.boatCategory),
+      boatEngineCount: toStringOrEmpty(data.engine_count ?? data.boatEngineCount),
+      boatMaterial: toStringOrEmpty(data.boat_material ?? data.boatMaterial ?? data.material),
+      boatLength: toStringOrEmpty(data.boat_length ?? data.boatLength ?? data.length_m),
+      boatWidth: toStringOrEmpty(data.width_m ?? data.boatWidth),
+      boatDraft: toStringOrEmpty(data.draft_m ?? data.boatDraft),
+      boatHours: toStringOrEmpty(data.boat_hours ?? data.boatHours ?? data.hours),
+      boatFeatures: normalizeFeatures(data.boat_features ?? data.boatFeatures),
+      trailerCategory: toStringOrEmpty(data.trailer_category ?? data.trailerCategory),
+      trailerLoad: toStringOrEmpty(data.trailer_load ?? data.trailerLoad ?? data.load_kg),
+      trailerAxles: toStringOrEmpty(data.trailer_axles ?? data.trailerAxles ?? data.axles),
+      trailerFeatures: normalizeFeatures(data.trailer_features ?? data.trailerFeatures),
+      classifiedFor: toStringOrEmpty(data.classified_for ?? data.classifiedFor),
+      accessoryCategory: toStringOrEmpty(data.accessory_category ?? data.accessoryCategory),
+      buyServiceCategory: toStringOrEmpty(data.buy_service_category ?? data.buyServiceCategory),
     };
 
     setFormData(nextFormData);
@@ -649,22 +1321,30 @@ const PublishPage: React.FC = () => {
   };
 
   const calculateCompletion = (): number => {
-    const fields = [
-      formData.brand,
-      formData.model,
-      formData.yearFrom,
-      formData.price,
-      formData.city,
-      formData.fuel,
-      formData.gearbox,
-      formData.mileage,
-      formData.description,
-      formData.phone,
-      formData.email,
-      images.length > 0 ? "yes" : "",
-    ];
-    const filled = fields.filter((f) => f).length;
-    return Math.round((filled / fields.length) * 100);
+    const requiredByStep = getRequiredFieldsByStep(formData.mainCategory);
+    const requiredKeys = new Set<keyof PublishFormData>();
+
+    publishSteps.forEach((step) => {
+      (requiredByStep[step.key] ?? []).forEach((field) => {
+        if (!field.when || field.when(formData)) {
+          requiredKeys.add(field.key);
+        }
+      });
+    });
+
+    let filled = 0;
+    requiredKeys.forEach((key) => {
+      if (!isFieldMissing(formData[key])) {
+        filled += 1;
+      }
+    });
+
+    const hasImage = images.length > 0 || !!existingCoverImage;
+    const totalRequired = requiredKeys.size + 1;
+    const totalFilled = filled + (hasImage ? 1 : 0);
+
+    if (totalRequired <= 0) return 0;
+    return Math.round((totalFilled / totalRequired) * 100);
   };
 
   const completionPercentage = calculateCompletion();
@@ -674,7 +1354,11 @@ const PublishPage: React.FC = () => {
     !!initialFormSnapshotRef.current &&
     (currentFormSnapshot !== initialFormSnapshotRef.current || images.length > 0);
   const priceSummary = {
-    price: formData.price ? `${formData.price} EUR` : "не е въведена",
+    price: requiresPrice(formData.mainCategory)
+      ? formData.price
+        ? `${formData.price} EUR`
+        : "не е въведена"
+      : "не се използва",
     region: formData.locationCountry ? formData.locationCountry : "не е избран",
     city:
       formData.locationCountry === "Извън страната"
@@ -685,6 +1369,16 @@ const PublishPage: React.FC = () => {
   };
   const coverPreview =
     images.find((img) => img.isCover)?.preview || existingCoverImage || undefined;
+  const previewTitle =
+    (requiresBrandAndModel(formData.mainCategory)
+      ? `${formData.brand} ${formData.model}`.trim()
+      : "") || `${getMainCategoryLabel(formData.mainCategory)} обява`;
+  const previewYear =
+    formData.mainCategory === "u" ? formData.partYearFrom : formData.yearFrom;
+  const previewPrice = requiresPrice(formData.mainCategory) ? formData.price : "";
+  const previewMileage = formData.mainCategory === "1" ? formData.mileage : "";
+  const previewFuel = formData.mainCategory === "1" ? formData.fuel : "";
+  const previewGearbox = formData.mainCategory === "1" ? formData.gearbox : "";
   const stepMissingFields = getMissingFields(currentStep, formData);
   const validationMessage = formatMissingMessage(stepMissingFields);
   const isNextDisabled = currentStep < totalSteps && stepMissingFields.length > 0;
@@ -733,6 +1427,7 @@ const PublishPage: React.FC = () => {
         const response = await fetch(`http://localhost:8000/api/listings/${editId}/`, {
           headers: {
             Authorization: `Bearer ${token}`,
+            Accept: "application/json",
           },
         });
 
@@ -745,8 +1440,15 @@ const PublishPage: React.FC = () => {
           return;
         }
 
-        const data = await response.json();
-        applyListingToForm(data);
+        const raw = await response.text();
+        const data = raw ? JSON.parse(raw) : null;
+        if (data) {
+          applyListingToForm(data);
+        } else if (fallbackListing) {
+          applyListingToForm(fallbackListing);
+        } else {
+          setErrors({ submit: "Неуспешно зареждане на обявата за редакция." });
+        }
       } catch (error) {
         if (fallbackListing) {
           applyListingToForm(fallbackListing);
@@ -774,8 +1476,8 @@ const PublishPage: React.FC = () => {
 
     setLoading(true);
 
-    // Check if user has reached the 3 advert limit
-    if (!isEditMode && userListingsCount >= 3) {
+    // Check if private user has reached the 3 advert limit
+    if (!isEditMode && user?.userType !== "business" && userListingsCount >= 3) {
       setErrors({
         submit: "Можете да публикувате максимум 3 активни обяви. Моля, изтрийте или архивирайте някоя от вашите обяви, за да добавите нова.",
       });
@@ -784,58 +1486,179 @@ const PublishPage: React.FC = () => {
     }
 
     try {
-      // Create FormData for multipart/form-data
       const formDataToSend = new FormData();
-      formDataToSend.append("main_category", formData.mainCategory);
-      formDataToSend.append("category", formData.category);
-      formDataToSend.append("listing_type", formData.listingType);
-      formDataToSend.append("title", formData.title);
-      formDataToSend.append("brand", formData.brand);
-      formDataToSend.append("model", formData.model);
-      formDataToSend.append("year_from", formData.yearFrom);
+      const appendIfValue = (key: string, value: unknown) => {
+        if (value === null || value === undefined) return;
+        const normalized = String(value).trim();
+        if (!normalized) return;
+        formDataToSend.append(key, normalized);
+      };
 
-      // Only append optional numeric fields if they have values
-      if (formData.month) formDataToSend.append("month", formData.month);
-      if (formData.power) formDataToSend.append("power", formData.power);
-      if (formData.displacement) formDataToSend.append("displacement", formData.displacement);
+      const fallbackBrand = getMainCategoryLabel(formData.mainCategory);
+      const normalizedBrand = requiresBrandAndModel(formData.mainCategory)
+        ? formData.brand.trim()
+        : fallbackBrand;
+      const normalizedModel = requiresBrandAndModel(formData.mainCategory)
+        ? formData.model.trim()
+        : "Обява";
+      const normalizedYearSource =
+        formData.mainCategory === "u"
+          ? formData.partYearFrom.trim()
+          : requiresBrandAndModel(formData.mainCategory)
+            ? formData.yearFrom.trim()
+            : "";
+      const normalizedYear = normalizedYearSource || String(currentYear);
+      const normalizedFuel =
+        formData.mainCategory === "1" ? formData.fuel || "benzin" : "benzin";
+      const normalizedGearbox =
+        formData.mainCategory === "1" ? formData.gearbox || "ruchna" : "ruchna";
+      const normalizedMileage =
+        formData.mainCategory === "1" ? formData.mileage || "0" : "0";
+      const normalizedPrice = requiresPrice(formData.mainCategory)
+        ? formData.price || "0"
+        : "0";
+      const normalizedCity =
+        formData.locationCountry === "Извън страната"
+          ? formData.city || "Извън страната"
+          : formData.city || "Непосочен";
+      const normalizedTitle =
+        formData.mainCategory === "1"
+          ? `${normalizedBrand} ${normalizedModel}`.trim()
+          : `${getMainCategoryLabel(formData.mainCategory)} обява`;
+      const normalizedDescription =
+        formData.description?.trim() || `${getMainCategoryLabel(formData.mainCategory)} обява`;
+      const normalizedEmail = user?.email || formData.email || "";
 
-      formDataToSend.append("location_country", formData.locationCountry);
-      formDataToSend.append("location_region", formData.locationRegion);
-      formDataToSend.append("price", formData.price);
-      formDataToSend.append("city", formData.city);
-      formDataToSend.append("fuel", formData.fuel);
-      formDataToSend.append("gearbox", formData.gearbox);
+      appendIfValue("main_category", formData.mainCategory);
+      appendIfValue("category", formData.category);
+      appendIfValue("title", normalizedTitle);
+      appendIfValue("brand", normalizedBrand);
+      appendIfValue("model", normalizedModel);
+      appendIfValue("year_from", normalizedYear);
+      appendIfValue("month", formData.month);
+      appendIfValue("vin", formData.vin);
+      appendIfValue("price", normalizedPrice);
+      appendIfValue("location_country", formData.locationCountry);
+      appendIfValue("location_region", formData.locationRegion);
+      appendIfValue("city", normalizedCity);
+      appendIfValue("fuel", normalizedFuel);
+      appendIfValue("gearbox", normalizedGearbox);
+      appendIfValue("mileage", normalizedMileage);
+      if (formData.mainCategory !== "u") {
+        appendIfValue("color", formData.color);
+      }
+      appendIfValue("condition", formData.condition || "0");
+      appendIfValue("power", formData.power);
+      appendIfValue("displacement", formData.displacement);
+      appendIfValue("euro_standard", normalizeCarEuroStandard(formData.euroStandard));
+      appendIfValue("description", normalizedDescription);
+      appendIfValue("phone", formData.phone);
+      appendIfValue("email", normalizedEmail);
+      appendIfValue("listing_type", formData.listingType);
 
-      formDataToSend.append("mileage", formData.mileage);
+      if (formData.features.length > 0) {
+        formDataToSend.append("features", JSON.stringify(formData.features));
+      }
 
-      // Only append optional string fields if they have values
-      if (formData.vin) formDataToSend.append("vin", formData.vin);
-      if (formData.color) formDataToSend.append("color", formData.color);
+      switch (formData.mainCategory) {
+        case "w":
+          appendIfValue("wheel_for", formData.wheelFor);
+          appendIfValue("offer_type", formData.wheelOfferType);
+          appendIfValue("wheel_brand", formData.wheelBrand);
+          appendIfValue("material", formData.wheelMaterial);
+          appendIfValue("bolts", formData.wheelBolts);
+          appendIfValue("pcd", formData.wheelPcd);
+          appendIfValue("center_bore", formData.wheelCenterBore);
+          appendIfValue("offset", formData.wheelOffset);
+          appendIfValue("width", formData.wheelWidth);
+          appendIfValue("diameter", formData.wheelDiameter);
+          appendIfValue("count", formData.wheelCount);
+          appendIfValue("wheel_type", formData.wheelType);
+          break;
+        case "u":
+          appendIfValue("part_for", formData.partFor);
+          appendIfValue("part_category", formData.partCategory);
+          appendIfValue("part_element", formData.partElement);
+          appendIfValue("part_year_from", formData.partYearFrom);
+          appendIfValue("part_year_to", formData.partYearTo);
+          break;
+        case "3":
+        case "4":
+          appendIfValue("axles", formData.heavyAxles);
+          appendIfValue("seats", formData.heavySeats);
+          appendIfValue("load_kg", formData.heavyLoad);
+          appendIfValue("transmission", formData.transmission);
+          appendIfValue("engine_type", formData.engineType);
+          appendIfValue("heavy_euro_standard", formData.heavyEuroStandard);
+          break;
+        case "5":
+          appendIfValue("displacement_cc", formData.motoDisplacement);
+          appendIfValue("transmission", formData.transmission);
+          appendIfValue("engine_type", formData.engineType);
+          break;
+        case "6":
+        case "7":
+          appendIfValue("equipment_type", formData.equipmentType);
+          break;
+        case "8":
+          appendIfValue("engine_type", formData.engineType);
+          appendIfValue("lift_capacity_kg", formData.forkliftLoad);
+          appendIfValue("hours", formData.forkliftHours);
+          break;
+        case "9":
+          appendIfValue("beds", formData.caravanBeds);
+          appendIfValue("length_m", formData.caravanLength);
+          formDataToSend.append("has_toilet", String(formData.caravanHasToilet));
+          formDataToSend.append("has_heating", String(formData.caravanHasHeating));
+          formDataToSend.append("has_air_conditioning", String(formData.caravanHasAc));
+          break;
+        case "a":
+          appendIfValue("boat_category", formData.boatCategory);
+          appendIfValue("engine_type", formData.engineType);
+          appendIfValue("engine_count", formData.boatEngineCount);
+          appendIfValue("material", formData.boatMaterial);
+          appendIfValue("length_m", formData.boatLength);
+          appendIfValue("width_m", formData.boatWidth);
+          appendIfValue("draft_m", formData.boatDraft);
+          appendIfValue("hours", formData.boatHours);
+          formData.boatFeatures
+            .map((feature) => feature.trim())
+            .filter(Boolean)
+            .forEach((feature) => formDataToSend.append("boat_features", feature));
+          break;
+        case "b":
+          appendIfValue("trailer_category", formData.trailerCategory);
+          appendIfValue("load_kg", formData.trailerLoad);
+          appendIfValue("axles", formData.trailerAxles);
+          formData.trailerFeatures
+            .map((feature) => feature.trim())
+            .filter(Boolean)
+            .forEach((feature) => formDataToSend.append("trailer_features", feature));
+          break;
+        case "v":
+          appendIfValue("classified_for", formData.classifiedFor);
+          appendIfValue("accessory_category", formData.accessoryCategory);
+          break;
+        case "y":
+        case "z":
+          appendIfValue("classified_for", formData.classifiedFor);
+          appendIfValue("buy_service_category", formData.buyServiceCategory);
+          break;
+        default:
+          break;
+      }
 
-      formDataToSend.append("condition", formData.condition);
-
-      if (formData.euroStandard) formDataToSend.append("euro_standard", formData.euroStandard);
-
-      formDataToSend.append("description", formData.description);
-
-      formDataToSend.append("phone", formData.phone);
-      formDataToSend.append("email", formData.email);
-      formDataToSend.append("features", JSON.stringify(formData.features));
-
-      // Add images as images_upload field
       images.forEach((img) => {
         formDataToSend.append("images_upload", img.file);
       });
 
-      // Get token from localStorage
-      const token = localStorage.getItem("authToken");
+      const token = await getValidAccessToken();
       if (!token) {
         setErrors({ submit: "Не сте логнати. Моля, влезте отново." });
         navigate("/auth");
         return;
       }
 
-      // Submit to backend
       const response = await fetch(
         isEditMode && editingListingId
           ? `http://localhost:8000/api/listings/${editingListingId}/`
@@ -844,26 +1667,44 @@ const PublishPage: React.FC = () => {
           method: isEditMode ? "PATCH" : "POST",
           headers: {
             Authorization: `Bearer ${token}`,
+            Accept: "application/json",
           },
           body: formDataToSend,
         }
       );
 
+      const rawResponse = await response.text();
+      let parsedResponse: any = null;
+      if (rawResponse) {
+        try {
+          parsedResponse = JSON.parse(rawResponse);
+        } catch {
+          parsedResponse = null;
+        }
+      }
+
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error("Backend error:", errorData);
-        // Handle both detail and field-specific errors
+        const errorData = parsedResponse;
         let errorMessage = "Грешка при изпращане на обявата";
-        if (errorData.detail) {
-          errorMessage = errorData.detail;
-        } else if (typeof errorData === 'object') {
-          // Get first field error
+        if (errorData?.detail) {
+          errorMessage = String(errorData.detail);
+        } else if (errorData && typeof errorData === "object") {
           const firstError = Object.values(errorData)[0];
-          if (Array.isArray(firstError)) {
-            errorMessage = firstError[0];
-          } else if (typeof firstError === 'string') {
+          if (Array.isArray(firstError) && firstError.length > 0) {
+            errorMessage = String(firstError[0]);
+          } else if (typeof firstError === "string") {
             errorMessage = firstError;
           }
+        } else if (rawResponse.trim().startsWith("<!DOCTYPE") || rawResponse.trim().startsWith("<html")) {
+          errorMessage = "Сървърът върна HTML вместо JSON. Провери backend-а и токена.";
+          console.error("Non-JSON error response:", {
+            status: response.status,
+            statusText: response.statusText,
+            url: response.url,
+            bodyPreview: rawResponse.slice(0, 400),
+          });
+        } else if (rawResponse.trim()) {
+          errorMessage = rawResponse.trim().slice(0, 300);
         }
         setErrors({ submit: errorMessage });
         if (errorMessage === "Недостатъчни средства") {
@@ -872,13 +1713,18 @@ const PublishPage: React.FC = () => {
         return;
       }
 
-      const savedListing = await response.json();
+      if (!parsedResponse || typeof parsedResponse !== "object") {
+        throw new Error("Неочакван отговор от сървъра (invalid JSON).");
+      }
+
+      const savedListing = parsedResponse;
+
       if (formData.listingType === "top") {
         try {
-          const token = localStorage.getItem("authToken");
-          if (token) {
+          const meToken = localStorage.getItem("authToken");
+          if (meToken) {
             const meRes = await fetch("http://localhost:8000/api/auth/me/", {
-              headers: { Authorization: `Bearer ${token}` },
+              headers: { Authorization: `Bearer ${meToken}`, Accept: "application/json" },
             });
             if (meRes.ok) {
               const meData = await meRes.json();
@@ -901,6 +1747,7 @@ const PublishPage: React.FC = () => {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
+            Accept: "application/json",
           },
           body: imagesData,
         });
@@ -913,35 +1760,10 @@ const PublishPage: React.FC = () => {
         type: "success",
       });
 
-      // Reset form after create
       if (!isEditMode) {
         setFormData({
-          mainCategory: "1",
-          category: "",
-          title: "",
-          brand: "",
-          model: "",
-          yearFrom: "",
-          month: "",
-          vin: "",
-          locationCountry: "",
-          locationRegion: "",
-          price: "",
-          city: "",
-          fuel: "",
-          gearbox: "",
-          mileage: "",
-          color: "",
-          condition: "0",
-          power: "",
-          displacement: "",
-          euroStandard: "",
-          description: "",
-          phone: "",
-          email: "",
-          pictures: [],
-          features: [],
-          listingType: "normal",
+          ...createInitialFormData(),
+          email: user?.email || "",
         });
         setImages([]);
       } else {
@@ -950,12 +1772,12 @@ const PublishPage: React.FC = () => {
         initialFormSnapshotRef.current = normalizeFormSnapshot(formData);
       }
 
-      // Redirect to my ads after 2 seconds
       setTimeout(() => {
         navigate("/my-ads");
       }, 2000);
     } catch (error) {
-      setErrors({ submit: "Грешка при изпращане на обявата" });
+      const message = error instanceof Error ? error.message : "Грешка при изпращане на обявата";
+      setErrors({ submit: message });
       console.error("Error submitting listing:", error);
     } finally {
       setLoading(false);
@@ -1692,194 +2514,1128 @@ const PublishPage: React.FC = () => {
           <ListingFormStepper
             currentStep={currentStep}
             totalSteps={totalSteps}
-            steps={[
-              {
-                id: 1,
-                label: "Основна информация",
-                icon: <ClipboardList size={16} />,
-                description: "Марка, модел, година",
-              },
-              {
-                id: 2,
-                label: "Детайли",
-                icon: <Settings2 size={16} />,
-                description: "Гориво, пробег, мощност",
-              },
-              {
-                id: 3,
-                label: "Цена & Локация",
-                icon: <Wallet size={16} />,
-                description: "Цена, град",
-              },
-              {
-                id: 4,
-                label: "Снимки",
-                icon: <Image size={16} />,
-                description: "Качи снимки",
-              },
-              {
-                id: 5,
-                label: "Екстри",
-                icon: <Sparkles size={16} />,
-                description: "Опции и екстри",
-              },
-              {
-                id: 6,
-                label: "Описание",
-                icon: <FileText size={16} />,
-                description: "Описание",
-              },
-              {
-                id: 7,
-                label: "Контакт",
-                icon: <Phone size={16} />,
-                description: "Телефон",
-              },
-              {
-                id: 8,
-                label: "Тип обява",
-                icon: <Sparkles size={16} />,
-                description: "Топ или нормална",
-              },
-            ]}
+            steps={publishSteps.map((step, index) => ({
+              id: index + 1,
+              label: step.label,
+              icon: step.icon,
+              description: step.description,
+            }))}
             onStepClick={handleStepClick}
             completedSteps={Array.from({ length: currentStep - 1 }, (_, i) => i + 1)}
           />
 
           {/* Picture Upload */}
-          {currentStep === 4 && (
+          {currentStepKey === "images" && (
             <div style={styles.section}>
               <h2 style={styles.sectionTitle} className="section-title">
                 <Image size={18} className="section-icon" />
-                Снимки на автомобила
+                Снимки към обявата
               </h2>
               <AdvancedImageUpload images={images} onImagesChange={setImages} maxImages={15} />
             </div>
           )}
 
           {/* Step 1: Basic Info */}
-          {currentStep === 1 && (
+          {currentStepKey === "basic" && (
             <div style={styles.section}>
               <h2 style={styles.sectionTitle} className="section-title">
                 <ClipboardList size={18} className="section-icon" />
                 Основна информация
               </h2>
               <div className="field-grid">
-                <FormFieldWithTooltip label="Марка" required tooltip="Производител на автомобила">
-                  <select style={styles.input} name="brand" value={formData.brand} onChange={handleChange} required>
-                    <option value="">Избери марка</option>
-                    {BRANDS.map((brand) => (
-                      <option key={brand} value={brand}>
-                        {brand}
-                      </option>
-                    ))}
-                  </select>
-                </FormFieldWithTooltip>
-
-                <FormFieldWithTooltip label="Модел" required tooltip="Модел на автомобила">
+                <FormFieldWithTooltip
+                  label="Основна категория"
+                  required
+                  tooltip="Изберете правилната категория за обявата"
+                >
                   <select
                     style={styles.input}
-                    name="model"
-                    value={formData.model}
+                    name="mainCategory"
+                    value={formData.mainCategory}
                     onChange={handleChange}
                     required
-                    disabled={!formData.brand}
                   >
-                    <option value="">{formData.brand ? "Избери модел" : "Избери марка първо"}</option>
-                    {formData.brand && MODELS[formData.brand as keyof typeof MODELS]
-                      ? MODELS[formData.brand as keyof typeof MODELS].map((model: string) => (
-                          <option key={model} value={model}>
-                            {model}
-                          </option>
-                        ))
-                      : null}
-                  </select>
-                </FormFieldWithTooltip>
-
-                <FormFieldWithTooltip label="Година" required tooltip="Година на производство">
-                  <select style={styles.input} name="yearFrom" value={formData.yearFrom} onChange={handleChange} required>
-                    <option value="">Избери година</option>
-                    {years.map((year) => (
-                      <option key={year} value={year}>
-                        {year}
+                    {MAIN_CATEGORY_OPTIONS.map((categoryOption) => (
+                      <option key={categoryOption.value} value={categoryOption.value}>
+                        {categoryOption.label}
                       </option>
                     ))}
                   </select>
                 </FormFieldWithTooltip>
+
+                {formData.mainCategory === "1" && (
+                  <FormFieldWithTooltip label="Тип автомобил" tooltip="Тип на купето">
+                    <select
+                      style={styles.input}
+                      name="category"
+                      value={formData.category}
+                      onChange={handleChange}
+                    >
+                      <option value="">Избери тип</option>
+                      {CAR_CATEGORY_OPTIONS.map((carCategoryOption) => (
+                        <option key={carCategoryOption.value} value={carCategoryOption.value}>
+                          {carCategoryOption.label}
+                        </option>
+                      ))}
+                    </select>
+                  </FormFieldWithTooltip>
+                )}
+
+                {requiresBrandAndModel(formData.mainCategory) && (
+                  <>
+                    <FormFieldWithTooltip
+                      label="Марка"
+                      required
+                      tooltip="Марка на превозното средство/техниката"
+                    >
+                      <select
+                        style={styles.input}
+                        name="brand"
+                        value={formData.brand}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Избери марка</option>
+                        {BRANDS.map((brand) => (
+                          <option key={brand} value={brand}>
+                            {brand}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip
+                      label="Модел"
+                      required
+                      tooltip="Модел на превозното средство/техниката"
+                    >
+                      <select
+                        style={styles.input}
+                        name="model"
+                        value={formData.model}
+                        onChange={handleChange}
+                        required
+                        disabled={!formData.brand}
+                      >
+                        <option value="">
+                          {formData.brand ? "Избери модел" : "Избери марка първо"}
+                        </option>
+                        {formData.brand && MODELS[formData.brand as keyof typeof MODELS]
+                          ? MODELS[formData.brand as keyof typeof MODELS].map((model: string) => (
+                              <option key={model} value={model}>
+                                {model}
+                              </option>
+                            ))
+                          : null}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip
+                      label="Година на производство"
+                      required
+                      tooltip="Година на производство"
+                    >
+                      <select
+                        style={styles.input}
+                        name="yearFrom"
+                        value={formData.yearFrom}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Избери година</option>
+                        {years.map((year) => (
+                          <option key={year} value={year}>
+                            {year}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+                  </>
+                )}
+
+                {formData.mainCategory === "w" && (
+                  <>
+                    <FormFieldWithTooltip label="Гуми/джанти за" required>
+                      <select
+                        style={styles.input}
+                        name="wheelFor"
+                        value={formData.wheelFor}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Избери</option>
+                        {CLASSIFIED_FOR_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Тип оферта" required>
+                      <select
+                        style={styles.input}
+                        name="wheelOfferType"
+                        value={formData.wheelOfferType}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Избери тип</option>
+                        {WHEEL_OFFER_TYPE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Марка джанти">
+                      <select
+                        style={styles.input}
+                        name="wheelBrand"
+                        value={formData.wheelBrand}
+                        onChange={handleChange}
+                      >
+                        <option value="">Избери</option>
+                        {WHEEL_BRAND_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+                  </>
+                )}
+
+                {formData.mainCategory === "u" && (
+                  <>
+                    <FormFieldWithTooltip label="Части за" required>
+                      <select
+                        style={styles.input}
+                        name="partFor"
+                        value={formData.partFor}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Избери</option>
+                        {CLASSIFIED_FOR_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Категория на частта" required>
+                      <select
+                        style={styles.input}
+                        name="partCategory"
+                        value={formData.partCategory}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Избери</option>
+                        {PART_CATEGORY_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Част">
+                      <select
+                        style={styles.input}
+                        name="partElement"
+                        value={formData.partElement}
+                        onChange={handleChange}
+                      >
+                        <option value="">Избери</option>
+                        {PART_ELEMENT_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Година на производство от">
+                      <select
+                        style={styles.input}
+                        name="partYearFrom"
+                        value={formData.partYearFrom}
+                        onChange={handleChange}
+                      >
+                        <option value="">Избери година</option>
+                        {years.map((year) => (
+                          <option key={year} value={year}>
+                            {year}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="до">
+                      <select
+                        style={styles.input}
+                        name="partYearTo"
+                        value={formData.partYearTo}
+                        onChange={handleChange}
+                      >
+                        <option value="">Избери година</option>
+                        {years.map((year) => (
+                          <option key={year} value={year}>
+                            {year}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+                  </>
+                )}
+
+                {formData.mainCategory === "v" && (
+                  <>
+                    <FormFieldWithTooltip label="Аксесоари за" required>
+                      <select
+                        style={styles.input}
+                        name="classifiedFor"
+                        value={formData.classifiedFor}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Избери</option>
+                        {CLASSIFIED_FOR_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Категория" required>
+                      <select
+                        style={styles.input}
+                        name="accessoryCategory"
+                        value={formData.accessoryCategory}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Избери</option>
+                        {ACCESSORY_CATEGORY_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+                  </>
+                )}
+
+                {(formData.mainCategory === "y" || formData.mainCategory === "z") && (
+                  <>
+                    <FormFieldWithTooltip
+                      label={formData.mainCategory === "y" ? "Купува за" : "Услуга за"}
+                      required
+                    >
+                      <select
+                        style={styles.input}
+                        name="classifiedFor"
+                        value={formData.classifiedFor}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Избери</option>
+                        {CLASSIFIED_FOR_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Категория" required>
+                      <select
+                        style={styles.input}
+                        name="buyServiceCategory"
+                        value={formData.buyServiceCategory}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Избери</option>
+                        {getBuyServiceCategoryOptions(formData.mainCategory).map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+                  </>
+                )}
               </div>
             </div>
           )}
 
           {/* Step 2: Car Details */}
-          {currentStep === 2 && (
+          {currentStepKey === "details" && (
             <div style={styles.section}>
               <h2 style={styles.sectionTitle} className="section-title">
                 <Settings2 size={18} className="section-icon" />
-                Детайли на автомобила
+                Детайли за категорията
               </h2>
               <div className="field-grid">
-                <FormFieldWithTooltip label="Гориво" required tooltip="Тип на горивото">
-                  <select style={styles.input} name="fuel" value={formData.fuel} onChange={handleChange}>
-                    <option value="">Избери гориво</option>
-                    <option value="benzin">Бензин</option>
-                    <option value="dizel">Дизел</option>
-                    <option value="gaz_benzin">Газ/Бензин</option>
-                    <option value="hibrid">Хибрид</option>
-                    <option value="elektro">Електро</option>
-                  </select>
-                </FormFieldWithTooltip>
+                {formData.mainCategory === "1" && (
+                  <>
+                    <FormFieldWithTooltip label="Гориво" required tooltip="Тип на горивото">
+                      <select
+                        style={styles.input}
+                        name="fuel"
+                        value={formData.fuel}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Избери гориво</option>
+                        {CAR_FUEL_OPTIONS.map((fuelOption) => (
+                          <option key={fuelOption.value} value={fuelOption.value}>
+                            {fuelOption.label}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
 
-                <FormFieldWithTooltip label="Скоростна кутия" required tooltip="Тип на скоростната кутия">
-                  <select style={styles.input} name="gearbox" value={formData.gearbox} onChange={handleChange}>
-                    <option value="">Избери кутия</option>
-                    <option value="ruchna">Ръчна</option>
-                    <option value="avtomatik">Автоматик</option>
-                  </select>
-                </FormFieldWithTooltip>
+                    <FormFieldWithTooltip
+                      label="Скоростна кутия"
+                      required
+                      tooltip="Тип на скоростната кутия"
+                    >
+                      <select
+                        style={styles.input}
+                        name="gearbox"
+                        value={formData.gearbox}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Избери кутия</option>
+                        {CAR_GEARBOX_OPTIONS.map((gearboxOption) => (
+                          <option key={gearboxOption.value} value={gearboxOption.value}>
+                            {gearboxOption.label}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
 
-                <FormFieldWithTooltip label="Пробег (км)" required tooltip="Общо изминати километри">
-                  <input style={styles.input} type="number" name="mileage" placeholder="Въведи пробег" min="0" value={formData.mileage} onChange={handleChange} />
-                </FormFieldWithTooltip>
+                    <FormFieldWithTooltip label="Пробег (км)" required>
+                      <input
+                        style={styles.input}
+                        type="number"
+                        name="mileage"
+                        placeholder="Въведи пробег"
+                        min="0"
+                        value={formData.mileage}
+                        onChange={handleChange}
+                      />
+                    </FormFieldWithTooltip>
 
-                <FormFieldWithTooltip label="Мощност (к.с.)" tooltip="Конски сили">
-                  <input
-                    style={styles.input}
-                    type="number"
-                    name="power"
-                    placeholder="напр. 150"
-                    min="0"
-                    value={formData.power}
-                    onChange={handleChange}
-                  />
-                </FormFieldWithTooltip>
+                    <FormFieldWithTooltip label="Мощност (к.с.)">
+                      <input
+                        style={styles.input}
+                        type="number"
+                        name="power"
+                        placeholder="напр. 150"
+                        min="0"
+                        value={formData.power}
+                        onChange={handleChange}
+                      />
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Кубатура (куб. см.)">
+                      <input
+                        style={styles.input}
+                        type="number"
+                        name="displacement"
+                        min="0"
+                        value={formData.displacement}
+                        onChange={handleChange}
+                      />
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Евростандарт">
+                      <select
+                        style={styles.input}
+                        name="euroStandard"
+                        value={formData.euroStandard}
+                        onChange={handleChange}
+                      >
+                        <option value="">Избери</option>
+                        {HEAVY_EURO_STANDARD_OPTIONS.map((option, index) => (
+                          <option key={option} value={String(index + 1)}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+                  </>
+                )}
+
+                {formData.mainCategory === "w" && (
+                  <>
+                    <FormFieldWithTooltip label="Материал">
+                      <select
+                        style={styles.input}
+                        name="wheelMaterial"
+                        value={formData.wheelMaterial}
+                        onChange={handleChange}
+                      >
+                        <option value="">Избери</option>
+                        {WHEEL_MATERIAL_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Болтове">
+                      <select
+                        style={styles.input}
+                        name="wheelBolts"
+                        value={formData.wheelBolts}
+                        onChange={handleChange}
+                      >
+                        <option value="">Избери</option>
+                        {WHEEL_BOLT_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Междуболтово разстояние (PCD)">
+                      <select style={styles.input} name="wheelPcd" value={formData.wheelPcd} onChange={handleChange}>
+                        <option value="">Избери</option>
+                        {WHEEL_PCD_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Централен отвор">
+                      <select
+                        style={styles.input}
+                        name="wheelCenterBore"
+                        value={formData.wheelCenterBore}
+                        onChange={handleChange}
+                      >
+                        <option value="">Избери</option>
+                        {WHEEL_CENTER_BORE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Офсет /ET/">
+                      <select
+                        style={styles.input}
+                        name="wheelOffset"
+                        value={formData.wheelOffset}
+                        onChange={handleChange}
+                      >
+                        <option value="">Избери</option>
+                        {WHEEL_OFFSET_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Ширина (J)">
+                      <select style={styles.input} name="wheelWidth" value={formData.wheelWidth} onChange={handleChange}>
+                        <option value="">Избери</option>
+                        {WHEEL_WIDTH_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Диаметър (инча)">
+                      <select
+                        style={styles.input}
+                        name="wheelDiameter"
+                        value={formData.wheelDiameter}
+                        onChange={handleChange}
+                      >
+                        <option value="">Избери</option>
+                        {WHEEL_DIAMETER_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Брой джанти">
+                      <select style={styles.input} name="wheelCount" value={formData.wheelCount} onChange={handleChange}>
+                        <option value="">Избери</option>
+                        {WHEEL_COUNT_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Вид">
+                      <select style={styles.input} name="wheelType" value={formData.wheelType} onChange={handleChange}>
+                        <option value="">Избери</option>
+                        {WHEEL_TYPE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+                  </>
+                )}
+
+                {(formData.mainCategory === "3" || formData.mainCategory === "4") && (
+                  <>
+                    <FormFieldWithTooltip label="Брой оси">
+                      <select style={styles.input} name="heavyAxles" value={formData.heavyAxles} onChange={handleChange}>
+                        <option value="">Избери</option>
+                        {HEAVY_AXLE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Брой места">
+                      <select style={styles.input} name="heavySeats" value={formData.heavySeats} onChange={handleChange}>
+                        <option value="">Избери</option>
+                        {HEAVY_SEAT_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Товароносимост (кг)">
+                      <select style={styles.input} name="heavyLoad" value={formData.heavyLoad} onChange={handleChange}>
+                        <option value="">Избери</option>
+                        {HEAVY_LOAD_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Мощност (к.с.)">
+                      <input
+                        style={styles.input}
+                        type="number"
+                        min="0"
+                        name="power"
+                        value={formData.power}
+                        onChange={handleChange}
+                      />
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Вид двигател" required>
+                      <select
+                        style={styles.input}
+                        name="engineType"
+                        value={formData.engineType}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Избери</option>
+                        {ENGINE_TYPE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Трансмисия">
+                      <select
+                        style={styles.input}
+                        name="transmission"
+                        value={formData.transmission}
+                        onChange={handleChange}
+                      >
+                        <option value="">Избери</option>
+                        {TRANSMISSION_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Евростандарт">
+                      <select
+                        style={styles.input}
+                        name="heavyEuroStandard"
+                        value={formData.heavyEuroStandard}
+                        onChange={handleChange}
+                      >
+                        <option value="">Избери</option>
+                        {HEAVY_EURO_STANDARD_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+                  </>
+                )}
+
+                {formData.mainCategory === "5" && (
+                  <>
+                    <FormFieldWithTooltip label="Кубатура (куб. см.)" required>
+                      <input
+                        style={styles.input}
+                        type="number"
+                        min="0"
+                        name="motoDisplacement"
+                        value={formData.motoDisplacement}
+                        onChange={handleChange}
+                        required
+                      />
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Мощност (к.с.)">
+                      <input
+                        style={styles.input}
+                        type="number"
+                        min="0"
+                        name="power"
+                        value={formData.power}
+                        onChange={handleChange}
+                      />
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Вид двигател">
+                      <select
+                        style={styles.input}
+                        name="engineType"
+                        value={formData.engineType}
+                        onChange={handleChange}
+                      >
+                        <option value="">Избери</option>
+                        {ENGINE_TYPE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Трансмисия">
+                      <select
+                        style={styles.input}
+                        name="transmission"
+                        value={formData.transmission}
+                        onChange={handleChange}
+                      >
+                        <option value="">Избери</option>
+                        {TRANSMISSION_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+                  </>
+                )}
+
+                {(formData.mainCategory === "6" || formData.mainCategory === "7") && (
+                  <>
+                    <FormFieldWithTooltip label="Вид техника" required>
+                      <select
+                        style={styles.input}
+                        name="equipmentType"
+                        value={formData.equipmentType}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Избери</option>
+                        {EQUIPMENT_TYPE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Мощност (к.с.)">
+                      <input
+                        style={styles.input}
+                        type="number"
+                        min="0"
+                        name="power"
+                        value={formData.power}
+                        onChange={handleChange}
+                      />
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Вид двигател">
+                      <select
+                        style={styles.input}
+                        name="engineType"
+                        value={formData.engineType}
+                        onChange={handleChange}
+                      >
+                        <option value="">Избери</option>
+                        {ENGINE_TYPE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+                  </>
+                )}
+
+                {formData.mainCategory === "8" && (
+                  <>
+                    <FormFieldWithTooltip label="Вид двигател" required>
+                      <select
+                        style={styles.input}
+                        name="engineType"
+                        value={formData.engineType}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Избери</option>
+                        {ENGINE_TYPE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Товароподемност (кг)">
+                      <select style={styles.input} name="forkliftLoad" value={formData.forkliftLoad} onChange={handleChange}>
+                        <option value="">Избери</option>
+                        {FORKLIFT_LOAD_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Часове работа">
+                      <select style={styles.input} name="forkliftHours" value={formData.forkliftHours} onChange={handleChange}>
+                        <option value="">Избери</option>
+                        {FORKLIFT_HOUR_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+                  </>
+                )}
+
+                {formData.mainCategory === "9" && (
+                  <>
+                    <FormFieldWithTooltip label="Брой спални места" required>
+                      <select
+                        style={styles.input}
+                        name="caravanBeds"
+                        value={formData.caravanBeds}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Избери</option>
+                        {CARAVAN_BED_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Дължина (м)">
+                      <select
+                        style={styles.input}
+                        name="caravanLength"
+                        value={formData.caravanLength}
+                        onChange={handleChange}
+                      >
+                        <option value="">Избери</option>
+                        {CARAVAN_LENGTH_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Оборудване">
+                      <div style={{ display: "grid", gap: 8 }}>
+                        <label>
+                          <input
+                            type="checkbox"
+                            name="caravanHasToilet"
+                            checked={formData.caravanHasToilet}
+                            onChange={handleChange}
+                          />{" "}
+                          Тоалетна
+                        </label>
+                        <label>
+                          <input
+                            type="checkbox"
+                            name="caravanHasHeating"
+                            checked={formData.caravanHasHeating}
+                            onChange={handleChange}
+                          />{" "}
+                          Отопление
+                        </label>
+                        <label>
+                          <input
+                            type="checkbox"
+                            name="caravanHasAc"
+                            checked={formData.caravanHasAc}
+                            onChange={handleChange}
+                          />{" "}
+                          Климатик
+                        </label>
+                      </div>
+                    </FormFieldWithTooltip>
+                  </>
+                )}
+
+                {formData.mainCategory === "a" && (
+                  <>
+                    <FormFieldWithTooltip label="Категория" required>
+                      <select
+                        style={styles.input}
+                        name="boatCategory"
+                        value={formData.boatCategory}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Избери</option>
+                        {BOAT_CATEGORY_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Вид двигател">
+                      <select
+                        style={styles.input}
+                        name="engineType"
+                        value={formData.engineType}
+                        onChange={handleChange}
+                      >
+                        <option value="">Избери</option>
+                        {ENGINE_TYPE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Брой двигатели">
+                      <select
+                        style={styles.input}
+                        name="boatEngineCount"
+                        value={formData.boatEngineCount}
+                        onChange={handleChange}
+                      >
+                        <option value="">Избери</option>
+                        {BOAT_ENGINE_COUNT_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Материал">
+                      <select
+                        style={styles.input}
+                        name="boatMaterial"
+                        value={formData.boatMaterial}
+                        onChange={handleChange}
+                      >
+                        <option value="">Избери</option>
+                        {BOAT_MATERIAL_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Дължина (м)">
+                      <select style={styles.input} name="boatLength" value={formData.boatLength} onChange={handleChange}>
+                        <option value="">Избери</option>
+                        {BOAT_LENGTH_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Ширина (м)">
+                      <select style={styles.input} name="boatWidth" value={formData.boatWidth} onChange={handleChange}>
+                        <option value="">Избери</option>
+                        {BOAT_WIDTH_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Газене (м)">
+                      <select style={styles.input} name="boatDraft" value={formData.boatDraft} onChange={handleChange}>
+                        <option value="">Избери</option>
+                        {BOAT_DRAFT_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Часове работа">
+                      <select style={styles.input} name="boatHours" value={formData.boatHours} onChange={handleChange}>
+                        <option value="">Избери</option>
+                        {BOAT_HOUR_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+                  </>
+                )}
+
+                {formData.mainCategory === "b" && (
+                  <>
+                    <FormFieldWithTooltip label="Категория" required>
+                      <select
+                        style={styles.input}
+                        name="trailerCategory"
+                        value={formData.trailerCategory}
+                        onChange={handleChange}
+                        required
+                      >
+                        <option value="">Избери</option>
+                        {TRAILER_CATEGORY_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Товароносимост (кг)">
+                      <select style={styles.input} name="trailerLoad" value={formData.trailerLoad} onChange={handleChange}>
+                        <option value="">Избери</option>
+                        {TRAILER_LOAD_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Брой оси">
+                      <select style={styles.input} name="trailerAxles" value={formData.trailerAxles} onChange={handleChange}>
+                        <option value="">Избери</option>
+                        {TRAILER_AXLE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </FormFieldWithTooltip>
+                  </>
+                )}
+
+                {!["y", "z", "u"].includes(formData.mainCategory) && (
+                  <FormFieldWithTooltip label="Цвят">
+                    <select style={styles.input} name="color" value={formData.color} onChange={handleChange}>
+                      <option value="">Избери цвят</option>
+                      {COLOR_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </FormFieldWithTooltip>
+                )}
+
+                {!["y", "z"].includes(formData.mainCategory) && (
+                  <FormFieldWithTooltip label="Състояние">
+                    <select style={styles.input} name="condition" value={formData.condition} onChange={handleChange}>
+                      {CONDITION_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </FormFieldWithTooltip>
+                )}
+
+                {(formData.mainCategory === "y" || formData.mainCategory === "z") && (
+                  <div style={{ gridColumn: "1 / -1", color: "#666", fontSize: 14 }}>
+                    За тази категория няма допълнителни технически полета.
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           {/* Step 3: Price & Location */}
-          {currentStep === 3 && (
+          {currentStepKey === "pricing" && (
             <div style={styles.section}>
               <h2 style={styles.sectionTitle} className="section-title">
                 <Wallet size={18} className="section-icon" />
                 Цена и локация
               </h2>
               <div className="field-grid">
-                <FormFieldWithTooltip label="Цена (EUR)" required tooltip="Цена на автомобила">
-                  <input style={styles.input} type="number" name="price" placeholder="Въведи цена" min="0" step="0.01" value={formData.price} onChange={handleChange} required />
-                  <div className="price-summary">
-                    <span>
-                      <strong>Цена:</strong> {priceSummary.price}
-                    </span>
-                    <span>
-                      <strong>Регион:</strong> {priceSummary.region}
-                    </span>
-                    <span>
-                      <strong>Град:</strong> {priceSummary.city}
-                    </span>
-                  </div>
-                </FormFieldWithTooltip>
+                {requiresPrice(formData.mainCategory) && (
+                  <FormFieldWithTooltip label="Цена (EUR)" required tooltip="Цена на обявата">
+                    <input style={styles.input} type="number" name="price" placeholder="Въведи цена" min="0" step="0.01" value={formData.price} onChange={handleChange} required />
+                    <div className="price-summary">
+                      <span>
+                        <strong>Цена:</strong> {priceSummary.price}
+                      </span>
+                      <span>
+                        <strong>Регион:</strong> {priceSummary.region}
+                      </span>
+                      <span>
+                        <strong>Град:</strong> {priceSummary.city}
+                      </span>
+                    </div>
+                  </FormFieldWithTooltip>
+                )}
 
-                <FormFieldWithTooltip label="Местоположение - Регион" required tooltip="Регион, където се намира автомобилът">
+                <FormFieldWithTooltip label="Местоположение - Регион" required tooltip="Регион, където се намира обявата">
                   <select style={styles.input} name="locationCountry" value={formData.locationCountry} onChange={handleChange} required>
                     <option value="">Избери местоположение</option>
                     {BULGARIA_REGIONS.map((region) => (
@@ -1891,7 +3647,7 @@ const PublishPage: React.FC = () => {
                 </FormFieldWithTooltip>
 
                 {formData.locationCountry && formData.locationCountry !== "Извън страната" && (
-                  <FormFieldWithTooltip label="Град" required tooltip="Град, където се намира автомобилът">
+                  <FormFieldWithTooltip label="Град" required tooltip="Град, където се намира обявата">
                     <select style={styles.input} name="city" value={formData.city} onChange={handleChange} required>
                       <option value="">Избери град</option>
                       {BULGARIAN_CITIES_BY_REGION[formData.locationCountry]?.map((city) => (
@@ -1907,7 +3663,7 @@ const PublishPage: React.FC = () => {
           )}
 
           {/* Step 5: Features/Extras */}
-          {currentStep === 5 && (
+          {currentStepKey === "features" && (
             <div style={styles.section}>
               <h2 style={styles.sectionTitle} className="section-title">
                 <Sparkles size={18} className="section-icon" />
@@ -1964,7 +3720,7 @@ const PublishPage: React.FC = () => {
           )}
 
           {/* Step 6: Description */}
-          {currentStep === 6 && (
+          {currentStepKey === "description" && (
             <div style={styles.section}>
               <h2 style={styles.sectionTitle} className="section-title">
                 <FileText size={18} className="section-icon" />
@@ -1973,16 +3729,16 @@ const PublishPage: React.FC = () => {
               <FormFieldWithTooltip
                 label="Описание"
                 required
-                tooltip="Подробно описание на автомобила"
+                tooltip="Подробно описание на обявата"
                 helperText="Напиши поне 50 символа за по-добра видимост"
-                hint="Включи информация за състояние, история на обслужване, причина за продажба"
+                hint="Включи състояние, особености, сервизна история и важни детайли"
               >
                 <textarea
                   style={styles.textarea}
                   name="description"
-                  placeholder="Опишете състоянието, особеностите и причината за продажба..."
                   value={formData.description}
                   onChange={handleChange}
+                  placeholder="Опишете състоянието, особеностите и причината за продажба..."
                   rows={8}
                 />
               </FormFieldWithTooltip>
@@ -1990,7 +3746,7 @@ const PublishPage: React.FC = () => {
           )}
 
           {/* Step 7: Contact */}
-          {currentStep === 7 && (
+          {currentStepKey === "contact" && (
             <div style={styles.section}>
               <h2 style={styles.sectionTitle} className="section-title">
                 <Phone size={18} className="section-icon" />
@@ -2016,15 +3772,17 @@ const PublishPage: React.FC = () => {
                 <FormFieldWithTooltip
                   label="Имейл"
                   required
-                  tooltip="Имейл адрес за връзка"
+                  tooltip="Имейл от профила (автоматично попълнен)"
+                  helperText="Имейлът се взима от акаунта и не може да се променя"
                 >
                   <input
                     style={styles.input}
                     type="email"
                     name="email"
-                    placeholder="Въведи имейл"
+                    placeholder="Няма наличен имейл в профила"
                     value={formData.email}
-                    onChange={handleChange}
+                    readOnly
+                    disabled
                   />
                 </FormFieldWithTooltip>
               </div>
@@ -2032,7 +3790,7 @@ const PublishPage: React.FC = () => {
           )}
 
           {/* Step 8: Listing Type */}
-          {currentStep === 8 && (
+          {currentStepKey === "listingType" && (
             <div style={styles.section}>
               <h2 style={styles.sectionTitle} className="section-title">
                 <Sparkles size={18} className="section-icon" />
@@ -2095,7 +3853,7 @@ const PublishPage: React.FC = () => {
               Назад
             </button>
 
-            {currentStep === 8 ? (
+            {currentStep === totalSteps ? (
               <button
                 type="button"
                 onClick={handlePublishClick}
@@ -2149,7 +3907,7 @@ const PublishPage: React.FC = () => {
                 title: "Конкурентна цена",
                 description: "Задай реалистична цена",
                 icon: <Wallet size={16} />,
-                completed: !!formData.price,
+                completed: requiresPrice(formData.mainCategory) ? !!formData.price : true,
               },
               {
                 id: "contact",
@@ -2162,15 +3920,15 @@ const PublishPage: React.FC = () => {
           />
           <ListingPreview
             variant="compact"
-            title={`${formData.brand} ${formData.model}`}
+            title={previewTitle}
             brand={formData.brand}
             model={formData.model}
-            year={formData.yearFrom}
-            price={formData.price}
+            year={previewYear}
+            price={previewPrice}
             city={formData.city}
-            mileage={formData.mileage}
-            fuel={formData.fuel}
-            gearbox={formData.gearbox}
+            mileage={previewMileage}
+            fuel={previewFuel}
+            gearbox={previewGearbox}
             power={formData.power}
             coverImage={coverPreview}
             description={formData.description}
@@ -2203,4 +3961,5 @@ const PublishPage: React.FC = () => {
 };
 
 export default PublishPage;
+
 

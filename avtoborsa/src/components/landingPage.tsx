@@ -5,6 +5,7 @@ import { AdvancedSearch } from "./AdvancedSearch";
 import { useRecentSearches } from "../hooks/useRecentSearches";
 import { useSavedSearches } from "../hooks/useSavedSearches";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
+import { CAR_BRANDS, CAR_MODELS } from "../constants/carBrandModels";
 
 type CarListing = {
   id: number;
@@ -68,22 +69,7 @@ type Listing = {
   tags?: string[];
 };
 
-const BRANDS: string[] = [
-  "Audi",
-  "BMW",
-  "Mercedes-Benz",
-  "Volkswagen",
-  "Opel",
-  "Ford",
-  "Toyota",
-  "Honda",
-  "Peugeot",
-  "Renault",
-  "Skoda",
-  "Hyundai",
-  "Kia",
-  "Nissan",
-];
+const BRANDS: string[] = CAR_BRANDS;
 
 const CITIES = [
   "София",
@@ -101,22 +87,7 @@ const CITIES = [
 const FUEL: Fuel[] = ["Бензин", "Дизел", "Газ/Бензин", "Хибрид", "Електро"];
 const GEARBOX: Gearbox[] = ["Ръчна", "Автоматик"];
 
-const MODELS: Record<string, string[]> = {
-  "Audi": ["A1", "A3", "A4", "A5", "A6", "A7", "A8", "Q3", "Q5", "Q7"],
-  "BMW": ["116", "118", "120", "316", "318", "320", "330", "520", "530", "X1", "X3", "X5"],
-  "Mercedes-Benz": ["A-Class", "C-Class", "E-Class", "S-Class", "GLA", "GLC", "GLE", "GLS"],
-  "Volkswagen": ["Golf", "Passat", "Tiguan", "Touareg", "Polo", "Jetta", "Arteon"],
-  "Opel": ["Astra", "Insignia", "Corsa", "Grandland", "Crossland"],
-  "Ford": ["Focus", "Mondeo", "Fiesta", "Kuga", "Edge"],
-  "Toyota": ["Corolla", "Camry", "RAV4", "Yaris", "Auris"],
-  "Honda": ["Civic", "Accord", "CR-V", "Jazz", "Pilot"],
-  "Peugeot": ["208", "308", "3008", "5008", "2008"],
-  "Renault": ["Clio", "Megane", "Scenic", "Duster", "Captur"],
-  "Skoda": ["Octavia", "Superb", "Fabia", "Kodiaq", "Karoq"],
-  "Hyundai": ["i30", "i40", "Tucson", "Santa Fe", "Elantra"],
-  "Kia": ["Ceed", "Sportage", "Sorento", "Picanto", "Niro"],
-  "Nissan": ["Qashqai", "X-Trail", "Altima", "Micra", "Juke"],
-};
+const MODELS: Record<string, string[]> = CAR_MODELS;
 
 const CATEGORIES = [
   { value: "1", label: "Автомобили и Джипове" },

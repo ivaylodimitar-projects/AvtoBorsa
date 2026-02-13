@@ -19,6 +19,10 @@ export const useGalleryLazyLoad = (
 
   // Preload images: current, previous, and next
   useEffect(() => {
+    if (!Array.isArray(images) || images.length === 0) {
+      return;
+    }
+
     const indicesToLoad = [
       currentIndex,
       (currentIndex - 1 + images.length) % images.length,
@@ -27,8 +31,13 @@ export const useGalleryLazyLoad = (
 
     indicesToLoad.forEach((idx) => {
       if (!loadedImagesRef.current.has(idx)) {
+        const nextImage = images[idx];
+        if (!nextImage || typeof nextImage.image !== 'string' || !nextImage.image.trim()) {
+          return;
+        }
+
         const img = new Image();
-        img.src = getImageUrl(images[idx].image);
+        img.src = getImageUrl(nextImage.image);
         img.onload = () => {
           loadedImagesRef.current.add(idx);
         };

@@ -512,17 +512,36 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
   const touchStartRef = useRef<number>(0);
   const getImageUrl = useImageUrl();
+  const safeImages = useMemo(
+    () =>
+      (Array.isArray(images) ? images : []).filter(
+        (img): img is Image => !!img && typeof img.image === 'string' && img.image.trim().length > 0
+      ),
+    [images]
+  );
 
   // Lazy load images
-  useGalleryLazyLoad(images, currentIndex, getImageUrl);
+  useGalleryLazyLoad(safeImages, currentIndex, getImageUrl);
+
+  useEffect(() => {
+    if (safeImages.length === 0 && currentIndex !== 0) {
+      setCurrentIndex(0);
+      return;
+    }
+    if (safeImages.length > 0 && currentIndex >= safeImages.length) {
+      setCurrentIndex(0);
+    }
+  }, [currentIndex, safeImages.length]);
 
   const handlePrevious = useCallback(() => {
-    setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
-  }, [images.length]);
+    if (safeImages.length <= 1) return;
+    setCurrentIndex((prev) => (prev === 0 ? safeImages.length - 1 : prev - 1));
+  }, [safeImages.length]);
 
   const handleNext = useCallback(() => {
-    setCurrentIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
-  }, [images.length]);
+    if (safeImages.length <= 1) return;
+    setCurrentIndex((prev) => (prev === safeImages.length - 1 ? 0 : prev + 1));
+  }, [safeImages.length]);
 
   // Throttle navigation
   const throttledPrevious = useThrottle(handlePrevious, 300);
@@ -563,7 +582,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [throttledPrevious, throttledNext]);
 
-  if (!images || images.length === 0) {
+  if (safeImages.length === 0) {
     return (
       <div
         style={{
@@ -583,7 +602,8 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
     );
   }
 
-  const currentImage = images[currentIndex];
+  const safeIndex = Math.min(Math.max(currentIndex, 0), safeImages.length - 1);
+  const currentImage = safeImages[safeIndex];
 
   const styles = useMemo(
     () => ({
@@ -731,11 +751,11 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
           onTouchEnd={handleTouchEnd}
         >
           <div style={styles.carouselInner}>
-            <MainCarouselImage
-              image={currentImage}
-              title={title}
-              getImageUrl={getImageUrl}
-              isActive={true}
+              <MainCarouselImage
+                image={currentImage}
+                title={title}
+                getImageUrl={getImageUrl}
+                isActive={true}
             />
           </div>
 
@@ -768,7 +788,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
           )}
 
           {/* Navigation Controls */}
-          {images.length > 1 && (
+          {safeImages.length > 1 && (
             <>
               <button
                 onClick={() => throttledPrevious()}
@@ -824,18 +844,18 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
           </button>
 
           {/* Counter */}
-          {images.length > 1 && (
+          {safeImages.length > 1 && (
             <div style={styles.counter}>
-              {currentIndex + 1} / {images.length}
+              {safeIndex + 1} / {safeImages.length}
             </div>
           )}
         </div>
 
         {/* Thumbnail Strip */}
-        {images.length > 0 && (
+        {safeImages.length > 0 && (
           <ThumbnailStrip
-            images={images}
-            currentIndex={currentIndex}
+            images={safeImages}
+            currentIndex={safeIndex}
             onSlideTo={setCurrentIndex}
             getImageUrl={getImageUrl}
             isMobile={isMobile}
@@ -848,8 +868,8 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         isOpen={isFullscreenOpen}
         image={currentImage}
         title={title}
-        currentIndex={currentIndex}
-        totalImages={images.length}
+        currentIndex={safeIndex}
+        totalImages={safeImages.length}
         onClose={() => setIsFullscreenOpen(false)}
         onPrevious={() => throttledPrevious()}
         onNext={() => throttledNext()}

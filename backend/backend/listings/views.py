@@ -1,4 +1,4 @@
-from decimal import Decimal
+﻿from decimal import Decimal
 from datetime import timedelta
 import hashlib
 
@@ -89,6 +89,11 @@ def _clear_top_listing_window(listing):
     """Remove top status timing fields from the listing."""
     listing.top_paid_at = None
     listing.top_expires_at = None
+
+
+def _is_business_user(user):
+    """Return True when the account is a business profile."""
+    return hasattr(user, "business_profile")
 
 
 def _set_public_cache_headers(response, max_age=LISTINGS_PUBLIC_CACHE_SECONDS):
@@ -200,81 +205,117 @@ class CarListingViewSet(viewsets.ModelViewSet):
             )
             queryset = queryset.filter(main_category=main_category_key)
 
-        brand = self.request.query_params.get('brand')
-        if brand:
+        def get_param(*keys):
+            for key in keys:
+                value = self.request.query_params.get(key)
+                if value not in (None, ""):
+                    return value
+            return None
+
+        def to_int(value):
+            try:
+                return int(str(value))
+            except (TypeError, ValueError):
+                return None
+
+        def to_float(value):
+            try:
+                return float(str(value))
+            except (TypeError, ValueError):
+                return None
+
+        brand = get_param('brand', 'marka')
+        model = get_param('model')
+
+        # Price filters
+        price_from = to_float(get_param('priceFrom'))
+        if price_from is not None:
+            queryset = queryset.filter(price__gte=price_from)
+
+        price_to = to_float(get_param('priceTo'))
+        if price_to is not None:
+            queryset = queryset.filter(price__lte=price_to)
+
+        max_price = to_float(get_param('maxPrice', 'price1'))
+        if max_price is not None:
+            queryset = queryset.filter(price__lte=max_price)
+
+        # Year filters
+        year_from = to_int(get_param('yearFrom', 'year'))
+        if year_from is not None:
+            queryset = queryset.filter(year_from__gte=year_from)
+
+        year_to = to_int(get_param('yearTo'))
+        if year_to is not None:
+            queryset = queryset.filter(year_from__lte=year_to)
+
+        if main_category in {'6', '7'} and brand:
+            related_name = 'agri_details__equipment_type' if main_category == '6' else 'industrial_details__equipment_type'
+            queryset = queryset.filter(**{f'{related_name}__icontains': brand})
+        elif main_category == 'v' and brand:
+            queryset = queryset.filter(accessories_details__accessory_category__icontains=brand)
+        elif brand:
             queryset = queryset.filter(brand__icontains=brand)
 
-        model = self.request.query_params.get('model')
         if model:
             queryset = queryset.filter(model__icontains=model)
 
-        # Price filters
-        price_from = self.request.query_params.get('priceFrom')
-        if price_from:
-            queryset = queryset.filter(price__gte=float(price_from))
-
-        price_to = self.request.query_params.get('priceTo')
-        if price_to:
-            queryset = queryset.filter(price__lte=float(price_to))
-
-        max_price = self.request.query_params.get('maxPrice')
-        if max_price:
-            queryset = queryset.filter(price__lte=float(max_price))
-
-        # Year filters
-        year_from = self.request.query_params.get('yearFrom')
-        if year_from:
-            queryset = queryset.filter(year_from__gte=int(year_from))
-
-        year_to = self.request.query_params.get('yearTo')
-        if year_to:
-            queryset = queryset.filter(year_from__lte=int(year_to))
-
-        # Sorting
-        sort_by = self.request.query_params.get('sortBy')
-        if sort_by:
-            if sort_by == 'price-asc':
-                queryset = queryset.order_by('top_rank', 'price')
-            elif sort_by == 'price-desc':
-                queryset = queryset.order_by('top_rank', '-price')
-            elif sort_by == 'year-desc':
-                queryset = queryset.order_by('top_rank', '-year_from')
-            elif sort_by == 'year-asc':
-                queryset = queryset.order_by('top_rank', 'year_from')
-            elif sort_by == 'Марка/Модел/Цена' or sort_by == '':
-                # Default: Марка/Модел/Цена
-                queryset = queryset.order_by('top_rank', 'brand', 'model', 'price')
+        # Location filters
+        region = get_param('region', 'locat')
+        if region:
+            if region in {'България', 'Извън страната'}:
+                # Support country-level filters for classifieds-style categories.
+                queryset = queryset.filter(location_country__icontains=region)
             else:
-                # Default fallback
-                queryset = queryset.order_by('top_rank', 'brand', 'model', 'price')
+                # Keep compatibility with records that store the region either in
+                # location_region (preferred) or location_country (legacy data/UI).
+                queryset = queryset.filter(
+                    Q(location_region__icontains=region) | Q(location_country__icontains=region)
+                )
+        city = get_param('city', 'locatc')
+        if city:
+            queryset = queryset.filter(city__icontains=city)
 
-        else:
-            # Stable default ordering for pagination and landing page
-            queryset = queryset.order_by('top_rank', '-created_at')
-
-        # Fuel filter - handle both display names and keys
-        fuel = self.request.query_params.get('fuel')
+        # Fuel / engine type filters
+        fuel = get_param('fuel')
         if fuel:
-            # Map display names to database keys
-            fuel_mapping = {
-                'Бензин': 'benzin',
-                'Дизел': 'dizel',
-                'Газ/Бензин': 'gaz_benzin',
-                'Хибрид': 'hibrid',
-                'Електро': 'elektro',
-                'benzin': 'benzin',
-                'dizel': 'dizel',
-                'gaz_benzin': 'gaz_benzin',
-                'hibrid': 'hibrid',
-                'elektro': 'elektro',
-            }
-            fuel_key = fuel_mapping.get(fuel, fuel)
-            queryset = queryset.filter(fuel=fuel_key)
+            if main_category == '3':
+                queryset = queryset.filter(buses_details__engine_type__icontains=fuel)
+            elif main_category == '4':
+                queryset = queryset.filter(trucks_details__engine_type__icontains=fuel)
+            elif main_category == '5':
+                queryset = queryset.filter(moto_details__engine_type__icontains=fuel)
+            elif main_category == '8':
+                queryset = queryset.filter(forklift_details__engine_type__icontains=fuel)
+            elif main_category == 'a':
+                queryset = queryset.filter(boats_details__engine_type__icontains=fuel)
+            else:
+                fuel_mapping = {
+                    'Бензин': 'benzin',
+                    'Дизел': 'dizel',
+                    'Газ/Бензин': 'gaz_benzin',
+                    'Хибрид': 'hibrid',
+                    'Електро': 'elektro',
+                    'benzin': 'benzin',
+                    'dizel': 'dizel',
+                    'gaz_benzin': 'gaz_benzin',
+                    'hibrid': 'hibrid',
+                    'elektro': 'elektro',
+                }
+                fuel_key = fuel_mapping.get(fuel, fuel)
+                queryset = queryset.filter(fuel=fuel_key)
 
-        # Gearbox filter - handle both display names and keys
-        gearbox = self.request.query_params.get('gearbox')
+        transmission = get_param('transmission')
+        if transmission:
+            if main_category == '3':
+                queryset = queryset.filter(buses_details__transmission__icontains=transmission)
+            elif main_category == '4':
+                queryset = queryset.filter(trucks_details__transmission__icontains=transmission)
+            elif main_category == '5':
+                queryset = queryset.filter(moto_details__transmission__icontains=transmission)
+
+        gearbox = get_param('gearbox')
         if gearbox:
-            # Map display names to database keys
             gearbox_mapping = {
                 'Ръчна': 'ruchna',
                 'Автоматик': 'avtomatik',
@@ -285,37 +326,28 @@ class CarListingViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(gearbox=gearbox_key)
 
         # Mileage filters
-        mileage_from = self.request.query_params.get('mileageFrom')
-        if mileage_from:
-            queryset = queryset.filter(mileage__gte=int(mileage_from))
-
-        mileage_to = self.request.query_params.get('mileageTo')
-        if mileage_to:
-            queryset = queryset.filter(mileage__lte=int(mileage_to))
+        mileage_from = to_int(get_param('mileageFrom'))
+        if mileage_from is not None:
+            queryset = queryset.filter(mileage__gte=mileage_from)
+        mileage_to = to_int(get_param('mileageTo'))
+        if mileage_to is not None:
+            queryset = queryset.filter(mileage__lte=mileage_to)
 
         # Engine/Power filters
-        engine_from = self.request.query_params.get('engineFrom')
-        if engine_from:
-            queryset = queryset.filter(power__gte=int(engine_from))
+        engine_from = to_int(get_param('engineFrom'))
+        if engine_from is not None:
+            queryset = queryset.filter(power__gte=engine_from)
+        engine_to = to_int(get_param('engineTo'))
+        if engine_to is not None:
+            queryset = queryset.filter(power__lte=engine_to)
 
-        engine_to = self.request.query_params.get('engineTo')
-        if engine_to:
-            queryset = queryset.filter(power__lte=int(engine_to))
-
-        # Color filter
-        color = self.request.query_params.get('color')
+        color = get_param('color')
         if color:
             queryset = queryset.filter(color__icontains=color)
 
-        # Region filter (for "Намира се в" and "Регион")
-        region = self.request.query_params.get('region')
-        if region:
-            queryset = queryset.filter(location_region__icontains=region)
-
-        # Condition filter - handle both display names and keys
-        condition = self.request.query_params.get('condition')
+        condition = get_param('condition')
+        nup = get_param('nup')
         if condition:
-            # Map display names to database keys
             condition_mapping = {
                 'Нов': '0',
                 'Употребяван': '1',
@@ -328,11 +360,202 @@ class CarListingViewSet(viewsets.ModelViewSet):
             }
             condition_key = condition_mapping.get(condition, condition)
             queryset = queryset.filter(condition=condition_key)
+        elif nup:
+            # mobile.bg-compatible state mask:
+            # 1=new, 0=used, 3=damaged, 2=for parts
+            nup_to_condition = {
+                '1': '0',
+                '0': '1',
+                '3': '2',
+                '2': '3',
+            }
+            allowed_states = [nup_to_condition[flag] for flag in str(nup) if flag in nup_to_condition]
+            if allowed_states:
+                queryset = queryset.filter(condition__in=list(dict.fromkeys(allowed_states)))
 
-        # Category filter - handle both display names and keys
-        category = self.request.query_params.get('category')
-        if category:
-            # Map display names to database keys
+        # Main-category-specific filters
+        if main_category == 'w':
+            topmenu = get_param('topmenu')
+            if topmenu:
+                queryset = queryset.filter(wheels_details__wheel_for=topmenu)
+            twrubr = get_param('twrubr')
+            if twrubr:
+                queryset = queryset.filter(wheels_details__offer_type=twrubr)
+            wheel_brand = get_param('wheelBrand')
+            if wheel_brand:
+                queryset = queryset.filter(wheels_details__wheel_brand__icontains=wheel_brand)
+            wheel_material = get_param('wheelMaterial')
+            if wheel_material:
+                queryset = queryset.filter(wheels_details__material__icontains=wheel_material)
+            wheel_bolts = to_int(get_param('wheelBolts'))
+            if wheel_bolts is not None:
+                queryset = queryset.filter(wheels_details__bolts=wheel_bolts)
+            wheel_pcd = get_param('wheelPcd')
+            if wheel_pcd:
+                queryset = queryset.filter(wheels_details__pcd__icontains=wheel_pcd)
+            center_bore = get_param('wheelCenterBore')
+            if center_bore:
+                queryset = queryset.filter(wheels_details__center_bore__icontains=center_bore)
+            wheel_offset = get_param('wheelOffset')
+            if wheel_offset:
+                queryset = queryset.filter(wheels_details__offset__icontains=wheel_offset)
+            wheel_width = get_param('wheelWidth')
+            if wheel_width:
+                queryset = queryset.filter(wheels_details__width__icontains=wheel_width)
+            wheel_diameter = get_param('wheelDiameter')
+            if wheel_diameter:
+                queryset = queryset.filter(wheels_details__diameter__icontains=wheel_diameter)
+            wheel_count = to_int(get_param('wheelCount'))
+            if wheel_count is not None:
+                queryset = queryset.filter(wheels_details__count=wheel_count)
+            wheel_type = get_param('wheelType')
+            if wheel_type:
+                queryset = queryset.filter(wheels_details__wheel_type__icontains=wheel_type)
+
+        if main_category == 'u':
+            part_for = get_param('topmenu')
+            if part_for:
+                queryset = queryset.filter(parts_details__part_for=part_for)
+            part_category = get_param('partrub')
+            if part_category:
+                queryset = queryset.filter(parts_details__part_category__icontains=part_category)
+            part_element = get_param('partelem')
+            if part_element:
+                queryset = queryset.filter(parts_details__part_element__icontains=part_element)
+
+        if main_category in {'3', '4'}:
+            relation = 'buses_details' if main_category == '3' else 'trucks_details'
+            axles_from = to_int(get_param('axlesFrom'))
+            if axles_from is not None:
+                queryset = queryset.filter(**{f'{relation}__axles__gte': axles_from})
+            axles_to = to_int(get_param('axlesTo'))
+            if axles_to is not None:
+                queryset = queryset.filter(**{f'{relation}__axles__lte': axles_to})
+            seats_from = to_int(get_param('seatsFrom'))
+            if seats_from is not None:
+                queryset = queryset.filter(**{f'{relation}__seats__gte': seats_from})
+            seats_to = to_int(get_param('seatsTo'))
+            if seats_to is not None:
+                queryset = queryset.filter(**{f'{relation}__seats__lte': seats_to})
+            load_from = to_int(get_param('loadFrom'))
+            if load_from is not None:
+                queryset = queryset.filter(**{f'{relation}__load_kg__gte': load_from})
+            load_to = to_int(get_param('loadTo'))
+            if load_to is not None:
+                queryset = queryset.filter(**{f'{relation}__load_kg__lte': load_to})
+            euro_standard = get_param('euroStandard')
+            if euro_standard:
+                queryset = queryset.filter(**{f'{relation}__euro_standard__icontains': euro_standard})
+
+        if main_category == '5':
+            displacement_from = to_int(get_param('displacementFrom'))
+            if displacement_from is not None:
+                queryset = queryset.filter(moto_details__displacement_cc__gte=displacement_from)
+            displacement_to = to_int(get_param('displacementTo'))
+            if displacement_to is not None:
+                queryset = queryset.filter(moto_details__displacement_cc__lte=displacement_to)
+
+        if main_category == '8':
+            lift_from = to_int(get_param('liftCapacityFrom'))
+            if lift_from is not None:
+                queryset = queryset.filter(forklift_details__lift_capacity_kg__gte=lift_from)
+            lift_to = to_int(get_param('liftCapacityTo'))
+            if lift_to is not None:
+                queryset = queryset.filter(forklift_details__lift_capacity_kg__lte=lift_to)
+            hours_from = to_int(get_param('hoursFrom'))
+            if hours_from is not None:
+                queryset = queryset.filter(forklift_details__hours__gte=hours_from)
+            hours_to = to_int(get_param('hoursTo'))
+            if hours_to is not None:
+                queryset = queryset.filter(forklift_details__hours__lte=hours_to)
+
+        if main_category == '9':
+            beds_from = to_int(get_param('bedsFrom'))
+            if beds_from is not None:
+                queryset = queryset.filter(caravan_details__beds__gte=beds_from)
+            beds_to = to_int(get_param('bedsTo'))
+            if beds_to is not None:
+                queryset = queryset.filter(caravan_details__beds__lte=beds_to)
+            length_from = to_float(get_param('lengthFrom'))
+            if length_from is not None:
+                queryset = queryset.filter(caravan_details__length_m__gte=length_from)
+            length_to = to_float(get_param('lengthTo'))
+            if length_to is not None:
+                queryset = queryset.filter(caravan_details__length_m__lte=length_to)
+            if get_param('hasToilet') in {'1', 'true', 'True'}:
+                queryset = queryset.filter(caravan_details__has_toilet=True)
+            if get_param('hasHeating') in {'1', 'true', 'True'}:
+                queryset = queryset.filter(caravan_details__has_heating=True)
+            if get_param('hasAirConditioning') in {'1', 'true', 'True'}:
+                queryset = queryset.filter(caravan_details__has_air_conditioning=True)
+
+        if main_category == 'a':
+            engine_count_from = to_int(get_param('engineCountFrom'))
+            if engine_count_from is not None:
+                queryset = queryset.filter(boats_details__engine_count__gte=engine_count_from)
+            engine_count_to = to_int(get_param('engineCountTo'))
+            if engine_count_to is not None:
+                queryset = queryset.filter(boats_details__engine_count__lte=engine_count_to)
+            material = get_param('material')
+            if material:
+                queryset = queryset.filter(boats_details__material__icontains=material)
+            for query_key, field_name in [
+                ('lengthFrom', 'length_m__gte'),
+                ('lengthTo', 'length_m__lte'),
+                ('widthFrom', 'width_m__gte'),
+                ('widthTo', 'width_m__lte'),
+                ('draftFrom', 'draft_m__gte'),
+                ('draftTo', 'draft_m__lte'),
+                ('hoursFrom', 'hours__gte'),
+                ('hoursTo', 'hours__lte'),
+            ]:
+                value = to_float(get_param(query_key))
+                if value is not None:
+                    queryset = queryset.filter(**{f'boats_details__{field_name}': value})
+            boat_features = get_param('boatFeatures')
+            if boat_features:
+                for feature in [item.strip() for item in boat_features.split(',') if item.strip()]:
+                    queryset = queryset.filter(boats_details__features__contains=[feature])
+
+        if main_category == 'b':
+            load_from = to_int(get_param('loadFrom'))
+            if load_from is not None:
+                queryset = queryset.filter(trailers_details__load_kg__gte=load_from)
+            load_to = to_int(get_param('loadTo'))
+            if load_to is not None:
+                queryset = queryset.filter(trailers_details__load_kg__lte=load_to)
+            axles_from = to_int(get_param('axlesFrom'))
+            if axles_from is not None:
+                queryset = queryset.filter(trailers_details__axles__gte=axles_from)
+            axles_to = to_int(get_param('axlesTo'))
+            if axles_to is not None:
+                queryset = queryset.filter(trailers_details__axles__lte=axles_to)
+            trailer_features = get_param('trailerFeatures')
+            if trailer_features:
+                for feature in [item.strip() for item in trailer_features.split(',') if item.strip()]:
+                    queryset = queryset.filter(trailers_details__features__contains=[feature])
+
+        if main_category == 'v':
+            topmenu = get_param('topmenu')
+            if topmenu:
+                queryset = queryset.filter(accessories_details__classified_for=topmenu)
+            accessory_category = get_param('marka')
+            if accessory_category:
+                queryset = queryset.filter(accessories_details__accessory_category__icontains=accessory_category)
+
+        if main_category in {'y', 'z'}:
+            topmenu = get_param('topmenu')
+            if topmenu:
+                relation_field = 'buy_details__classified_for' if main_category == 'y' else 'services_details__classified_for'
+                queryset = queryset.filter(**{relation_field: topmenu})
+            category = get_param('category')
+            if category:
+                relation_field = 'buy_details__buy_category' if main_category == 'y' else 'services_details__service_category'
+                queryset = queryset.filter(**{f'{relation_field}__icontains': category})
+
+        # Car category filter (legacy mappings)
+        category = get_param('category')
+        if category and (main_category == '1' or main_category is None):
             category_mapping = {
                 'Ван': 'van',
                 'Джип': 'jeep',
@@ -358,6 +581,34 @@ class CarListingViewSet(viewsets.ModelViewSet):
             category_key = category_mapping.get(category, category)
             queryset = queryset.filter(category=category_key)
 
+        # Media / seller filters
+        if get_param('hasPhoto') in {'1', 'true', 'True'}:
+            queryset = queryset.filter(images__isnull=False).distinct()
+
+        seller_type = get_param('sellerType')
+        if seller_type == '2':
+            queryset = queryset.filter(user__business_profile__isnull=False)
+        elif seller_type == '1':
+            queryset = queryset.filter(user__business_profile__isnull=True)
+
+        # Sorting
+        sort_by = get_param('sortBy', 'sort') or ''
+        if sort_by in {'price-asc', '3', 'Цена'}:
+            queryset = queryset.order_by('top_rank', 'price')
+        elif sort_by in {'price-desc'}:
+            queryset = queryset.order_by('top_rank', '-price')
+        elif sort_by in {'year-desc', '4'}:
+            queryset = queryset.order_by('top_rank', '-year_from')
+        elif sort_by in {'year-asc'}:
+            queryset = queryset.order_by('top_rank', 'year_from')
+        elif sort_by in {'mileage-desc', '5'}:
+            queryset = queryset.order_by('top_rank', '-mileage')
+        elif sort_by in {'newest', '6', 'Най-новите обяви'}:
+            queryset = queryset.order_by('top_rank', '-created_at')
+        elif sort_by in {'newest-2days', '7', 'Най-новите обяви от посл. 2 дни'}:
+            queryset = queryset.filter(created_at__gte=timezone.now() - timedelta(days=2)).order_by('top_rank', '-created_at')
+        else:
+            queryset = queryset.order_by('top_rank', 'brand', 'model', 'price')
         if self.action == "list":
             lite = (self.request.query_params.get("lite") or "").lower()
             compact = (self.request.query_params.get("compact") or "").lower()
@@ -454,10 +705,10 @@ class CarListingViewSet(viewsets.ModelViewSet):
             created_at__gte=cutoff
         ).count()
 
-        if active_listings_count >= 3:
+        if not _is_business_user(self.request.user) and active_listings_count >= 3:
             raise ValidationError(
-                "Можете да публикувате максимум 3 активни обяви. "
-                "Моля, изтрийте или архивирайте някоя от вашите обяви, за да добавите нова."
+                "ÐœÐ¾Ð¶ÐµÑ‚Ðµ Ð´Ð° Ð¿ÑƒÐ±Ð»Ð¸ÐºÑƒÐ²Ð°Ñ‚Ðµ Ð¼Ð°ÐºÑÐ¸Ð¼ÑƒÐ¼ 3 Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¸ Ð¾Ð±ÑÐ²Ð¸. "
+                "ÐœÐ¾Ð»Ñ, Ð¸Ð·Ñ‚Ñ€Ð¸Ð¹Ñ‚Ðµ Ð¸Ð»Ð¸ Ð°Ñ€Ñ…Ð¸Ð²Ð¸Ñ€Ð°Ð¹Ñ‚Ðµ Ð½ÑÐºÐ¾Ñ Ð¾Ñ‚ Ð²Ð°ÑˆÐ¸Ñ‚Ðµ Ð¾Ð±ÑÐ²Ð¸, Ð·Ð° Ð´Ð° Ð´Ð¾Ð±Ð°Ð²Ð¸Ñ‚Ðµ Ð½Ð¾Ð²Ð°."
             )
 
         listing_type = serializer.validated_data.get("listing_type", "normal")
@@ -587,11 +838,11 @@ def unarchive_listing(request, listing_id):
         created_at__gte=cutoff
     ).exclude(id=listing.id).count()
 
-    if active_count >= 3:
+    if not _is_business_user(request.user) and active_count >= 3:
         return Response(
             {
-                "detail": "Можете да имате максимум 3 активни обяви. "
-                          "Моля, архивирайте или изтрийте някоя от активните."
+                "detail": "ÐœÐ¾Ð¶ÐµÑ‚Ðµ Ð´Ð° Ð¸Ð¼Ð°Ñ‚Ðµ Ð¼Ð°ÐºÑÐ¸Ð¼ÑƒÐ¼ 3 Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¸ Ð¾Ð±ÑÐ²Ð¸. "
+                          "ÐœÐ¾Ð»Ñ, Ð°Ñ€Ñ…Ð¸Ð²Ð¸Ñ€Ð°Ð¹Ñ‚Ðµ Ð¸Ð»Ð¸ Ð¸Ð·Ñ‚Ñ€Ð¸Ð¹Ñ‚Ðµ Ð½ÑÐºÐ¾Ñ Ð¾Ñ‚ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¸Ñ‚Ðµ."
             },
             status=status.HTTP_400_BAD_REQUEST
         )
@@ -635,18 +886,18 @@ def republish_listing(request, listing_id):
         created_at__gte=cutoff
     ).exclude(id=listing.id).count()
 
-    if active_count >= 3:
+    if not _is_business_user(request.user) and active_count >= 3:
         return Response(
             {
-                "detail": "Можете да имате максимум 3 активни обяви. "
-                          "Моля, архивирайте или изтрийте някоя от активните."
+                "detail": "ÐœÐ¾Ð¶ÐµÑ‚Ðµ Ð´Ð° Ð¸Ð¼Ð°Ñ‚Ðµ Ð¼Ð°ÐºÑÐ¸Ð¼ÑƒÐ¼ 3 Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¸ Ð¾Ð±ÑÐ²Ð¸. "
+                          "ÐœÐ¾Ð»Ñ, Ð°Ñ€Ñ…Ð¸Ð²Ð¸Ñ€Ð°Ð¹Ñ‚Ðµ Ð¸Ð»Ð¸ Ð¸Ð·Ñ‚Ñ€Ð¸Ð¹Ñ‚Ðµ Ð½ÑÐºÐ¾Ñ Ð¾Ñ‚ Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¸Ñ‚Ðµ."
             },
             status=status.HTTP_400_BAD_REQUEST
         )
 
     if listing_type not in ['top', 'normal']:
         return Response(
-            {"detail": "Невалиден тип на обявата."},
+            {"detail": "ÐÐµÐ²Ð°Ð»Ð¸Ð´ÐµÐ½ Ñ‚Ð¸Ð¿ Ð½Ð° Ð¾Ð±ÑÐ²Ð°Ñ‚Ð°."},
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -679,7 +930,7 @@ def update_listing_type(request, listing_id):
 
     if listing_type not in ['top', 'normal']:
         return Response(
-            {"detail": "Невалиден тип на обявата."},
+            {"detail": "ÐÐµÐ²Ð°Ð»Ð¸Ð´ÐµÐ½ Ñ‚Ð¸Ð¿ Ð½Ð° Ð¾Ð±ÑÐ²Ð°Ñ‚Ð°."},
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -878,3 +1129,4 @@ def latest_listings(request):
     _set_public_cache_headers(response, max_age=LATEST_LISTINGS_CACHE_SECONDS)
     response["X-Latest-Listings-Cache"] = "MISS"
     return response
+

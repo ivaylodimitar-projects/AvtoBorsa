@@ -253,6 +253,181 @@ class CarListingPriceHistory(models.Model):
         return f"Price change for {self.listing_id}: {self.old_price} -> {self.new_price}"
 
 
+class CarsListing(models.Model):
+    """Dedicated details model for main_category='1' (Автомобили и Джипове)."""
+    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='cars_details')
+
+    def __str__(self):
+        return f"Cars details for listing {self.listing_id}"
+
+
+class WheelsListing(models.Model):
+    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='wheels_details')
+    wheel_for = models.CharField(max_length=8, blank=True)
+    offer_type = models.CharField(max_length=8, blank=True)
+    wheel_brand = models.CharField(max_length=120, blank=True)
+    material = models.CharField(max_length=60, blank=True)
+    bolts = models.PositiveSmallIntegerField(null=True, blank=True)
+    pcd = models.CharField(max_length=24, blank=True)
+    center_bore = models.CharField(max_length=24, blank=True)
+    offset = models.CharField(max_length=24, blank=True)
+    width = models.CharField(max_length=24, blank=True)
+    diameter = models.CharField(max_length=24, blank=True)
+    count = models.PositiveSmallIntegerField(null=True, blank=True)
+    wheel_type = models.CharField(max_length=60, blank=True)
+
+    def __str__(self):
+        return f"Wheels details for listing {self.listing_id}"
+
+
+class PartsListing(models.Model):
+    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='parts_details')
+    part_for = models.CharField(max_length=8, blank=True)
+    part_category = models.CharField(max_length=120, blank=True)
+    part_element = models.CharField(max_length=120, blank=True)
+    part_year_from = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1900), MaxValueValidator(2100)],
+    )
+    part_year_to = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1900), MaxValueValidator(2100)],
+    )
+
+    def __str__(self):
+        return f"Parts details for listing {self.listing_id}"
+
+
+class BusesListing(models.Model):
+    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='buses_details')
+    axles = models.PositiveSmallIntegerField(null=True, blank=True)
+    seats = models.PositiveIntegerField(null=True, blank=True)
+    load_kg = models.PositiveIntegerField(null=True, blank=True)
+    transmission = models.CharField(max_length=60, blank=True)
+    engine_type = models.CharField(max_length=60, blank=True)
+    euro_standard = models.CharField(max_length=24, blank=True)
+
+    def __str__(self):
+        return f"Bus details for listing {self.listing_id}"
+
+
+class TrucksListing(models.Model):
+    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='trucks_details')
+    axles = models.PositiveSmallIntegerField(null=True, blank=True)
+    seats = models.PositiveIntegerField(null=True, blank=True)
+    load_kg = models.PositiveIntegerField(null=True, blank=True)
+    transmission = models.CharField(max_length=60, blank=True)
+    engine_type = models.CharField(max_length=60, blank=True)
+    euro_standard = models.CharField(max_length=24, blank=True)
+
+    def __str__(self):
+        return f"Truck details for listing {self.listing_id}"
+
+
+class MotoListing(models.Model):
+    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='moto_details')
+    displacement_cc = models.PositiveIntegerField(null=True, blank=True)
+    transmission = models.CharField(max_length=60, blank=True)
+    engine_type = models.CharField(max_length=60, blank=True)
+
+    def __str__(self):
+        return f"Moto details for listing {self.listing_id}"
+
+
+class AgriListing(models.Model):
+    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='agri_details')
+    equipment_type = models.CharField(max_length=120, blank=True)
+
+    def __str__(self):
+        return f"Agri details for listing {self.listing_id}"
+
+
+class IndustrialListing(models.Model):
+    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='industrial_details')
+    equipment_type = models.CharField(max_length=120, blank=True)
+
+    def __str__(self):
+        return f"Industrial details for listing {self.listing_id}"
+
+
+class ForkliftListing(models.Model):
+    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='forklift_details')
+    engine_type = models.CharField(max_length=60, blank=True)
+    lift_capacity_kg = models.PositiveIntegerField(null=True, blank=True)
+    hours = models.PositiveIntegerField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Forklift details for listing {self.listing_id}"
+
+
+class CaravanListing(models.Model):
+    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='caravan_details')
+    beds = models.PositiveSmallIntegerField(null=True, blank=True)
+    length_m = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    has_toilet = models.BooleanField(default=False)
+    has_heating = models.BooleanField(default=False)
+    has_air_conditioning = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Caravan details for listing {self.listing_id}"
+
+
+class BoatsListing(models.Model):
+    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='boats_details')
+    boat_category = models.CharField(max_length=120, blank=True)
+    engine_type = models.CharField(max_length=60, blank=True)
+    engine_count = models.PositiveSmallIntegerField(null=True, blank=True)
+    material = models.CharField(max_length=80, blank=True)
+    length_m = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    width_m = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    draft_m = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    hours = models.PositiveIntegerField(null=True, blank=True)
+    features = models.JSONField(default=list, blank=True)
+
+    def __str__(self):
+        return f"Boats details for listing {self.listing_id}"
+
+
+class TrailersListing(models.Model):
+    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='trailers_details')
+    trailer_category = models.CharField(max_length=120, blank=True)
+    load_kg = models.PositiveIntegerField(null=True, blank=True)
+    axles = models.PositiveSmallIntegerField(null=True, blank=True)
+    features = models.JSONField(default=list, blank=True)
+
+    def __str__(self):
+        return f"Trailer details for listing {self.listing_id}"
+
+
+class AccessoriesListing(models.Model):
+    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='accessories_details')
+    classified_for = models.CharField(max_length=8, blank=True)
+    accessory_category = models.CharField(max_length=160, blank=True)
+
+    def __str__(self):
+        return f"Accessory details for listing {self.listing_id}"
+
+
+class BuyListing(models.Model):
+    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='buy_details')
+    classified_for = models.CharField(max_length=8, blank=True)
+    buy_category = models.CharField(max_length=160, blank=True)
+
+    def __str__(self):
+        return f"Buy details for listing {self.listing_id}"
+
+
+class ServicesListing(models.Model):
+    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='services_details')
+    classified_for = models.CharField(max_length=8, blank=True)
+    service_category = models.CharField(max_length=160, blank=True)
+
+    def __str__(self):
+        return f"Service details for listing {self.listing_id}"
+
+
 class CarImage(models.Model):
     """Model for storing images for car listings"""
     listing = models.ForeignKey(CarListing, on_delete=models.CASCADE, related_name='images')
