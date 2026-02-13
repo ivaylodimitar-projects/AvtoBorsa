@@ -442,6 +442,7 @@ export default function LandingPage() {
             models={MODELS}
             categories={CATEGORIES}
             mainCategory={category}
+            onMainCategoryChange={setCategory}
             recentSearches={searches}
             savedSearches={savedSearches}
           />
