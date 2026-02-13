@@ -806,7 +806,6 @@ const MyAdsPage: React.FC = () => {
     display: "flex",
     gap: 12,
     marginBottom: 32,
-    flexWrap: "wrap",
   },
   tab: {
     padding: "12px 24px",

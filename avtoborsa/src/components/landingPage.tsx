@@ -131,7 +131,6 @@ const CATEGORIES = [
   { value: "9", label: "Каравани" },
   { value: "a", label: "Яхти и Лодки" },
   { value: "b", label: "Ремаркета" },
-  { value: "c", label: "Велосипеди" },
   { value: "v", label: "Аксесоари" },
   { value: "y", label: "Купува" },
   { value: "z", label: "Услуги" },
@@ -255,7 +254,9 @@ export default function LandingPage() {
 
   const handleAdvancedSearch = (criteria: any) => {
     // Update filters based on search criteria
-    setCategory(criteria.category || "1");
+    if (criteria.mainCategory) {
+      setCategory(criteria.mainCategory);
+    }
     setBrand(criteria.brand || "");
     setModel(criteria.model || "");
     setCity(criteria.region || "");
@@ -412,11 +413,35 @@ export default function LandingPage() {
 
       <main style={styles.main}>
         <div id="search" style={styles.searchBlock}>
+          <div className="catsRow formShowGrid" style={styles.mainCategoryRow}>
+            {CATEGORIES.map((mainCategory) => {
+              const isActive = category === mainCategory.value;
+              return (
+                <button
+                  key={mainCategory.value}
+                  id={`ptico_${mainCategory.value}`}
+                  type="button"
+                  data-title={mainCategory.label}
+                  className={`cat${mainCategory.value}${isActive ? " active" : ""}`}
+                  style={{
+                    ...styles.mainCategoryButton,
+                    ...(isActive ? styles.mainCategoryButtonActive : {}),
+                  }}
+                  onClick={() => setCategory(mainCategory.value)}
+                  aria-pressed={isActive}
+                  title={mainCategory.label}
+                >
+                  {mainCategory.label}
+                </button>
+              );
+            })}
+          </div>
           <AdvancedSearch
             onSearch={handleAdvancedSearch}
             brands={BRANDS}
             models={MODELS}
             categories={CATEGORIES}
+            mainCategory={category}
             recentSearches={searches}
             savedSearches={savedSearches}
           />
@@ -626,7 +651,7 @@ export default function LandingPage() {
                               <tr>
                                 {Object.entries(CAR_FEATURES).map(([category, features]) => (
                                   <td key={category}>
-                                    <label style={{ fontSize: 12, fontWeight: 700, color: "#333", marginBottom: 12, display: "block", textTransform: "capitalize", paddingBottom: 8, borderBottom: "2px solid #0f766e" }}>
+                                    <label style={{ fontSize: 12, fontWeight: 700, color: "#333", marginBottom: 12, display: "block", textTransform: "capitalize", paddingBottom: 8, borderBottom: "3px solid #0f766e" }}>
                                       {category.charAt(0).toUpperCase() + category.slice(1)}
                                     </label>
                                     {features.map((feature) => (
@@ -1007,7 +1032,7 @@ export default function LandingPage() {
               <div style={styles.infoCard} className="info-card">
                 <div style={styles.infoTitle}>Какво представлява</div>
                 <p style={styles.infoText}>
-                  AvtoBorsa е{" "}
+                  Kar.bg е{" "}
                   <span style={styles.infoHighlight}>специализирана платформа</span> за покупко‑продажба на
                   автомобили с{" "}
                   <span style={styles.infoHighlight}>умно търсене</span>, ясни параметри и
@@ -1204,6 +1229,36 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#fafafa",
   },
   searchBlock: { marginBottom: 32 },
+  mainCategoryRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 12,
+    background: "#ffffff",
+    border: "1px solid #e2e8f0",
+    borderRadius: 12,
+    padding: "10px 12px",
+    boxShadow: "0 3px 10px rgba(15, 23, 42, 0.06)",
+  },
+  mainCategoryButton: {
+    border: "1px solid #d1d5db",
+    background: "#f8fafc",
+    color: "#334155",
+    borderRadius: 999,
+    padding: "8px 12px",
+    cursor: "pointer",
+    fontSize: 13,
+    fontWeight: 700,
+    lineHeight: 1.2,
+    whiteSpace: "nowrap",
+    transition: "all 0.2s ease",
+  },
+  mainCategoryButtonActive: {
+    background: "#0f766e",
+    borderColor: "#0f766e",
+    color: "#ffffff",
+    boxShadow: "0 4px 12px rgba(15, 118, 110, 0.24)",
+  },
   searchTitle: {
     fontWeight: 700,
     fontSize: 17,
@@ -1326,7 +1381,7 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: "0 4px 10px rgba(16,185,129,0.12)",
     backdropFilter: "blur(4px)",
   },
-  containerHeader: { marginTop: 0 },
+  containerHeader: { marginTop: 0, borderBottom: "3px solid #0f766e"},
   h2: {
     margin: 0,
     fontSize: 26,

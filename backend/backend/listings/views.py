@@ -184,6 +184,22 @@ class CarListingViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(user_id=user_id)
 
         # Search filters
+        main_category = (
+            self.request.query_params.get('main_category')
+            or self.request.query_params.get('mainCategory')
+        )
+        if main_category:
+            allowed_main_categories = {key for key, _ in CarListing.MAIN_CATEGORY_CHOICES}
+            label_to_main_category = {
+                label: key for key, label in CarListing.MAIN_CATEGORY_CHOICES
+            }
+            main_category_key = (
+                main_category
+                if main_category in allowed_main_categories
+                else label_to_main_category.get(main_category, main_category)
+            )
+            queryset = queryset.filter(main_category=main_category_key)
+
         brand = self.request.query_params.get('brand')
         if brand:
             queryset = queryset.filter(brand__icontains=brand)

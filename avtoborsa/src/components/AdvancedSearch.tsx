@@ -9,6 +9,7 @@ import { useSavedSearches } from "../hooks/useSavedSearches";
 import type { SavedSearch } from "../hooks/useSavedSearches";
 
 interface SearchCriteria {
+  mainCategory?: string;
   category: string;
   brand: string;
   model: string;
@@ -38,6 +39,7 @@ interface AdvancedSearchProps {
   brands: string[];
   models: Record<string, string[]>;
   categories: Array<{ value: string; label: string }>;
+  mainCategory: string;
   recentSearches?: RecentSearch[];
   savedSearches?: SavedSearch[];
 }
@@ -53,6 +55,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   brands,
   models,
   categories,
+  mainCategory,
   recentSearches = [],
   savedSearches = [],
 }) => {
@@ -131,6 +134,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     if (searchCriteria.color) query.color = searchCriteria.color;
     if (searchCriteria.region) query.region = searchCriteria.region;
     if (searchCriteria.category) query.category = searchCriteria.category;
+    if (mainCategory) query.mainCategory = mainCategory;
     if (searchCriteria.sortBy) query.sortBy = searchCriteria.sortBy;
 
     console.log("Search Query:", query);
@@ -143,7 +147,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     navigate(`/search?${queryString}`);
 
     // Also call onSearch for any landing page updates
-    onSearch(searchCriteria);
+    onSearch({ ...searchCriteria, mainCategory });
   };
 
   const handleClearFilters = () => {
@@ -195,6 +199,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       if (searchCriteria.color) query.color = searchCriteria.color;
       if (searchCriteria.region) query.region = searchCriteria.region;
       if (searchCriteria.category) query.category = searchCriteria.category;
+      if (mainCategory) query.mainCategory = mainCategory;
 
       saveSearch(searchName, query);
       setShowSaveModal(false);

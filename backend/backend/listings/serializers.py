@@ -416,6 +416,16 @@ class CarListingSerializer(serializers.ModelSerializer):
             for entry in history
         ]
 
+    def to_internal_value(self, data):
+        """
+        Support camelCase payloads from the frontend by mapping
+        `mainCategory` -> `main_category`.
+        """
+        mutable_data = data.copy() if hasattr(data, "copy") else dict(data)
+        if "mainCategory" in mutable_data and "main_category" not in mutable_data:
+            mutable_data["main_category"] = mutable_data.get("mainCategory")
+        return super().to_internal_value(mutable_data)
+
     def create(self, validated_data):
         """Create listing and handle image uploads"""
         images_data = validated_data.pop('images_upload', [])
