@@ -139,7 +139,7 @@ class CarListingListSerializer(serializers.ModelSerializer):
     class Meta:
         model = CarListing
         fields = [
-            'id', 'slug', 'main_category', 'main_category_display', 'brand', 'model', 'year_from', 'price', 'mileage', 'power', 'location_country', 'city',
+            'id', 'slug', 'main_category', 'main_category_display', 'title', 'brand', 'model', 'year_from', 'price', 'mileage', 'power', 'location_country', 'city',
             'fuel', 'fuel_display', 'gearbox', 'gearbox_display',
             'category', 'category_display', 'condition', 'condition_display',
             'description_preview', 'created_at', 'updated_at',
@@ -278,7 +278,7 @@ class CarListingSearchCompactSerializer(CarListingListSerializer):
     class Meta:
         model = CarListing
         fields = [
-            'id', 'slug', 'main_category', 'main_category_display', 'brand', 'model', 'year_from', 'price', 'mileage', 'power', 'location_country', 'city',
+            'id', 'slug', 'main_category', 'main_category_display', 'title', 'brand', 'model', 'year_from', 'price', 'mileage', 'power', 'location_country', 'city',
             'fuel_display', 'gearbox_display', 'category_display', 'condition_display',
             'description_preview', 'created_at', 'updated_at',
             'listing_type', 'listing_type_display',

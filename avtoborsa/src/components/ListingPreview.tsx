@@ -1,5 +1,5 @@
 ﻿import React from "react";
-import { CheckCircle2, ImageOff } from "lucide-react";
+import { FiCheckCircle, FiHome, FiImage } from "react-icons/fi";
 import { formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 
 interface ListingPreviewProps {
@@ -19,6 +19,8 @@ interface ListingPreviewProps {
   variant?: "full" | "compact";
   listingType?: "top" | "normal" | string;
   dealershipAbout?: string;
+  imageCount?: number;
+  priceRequired?: boolean;
 }
 
 const ListingPreview: React.FC<ListingPreviewProps> = ({
@@ -38,6 +40,8 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
   variant = "full",
   listingType = "normal",
   dealershipAbout,
+  imageCount = 0,
+  priceRequired = true,
 }) => {
   const isCompact = variant === "compact";
 
@@ -49,6 +53,14 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
   const powerValue = Number(power);
   const powerLabel =
     Number.isFinite(powerValue) && powerValue > 0 ? `${powerValue} к.с.` : "";
+  const numericPrice = Number(price);
+  const hasValidPrice = Number.isFinite(numericPrice) && numericPrice > 0;
+  const priceLabel = hasValidPrice
+    ? `${new Intl.NumberFormat("bg-BG", { maximumFractionDigits: 0 }).format(numericPrice)} EUR`
+    : priceRequired
+      ? "Добави цена"
+      : "По договаряне";
+  const mediaLabel = `${imageCount} ${imageCount === 1 ? "снимка" : "снимки"}`;
 
   const specs = [
     { label: "Година", value: year },
@@ -70,7 +82,7 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
       boxShadow: "0 12px 24px rgba(15, 23, 42, 0.08)",
     },
     header: {
-      background: "#f8fafc",
+      background: "linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)",
       padding: isCompact ? "12px 14px" : "16px",
       borderBottom: "1px solid #e2e8f0",
     },
@@ -169,14 +181,33 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
       color: "#0f172a",
     },
     price: {
-      fontSize: isCompact ? 18 : 20,
+      fontSize: isCompact ? 18 : 21,
       fontWeight: 800,
       color: "#fff",
-      marginBottom: 14,
-      padding: "10px",
-      background: "#0f766e",
-      borderRadius: 10,
+      marginBottom: 10,
+      padding: "12px 14px",
+      background: "linear-gradient(135deg, #0f766e 0%, #0ea5a3 100%)",
+      borderRadius: 12,
       textAlign: "center" as const,
+    },
+    priceMeta: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+      padding: "8px 10px",
+      marginBottom: 14,
+      borderRadius: 10,
+      border: "1px solid #e2e8f0",
+      background: "#f8fafc",
+      fontSize: 12,
+      color: "#475569",
+    },
+    priceMetaItem: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      fontWeight: 600,
     },
     description: {
       fontSize: 13,
@@ -229,7 +260,7 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
           <div style={styles.completionFill} />
         </div>
         <div style={styles.completionRow}>
-          <CheckCircle2 size={14} />
+          <FiCheckCircle size={14} />
           <span>Обявата е {completionPercentage}% завършена</span>
         </div>
       </div>
@@ -241,13 +272,23 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
             <img src={coverImage} alt="Cover" style={styles.image} />
           ) : (
             <div style={styles.noImage}>
-              <ImageOff size={32} />
+              <FiImage size={32} />
               <span>Няма снимка</span>
             </div>
           )}
         </div>
 
-        <div style={styles.price}>€{price || "0"}</div>
+        <div style={styles.price}>{priceLabel}</div>
+        <div style={styles.priceMeta}>
+          <span style={styles.priceMetaItem}>
+            <FiImage size={14} />
+            {mediaLabel}
+          </span>
+          <span style={styles.priceMetaItem}>
+            <FiCheckCircle size={14} />
+            {hasValidPrice || !priceRequired ? "Цена: ОК" : "Цена: липсва"}
+          </span>
+        </div>
 
         <div style={styles.specs}>
           {visibleSpecs.map((spec) => (
@@ -266,10 +307,7 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
       {!isCompact && dealershipAbout && (
         <div style={styles.dealershipSection}>
           <div style={styles.dealershipTitle}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0f172a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-              <polyline points="9 22 9 12 15 12 15 22" />
-            </svg>
+            <FiHome size={16} />
             За автокъщата
           </div>
           <div style={styles.dealershipAboutText}>{dealershipAbout}</div>

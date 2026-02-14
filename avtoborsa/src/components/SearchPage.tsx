@@ -17,15 +17,18 @@ import {
   TrendingUp,
   TrendingDown,
   PencilLine,
+  Bookmark,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 import { formatConditionLabel, formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 import { getMainCategoryFromTopmenu, getMainCategoryLabel } from "../constants/mobileBgData";
+import { useSavedSearches } from "../hooks/useSavedSearches";
 
 type CarListing = {
   id: number;
   slug: string;
+  title?: string;
   brand: string;
   model: string;
   year_from: number;
@@ -103,6 +106,11 @@ const SearchPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [searchName, setSearchName] = useState("");
+  const [saveSearchFeedback, setSaveSearchFeedback] = useState("");
+  const saveSearchFeedbackTimeoutRef = useRef<number | null>(null);
+  const { saveSearch } = useSavedSearches();
   const getImageUrl = useImageUrl();
 
   const baseQueryString = useMemo(() => {
@@ -481,11 +489,15 @@ const SearchPage: React.FC = () => {
   // Build search criteria display
   const searchCriteriaDisplay = useMemo(() => {
     const criteria: string[] = [];
+    const consumed = new Set<string>();
 
     const getParam = (...keys: string[]) => {
       for (const key of keys) {
         const value = (searchParams.get(key) || "").trim();
-        if (value) return value;
+        if (value) {
+          keys.forEach((alias) => consumed.add(alias));
+          return value;
+        }
       }
       return "";
     };
@@ -520,14 +532,7 @@ const SearchPage: React.FC = () => {
 
     const mainCategory = getParam("main_category", "mainCategory");
     const mainCategoryLabel = getMainCategoryLabel(mainCategory || "1") || "Категория";
-    const marka = getParam("marka");
-    const brand = getParam("brand");
-    const model = getParam("model");
     const category = getParam("category");
-    const motoCategory = getParam("motoCategory");
-    const motoCoolingType = getParam("motoCoolingType");
-    const motoEngineKind = getParam("motoEngineKind");
-    const motoFeatures = getParam("motoFeatures");
     const year = getParam("year");
     const yearFrom = getParam("yearFrom");
     const yearTo = getParam("yearTo");
@@ -585,7 +590,9 @@ const SearchPage: React.FC = () => {
     if (sellerType && sellerTypeLabels[sellerType]) addCriterion("Тип обяви", sellerTypeLabels[sellerType]);
 
     if (mainCategory === "w") {
-      addCriterion("Марка авто", brand || marka);
+      const brand = getParam("brand", "marka");
+      const model = getParam("model");
+      addCriterion("Марка авто", brand);
       addCriterion("Модел авто", model);
       const wheelOfferType = getParam("twrubr");
       addCriterion("Оферта", wheelOfferTypeLabels[wheelOfferType] || wheelOfferType);
@@ -603,15 +610,19 @@ const SearchPage: React.FC = () => {
     }
 
     if (mainCategory === "u") {
-      addCriterion("Марка", brand || marka);
+      const brand = getParam("brand", "marka");
+      const model = getParam("model");
+      addCriterion("Марка", brand);
       addCriterion("Модел", model);
       addCriterion("Категория част", getParam("partrub"));
       addCriterion("Част", getParam("partelem"));
+      addRangeCriterion("Година на част (от)", getParam("partYearFrom", "part_year_from"), "");
+      addRangeCriterion("Година на част (до)", "", getParam("partYearTo", "part_year_to"));
       return criteria;
     }
 
     if (mainCategory === "v") {
-      addCriterion("Категория аксесоар", marka);
+      addCriterion("Категория аксесоар", getParam("marka", "accessoryCategory"));
       return criteria;
     }
 
@@ -620,37 +631,61 @@ const SearchPage: React.FC = () => {
       return criteria;
     }
 
-    if (mainCategory === "6" || mainCategory === "7") {
-      const explicitEquipmentType = getParam("equipmentType");
-      const legacyEquipmentType = explicitEquipmentType ? "" : marka;
-      const equipmentType = explicitEquipmentType || legacyEquipmentType;
-      const equipmentBrand = brand || (explicitEquipmentType ? marka : model);
-      const equipmentModel = explicitEquipmentType ? model : "";
-
-      addCriterion("Вид техника", equipmentType);
-      addCriterion("Марка", equipmentBrand);
-      addCriterion("Модел", equipmentModel);
+    if (mainCategory === "6") {
+      addCriterion("Категория", getParam("equipmentType", "marka"));
+      addCriterion("Марка", getParam("model"));
       addRangeCriterion("Мощност", getParam("engineFrom"), getParam("engineTo"), " к.с.");
       addCriterion("Цвят", getParam("color"));
       return criteria;
     }
 
-    addCriterion("Марка", brand || marka);
-    addCriterion("Модел", model);
-    if (mainCategory === "a") addCriterion("Категория лодка", getParam("boatCategory"));
-    if (mainCategory === "b") addCriterion("Категория ремарке", getParam("trailerCategory"));
-    addCriterion("Тип", mainCategory === "5" ? motoCategory : category);
+    if (mainCategory === "7") {
+      addCriterion("Вид техника", getParam("equipmentType"));
+      addCriterion("Марка", getParam("brand", "marka"));
+      addCriterion("Модел", getParam("model"));
+      addRangeCriterion("Мощност", getParam("engineFrom"), getParam("engineTo"), " к.с.");
+      addCriterion("Цвят", getParam("color"));
+      return criteria;
+    }
+
+    if (mainCategory === "a") {
+      addCriterion("Категория лодка", getParam("boatCategory", "marka"));
+      addCriterion("Марка", getParam("model"));
+      addCriterion("Вид двигател", getParam("fuel"));
+      addRangeCriterion("Брой двигатели", getParam("engineCountFrom"), getParam("engineCountTo"));
+      addRangeCriterion("Дължина", getParam("lengthFrom"), getParam("lengthTo"), " м");
+      addRangeCriterion("Ширина", getParam("widthFrom"), getParam("widthTo"), " м");
+      addRangeCriterion("Газене", getParam("draftFrom"), getParam("draftTo"), " м");
+      addRangeCriterion("Часове", getParam("hoursFrom"), getParam("hoursTo"));
+      addCriterion("Материал", getParam("material"));
+      addCriterion("Цвят", getParam("color"));
+      return criteria;
+    }
+
+    if (mainCategory === "b") {
+      addCriterion("Категория ремарке", getParam("trailerCategory", "marka"));
+      addCriterion("Марка", getParam("model"));
+      addRangeCriterion("Товароносимост", getParam("loadFrom"), getParam("loadTo"), " кг");
+      addRangeCriterion("Оси", getParam("axlesFrom"), getParam("axlesTo"));
+      addCriterion("Цвят", getParam("color"));
+      return criteria;
+    }
+
+    addCriterion("Марка", getParam("brand", "marka"));
+    addCriterion("Модел", getParam("model"));
+    addCriterion("Тип", mainCategory === "5" ? getParam("motoCategory") : category);
     const fuelOrEngineType = getParam("fuel");
     if (mainCategory === "1") {
       addCriterion("Гориво", formatFuelLabel(fuelOrEngineType));
       addCriterion("Скоростна кутия", formatGearboxLabel(getParam("gearbox")));
+      addRangeCriterion("Кубатура", getParam("displacementFrom"), getParam("displacementTo"), " куб.см.");
+      addCriterion("Евростандарт", getParam("euroStandard"));
     } else {
       addCriterion("Вид двигател", fuelOrEngineType);
     }
     if (mainCategory === "5") {
-      addCriterion("Вид охлаждане", motoCoolingType);
-      addCriterion("Вид двигател (конфигурация)", motoEngineKind);
-      addCriterion("Екстри", motoFeatures.split(",").filter(Boolean).join(", "));
+      addCriterion("Вид охлаждане", getParam("motoCoolingType"));
+      addCriterion("Вид двигател (конфигурация)", getParam("motoEngineKind"));
     }
     addCriterion("Трансмисия", getParam("transmission"));
     addCriterion("Евростандарт", getParam("euroStandard"));
@@ -671,9 +706,38 @@ const SearchPage: React.FC = () => {
     if (["1", "true", "True"].includes(getParam("hasToilet"))) addCriterion("Тоалетна", "Да");
     if (["1", "true", "True"].includes(getParam("hasHeating"))) addCriterion("Отопление", "Да");
     if (["1", "true", "True"].includes(getParam("hasAirConditioning"))) addCriterion("Климатик", "Да");
-    addCriterion("Екстри лодка", getParam("boatFeatures").split(",").filter(Boolean).join(", "));
-    addCriterion("Екстри ремарке", getParam("trailerFeatures").split(",").filter(Boolean).join(", "));
     addCriterion("Цвят", getParam("color"));
+
+    const fallbackLabels: Record<string, string> = {
+      partYearFrom: "Година на част (от)",
+      partYearTo: "Година на част (до)",
+      equipmentType: "Вид техника",
+      boatCategory: "Категория лодка",
+      trailerCategory: "Категория ремарке",
+      liftCapacityFrom: "Товароподемност от",
+      liftCapacityTo: "Товароподемност до",
+      hasToilet: "Тоалетна",
+      hasHeating: "Отопление",
+      hasAirConditioning: "Климатик",
+    };
+    const ignoredKeys = new Set([
+      "page",
+      "page_size",
+      "compact",
+      "features",
+      "motoFeatures",
+      "boatFeatures",
+      "trailerFeatures",
+    ]);
+
+    searchParams.forEach((rawValue, key) => {
+      const value = rawValue.trim();
+      if (!value) return;
+      if (ignoredKeys.has(key) || consumed.has(key)) return;
+      const label = fallbackLabels[key] || key;
+      criteria.push(`${label}: ${value}`);
+      consumed.add(key);
+    });
 
     return criteria;
   }, [searchParams]);
@@ -768,6 +832,53 @@ const SearchPage: React.FC = () => {
   }, [searchParams]);
   const skeletonRows = useMemo(() => Array.from({ length: PAGE_SIZE }, (_, idx) => idx), []);
 
+  const saveableSearchCriteria = useMemo(() => {
+    const criteria: Record<string, string> = {};
+    searchParams.forEach((rawValue, key) => {
+      if (key === "page" || key === "page_size" || key === "compact") return;
+      const value = rawValue.trim();
+      if (!value) return;
+      if (criteria[key]) {
+        criteria[key] = `${criteria[key]},${value}`;
+      } else {
+        criteria[key] = value;
+      }
+    });
+    return criteria;
+  }, [searchParams]);
+
+  const defaultSearchName = useMemo(
+    () => (listingsScopeLabel ? `Търсене: ${listingsScopeLabel}` : "Запазено търсене"),
+    [listingsScopeLabel]
+  );
+
+  const openSaveSearchModal = useCallback(() => {
+    setSearchName(defaultSearchName);
+    setShowSaveModal(true);
+  }, [defaultSearchName]);
+
+  const submitSaveSearch = useCallback(() => {
+    const finalName = searchName.trim() || defaultSearchName;
+    saveSearch(finalName, saveableSearchCriteria);
+    setSaveSearchFeedback(`Запазено търсене: ${finalName}`);
+    setShowSaveModal(false);
+    if (saveSearchFeedbackTimeoutRef.current) {
+      window.clearTimeout(saveSearchFeedbackTimeoutRef.current);
+    }
+    saveSearchFeedbackTimeoutRef.current = window.setTimeout(() => {
+      setSaveSearchFeedback("");
+      saveSearchFeedbackTimeoutRef.current = null;
+    }, 2800);
+  }, [defaultSearchName, saveSearch, saveableSearchCriteria, searchName]);
+
+  useEffect(() => {
+    return () => {
+      if (saveSearchFeedbackTimeoutRef.current) {
+        window.clearTimeout(saveSearchFeedbackTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const visiblePages = useMemo(() => {
     if (totalPages <= 1) return [];
     if (totalPages <= 7) {
@@ -805,7 +916,38 @@ const SearchPage: React.FC = () => {
     page: { minHeight: "100vh", background: "#f4f6f9", width: "100%", paddingTop: 20, paddingBottom: 40 },
     container: { width: "100%", maxWidth: 1200, margin: "0 auto", padding: "0 20px" },
     header: { marginBottom: 24, background: "#fff", padding: 24, borderRadius: 10, boxShadow: "0 6px 18px rgba(15, 23, 42, 0.08)" },
-    title: { fontSize: 28, fontWeight: 700, color: "#0f172a", margin: "0 0 16px 0" },
+    headerTop: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" },
+    title: { fontSize: 28, fontWeight: 700, color: "#0f172a", margin: 0 },
+    headerLead: { margin: "6px 0 0", color: "#666", fontSize: 15, lineHeight: 1.6 },
+    headerDivider: {
+      height: 2,
+      margin: "18px 0 0",
+      width: "100%",
+      borderRadius: 999,
+      background: "rgb(15, 118, 110)",
+      border: "1px solid rgb(15, 118, 110)",
+      boxShadow: "0 2px 6px rgba(15, 118, 110, 0.28)",
+    },
+    saveSearchButton: {
+      display: "inline-flex",
+      alignItems: "center",
+      background: "#d97706",
+      border: "1.5px solid #d97706",
+      borderRadius: 10,
+      color: "#fff",
+      fontSize: 13,
+      padding: "8px 20px",
+      cursor: "pointer",
+      transition: "all 0.2s",
+      height: 48,
+      whiteSpace: "nowrap" as const,
+    },
+    saveSearchFeedback: {
+      marginTop: 10,
+      color: "#047857",
+      fontWeight: 700,
+      fontSize: 13,
+    },
     criteria: { display: "flex", flexWrap: "wrap", gap: 12, marginTop: 16 },
     criteriaTag: { background: "#f1f5f9", padding: "8px 14px", borderRadius: 20, fontSize: 13, color: "#475569", fontWeight: 600 },
     results: { display: "flex", flexDirection: "column", gap: 16 },
@@ -867,9 +1009,9 @@ const SearchPage: React.FC = () => {
       borderRadius: 999,
       fontSize: 11,
       fontWeight: 700,
-      background: "#ecfdf5",
-      color: "#15803d",
-      border: "1px solid #bbf7d0",
+      background: "#ccfbf1",
+      color: "#000",
+      border: "1px solid #5eead4",
       width: "fit-content",
       whiteSpace: "nowrap" as const,
       maxWidth: 220,
@@ -908,11 +1050,12 @@ const SearchPage: React.FC = () => {
       display: "-webkit-box",
       WebkitLineClamp: 4,
       WebkitBoxOrient: "vertical" as any,
-      background: "linear-gradient(90deg, rgba(15,23,42,0.06), rgba(15,23,42,0.01))",
-      borderLeft: "3px solid rgb(15, 118, 110)",
+      background: "#f8fafc",
+      border: "1px solid #e2e8f0",
       padding: "10px 12px",
       borderRadius: 10,
-      fontWeight: 600,
+      fontWeight: 500,
+      fontFamily: "inherit",
     },
     itemSide: { width: 240, padding: 16, background: "linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)", borderLeft: "1px solid #e2e8f0", display: "flex", flexDirection: "column" as const, gap: 12 },
     sideSection: { display: "flex", flexDirection: "column" as const, gap: 8 },
@@ -962,6 +1105,61 @@ const SearchPage: React.FC = () => {
     skeletonChip: { height: 28, width: 90, borderRadius: 999, ...skeletonBase },
     skeletonDesc: { height: 14, width: "100%", borderRadius: 8, ...skeletonBase },
     skeletonSideLine: { height: 14, width: "80%", borderRadius: 8, ...skeletonBase },
+    modalOverlay: {
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "rgba(0, 0, 0, 0.5)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 10000,
+      padding: 16,
+    },
+    modalCard: {
+      background: "#fff",
+      borderRadius: 12,
+      padding: 24,
+      maxWidth: 400,
+      width: "100%",
+      boxSizing: "border-box",
+      boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
+    },
+    modalTitle: { fontSize: 18, fontWeight: 700, color: "#333", margin: "0 0 16px 0" },
+    modalInput: {
+      width: "100%",
+      padding: "10px 12px",
+      border: "1.5px solid #e5e7eb",
+      borderRadius: 8,
+      fontSize: 14,
+      marginBottom: 16,
+      outline: "none",
+      fontFamily: "inherit",
+      boxSizing: "border-box",
+    },
+    modalActions: { display: "flex", gap: 12, justifyContent: "flex-end" },
+    modalButtonCancel: {
+      padding: "10px 20px",
+      borderRadius: 8,
+      fontSize: 14,
+      fontWeight: 600,
+      cursor: "pointer",
+      background: "#f3f4f6",
+      border: "1px solid #e5e7eb",
+      color: "#6b7280",
+    },
+    modalButtonSave: {
+      padding: "10px 20px",
+      borderRadius: 8,
+      fontSize: 14,
+      fontWeight: 600,
+      cursor: "pointer",
+      background: "#d97706",
+      border: "none",
+      color: "#fff",
+    },
   };
 
   return (
@@ -976,10 +1174,36 @@ const SearchPage: React.FC = () => {
           box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12) !important;
           transform: translateY(-4px);
         }
+
+        .search-save-btn:hover {
+          background: #ea580c !important;
+          border-color: #ea580c !important;
+        }
+
+        .search-modal-btn-cancel:hover {
+          background: #e5e7eb !important;
+        }
+
+        .search-modal-btn-save:hover {
+          background: #ea580c !important;
+        }
       `}</style>
       <div style={styles.container}>
         <div style={styles.header}>
-          <h1 style={styles.title}>Резултати от търсене</h1>
+          <div style={styles.headerTop}>
+            <h1 style={styles.title}>Резултати от търсене</h1>
+            <button
+              type="button"
+              className="search-save-btn"
+              style={styles.saveSearchButton}
+              onClick={openSaveSearchModal}
+            >
+              <Bookmark size={16} style={{ marginRight: 6 }} />
+              Запази търсене
+            </button>
+          </div>
+          <p style={styles.headerLead}>Намерените обяви според избраните филтри</p>
+          {saveSearchFeedback && <div style={styles.saveSearchFeedback}>{saveSearchFeedback}</div>}
           {searchCriteriaDisplay.length > 0 && (
             <div style={styles.criteria}>
               {searchCriteriaDisplay.map((criterion, idx) => (
@@ -992,6 +1216,7 @@ const SearchPage: React.FC = () => {
             <strong style={{ color: "rgb(15, 118, 110)" }}>{totalListings}</strong> намерени обяви за{" "}
             <strong style={{ color: "rgb(15, 118, 110)" }}>{listingsScopeLabel}</strong>
           </p>
+          <div style={styles.headerDivider} />
         </div>
 
         {isLoading ? (
@@ -1104,6 +1329,7 @@ const SearchPage: React.FC = () => {
               while (thumbItems.length < maxThumbs) {
                 thumbItems.push({ type: "placeholder" });
               }
+              const listingTitle = (listing.title || `${listing.brand} ${listing.model}`).trim() || "Обява";
 
                 return (
                   <div
@@ -1125,7 +1351,7 @@ const SearchPage: React.FC = () => {
                             <>
                               <img
                                 src={mainImageUrl}
-                                alt={`${listing.brand} ${listing.model}`}
+                                alt={listingTitle}
                                 style={styles.itemImage}
                                 loading={isPriorityImage ? "eager" : "lazy"}
                                 decoding="async"
@@ -1208,11 +1434,8 @@ const SearchPage: React.FC = () => {
                                   openListing(listing.slug);
                                 }}
                               >
-                                {listing.brand} {listing.model}
+                                {listingTitle}
                               </a>
-                              <div style={styles.itemCategoryBadge}>
-                                {listing.main_category_display || getMainCategoryLabel(listing.main_category || "") || "Категория"}
-                              </div>
                             </div>
                             <div style={styles.itemPrice}>
                               € {listing.price.toLocaleString("bg-BG")}
@@ -1364,6 +1587,43 @@ const SearchPage: React.FC = () => {
           <div style={styles.empty}>
             <h3 style={{ fontSize: 20, color: "#333", marginBottom: 12 }}>Няма намерени обяви</h3>
             <p style={{ fontSize: 14, color: "#666", margin: 0 }}>Опитайте да промените филтрите или се върнете на начална страница</p>
+          </div>
+        )}
+
+        {showSaveModal && (
+          <div style={styles.modalOverlay} onClick={() => setShowSaveModal(false)}>
+            <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+              <h3 style={styles.modalTitle}>Запази търсене</h3>
+              <input
+                type="text"
+                style={styles.modalInput}
+                placeholder="Име на търсенето (напр. BMW 320 София)"
+                value={searchName}
+                onChange={(e) => setSearchName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submitSaveSearch();
+                }}
+                autoFocus
+              />
+              <div style={styles.modalActions}>
+                <button
+                  type="button"
+                  className="search-modal-btn-cancel"
+                  style={styles.modalButtonCancel}
+                  onClick={() => setShowSaveModal(false)}
+                >
+                  Отказ
+                </button>
+                <button
+                  type="button"
+                  className="search-modal-btn-save"
+                  style={styles.modalButtonSave}
+                  onClick={submitSaveSearch}
+                >
+                  Запази
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

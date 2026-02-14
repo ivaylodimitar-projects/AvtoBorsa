@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  ClipboardList,
-  FileText,
-  Image,
-  Phone,
-  Settings2,
-  Sparkles,
-  Wallet,
-} from "lucide-react";
+  FiArrowLeft,
+  FiArrowRight,
+  FiCheck,
+  FiClipboard,
+  FiFileText,
+  FiImage,
+  FiPhone,
+  FiSettings,
+  FiStar,
+  FiTag,
+} from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
 import { BULGARIAN_CITIES_BY_REGION } from "../constants/bulgarianCities";
 import ListingFormStepper from "./ListingFormStepper";
@@ -20,6 +20,7 @@ import FormFieldWithTooltip from "./FormFieldWithTooltip";
 import ListingPreview from "./ListingPreview";
 import ListingQualityIndicator from "./ListingQualityIndicator";
 import { CAR_FEATURE_GROUPS, normalizeCarFeatures } from "../constants/carFeatures";
+import type { CarFeatureGroup } from "../constants/carFeatures";
 import { HEAVY_FEATURE_GROUPS } from "../constants/heavyFeatures";
 import {
   MOTO_CATEGORY_OPTIONS,
@@ -134,6 +135,7 @@ interface PublishFormData {
   motoCoolingType: string;
   motoEngineKind: string;
   equipmentType: string;
+  agriDriveType: string;
   forkliftLoad: string;
   forkliftHours: string;
   caravanBeds: string;
@@ -472,17 +474,6 @@ const EQUIPMENT_TYPE_OPTIONS = [
   "Друго",
 ];
 
-const BOAT_CATEGORY_OPTIONS = [
-  "Яхта",
-  "Лодка",
-  "Катер",
-  "Джет",
-  "Надуваема лодка",
-  "Рибарска лодка",
-  "Понтон",
-  "Други",
-];
-
 const BOAT_MATERIAL_OPTIONS = [
   "Алуминий",
   "Желязо",
@@ -494,8 +485,6 @@ const BOAT_MATERIAL_OPTIONS = [
   "Hypalon",
   "Стъклопласт",
 ];
-
-const TRAILER_CATEGORY_OPTIONS = ["За автомобил", "За камион", "За трактор", "Полуремарке"];
 
 const buildNumericOptions = (
   from: number,
@@ -539,6 +528,62 @@ const CAR_CATEGORY_OPTIONS = [
   { value: "hatchback", label: "Хечбек" },
 ];
 
+const AGRI_DRIVE_TYPE_OPTIONS = ["2x4", "4x4", "Верижно", "Друго"];
+
+const CATEGORY_AS_BRAND_MAIN_CATEGORIES = new Set<MainCategoryKey>(["6", "a", "b"]);
+const UNSORTED_BRAND_OPTION_MAIN_CATEGORIES = new Set<MainCategoryKey>(["6", "a", "b"]);
+
+type AgriFieldVisibility = {
+  showEngineType: boolean;
+  showPower: boolean;
+  showTransmission: boolean;
+  showDriveType: boolean;
+  showHours: boolean;
+  showEuroStandard: boolean;
+};
+
+const DEFAULT_AGRI_FIELD_VISIBILITY: AgriFieldVisibility = {
+  showEngineType: false,
+  showPower: false,
+  showTransmission: false,
+  showDriveType: false,
+  showHours: false,
+  showEuroStandard: false,
+};
+
+const AGRI_FIELD_VISIBILITY_BY_CATEGORY: Record<string, AgriFieldVisibility> = {
+  "трактор": {
+    showEngineType: true,
+    showPower: true,
+    showTransmission: true,
+    showDriveType: true,
+    showHours: true,
+    showEuroStandard: true,
+  },
+  "комбайн": {
+    showEngineType: true,
+    showPower: true,
+    showTransmission: true,
+    showDriveType: false,
+    showHours: true,
+    showEuroStandard: true,
+  },
+  "телескопичен товарач": {
+    showEngineType: false,
+    showPower: false,
+    showTransmission: false,
+    showDriveType: false,
+    showHours: false,
+    showEuroStandard: false,
+  },
+};
+
+const getAgriFieldVisibility = (category: string): AgriFieldVisibility => {
+  const normalizedCategory = category.trim().toLocaleLowerCase("bg-BG");
+  if (!normalizedCategory) return DEFAULT_AGRI_FIELD_VISIBILITY;
+  return AGRI_FIELD_VISIBILITY_BY_CATEGORY[normalizedCategory] ?? DEFAULT_AGRI_FIELD_VISIBILITY;
+};
+
 const CATEGORIES_WITHOUT_BRAND_AND_MODEL = new Set<MainCategoryKey>(["w", "u", "v", "y", "z"]);
 const CATEGORIES_WITHOUT_PRICE = new Set<MainCategoryKey>(["y", "z"]);
 
@@ -554,11 +599,146 @@ const INDUSTRIAL_FEATURE_GROUPS = (["komfort", "drugi", "zashtita"] as const)
   .map((groupKey) => HEAVY_FEATURE_GROUPS.find((group) => group.key === groupKey))
   .filter((group): group is NonNullable<(typeof HEAVY_FEATURE_GROUPS)[number]> => Boolean(group));
 
+const AGRI_FEATURE_GROUPS = INDUSTRIAL_FEATURE_GROUPS;
+
+const TRAILER_FEATURE_GROUPS: CarFeatureGroup[] = [
+  {
+    key: "bezopasnost",
+    title: "Безопасност",
+    items: [
+      "Антиблокираща система",
+      "Въздушно окачване",
+      "Дискови спирачки",
+      "Електронна система за завиване",
+      "Завиващ мост",
+      "Инерционен теглич",
+      "Люлеещ теглич",
+      "Пневматична спирачна система",
+      "Твърд теглич",
+    ],
+  },
+  {
+    key: "drugi",
+    title: "Други",
+    items: [
+      "Бартер",
+      "Капариран/Продаден",
+      "Лизинг",
+      "Нов внос",
+      "Подвижен под",
+      "Подсилен под",
+      "Ресьори",
+      "С регистрация",
+    ],
+  },
+  {
+    key: "zashtita",
+    title: "Защита",
+    items: ["Каско"],
+  },
+  {
+    key: "specializirani",
+    title: "Специализирани",
+    items: [
+      "Автовоз",
+      "Бордово",
+      "Гондола",
+      "За превоз на животни",
+      "За превоз на лодка/яхта",
+      "За превоз на опасни товари",
+      "За превоз на стъкло",
+      "За превоз на трупи/дървесина",
+      "Зърновоз",
+      "Изотермично",
+      "Контейнеровоз",
+      "Магазин",
+      "Мобилно заведение",
+      "Открито",
+      "Палетоносач",
+      "Платформа",
+      "С ниска товарна площадка",
+      "Самосвал",
+      "Туристическо",
+      "Фургон",
+      "Хенгер",
+      "Хладилно",
+      "Циментовоз",
+      "Цистерна",
+      "Шаси",
+    ],
+  },
+  {
+    key: "eksterior",
+    title: "Екстериор",
+    items: [
+      "2/3 странно изсипване",
+      "Алуминиев кош",
+      "Брезент",
+      "Капаци",
+      "Лети джанти",
+      "Повдигащи се оси",
+      "Тристранна щора",
+      "Тристранно разтоварване",
+    ],
+  },
+];
+
+const BOAT_FEATURE_GROUPS: CarFeatureGroup[] = [
+  {
+    key: "bezopasnost",
+    title: "Безопасност",
+    items: ["Автопилот", "Ехолот", "Радар", "Радиостанция", "Чартплотер"],
+  },
+  {
+    key: "komfort",
+    title: "Комфорт",
+    items: [
+      "DVD, TV",
+      "Климатик",
+      "Навигация",
+      "Печка",
+      "Стерео уредба",
+      "Хидрофорна система",
+      "Хладилник",
+    ],
+  },
+  {
+    key: "drugi",
+    title: "Други",
+    items: [
+      "Бартер",
+      "Воден резервоар",
+      "Генератор",
+      "Капариран/Продаден",
+      "Лизинг",
+      "Нов внос",
+      "Помпа",
+      "С регистрация",
+      "С ремарке",
+      "Тента",
+      "Кран",
+    ],
+  },
+  {
+    key: "zashtita",
+    title: "Защита",
+    items: ["Каско", "Лебедка", "Покривало", "Противопожарно оборудване", "Хидравлични стабилизатори"],
+  },
+  {
+    key: "interior",
+    title: "Интериор",
+    items: ["Баня", "Кухня", "Тоалетна"],
+  },
+];
+
 const getFeatureGroupsByMainCategory = (mainCategory: MainCategoryKey) => {
   if (mainCategory === "1") return CAR_FEATURE_GROUPS;
   if (isHeavyMainCategory(mainCategory)) return HEAVY_FEATURE_GROUPS;
   if (mainCategory === "5") return MOTO_FEATURE_GROUPS;
+  if (mainCategory === "6") return AGRI_FEATURE_GROUPS;
   if (mainCategory === "7") return INDUSTRIAL_FEATURE_GROUPS;
+  if (mainCategory === "a") return BOAT_FEATURE_GROUPS;
+  if (mainCategory === "b") return TRAILER_FEATURE_GROUPS;
   return [];
 };
 
@@ -810,6 +990,7 @@ const createInitialFormData = (): PublishFormData => ({
   motoCoolingType: "",
   motoEngineKind: "",
   equipmentType: "",
+  agriDriveType: "",
   forkliftLoad: "",
   forkliftHours: "",
   caravanBeds: "",
@@ -876,9 +1057,14 @@ const PublishPage: React.FC = () => {
     return options.length > 0 ? options : getBrandOptionsByMainCategory("1");
   }, [formData.mainCategory]);
 
-  const groupedBrandOptions = useMemo(
-    () => groupOptionsByInitial(sortUniqueOptions(availableBrandOptions)),
+  const orderedBrandOptions = useMemo(
+    () => Array.from(new Set(availableBrandOptions.map((option) => option.trim()).filter(Boolean))),
     [availableBrandOptions]
+  );
+
+  const groupedBrandOptions = useMemo(
+    () => groupOptionsByInitial(sortUniqueOptions(orderedBrandOptions)),
+    [orderedBrandOptions]
   );
 
   const availableModelOptions = useMemo(() => {
@@ -886,9 +1072,25 @@ const PublishPage: React.FC = () => {
     return getModelOptionsByMainCategory(formData.mainCategory, formData.brand);
   }, [formData.brand, formData.mainCategory]);
 
-  const groupedModelOptions = useMemo(
-    () => groupOptionsByInitial(sortUniqueOptions(availableModelOptions)),
+  const orderedModelOptions = useMemo(
+    () => Array.from(new Set(availableModelOptions.map((option) => option.trim()).filter(Boolean))),
     [availableModelOptions]
+  );
+
+  const groupedModelOptions = useMemo(
+    () => groupOptionsByInitial(sortUniqueOptions(orderedModelOptions)),
+    [orderedModelOptions]
+  );
+
+  const isCategoryBasedBrandModel = CATEGORY_AS_BRAND_MAIN_CATEGORIES.has(formData.mainCategory);
+  const useUnsortedBrandOptions = UNSORTED_BRAND_OPTION_MAIN_CATEGORIES.has(formData.mainCategory);
+
+  const agriFieldVisibility = useMemo(
+    () =>
+      formData.mainCategory === "6"
+        ? getAgriFieldVisibility(formData.brand)
+        : DEFAULT_AGRI_FIELD_VISIBILITY,
+    [formData.brand, formData.mainCategory]
   );
 
   const wheelOfferTypeOptions = useMemo(() => {
@@ -1011,25 +1213,25 @@ const PublishPage: React.FC = () => {
     {
       key: "basic",
       label: "Основна информация",
-      icon: <ClipboardList size={16} />,
+      icon: <FiClipboard size={16} />,
       description: "Категория и основни данни",
     },
     {
       key: "details",
       label: "Детайли",
-      icon: <Settings2 size={16} />,
+      icon: <FiSettings size={16} />,
       description: "Параметри по категория",
     },
     {
       key: "pricing",
       label: "Цена и локация",
-      icon: <Wallet size={16} />,
+      icon: <FiTag size={16} />,
       description: "Цена и местоположение",
     },
     {
       key: "images",
       label: "Снимки",
-      icon: <Image size={16} />,
+      icon: <FiImage size={16} />,
       description: "Качи снимки",
     },
     ...(supportsFeaturesStep(formData.mainCategory)
@@ -1037,7 +1239,7 @@ const PublishPage: React.FC = () => {
           {
             key: "features" as const,
             label: "Екстри",
-            icon: <Sparkles size={16} />,
+            icon: <FiStar size={16} />,
             description: "Опции и екстри",
           },
         ]
@@ -1045,19 +1247,19 @@ const PublishPage: React.FC = () => {
     {
       key: "description",
       label: "Описание",
-      icon: <FileText size={16} />,
+      icon: <FiFileText size={16} />,
       description: "Описание",
     },
     {
       key: "contact",
       label: "Контакт",
-      icon: <Phone size={16} />,
+      icon: <FiPhone size={16} />,
       description: "Телефон",
     },
     {
       key: "listingType",
       label: "Тип обява",
-      icon: <Sparkles size={16} />,
+      icon: <FiStar size={16} />,
       description: "Топ или нормална",
     },
   ];
@@ -1116,6 +1318,21 @@ const PublishPage: React.FC = () => {
 
       if (key === "brand") {
         next.model = "";
+        if (prev.mainCategory === "a") {
+          next.boatCategory = String(nextValue ?? "").trim();
+        }
+        if (prev.mainCategory === "b") {
+          next.trailerCategory = String(nextValue ?? "").trim();
+        }
+        if (prev.mainCategory === "6") {
+          next.equipmentType = String(nextValue ?? "").trim();
+          next.engineType = "";
+          next.transmission = "";
+          next.power = "";
+          next.forkliftHours = "";
+          next.agriDriveType = "";
+          next.euroStandard = "";
+        }
       }
       if (key === "partFor") {
         next.partCategory = "";
@@ -1182,9 +1399,15 @@ const PublishPage: React.FC = () => {
     }
 
     if (requiresBrandAndModel(mainCategory)) {
+      const brandLabel = CATEGORY_AS_BRAND_MAIN_CATEGORIES.has(mainCategory)
+        ? "Категория"
+        : "Марка";
+      const modelLabel = CATEGORY_AS_BRAND_MAIN_CATEGORIES.has(mainCategory)
+        ? "Марка"
+        : "Модел";
       requirements.basic.push(
-        { key: "brand", label: "Марка" },
-        { key: "model", label: "Модел" },
+        { key: "brand", label: brandLabel },
+        { key: "model", label: modelLabel },
         { key: "yearFrom", label: "Година" }
       );
     }
@@ -1262,7 +1485,42 @@ const PublishPage: React.FC = () => {
       );
     }
 
-    if (mainCategory === "6" || mainCategory === "7") {
+    if (mainCategory === "6") {
+      requirements.details.push(
+        {
+          key: "engineType",
+          label: "Двигател",
+          when: (data) => getAgriFieldVisibility(data.brand).showEngineType,
+        },
+        {
+          key: "power",
+          label: "Мощност",
+          when: (data) => getAgriFieldVisibility(data.brand).showPower,
+        },
+        {
+          key: "transmission",
+          label: "Скоростна кутия",
+          when: (data) => getAgriFieldVisibility(data.brand).showTransmission,
+        },
+        {
+          key: "agriDriveType",
+          label: "Задвижване",
+          when: (data) => getAgriFieldVisibility(data.brand).showDriveType,
+        },
+        {
+          key: "forkliftHours",
+          label: "Часове работа",
+          when: (data) => getAgriFieldVisibility(data.brand).showHours,
+        },
+        {
+          key: "euroStandard",
+          label: "Евростандарт",
+          when: (data) => getAgriFieldVisibility(data.brand).showEuroStandard,
+        }
+      );
+    }
+
+    if (mainCategory === "7") {
       requirements.details.push(
         { key: "equipmentType", label: "Вид техника" },
         { key: "power", label: "Мощност" }
@@ -1286,7 +1544,6 @@ const PublishPage: React.FC = () => {
 
     if (mainCategory === "a") {
       requirements.details.push(
-        { key: "boatCategory", label: "Категория" },
         { key: "engineType", label: "Вид двигател" },
         { key: "boatEngineCount", label: "Брой двигатели" },
         { key: "boatLength", label: "Дължина" }
@@ -1295,7 +1552,6 @@ const PublishPage: React.FC = () => {
 
     if (mainCategory === "b") {
       requirements.details.push(
-        { key: "trailerCategory", label: "Категория" },
         { key: "trailerLoad", label: "Товароносимост" },
         { key: "trailerAxles", label: "Брой оси" }
       );
@@ -1315,7 +1571,7 @@ const PublishPage: React.FC = () => {
       {
         key: "vin",
         label: "VIN номер",
-        when: (data) => !["y", "z", "u", "v", "w", "5"].includes(data.mainCategory),
+        when: (data) => !["y", "z", "u", "v", "w", "5", "6", "7", "a", "b"].includes(data.mainCategory),
       }
     );
 
@@ -1326,6 +1582,11 @@ const PublishPage: React.FC = () => {
     if (Array.isArray(value)) return value.length === 0;
     if (typeof value === "boolean") return false;
     return String(value ?? "").trim().length === 0;
+  };
+
+  const hasPositiveNumber = (value: string) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0;
   };
 
   const getMissingFields = (step: number, data: PublishFormData) => {
@@ -1479,6 +1740,10 @@ const PublishPage: React.FC = () => {
     const rawModel = toStringOrEmpty(data.model);
     const rawTitle = toStringOrEmpty(data.title);
     const normalizedFeatures = normalizeCarFeatures(data.features);
+    const normalizedBoatFeatures = normalizeCarFeatures(data.boat_features ?? data.boatFeatures);
+    const normalizedTrailerFeatures = normalizeCarFeatures(
+      data.trailer_features ?? data.trailerFeatures
+    );
     const parsedMotoFeatures =
       normalizedMainCategory === "5" ? extractMotoMetaFromFeatures(normalizedFeatures) : null;
 
@@ -1488,13 +1753,25 @@ const PublishPage: React.FC = () => {
       toStringOrEmpty(data.part_for ?? data.partFor) || defaultClassifiedTopmenu;
     const normalizedClassifiedFor =
       toStringOrEmpty(data.classified_for ?? data.classifiedFor) || defaultClassifiedTopmenu;
+    const normalizedTrailerCategoryValue = toStringOrEmpty(
+      data.trailer_category ?? data.trailerCategory
+    );
+    const normalizedBoatCategoryValue = toStringOrEmpty(data.boat_category ?? data.boatCategory);
+    const normalizedAgriCategoryValue = toStringOrEmpty(data.equipment_type ?? data.equipmentType);
 
     const nextFormData: PublishFormData = {
       ...createInitialFormData(),
       mainCategory: normalizedMainCategory,
       category: toStringOrEmpty(data.category),
       title: rawTitle,
-      brand: rawBrand,
+      brand:
+        normalizedMainCategory === "b"
+          ? normalizedTrailerCategoryValue || rawBrand
+          : normalizedMainCategory === "a"
+            ? normalizedBoatCategoryValue || rawBrand
+          : normalizedMainCategory === "6"
+            ? normalizedAgriCategoryValue || rawBrand
+          : rawBrand,
       model: rawModel,
       yearFrom: toStringOrEmpty(data.year_from ?? data.yearFrom),
       month: toStringOrEmpty(data.month),
@@ -1515,7 +1792,13 @@ const PublishPage: React.FC = () => {
       phone: toStringOrEmpty(data.phone),
       email: user?.email || toStringOrEmpty(data.email),
       pictures: [],
-      features: parsedMotoFeatures ? parsedMotoFeatures.plainFeatures : normalizedFeatures,
+      features: parsedMotoFeatures
+        ? parsedMotoFeatures.plainFeatures
+        : normalizedMainCategory === "b"
+          ? Array.from(new Set([...normalizedFeatures, ...normalizedTrailerFeatures]))
+          : normalizedMainCategory === "a"
+            ? Array.from(new Set([...normalizedFeatures, ...normalizedBoatFeatures]))
+          : normalizedFeatures,
       listingType: data.listing_type === "top" || data.listingType === "top" ? "top" : "normal",
       wheelFor: normalizedWheelFor,
       wheelOfferType: normalizeWheelOfferTypeValue(
@@ -1547,7 +1830,8 @@ const PublishPage: React.FC = () => {
       motoCategory: parsedMotoFeatures?.motoCategory || "",
       motoCoolingType: parsedMotoFeatures?.motoCoolingType || "",
       motoEngineKind: parsedMotoFeatures?.motoEngineKind || "",
-      equipmentType: toStringOrEmpty(data.equipment_type ?? data.equipmentType),
+      equipmentType: normalizedAgriCategoryValue,
+      agriDriveType: toStringOrEmpty(data.drive_type ?? data.agriDriveType),
       forkliftLoad: toStringOrEmpty(data.lift_capacity_kg ?? data.forkliftLoad),
       forkliftHours: toStringOrEmpty(data.hours ?? data.forkliftHours),
       caravanBeds: toStringOrEmpty(data.beds ?? data.caravanBeds),
@@ -1555,18 +1839,26 @@ const PublishPage: React.FC = () => {
       caravanHasToilet: toBoolean(data.has_toilet ?? data.caravanHasToilet),
       caravanHasHeating: toBoolean(data.has_heating ?? data.caravanHasHeating),
       caravanHasAc: toBoolean(data.has_air_conditioning ?? data.caravanHasAc),
-      boatCategory: toStringOrEmpty(data.boat_category ?? data.boatCategory),
+      boatCategory: normalizedBoatCategoryValue || rawBrand,
       boatEngineCount: toStringOrEmpty(data.engine_count ?? data.boatEngineCount),
       boatMaterial: toStringOrEmpty(data.boat_material ?? data.boatMaterial ?? data.material),
       boatLength: toStringOrEmpty(data.boat_length ?? data.boatLength ?? data.length_m),
       boatWidth: toStringOrEmpty(data.width_m ?? data.boatWidth),
       boatDraft: toStringOrEmpty(data.draft_m ?? data.boatDraft),
       boatHours: toStringOrEmpty(data.boat_hours ?? data.boatHours ?? data.hours),
-      boatFeatures: normalizeStringList(data.boat_features ?? data.boatFeatures),
-      trailerCategory: toStringOrEmpty(data.trailer_category ?? data.trailerCategory),
+      boatFeatures:
+        normalizedMainCategory === "a"
+          ? normalizedBoatFeatures.length > 0
+            ? normalizedBoatFeatures
+            : normalizeStringList(data.features)
+          : normalizedBoatFeatures,
+      trailerCategory:
+        normalizedMainCategory === "b"
+          ? normalizedTrailerCategoryValue || rawBrand
+          : normalizedTrailerCategoryValue,
       trailerLoad: toStringOrEmpty(data.trailer_load ?? data.trailerLoad ?? data.load_kg),
       trailerAxles: toStringOrEmpty(data.trailer_axles ?? data.trailerAxles ?? data.axles),
-      trailerFeatures: normalizeStringList(data.trailer_features ?? data.trailerFeatures),
+      trailerFeatures: normalizedTrailerFeatures,
       classifiedFor: normalizedClassifiedFor,
       accessoryCategory: toStringOrEmpty(data.accessory_category ?? data.accessoryCategory),
       buyServiceCategory: toStringOrEmpty(data.buy_service_category ?? data.buyServiceCategory),
@@ -1583,7 +1875,7 @@ const PublishPage: React.FC = () => {
     setErrors({});
   };
 
-  const calculateCompletion = (): number => {
+  const calculateCompletionStats = () => {
     const requiredByStep = getRequiredFieldsByStep(formData.mainCategory);
     const requiredKeys = new Set<keyof PublishFormData>();
 
@@ -1605,12 +1897,19 @@ const PublishPage: React.FC = () => {
     const hasImage = images.length > 0 || !!existingCoverImage;
     const totalRequired = requiredKeys.size + 1;
     const totalFilled = filled + (hasImage ? 1 : 0);
+    const percentage =
+      totalRequired <= 0 ? 0 : Math.round((totalFilled / totalRequired) * 100);
 
-    if (totalRequired <= 0) return 0;
-    return Math.round((totalFilled / totalRequired) * 100);
+    return {
+      percentage,
+      filledFields: filled,
+      totalFields: requiredKeys.size,
+      hasImage,
+    };
   };
 
-  const completionPercentage = calculateCompletion();
+  const completionStats = calculateCompletionStats();
+  const completionPercentage = completionStats.percentage;
   const currentFormSnapshot = normalizeFormSnapshot(formData);
   const isDirty =
     isEditMode &&
@@ -1652,6 +1951,10 @@ const PublishPage: React.FC = () => {
       : isHeavyMainCategory(formData.mainCategory)
         ? mapTransmissionToGearboxValue(formData.transmission)
         : "";
+  const previewImageCount = images.length + (existingCoverImage ? 1 : 0);
+  const hasValidPriceSignal = requiresPrice(formData.mainCategory)
+    ? hasPositiveNumber(formData.price)
+    : true;
   const stepMissingFields = getMissingFields(currentStep, formData);
   const validationMessage = formatMissingMessage(stepMissingFields);
   const isNextDisabled = currentStep < totalSteps && stepMissingFields.length > 0;
@@ -1807,7 +2110,7 @@ const PublishPage: React.FC = () => {
       appendIfValue("model", normalizedModel);
       appendIfValue("year_from", normalizedYear);
       appendIfValue("month", formData.month);
-      if (!["y", "z", "u", "v", "w", "5"].includes(formData.mainCategory)) {
+      if (!["y", "z", "u", "v", "w", "5", "6", "7", "a", "b"].includes(formData.mainCategory)) {
         appendIfValue("vin", formData.vin);
       }
       appendIfValue("price", normalizedPrice);
@@ -1884,6 +2187,20 @@ const PublishPage: React.FC = () => {
           appendIfValue("engine_type", formData.engineType);
           break;
         case "6":
+          appendIfValue("equipment_type", formData.brand || formData.equipmentType);
+          if (agriFieldVisibility.showEngineType) {
+            appendIfValue("engine_type", formData.engineType);
+          }
+          if (agriFieldVisibility.showTransmission) {
+            appendIfValue("transmission", formData.transmission);
+          }
+          if (agriFieldVisibility.showHours) {
+            appendIfValue("hours", formData.forkliftHours);
+          }
+          if (agriFieldVisibility.showDriveType) {
+            appendIfValue("drive_type", formData.agriDriveType);
+          }
+          break;
         case "7":
           appendIfValue("equipment_type", formData.equipmentType);
           break;
@@ -1900,7 +2217,7 @@ const PublishPage: React.FC = () => {
           formDataToSend.append("has_air_conditioning", String(formData.caravanHasAc));
           break;
         case "a":
-          appendIfValue("boat_category", formData.boatCategory);
+          appendIfValue("boat_category", formData.brand || formData.boatCategory);
           appendIfValue("engine_type", formData.engineType);
           appendIfValue("engine_count", formData.boatEngineCount);
           appendIfValue("material", formData.boatMaterial);
@@ -1908,7 +2225,9 @@ const PublishPage: React.FC = () => {
           appendIfValue("width_m", formData.boatWidth);
           appendIfValue("draft_m", formData.boatDraft);
           appendIfValue("hours", formData.boatHours);
-          const normalizedBoatFeatures = formData.boatFeatures
+          const normalizedBoatFeatures = Array.from(
+            new Set([...formData.boatFeatures, ...formData.features])
+          )
             .map((feature) => feature.trim())
             .filter(Boolean);
           if (normalizedBoatFeatures.length > 0) {
@@ -1918,10 +2237,12 @@ const PublishPage: React.FC = () => {
           }
           break;
         case "b":
-          appendIfValue("trailer_category", formData.trailerCategory);
+          appendIfValue("trailer_category", formData.brand || formData.trailerCategory);
           appendIfValue("load_kg", formData.trailerLoad);
           appendIfValue("axles", formData.trailerAxles);
-          const normalizedTrailerFeatures = formData.trailerFeatures
+          const normalizedTrailerFeatures = Array.from(
+            new Set([...formData.trailerFeatures, ...formData.features])
+          )
             .map((feature) => feature.trim())
             .filter(Boolean);
           if (normalizedTrailerFeatures.length > 0) {
@@ -2118,12 +2439,32 @@ const PublishPage: React.FC = () => {
   };
 
   const handleFeatureChange = (feature: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      features: prev.features.includes(feature)
+    setFormData((prev) => {
+      const nextFeatures = prev.features.includes(feature)
         ? prev.features.filter((f) => f !== feature)
-        : [...prev.features, feature],
-    }));
+        : [...prev.features, feature];
+
+      if (prev.mainCategory === "b") {
+        return {
+          ...prev,
+          features: nextFeatures,
+          trailerFeatures: nextFeatures,
+        };
+      }
+
+      if (prev.mainCategory === "a") {
+        return {
+          ...prev,
+          features: nextFeatures,
+          boatFeatures: nextFeatures,
+        };
+      }
+
+      return {
+        ...prev,
+        features: nextFeatures,
+      };
+    });
   };
 
   const styles: Record<string, React.CSSProperties> = {
@@ -2279,8 +2620,8 @@ const PublishPage: React.FC = () => {
 
     .publish-layout {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 360px;
-      gap: 24px;
+      grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+      gap: 28px;
       align-items: start;
     }
 
@@ -2711,7 +3052,7 @@ const PublishPage: React.FC = () => {
       top: 88px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 18px;
     }
 
     @media (max-width: 960px) {
@@ -2823,7 +3164,7 @@ const PublishPage: React.FC = () => {
           {currentStepKey === "images" && (
             <div style={styles.section}>
               <h2 style={styles.sectionTitle} className="section-title">
-                <Image size={18} className="section-icon" />
+                <FiImage size={18} className="section-icon" />
                 Снимки към обявата
               </h2>
               <AdvancedImageUpload images={images} onImagesChange={setImages} maxImages={15} />
@@ -2834,7 +3175,7 @@ const PublishPage: React.FC = () => {
           {currentStepKey === "basic" && (
             <div style={styles.section}>
               <h2 style={styles.sectionTitle} className="section-title">
-                <ClipboardList size={18} className="section-icon" />
+                <FiClipboard size={18} className="section-icon" />
                 Основна информация
               </h2>
               <div className="field-grid">
@@ -2879,9 +3220,17 @@ const PublishPage: React.FC = () => {
                 {requiresBrandAndModel(formData.mainCategory) && (
                   <>
                     <FormFieldWithTooltip
-                      label="Марка"
+                      label={isCategoryBasedBrandModel ? "Категория" : "Марка"}
                       required
-                      tooltip="Марка на превозното средство/техниката"
+                      tooltip={
+                        isCategoryBasedBrandModel
+                          ? formData.mainCategory === "6"
+                            ? "Категория на селскостопанската техника"
+                            : formData.mainCategory === "a"
+                              ? "Категория на яхтата/лодката"
+                              : "Категория на ремаркето"
+                          : "Марка на превозното средство/техниката"
+                      }
                     >
                       <select
                         style={styles.input}
@@ -2890,23 +3239,39 @@ const PublishPage: React.FC = () => {
                         onChange={handleChange}
                         required
                       >
-                        <option value="">Избери марка</option>
-                        {groupedBrandOptions.map((group) => (
-                          <optgroup key={group.label} label={group.label}>
-                            {group.options.map((brand) => (
+                        <option value="">
+                          {isCategoryBasedBrandModel ? "Избери категория" : "Избери марка"}
+                        </option>
+                        {useUnsortedBrandOptions
+                          ? orderedBrandOptions.map((brand) => (
                               <option key={brand} value={brand}>
                                 {brand}
                               </option>
+                            ))
+                          : groupedBrandOptions.map((group) => (
+                              <optgroup key={group.label} label={group.label}>
+                                {group.options.map((brand) => (
+                                  <option key={brand} value={brand}>
+                                    {brand}
+                                  </option>
+                                ))}
+                              </optgroup>
                             ))}
-                          </optgroup>
-                        ))}
                       </select>
                     </FormFieldWithTooltip>
 
                     <FormFieldWithTooltip
-                      label="Модел"
+                      label={isCategoryBasedBrandModel ? "Марка" : "Модел"}
                       required
-                      tooltip="Модел на превозното средство/техниката"
+                      tooltip={
+                        isCategoryBasedBrandModel
+                          ? formData.mainCategory === "6"
+                            ? "Марка на селскостопанската техника"
+                            : formData.mainCategory === "a"
+                              ? "Марка на яхтата/лодката"
+                              : "Марка на ремаркето"
+                          : "Модел на превозното средство/техниката"
+                      }
                     >
                       <select
                         style={styles.input}
@@ -2917,7 +3282,13 @@ const PublishPage: React.FC = () => {
                         disabled={!formData.brand}
                       >
                         <option value="">
-                          {formData.brand ? "Избери модел" : "Избери марка първо"}
+                          {formData.brand
+                            ? isCategoryBasedBrandModel
+                              ? "Избери марка"
+                              : "Избери модел"
+                            : isCategoryBasedBrandModel
+                              ? "Избери категория първо"
+                              : "Избери марка първо"}
                         </option>
                         {groupedModelOptions.map((group) => (
                           <optgroup key={group.label} label={group.label}>
@@ -3219,7 +3590,7 @@ const PublishPage: React.FC = () => {
           {currentStepKey === "details" && (
             <div style={styles.section}>
               <h2 style={styles.sectionTitle} className="section-title">
-                <Settings2 size={18} className="section-icon" />
+                <FiSettings size={18} className="section-icon" />
                 Детайли за категорията
               </h2>
               <div className="field-grid">
@@ -3652,7 +4023,115 @@ const PublishPage: React.FC = () => {
                   </>
                 )}
 
-                {(formData.mainCategory === "6" || formData.mainCategory === "7") && (
+                {formData.mainCategory === "6" && (
+                  <>
+                    {agriFieldVisibility.showEngineType && (
+                      <FormFieldWithTooltip label="Двигател" required>
+                        <select
+                          style={styles.input}
+                          name="engineType"
+                          value={formData.engineType}
+                          onChange={handleChange}
+                          required
+                        >
+                          <option value="">Избери</option>
+                          {ENGINE_TYPE_OPTIONS.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </FormFieldWithTooltip>
+                    )}
+
+                    {agriFieldVisibility.showPower && (
+                      <FormFieldWithTooltip label="Мощност (к.с.)" required>
+                        <input
+                          style={styles.input}
+                          type="number"
+                          min="0"
+                          name="power"
+                          value={formData.power}
+                          onChange={handleChange}
+                          required
+                        />
+                      </FormFieldWithTooltip>
+                    )}
+
+                    {agriFieldVisibility.showTransmission && (
+                      <FormFieldWithTooltip label="Скоростна кутия" required>
+                        <select
+                          style={styles.input}
+                          name="transmission"
+                          value={formData.transmission}
+                          onChange={handleChange}
+                          required
+                        >
+                          <option value="">Избери</option>
+                          {TRANSMISSION_OPTIONS.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </FormFieldWithTooltip>
+                    )}
+
+                    {agriFieldVisibility.showDriveType && (
+                      <FormFieldWithTooltip label="Задвижване" required>
+                        <select
+                          style={styles.input}
+                          name="agriDriveType"
+                          value={formData.agriDriveType}
+                          onChange={handleChange}
+                          required
+                        >
+                          <option value="">Избери</option>
+                          {AGRI_DRIVE_TYPE_OPTIONS.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </FormFieldWithTooltip>
+                    )}
+
+                    {agriFieldVisibility.showHours && (
+                      <FormFieldWithTooltip label="Часове работа" required>
+                        <input
+                          style={styles.input}
+                          type="number"
+                          min="0"
+                          name="forkliftHours"
+                          value={formData.forkliftHours}
+                          onChange={handleChange}
+                          required
+                        />
+                      </FormFieldWithTooltip>
+                    )}
+
+                    {agriFieldVisibility.showEuroStandard && (
+                      <FormFieldWithTooltip label="Евростандарт" required>
+                        <select
+                          style={styles.input}
+                          name="euroStandard"
+                          value={formData.euroStandard}
+                          onChange={handleChange}
+                          required
+                        >
+                          <option value="">Избери</option>
+                          {HEAVY_EURO_STANDARD_OPTIONS.map((option, index) => (
+                            <option key={option} value={String(index + 1)}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </FormFieldWithTooltip>
+                    )}
+                  </>
+                )}
+
+                {formData.mainCategory === "7" && (
                   <>
                     <FormFieldWithTooltip label="Вид техника" required>
                       <select
@@ -3814,23 +4293,6 @@ const PublishPage: React.FC = () => {
 
                 {formData.mainCategory === "a" && (
                   <>
-                    <FormFieldWithTooltip label="Категория" required>
-                      <select
-                        style={styles.input}
-                        name="boatCategory"
-                        value={formData.boatCategory}
-                        onChange={handleChange}
-                        required
-                      >
-                        <option value="">Избери</option>
-                        {BOAT_CATEGORY_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </FormFieldWithTooltip>
-
                     <FormFieldWithTooltip label="Вид двигател">
                       <select
                         style={styles.input}
@@ -3927,23 +4389,6 @@ const PublishPage: React.FC = () => {
 
                 {formData.mainCategory === "b" && (
                   <>
-                    <FormFieldWithTooltip label="Категория" required>
-                      <select
-                        style={styles.input}
-                        name="trailerCategory"
-                        value={formData.trailerCategory}
-                        onChange={handleChange}
-                        required
-                      >
-                        <option value="">Избери</option>
-                        {TRAILER_CATEGORY_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </FormFieldWithTooltip>
-
                     <FormFieldWithTooltip label="Товароносимост (кг)">
                       <select style={styles.input} name="trailerLoad" value={formData.trailerLoad} onChange={handleChange}>
                         <option value="">Избери</option>
@@ -3992,7 +4437,7 @@ const PublishPage: React.FC = () => {
                     </select>
                   </FormFieldWithTooltip>
                 )}
-                {!["y", "z", "u", "v", "w", "5"].includes(formData.mainCategory) && (
+                {!["y", "z", "u", "v", "w", "5", "6", "7", "a", "b"].includes(formData.mainCategory) && (
                   <FormFieldWithTooltip label="VIN номер">
                     <input
                       style={styles.input}
@@ -4018,7 +4463,7 @@ const PublishPage: React.FC = () => {
           {currentStepKey === "pricing" && (
             <div style={styles.section}>
               <h2 style={styles.sectionTitle} className="section-title">
-                <Wallet size={18} className="section-icon" />
+                <FiTag size={18} className="section-icon" />
                 Цена и локация
               </h2>
               <div className="field-grid">
@@ -4070,12 +4515,18 @@ const PublishPage: React.FC = () => {
           {currentStepKey === "features" && (
             <div style={styles.section}>
               <h2 style={styles.sectionTitle} className="section-title">
-                <Sparkles size={18} className="section-icon" />
+                <FiStar size={18} className="section-icon" />
                 Екстри и опции
               </h2>
               <p style={{ color: "#666", marginBottom: 16, fontSize: 14 }}>
-                {formData.mainCategory === "7"
+                {formData.mainCategory === "6"
+                  ? "Избери комфорт, други и защита за селскостопанската техника"
+                  : formData.mainCategory === "7"
                   ? "Избери комфорт, други и защита за индустриалната техника"
+                  : formData.mainCategory === "b"
+                  ? "Избери всички екстри и опции за ремаркето"
+                  : formData.mainCategory === "a"
+                  ? "Избери всички екстри и опции за яхтата или лодката"
                   : formData.mainCategory === "5"
                   ? "Избери всички екстри и опции, които има мотоциклетът"
                   : isHeavyMainCategory(formData.mainCategory)
@@ -4116,7 +4567,7 @@ const PublishPage: React.FC = () => {
                               className="feature-checkbox"
                             />
                             <span className="feature-check" aria-hidden="true">
-                              <Check size={12} />
+                              <FiCheck size={12} />
                             </span>
                             <span className="feature-label">{feature}</span>
                           </label>
@@ -4133,7 +4584,7 @@ const PublishPage: React.FC = () => {
           {currentStepKey === "description" && (
             <div style={styles.section}>
               <h2 style={styles.sectionTitle} className="section-title">
-                <FileText size={18} className="section-icon" />
+                <FiFileText size={18} className="section-icon" />
                 Описание на обявата
               </h2>
               <FormFieldWithTooltip
@@ -4159,7 +4610,7 @@ const PublishPage: React.FC = () => {
           {currentStepKey === "contact" && (
             <div style={styles.section}>
               <h2 style={styles.sectionTitle} className="section-title">
-                <Phone size={18} className="section-icon" />
+                <FiPhone size={18} className="section-icon" />
                 Контактна информация
               </h2>
               <div className="field-grid">
@@ -4203,7 +4654,7 @@ const PublishPage: React.FC = () => {
           {currentStepKey === "listingType" && (
             <div style={styles.section}>
               <h2 style={styles.sectionTitle} className="section-title">
-                <Sparkles size={18} className="section-icon" />
+                <FiStar size={18} className="section-icon" />
                 Тип обява
               </h2>
               <p style={{ color: "#666", marginBottom: 16, fontSize: 14 }}>
@@ -4259,7 +4710,7 @@ const PublishPage: React.FC = () => {
                 currentStep === 1 ? "disabled" : ""
               }`}
             >
-              <ArrowLeft size={16} />
+              <FiArrowLeft size={16} />
               Назад
             </button>
 
@@ -4274,7 +4725,7 @@ const PublishPage: React.FC = () => {
                   isEditMode ? "Запазване..." : "Публикуване..."
                 ) : (
                   <>
-                    <Check size={16} />
+                    <FiCheck size={16} />
                     {isEditMode ? "Запази промените" : "Публикувай обява"}
                   </>
                 )}
@@ -4287,7 +4738,7 @@ const PublishPage: React.FC = () => {
                 className={`publish-btn primary ${isNextDisabled ? "disabled" : ""}`}
               >
                 Напред
-                <ArrowRight size={16} />
+                <FiArrowRight size={16} />
               </button>
             )}
           </div>
@@ -4297,36 +4748,11 @@ const PublishPage: React.FC = () => {
         <aside className="publish-aside">
           <ListingQualityIndicator
             completionPercentage={completionPercentage}
-            tips={[
-              {
-                id: "images",
-                title: "Добри снимки",
-                description: "Качи поне 3 снимки",
-                icon: <Image size={16} />,
-                completed: images.length >= 3,
-              },
-              {
-                id: "description",
-                title: "Подробно описание",
-                description: "Напиши поне 50 символа",
-                icon: <FileText size={16} />,
-                completed: formData.description.length >= 50,
-              },
-              {
-                id: "price",
-                title: "Конкурентна цена",
-                description: "Задай реалистична цена",
-                icon: <Wallet size={16} />,
-                completed: requiresPrice(formData.mainCategory) ? !!formData.price : true,
-              },
-              {
-                id: "contact",
-                title: "Контактна информация",
-                description: "Добави телефон и имейл",
-                icon: <Phone size={16} />,
-                completed: !!formData.phone && !!formData.email,
-              },
-            ]}
+            filledFields={completionStats.filledFields}
+            totalFields={completionStats.totalFields}
+            imageCount={previewImageCount}
+            hasPrice={hasValidPriceSignal}
+            priceRequired={requiresPrice(formData.mainCategory)}
           />
           <ListingPreview
             variant="compact"
@@ -4341,6 +4767,8 @@ const PublishPage: React.FC = () => {
             gearbox={previewGearbox}
             power={formData.power}
             coverImage={coverPreview}
+            imageCount={previewImageCount}
+            priceRequired={requiresPrice(formData.mainCategory)}
             description={formData.description}
             completionPercentage={completionPercentage}
             listingType={formData.listingType}

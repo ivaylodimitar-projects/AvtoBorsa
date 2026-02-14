@@ -17,7 +17,6 @@ import {
   MOTO_CATEGORY_OPTIONS,
   MOTO_COOLING_TYPE_OPTIONS,
   MOTO_ENGINE_KIND_OPTIONS,
-  MOTO_FEATURE_GROUPS,
 } from "../constants/motoData";
 
 interface SearchCriteria {
@@ -42,6 +41,7 @@ interface SearchCriteria {
   transmission: string;
   agriType: string;
   agriBrand: string;
+  agriDriveType: string;
   condition: string;
   sortBy: string;
   isNew: boolean;
@@ -112,6 +112,7 @@ interface SearchCriteria {
   trailerAxlesTo: string;
   buyServiceCategory: string;
   motoFeatures: string[];
+  features: string[];
   boatFeatures: string[];
   trailerFeatures: string[];
 }
@@ -130,7 +131,20 @@ interface AdvancedSearchProps {
 const FUEL_OPTIONS = ["Бензин", "Дизел", "Газ/Бензин", "Хибрид", "Електро"];
 const GEARBOX_OPTIONS = ["Ръчна", "Автоматик"];
 const COLOR_OPTIONS = [
-  "Черен", "Бял", "Сив", "Червен", "Син", "Зелен", "Жълт", "Оранжев", "Кафяв", "Розов"
+  "Бял",
+  "Черен",
+  "Сив",
+  "Сребърен",
+  "Син",
+  "Червен",
+  "Зелен",
+  "Жълт",
+  "Оранжев",
+  "Кафяв",
+  "Бежов",
+  "Златист",
+  "Виолетов",
+  "Бордо",
 ];
 const WHEEL_FOR_OPTIONS = [
   { value: "1", label: "Автомобили и Джипове" },
@@ -431,8 +445,8 @@ const BOAT_FEATURE_OPTIONS = [
   "Навигация",
   "Печка",
   "Стерео уредба",
-  "хидрофорна система",
-  "хладилник",
+  "Хидрофорна система",
+  "Хладилник",
   "Бартер",
   "Воден резервоар",
   "Генератор",
@@ -443,7 +457,7 @@ const BOAT_FEATURE_OPTIONS = [
   "С регистрация",
   "С ремарке",
   "Тента",
-  "кран",
+  "Кран",
   "Каско",
   "Лебедка",
   "Покривало",
@@ -506,6 +520,61 @@ const TRAILER_FEATURE_OPTIONS = [
   "Цистерна",
   "Шаси",
 ];
+const AGRI_DRIVE_TYPE_OPTIONS = ["2x4", "4x4", "Верижно", "Друго"];
+
+type AgriFieldVisibility = {
+  showEngineType: boolean;
+  showPower: boolean;
+  showTransmission: boolean;
+  showDriveType: boolean;
+  showHours: boolean;
+  showEuroStandard: boolean;
+};
+
+const DEFAULT_AGRI_FIELD_VISIBILITY: AgriFieldVisibility = {
+  showEngineType: false,
+  showPower: false,
+  showTransmission: false,
+  showDriveType: false,
+  showHours: false,
+  showEuroStandard: false,
+};
+
+const AGRI_FIELD_VISIBILITY_BY_CATEGORY: Record<string, AgriFieldVisibility> = {
+  трактор: {
+    showEngineType: true,
+    showPower: true,
+    showTransmission: true,
+    showDriveType: true,
+    showHours: true,
+    showEuroStandard: true,
+  },
+  комбайн: {
+    showEngineType: true,
+    showPower: true,
+    showTransmission: true,
+    showDriveType: false,
+    showHours: true,
+    showEuroStandard: true,
+  },
+  "телескопичен товарач": {
+    showEngineType: false,
+    showPower: false,
+    showTransmission: false,
+    showDriveType: false,
+    showHours: false,
+    showEuroStandard: false,
+  },
+};
+
+const getAgriFieldVisibility = (category: string): AgriFieldVisibility => {
+  const normalizedCategory = category.trim().toLocaleLowerCase("bg-BG");
+  if (!normalizedCategory) return DEFAULT_AGRI_FIELD_VISIBILITY;
+  return AGRI_FIELD_VISIBILITY_BY_CATEGORY[normalizedCategory] ?? DEFAULT_AGRI_FIELD_VISIBILITY;
+};
+
+void BOAT_FEATURE_OPTIONS;
+void TRAILER_FEATURE_OPTIONS;
 const BUY_CATEGORY_OPTIONS = [
   "Автомобил",
   "АВТОЧАСТИ",
@@ -597,6 +666,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     transmission: "",
     agriType: "",
     agriBrand: "",
+    agriDriveType: "",
     condition: "",
     sortBy: "Марка/Модел/Цена",
     isNew: false,
@@ -667,6 +737,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     trailerAxlesTo: "",
     buyServiceCategory: "",
     motoFeatures: [],
+    features: [],
     boatFeatures: [],
     trailerFeatures: [],
   });
@@ -687,6 +758,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   const isServicesCategory = mainCategory === "z";
   const isBuyOrServicesCategory = isBuyCategory || isServicesCategory;
   const isHeavyCategory = isBusesCategory || isTrucksCategory || isMotoCategory;
+  const isCategoryBasedBrandModel = isAgroCategory || isBoatsCategory || isTrailersCategory;
   const isEquipmentCategory =
     isAgroCategory ||
     isIndustrialCategory ||
@@ -698,7 +770,22 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   const usesCompactMainCategoryForm =
     usesVehicleForSelect || isHeavyCategory || isEquipmentCategory || isBuyOrServicesCategory;
   const hasConditionCheckboxes = !isBuyOrServicesCategory;
-  const equipmentTypeOptions = EQUIPMENT_TYPE_OPTIONS_BY_MAIN_CATEGORY[mainCategory] || [];
+  const equipmentTypeOptions = useMemo(() => {
+    if (isAgroCategory || isBoatsCategory || isTrailersCategory) {
+      const dynamicOptions = getBrandOptionsByMainCategory(mainCategory);
+      if (dynamicOptions.length > 0) {
+        return dynamicOptions;
+      }
+    }
+    return EQUIPMENT_TYPE_OPTIONS_BY_MAIN_CATEGORY[mainCategory] || [];
+  }, [isAgroCategory, isBoatsCategory, isTrailersCategory, mainCategory]);
+  const agriFieldVisibility = useMemo(
+    () =>
+      isAgroCategory
+        ? getAgriFieldVisibility(searchCriteria.agriType)
+        : DEFAULT_AGRI_FIELD_VISIBILITY,
+    [isAgroCategory, searchCriteria.agriType]
+  );
   const regions = useMemo(() => Object.keys(BULGARIAN_CITIES_BY_REGION), []);
   const cities = useMemo(
     () => (searchCriteria.region ? BULGARIAN_CITIES_BY_REGION[searchCriteria.region] || [] : []),
@@ -738,7 +825,9 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     [availableBrands]
   );
 
-  const selectedBrand = searchCriteria.brand || searchCriteria.agriBrand;
+  const selectedBrand = isCategoryBasedBrandModel
+    ? searchCriteria.agriType
+    : searchCriteria.brand || searchCriteria.agriBrand;
   const availableModels = useMemo(() => {
     if (!selectedBrand) return [];
     const dynamicOptions = getModelOptionsByMainCategory(brandMainCategory, selectedBrand);
@@ -761,16 +850,6 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         return { ...prev, [field]: value === "true" };
       }
       return { ...prev, [field]: value };
-    });
-  };
-
-  const toggleFeature = (field: "motoFeatures" | "boatFeatures" | "trailerFeatures", feature: string) => {
-    setSearchCriteria((prev) => {
-      const current = prev[field];
-      const updated = current.includes(feature)
-        ? current.filter((item) => item !== feature)
-        : [...current, feature];
-      return { ...prev, [field]: updated };
     });
   };
 
@@ -831,6 +910,8 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       if (searchCriteria.model) query.model = searchCriteria.model;
       if (searchCriteria.yearFrom) query.yearFrom = searchCriteria.yearFrom;
       if (searchCriteria.yearTo) query.yearTo = searchCriteria.yearTo;
+      if (searchCriteria.yearFrom) query.partYearFrom = searchCriteria.yearFrom;
+      if (searchCriteria.yearTo) query.partYearTo = searchCriteria.yearTo;
       if (searchCriteria.region) query.locat = searchCriteria.region;
       if (searchCriteria.city) query.locatc = searchCriteria.city;
       if (searchCriteria.maxPrice) query.price1 = searchCriteria.maxPrice;
@@ -864,6 +945,8 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       if (searchCriteria.engineType) query.fuel = searchCriteria.engineType;
       if (searchCriteria.transmission) query.transmission = searchCriteria.transmission;
       if (searchCriteria.color) query.color = searchCriteria.color;
+      if (searchCriteria.mileageFrom) query.mileageFrom = searchCriteria.mileageFrom;
+      if (searchCriteria.mileageTo) query.mileageTo = searchCriteria.mileageTo;
       if (searchCriteria.engineFrom) query.engineFrom = searchCriteria.engineFrom;
       if (searchCriteria.engineTo) query.engineTo = searchCriteria.engineTo;
       if (isBusesCategory || isTrucksCategory) {
@@ -881,9 +964,6 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         if (searchCriteria.motoEngineKind) query.motoEngineKind = searchCriteria.motoEngineKind;
         if (searchCriteria.motoDisplacementFrom) query.displacementFrom = searchCriteria.motoDisplacementFrom;
         if (searchCriteria.motoDisplacementTo) query.displacementTo = searchCriteria.motoDisplacementTo;
-        if (searchCriteria.motoFeatures.length > 0) {
-          query.motoFeatures = searchCriteria.motoFeatures.join(",");
-        }
       }
       appendExtendedListingFilters();
 
@@ -900,6 +980,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
 
     if (isEquipmentCategory) {
       const equipmentBrand = searchCriteria.brand || searchCriteria.agriBrand;
+      const categoryBasedBrand = searchCriteria.model;
       if (searchCriteria.agriType) {
         if (isAgroCategory || isIndustrialCategory) {
           query.equipmentType = searchCriteria.agriType;
@@ -909,8 +990,13 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
           query.trailerCategory = searchCriteria.agriType;
         }
       }
-      if (equipmentBrand) query.marka = equipmentBrand;
-      if (searchCriteria.model) query.model = searchCriteria.model;
+      if (isCategoryBasedBrandModel) {
+        if (searchCriteria.agriType) query.marka = searchCriteria.agriType;
+        if (categoryBasedBrand) query.model = categoryBasedBrand;
+      } else {
+        if (equipmentBrand) query.marka = equipmentBrand;
+        if (searchCriteria.model) query.model = searchCriteria.model;
+      }
       if (searchCriteria.region) query.locat = searchCriteria.region;
       if (searchCriteria.city) query.locatc = searchCriteria.city;
       if (searchCriteria.maxPrice) query.price1 = searchCriteria.maxPrice;
@@ -921,8 +1007,31 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       if (searchCriteria.yearTo) query.yearTo = searchCriteria.yearTo;
       if (searchCriteria.color) query.color = searchCriteria.color;
       if (searchCriteria.sortBy) query.sort = searchCriteria.sortBy;
-      if (searchCriteria.engineFrom) query.engineFrom = searchCriteria.engineFrom;
-      if (searchCriteria.engineTo) query.engineTo = searchCriteria.engineTo;
+      if (isAgroCategory) {
+        if (agriFieldVisibility.showPower) {
+          if (searchCriteria.engineFrom) query.engineFrom = searchCriteria.engineFrom;
+          if (searchCriteria.engineTo) query.engineTo = searchCriteria.engineTo;
+        }
+        if (agriFieldVisibility.showEngineType && searchCriteria.engineType) {
+          query.engineType = searchCriteria.engineType;
+        }
+        if (agriFieldVisibility.showTransmission && searchCriteria.transmission) {
+          query.transmission = searchCriteria.transmission;
+        }
+        if (agriFieldVisibility.showDriveType && searchCriteria.agriDriveType) {
+          query.driveType = searchCriteria.agriDriveType;
+        }
+        if (agriFieldVisibility.showHours) {
+          if (searchCriteria.forkliftHoursFrom) query.hoursFrom = searchCriteria.forkliftHoursFrom;
+          if (searchCriteria.forkliftHoursTo) query.hoursTo = searchCriteria.forkliftHoursTo;
+        }
+        if (agriFieldVisibility.showEuroStandard && searchCriteria.heavyEuroStandard) {
+          query.euroStandard = searchCriteria.heavyEuroStandard;
+        }
+      } else {
+        if (searchCriteria.engineFrom) query.engineFrom = searchCriteria.engineFrom;
+        if (searchCriteria.engineTo) query.engineTo = searchCriteria.engineTo;
+      }
       if (isBoatsCategory) {
         if (searchCriteria.engineType) query.fuel = searchCriteria.engineType;
         if (searchCriteria.boatEngineCountFrom) query.engineCountFrom = searchCriteria.boatEngineCountFrom;
@@ -936,18 +1045,12 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         if (searchCriteria.boatDraftTo) query.draftTo = searchCriteria.boatDraftTo;
         if (searchCriteria.boatHoursFrom) query.hoursFrom = searchCriteria.boatHoursFrom;
         if (searchCriteria.boatHoursTo) query.hoursTo = searchCriteria.boatHoursTo;
-        if (searchCriteria.boatFeatures.length > 0) {
-          query.boatFeatures = searchCriteria.boatFeatures.join(",");
-        }
       }
       if (isTrailersCategory) {
         if (searchCriteria.trailerLoadFrom) query.loadFrom = searchCriteria.trailerLoadFrom;
         if (searchCriteria.trailerLoadTo) query.loadTo = searchCriteria.trailerLoadTo;
         if (searchCriteria.trailerAxlesFrom) query.axlesFrom = searchCriteria.trailerAxlesFrom;
         if (searchCriteria.trailerAxlesTo) query.axlesTo = searchCriteria.trailerAxlesTo;
-        if (searchCriteria.trailerFeatures.length > 0) {
-          query.trailerFeatures = searchCriteria.trailerFeatures.join(",");
-        }
       }
       if (isForkliftCategory) {
         if (searchCriteria.engineType) query.fuel = searchCriteria.engineType;
@@ -1023,6 +1126,9 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     if (searchCriteria.mileageTo) query.mileageTo = searchCriteria.mileageTo;
     if (searchCriteria.engineFrom) query.engineFrom = searchCriteria.engineFrom;
     if (searchCriteria.engineTo) query.engineTo = searchCriteria.engineTo;
+    if (searchCriteria.motoDisplacementFrom) query.displacementFrom = searchCriteria.motoDisplacementFrom;
+    if (searchCriteria.motoDisplacementTo) query.displacementTo = searchCriteria.motoDisplacementTo;
+    if (searchCriteria.heavyEuroStandard) query.euroStandard = searchCriteria.heavyEuroStandard;
     if (searchCriteria.color) query.color = searchCriteria.color;
     if (searchCriteria.region) query.region = searchCriteria.region;
     if (searchCriteria.city) query.city = searchCriteria.city;
@@ -1071,6 +1177,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       transmission: "",
       agriType: "",
       agriBrand: "",
+      agriDriveType: "",
       condition: "",
       sortBy: "Марка/Модел/Цена",
       isNew: false,
@@ -1141,6 +1248,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       trailerAxlesTo: "",
       buyServiceCategory: "",
       motoFeatures: [],
+      features: [],
       boatFeatures: [],
       trailerFeatures: [],
     });
@@ -1249,6 +1357,15 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       border-color: #115e59;
       background: #ffffff;
       box-shadow: 0 0 0 3px rgba(15,118,110,0.2);
+    }
+    .adv-input[type="number"]::-webkit-outer-spin-button,
+    .adv-input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    .adv-input[type="number"] {
+      -moz-appearance: textfield;
+      appearance: textfield;
     }
     .adv-select--disabled {
       background: #f3f4f6;
@@ -1954,11 +2071,17 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
             {equipmentTypeOptions.length > 0 && (
               <div className="adv-field">
                 <label className="adv-label">
-                  {isAgroCategory || isIndustrialCategory ? "ВИД ТЕХНИКА" : "КАТЕГОРИЯ"}
+                  {isCategoryBasedBrandModel ? "КАТЕГОРИЯ" : isIndustrialCategory ? "ВИД ТЕХНИКА" : "КАТЕГОРИЯ"}
                 </label>
                 <select
                   value={searchCriteria.agriType}
-                  onChange={(e) => handleInputChange("agriType", e.target.value)}
+                  onChange={(e) => {
+                    handleInputChange("agriType", e.target.value);
+                    if (isCategoryBasedBrandModel) {
+                      handleInputChange("brand", "");
+                      handleInputChange("model", "");
+                    }
+                  }}
                   className="adv-select"
                 >
                   <option value="">Всички</option>
@@ -1971,46 +2094,80 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               </div>
             )}
 
-            <div className="adv-field">
-              <label className="adv-label">МАРКА</label>
-              <BrandSelector
-                value={searchCriteria.brand}
-                onChange={(brand) => {
-                  handleInputChange("brand", brand);
-                  handleInputChange("model", "");
-                }}
-                brands={sortedAvailableBrands}
-                placeholder="Всички"
-              />
-            </div>
-
-            <div className="adv-field">
-              <label className="adv-label">МОДЕЛ</label>
-              <div style={{ position: "relative" }}>
-                <select
-                  value={searchCriteria.model}
-                  onChange={(e) => handleInputChange("model", e.target.value)}
-                  className={`adv-select ${!searchCriteria.brand ? "adv-select--disabled" : ""}`}
-                  disabled={!searchCriteria.brand}
-                >
-                  <option value="">{searchCriteria.brand ? "Всички" : "Избери марка първо"}</option>
-                  {groupedAvailableModels.map((group) => (
-                    <optgroup key={group.label} label={group.label}>
-                      {group.options.map((model) => (
-                        <option key={model} value={model}>
-                          {model}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-                {!searchCriteria.brand && (
-                  <span className="adv-lock-icon" title="Избери марка първо">
-                    <Lock size={14} />
-                  </span>
-                )}
+            {isCategoryBasedBrandModel ? (
+              <div className="adv-field">
+                <label className="adv-label">МАРКА</label>
+                <div style={{ position: "relative" }}>
+                  <select
+                    value={searchCriteria.model}
+                    onChange={(e) => handleInputChange("model", e.target.value)}
+                    className={`adv-select ${!searchCriteria.agriType ? "adv-select--disabled" : ""}`}
+                    disabled={!searchCriteria.agriType}
+                  >
+                    <option value="">
+                      {searchCriteria.agriType ? "Всички" : "Избери категория първо"}
+                    </option>
+                    {groupedAvailableModels.map((group) => (
+                      <optgroup key={group.label} label={group.label}>
+                        {group.options.map((model) => (
+                          <option key={model} value={model}>
+                            {model}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  {!searchCriteria.agriType && (
+                    <span className="adv-lock-icon" title="Избери категория първо">
+                      <Lock size={14} />
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
+            ) : (
+              <>
+                <div className="adv-field">
+                  <label className="adv-label">МАРКА</label>
+                  <BrandSelector
+                    value={searchCriteria.brand}
+                    onChange={(brand) => {
+                      handleInputChange("brand", brand);
+                      handleInputChange("model", "");
+                    }}
+                    brands={sortedAvailableBrands}
+                    placeholder="Всички"
+                  />
+                </div>
+
+                <div className="adv-field">
+                  <label className="adv-label">МОДЕЛ</label>
+                  <div style={{ position: "relative" }}>
+                    <select
+                      value={searchCriteria.model}
+                      onChange={(e) => handleInputChange("model", e.target.value)}
+                      className={`adv-select ${!searchCriteria.brand ? "adv-select--disabled" : ""}`}
+                      disabled={!searchCriteria.brand}
+                    >
+                      <option value="">{searchCriteria.brand ? "Всички" : "Избери марка първо"}</option>
+                      {groupedAvailableModels.map((group) => (
+                        <optgroup key={group.label} label={group.label}>
+                          {group.options.map((model) => (
+                            <option key={model} value={model}>
+                              {model}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                    {!searchCriteria.brand && (
+                      <span className="adv-lock-icon" title="Избери марка първо">
+                        <Lock size={14} />
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="adv-field">
               <label className="adv-label">НАМИРА СЕ В</label>
@@ -3072,6 +3229,182 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                     </>
                   )}
 
+                  {isAgroCategory && (
+                    <>
+                      {agriFieldVisibility.showEngineType && (
+                        <div className="adv-field">
+                          <label className="adv-label">ВИД ДВИГАТЕЛ</label>
+                          <select
+                            value={searchCriteria.engineType}
+                            onChange={(e) => handleInputChange("engineType", e.target.value)}
+                            className="adv-select"
+                          >
+                            <option value="">Всички</option>
+                            {ENGINE_TYPE_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      {agriFieldVisibility.showPower && (
+                        <>
+                          <div className="adv-field">
+                            <label className="adv-label">МОЩНОСТ ОТ [К.С.]</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={searchCriteria.engineFrom}
+                              onChange={(e) => handleInputChange("engineFrom", e.target.value)}
+                              className="adv-input"
+                            />
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">МОЩНОСТ ДО [К.С.]</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={searchCriteria.engineTo}
+                              onChange={(e) => handleInputChange("engineTo", e.target.value)}
+                              className="adv-input"
+                            />
+                          </div>
+                        </>
+                      )}
+                      {agriFieldVisibility.showTransmission && (
+                        <div className="adv-field">
+                          <label className="adv-label">СКОРОСТНА КУТИЯ</label>
+                          <select
+                            value={searchCriteria.transmission}
+                            onChange={(e) => handleInputChange("transmission", e.target.value)}
+                            className="adv-select"
+                          >
+                            <option value="">Всички</option>
+                            {TRANSMISSION_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      {agriFieldVisibility.showDriveType && (
+                        <div className="adv-field">
+                          <label className="adv-label">ЗАДВИЖВАНЕ</label>
+                          <select
+                            value={searchCriteria.agriDriveType}
+                            onChange={(e) => handleInputChange("agriDriveType", e.target.value)}
+                            className="adv-select"
+                          >
+                            <option value="">Всички</option>
+                            {AGRI_DRIVE_TYPE_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      {agriFieldVisibility.showHours && (
+                        <>
+                          <div className="adv-field">
+                            <label className="adv-label">ЧАСОВЕ РАБОТА ОТ</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={searchCriteria.forkliftHoursFrom}
+                              onChange={(e) => handleInputChange("forkliftHoursFrom", e.target.value)}
+                              className="adv-input"
+                            />
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">ЧАСОВЕ РАБОТА ДО</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={searchCriteria.forkliftHoursTo}
+                              onChange={(e) => handleInputChange("forkliftHoursTo", e.target.value)}
+                              className="adv-input"
+                            />
+                          </div>
+                        </>
+                      )}
+                      {agriFieldVisibility.showEuroStandard && (
+                        <div className="adv-field">
+                          <label className="adv-label">ЕВРОСТАНДАРТ</label>
+                          <select
+                            value={searchCriteria.heavyEuroStandard}
+                            onChange={(e) => handleInputChange("heavyEuroStandard", e.target.value)}
+                            className="adv-select"
+                          >
+                            <option value="">Всички</option>
+                            {EURO_STANDARD_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      <div className="adv-field">
+                        <label className="adv-label">ЦВЯТ</label>
+                        <select
+                          value={searchCriteria.color}
+                          onChange={(e) => handleInputChange("color", e.target.value)}
+                          className="adv-select"
+                        >
+                          <option value="">Всички</option>
+                          {COLOR_OPTIONS.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
+                  )}
+
+                  {isIndustrialCategory && (
+                    <>
+                      <div className="adv-field">
+                        <label className="adv-label">МОЩНОСТ ОТ [К.С.]</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={searchCriteria.engineFrom}
+                          onChange={(e) => handleInputChange("engineFrom", e.target.value)}
+                          className="adv-input"
+                        />
+                      </div>
+                      <div className="adv-field">
+                        <label className="adv-label">МОЩНОСТ ДО [К.С.]</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={searchCriteria.engineTo}
+                          onChange={(e) => handleInputChange("engineTo", e.target.value)}
+                          className="adv-input"
+                        />
+                      </div>
+                      <div className="adv-field">
+                        <label className="adv-label">ЦВЯТ</label>
+                        <select
+                          value={searchCriteria.color}
+                          onChange={(e) => handleInputChange("color", e.target.value)}
+                          className="adv-select"
+                        >
+                          <option value="">Всички</option>
+                          {COLOR_OPTIONS.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
+                  )}
+
                   {isMotoCategory && (
                     <>
                       <div className="adv-field">
@@ -3158,32 +3491,6 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                             </option>
                           ))}
                         </select>
-                      </div>
-                      <div className="adv-field" style={{ gridColumn: "1 / -1" }}>
-                        <label className="adv-label">ЕКСТРИ</label>
-                        <div className="adv-feature-groups">
-                          {MOTO_FEATURE_GROUPS.map((group) => (
-                            <div key={group.key} className="adv-feature-group">
-                              <div className="adv-feature-group-title">{group.title}</div>
-                              <div className="adv-chips-row">
-                                {group.items.map((feature) => (
-                                  <label
-                                    key={feature}
-                                    className={`adv-chip ${searchCriteria.motoFeatures.includes(feature) ? "adv-chip--active" : ""}`}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={searchCriteria.motoFeatures.includes(feature)}
-                                      onChange={() => toggleFeature("motoFeatures", feature)}
-                                      style={{ display: "none" }}
-                                    />
-                                    {feature}
-                                  </label>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
                       </div>
                     </>
                   )}
@@ -3497,25 +3804,6 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                           ))}
                         </select>
                       </div>
-                      <div className="adv-field" style={{ gridColumn: "1 / -1" }}>
-                        <label className="adv-label">ЕКСТРИ</label>
-                        <div className="adv-chips-row">
-                          {BOAT_FEATURE_OPTIONS.map((feature) => (
-                            <label
-                              key={feature}
-                              className={`adv-chip ${searchCriteria.boatFeatures.includes(feature) ? "adv-chip--active" : ""}`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={searchCriteria.boatFeatures.includes(feature)}
-                                onChange={() => toggleFeature("boatFeatures", feature)}
-                                style={{ display: "none" }}
-                              />
-                              {feature}
-                            </label>
-                          ))}
-                        </div>
-                      </div>
                     </>
                   )}
 
@@ -3584,25 +3872,6 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                           ))}
                         </select>
                       </div>
-                      <div className="adv-field" style={{ gridColumn: "1 / -1" }}>
-                        <label className="adv-label">ЕКСТРИ</label>
-                        <div className="adv-chips-row">
-                          {TRAILER_FEATURE_OPTIONS.map((feature) => (
-                            <label
-                              key={feature}
-                              className={`adv-chip ${searchCriteria.trailerFeatures.includes(feature) ? "adv-chip--active" : ""}`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={searchCriteria.trailerFeatures.includes(feature)}
-                                onChange={() => toggleFeature("trailerFeatures", feature)}
-                                style={{ display: "none" }}
-                              />
-                              {feature}
-                            </label>
-                          ))}
-                        </div>
-                      </div>
                     </>
                   )}
                 </>
@@ -3640,6 +3909,43 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                     <input type="number" placeholder="Макс." value={searchCriteria.engineTo} onChange={(e) => handleInputChange("engineTo", e.target.value)} className="adv-input" />
                   </div>
 
+                  <div className="adv-field">
+                    <label className="adv-label">КУБАТУРА ОТ (КУБ.СМ.)</label>
+                    <input
+                      type="number"
+                      placeholder="Мин."
+                      value={searchCriteria.motoDisplacementFrom}
+                      onChange={(e) => handleInputChange("motoDisplacementFrom", e.target.value)}
+                      className="adv-input"
+                    />
+                  </div>
+                  <div className="adv-field">
+                    <label className="adv-label">КУБАТУРА ДО (КУБ.СМ.)</label>
+                    <input
+                      type="number"
+                      placeholder="Макс."
+                      value={searchCriteria.motoDisplacementTo}
+                      onChange={(e) => handleInputChange("motoDisplacementTo", e.target.value)}
+                      className="adv-input"
+                    />
+                  </div>
+
+                  <div className="adv-field">
+                    <label className="adv-label">ЕВРОСТАНДАРТ</label>
+                    <select
+                      value={searchCriteria.heavyEuroStandard}
+                      onChange={(e) => handleInputChange("heavyEuroStandard", e.target.value)}
+                      className="adv-select"
+                    >
+                      <option value="">Всички</option>
+                      {EURO_STANDARD_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   {/* Year To */}
                   <div className="adv-field">
                     <label className="adv-label">ГОДИНА ДО</label>
@@ -3673,6 +3979,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                       <option value="За части">За части</option>
                     </select>
                   </div>
+
                 </>
               )}
             </div>

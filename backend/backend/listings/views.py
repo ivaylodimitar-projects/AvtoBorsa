@@ -440,6 +440,12 @@ class CarListingViewSet(viewsets.ModelViewSet):
             part_element = get_param('partelem')
             if part_element:
                 queryset = queryset.filter(parts_details__part_element__icontains=part_element)
+            part_year_from = to_int(get_param('partYearFrom', 'part_year_from'))
+            if part_year_from is not None:
+                queryset = queryset.filter(parts_details__part_year_from__gte=part_year_from)
+            part_year_to = to_int(get_param('partYearTo', 'part_year_to'))
+            if part_year_to is not None:
+                queryset = queryset.filter(parts_details__part_year_to__lte=part_year_to)
 
         if main_category in {'3', '4'}:
             relation = 'buses_details' if main_category == '3' else 'trucks_details'
@@ -618,6 +624,29 @@ class CarListingViewSet(viewsets.ModelViewSet):
             category_key = category_mapping.get(category, category)
             queryset = queryset.filter(category=category_key)
 
+        # Car-specific numeric filters
+        if main_category in {'1', None, ''}:
+            displacement_from = to_int(get_param('displacementFrom'))
+            if displacement_from is not None:
+                queryset = queryset.filter(displacement__gte=displacement_from)
+            displacement_to = to_int(get_param('displacementTo'))
+            if displacement_to is not None:
+                queryset = queryset.filter(displacement__lte=displacement_to)
+
+            euro_standard = get_param('euroStandard')
+            if euro_standard:
+                normalized_euro = str(euro_standard).strip()
+                lowered = normalized_euro.lower()
+                if lowered.startswith('евро'):
+                    parts = normalized_euro.split()
+                    normalized_euro = parts[-1] if parts else normalized_euro
+                queryset = queryset.filter(euro_standard__icontains=normalized_euro)
+
+        listing_features = get_param('features')
+        if listing_features and main_category not in {'a', 'b'}:
+            for feature in [item.strip() for item in listing_features.split(',') if item.strip()]:
+                queryset = queryset.filter(features__contains=[feature])
+
         # Media / seller filters
         if get_param('hasPhoto') in {'1', 'true', 'True'}:
             queryset = queryset.filter(images__isnull=False).distinct()
@@ -682,7 +711,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
                     'user__business_profile',
                     'user__private_profile'
                 ).only(
-                    'id', 'slug', 'main_category', 'brand', 'model', 'year_from', 'price', 'mileage',
+                    'id', 'slug', 'main_category', 'title', 'brand', 'model', 'year_from', 'price', 'mileage',
                     'fuel', 'gearbox', 'power', 'location_country', 'city',
                     'category', 'condition', 'created_at', 'updated_at', 'listing_type',
                     'user_id', 'user__email',
@@ -697,7 +726,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
                     'user__business_profile',
                     'user__private_profile'
                 ).only(
-                    'id', 'slug', 'main_category', 'brand', 'model', 'year_from', 'price', 'mileage',
+                    'id', 'slug', 'main_category', 'title', 'brand', 'model', 'year_from', 'price', 'mileage',
                     'fuel', 'gearbox', 'power', 'location_country', 'city',
                     'category', 'condition', 'created_at', 'updated_at', 'listing_type',
                     'is_active', 'is_draft', 'is_archived',

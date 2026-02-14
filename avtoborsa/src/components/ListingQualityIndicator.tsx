@@ -1,65 +1,57 @@
-﻿import React from "react";
-import {
-  AlertTriangle,
-  BadgeCheck,
-  CheckCircle2,
-  CircleDot,
-  Sparkles,
-} from "lucide-react";
-
-interface QualityTip {
-  id: string;
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  completed: boolean;
-}
+import React from "react";
+import { FiAlertTriangle, FiAward, FiCheckCircle, FiImage, FiTag } from "react-icons/fi";
 
 interface ListingQualityIndicatorProps {
   completionPercentage: number;
-  tips: QualityTip[];
+  filledFields?: number;
+  totalFields?: number;
+  imageCount?: number;
+  hasPrice?: boolean;
+  priceRequired?: boolean;
 }
 
 const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
   completionPercentage,
-  tips,
+  filledFields = 0,
+  totalFields = 0,
+  imageCount = 0,
+  hasPrice = false,
+  priceRequired = true,
 }) => {
   const getQualityLevel = (percentage: number) => {
     if (percentage < 25) {
-      return { label: "Начало", color: "#ef4444", icon: <AlertTriangle size={18} /> };
+      return { label: "Начало", color: "#ef4444", icon: <FiAlertTriangle size={18} /> };
     }
-    if (percentage < 50) {
-      return { label: "Добре", color: "#f59e0b", icon: <CircleDot size={18} /> };
-    }
-    if (percentage < 75) {
-      return { label: "Много добре", color: "#facc15", icon: <Sparkles size={18} /> };
+    if (percentage < 60) {
+      return { label: "Добре", color: "#f59e0b", icon: <FiCheckCircle size={18} /> };
     }
     if (percentage < 100) {
-      return { label: "Отлично", color: "#22c55e", icon: <CheckCircle2 size={18} /> };
+      return { label: "Почти готово", color: "#0f766e", icon: <FiCheckCircle size={18} /> };
     }
-    return { label: "Перфектно", color: "#16a34a", icon: <BadgeCheck size={18} /> };
+    return { label: "Готово", color: "#16a34a", icon: <FiAward size={18} /> };
   };
 
   const quality = getQualityLevel(completionPercentage);
-  const completedTips = tips.filter((t) => t.completed).length;
+  const priceLabel = !priceRequired ? "По договаряне" : hasPrice ? "Добавена" : "Липсва";
+  const priceColor = !priceRequired || hasPrice ? "#0f766e" : "#b91c1c";
 
   const styles: Record<string, React.CSSProperties> = {
     container: {
       background: "#fff",
-      borderRadius: 8,
-      padding: "20px",
-      border: "1px solid #e0e0e0",
-      boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+      borderRadius: 14,
+      padding: "18px",
+      border: "1px solid #e2e8f0",
+      boxShadow: "0 10px 24px rgba(15, 23, 42, 0.08)",
     },
     header: {
       display: "flex",
       alignItems: "center",
-      gap: 16,
-      marginBottom: 16,
+      gap: 14,
+      marginBottom: 14,
     },
     qualityCircle: {
-      width: 84,
-      height: 84,
+      width: 78,
+      height: 78,
       borderRadius: "50%",
       background: quality.color,
       display: "flex",
@@ -68,42 +60,43 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
       justifyContent: "center",
       color: "#fff",
       fontWeight: 700,
-      boxShadow: "0 10px 18px rgba(15, 23, 42, 0.2)",
-      gap: 4,
+      boxShadow: "0 10px 20px rgba(15, 23, 42, 0.18)",
+      gap: 3,
+      flexShrink: 0,
     },
     percentage: {
-      fontSize: 24,
+      fontSize: 20,
       fontWeight: 800,
       lineHeight: 1,
     },
     label: {
-      fontSize: 11,
+      fontSize: 10,
       fontWeight: 700,
       textTransform: "uppercase",
       letterSpacing: 0.4,
+      textAlign: "center" as const,
+      padding: "0 4px",
     },
     info: {
       flex: 1,
+      minWidth: 0,
     },
     infoTitle: {
-      fontSize: 16,
+      fontSize: 15,
       fontWeight: 700,
-      color: "#333",
+      color: "#0f172a",
       marginBottom: 4,
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
       fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
     },
     infoText: {
-      fontSize: 13,
-      color: "#666",
-      marginBottom: 10,
+      fontSize: 12,
+      color: "#64748b",
+      marginBottom: 8,
     },
     progressBar: {
       width: "100%",
       height: 8,
-      background: "#e0e0e0",
+      background: "#e2e8f0",
       borderRadius: 999,
       overflow: "hidden",
     },
@@ -113,57 +106,37 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
       width: `${completionPercentage}%`,
       transition: "width 0.3s ease",
     },
-    tipsContainer: {
-      marginTop: 16,
-    },
-    tipsTitle: {
-      fontSize: 13,
-      fontWeight: 700,
-      color: "#333",
-      marginBottom: 12,
-      fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
-    },
-    tipsList: {
+    metrics: {
       display: "grid",
-      gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-      gap: 12,
-    },
-    tip: {
-      padding: "12px",
-      background: "#fff",
-      borderRadius: 8,
-      border: "1px solid #e0e0e0",
-      display: "flex",
+      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
       gap: 10,
-      alignItems: "flex-start",
+      marginTop: 14,
     },
-    tipCompleted: {
-      background: "#ecfdf5",
-      borderColor: "#99f6e4",
+    metricCard: {
+      border: "1px solid #e2e8f0",
+      borderRadius: 10,
+      padding: "10px 8px",
+      background: "#f8fafc",
+      textAlign: "center" as const,
     },
-    tipIcon: {
+    metricIcon: {
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
-      width: 28,
-      height: 28,
-      borderRadius: 8,
-      background: "#ecfdf5",
+      marginBottom: 6,
       color: "#0f766e",
-      flexShrink: 0,
     },
-    tipContent: {
-      flex: 1,
-    },
-    tipTitle: {
-      fontSize: 12,
+    metricValue: {
+      fontSize: 13,
       fontWeight: 700,
-      color: "#333",
-      marginBottom: 4,
+      color: "#0f172a",
+      marginBottom: 2,
+      lineHeight: 1.2,
     },
-    tipDescription: {
+    metricLabel: {
       fontSize: 11,
-      color: "#666",
+      color: "#64748b",
+      lineHeight: 1.2,
     },
   };
 
@@ -176,40 +149,37 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
           <div style={styles.label}>{quality.label}</div>
         </div>
         <div style={styles.info}>
-          <div style={styles.infoTitle}>
-            Качество на обявата
-          </div>
-          <div style={styles.infoText}>
-            Завършени са {completedTips} от {tips.length} препоръки.
-          </div>
+          <div style={styles.infoTitle}>Завършеност на обявата</div>
+          <div style={styles.infoText}>Това е текущото състояние на формата.</div>
           <div style={styles.progressBar}>
             <div style={styles.progressFill} />
           </div>
         </div>
       </div>
 
-      {tips.length > 0 && (
-        <div style={styles.tipsContainer}>
-          <div style={styles.tipsTitle}>Съвети за подобрение</div>
-          <div style={styles.tipsList}>
-            {tips.map((tip) => (
-              <div
-                key={tip.id}
-                style={{
-                  ...styles.tip,
-                  ...(tip.completed ? styles.tipCompleted : {}),
-                }}
-              >
-                <div style={styles.tipIcon}>{tip.icon}</div>
-                <div style={styles.tipContent}>
-                  <div style={styles.tipTitle}>{tip.title}</div>
-                  <div style={styles.tipDescription}>{tip.description}</div>
-                </div>
-              </div>
-            ))}
-          </div>
+      <div style={styles.metrics}>
+        <div style={styles.metricCard}>
+          <span style={styles.metricIcon}>
+            <FiCheckCircle size={16} />
+          </span>
+          <div style={styles.metricValue}>{`${filledFields}/${totalFields}`}</div>
+          <div style={styles.metricLabel}>Попълнени полета</div>
         </div>
-      )}
+        <div style={styles.metricCard}>
+          <span style={styles.metricIcon}>
+            <FiImage size={16} />
+          </span>
+          <div style={styles.metricValue}>{imageCount}</div>
+          <div style={styles.metricLabel}>Снимки</div>
+        </div>
+        <div style={styles.metricCard}>
+          <span style={{ ...styles.metricIcon, color: priceColor }}>
+            <FiTag size={16} />
+          </span>
+          <div style={{ ...styles.metricValue, color: priceColor }}>{priceLabel}</div>
+          <div style={styles.metricLabel}>Цена</div>
+        </div>
+      </div>
     </div>
   );
 };

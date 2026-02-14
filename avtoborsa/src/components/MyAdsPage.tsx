@@ -35,6 +35,7 @@ import {
   formatFuelLabel,
   formatGearboxLabel,
 } from "../utils/listingLabels";
+import { getMainCategoryLabel } from "../constants/mobileBgData";
 import {
   readMyAdsCache,
   writeMyAdsCache,
@@ -116,6 +117,8 @@ const MyAdsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("active");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [brandFilter, setBrandFilter] = useState<string>("all");
   const [modelFilter, setModelFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
@@ -894,13 +897,13 @@ const MyAdsPage: React.FC = () => {
     padding: "12px 16px",
     marginBottom: 24,
     borderRadius: 10,
-    border: "1px solid #bbf7d0",
-    background: "#ecfdf5",
+    border: "1px solid rgb(15, 118, 110)",
+    background: "rgb(15, 118, 110)",
   },
   filterLabel: {
     fontSize: 13,
     fontWeight: 700,
-    color: "#0f766e",
+    color: "#fff",
   },
   filterControls: {
     display: "flex",
@@ -910,12 +913,12 @@ const MyAdsPage: React.FC = () => {
   },
   filterSelect: {
     height: 38,
-    minWidth: 200,
+    minWidth: 180,
     padding: "0 12px",
     borderRadius: 8,
-    border: "1px solid #5eead4",
+    border: "1px solid rgba(0,0,0,0.24)",
     background: "#ffffff",
-    color: "#0f766e",
+    color: "#000",
     fontSize: 14,
     fontWeight: 600,
     cursor: "pointer",
@@ -923,7 +926,7 @@ const MyAdsPage: React.FC = () => {
   filterCount: {
     fontSize: 12,
     fontWeight: 600,
-    color: "#0f766e",
+    color: "#fff",
   },
   filterEmpty: {
     padding: "24px 20px",
@@ -1705,19 +1708,62 @@ const MyAdsPage: React.FC = () => {
   };
 
   const currentListings = getCurrentListings();
-  const modelOptions = Array.from(
+  const categoryOptions = Array.from(
     new Set(
       currentListings
+        .map((listing) => (listing.main_category || "").trim())
+        .filter(Boolean)
+    )
+  )
+    .map((categoryCode) => ({
+      value: categoryCode,
+      label: getMainCategoryLabel(categoryCode) || categoryCode,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, "bg", { sensitivity: "base" }));
+
+  const selectedCategory =
+    categoryFilter === "all" || categoryOptions.some((option) => option.value === categoryFilter)
+      ? categoryFilter
+      : "all";
+
+  const categoryScopedListings =
+    selectedCategory === "all"
+      ? currentListings
+      : currentListings.filter((listing) => (listing.main_category || "").trim() === selectedCategory);
+
+  const brandOptions = Array.from(
+    new Set(
+      categoryScopedListings
+        .map((listing) => (listing.brand || "").trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, "bg", { sensitivity: "base" }));
+
+  const selectedBrand =
+    brandFilter === "all" || brandOptions.includes(brandFilter) ? brandFilter : "all";
+
+  const brandScopedListings =
+    selectedBrand === "all"
+      ? categoryScopedListings
+      : categoryScopedListings.filter((listing) => (listing.brand || "").trim() === selectedBrand);
+
+  const modelOptions = Array.from(
+    new Set(
+      brandScopedListings
         .map((listing) => (listing.model || "").trim())
         .filter(Boolean)
     )
   ).sort((a, b) => a.localeCompare(b, "bg", { sensitivity: "base" }));
-  const showModelFilter = currentListings.length > 10;
-  const selectedModel = modelOptions.includes(modelFilter) ? modelFilter : "all";
+
+  const selectedModel =
+    modelFilter === "all" || modelOptions.includes(modelFilter) ? modelFilter : "all";
+
   const filteredListings =
     selectedModel === "all"
-      ? currentListings
-      : currentListings.filter((listing) => listing.model === selectedModel);
+      ? brandScopedListings
+      : brandScopedListings.filter((listing) => (listing.model || "").trim() === selectedModel);
+
+  const showListingFilters = currentListings.length > 10;
   const hasFilteredListings = filteredListings.length > 0;
   const totalPages = Math.ceil(filteredListings.length / PAGE_SIZE);
   const safePage = totalPages > 0 ? Math.min(currentPage, totalPages) : 1;
@@ -2207,10 +2253,43 @@ const MyAdsPage: React.FC = () => {
           })}
         </div>
 
-        {showModelFilter && (
+        {showListingFilters && (
           <div style={styles.filterRow}>
-            <div style={styles.filterLabel}>Филтър по модел</div>
+            <div style={styles.filterLabel}>Филтри</div>
             <div style={styles.filterControls}>
+              <select
+                value={selectedCategory}
+                onChange={(e) => {
+                  setCategoryFilter(e.target.value);
+                  setBrandFilter("all");
+                  setModelFilter("all");
+                  setCurrentPage(1);
+                }}
+                style={styles.filterSelect}
+              >
+                <option value="all">Всички категории</option>
+                {categoryOptions.map((categoryOption) => (
+                  <option key={categoryOption.value} value={categoryOption.value}>
+                    {categoryOption.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={selectedBrand}
+                onChange={(e) => {
+                  setBrandFilter(e.target.value);
+                  setModelFilter("all");
+                  setCurrentPage(1);
+                }}
+                style={styles.filterSelect}
+              >
+                <option value="all">Всички марки</option>
+                {brandOptions.map((brand) => (
+                  <option key={brand} value={brand}>
+                    {brand}
+                  </option>
+                ))}
+              </select>
               <select
                 value={selectedModel}
                 onChange={(e) => {

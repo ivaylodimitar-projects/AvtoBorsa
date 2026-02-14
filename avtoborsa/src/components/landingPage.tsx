@@ -1055,8 +1055,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <div style={styles.glassDivider} aria-hidden="true" />
-
         {/* ABOUT */}
         <section id="about" style={styles.section}>
           <div style={styles.infoContainer}>
@@ -1452,17 +1450,6 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 12,
     padding: 22,
     boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
-  },
-  glassDivider: {
-    height: 2,
-    margin: "24px auto 6px",
-    width: "100%",
-    borderRadius: 999,
-    background:
-      "linear-gradient(90deg, rgba(16,185,129,0.02), rgba(16,185,129,0.32), rgba(16,185,129,0.02))",
-    border: "1px solid rgba(16,185,129,0.18)",
-    boxShadow: "0 4px 10px rgba(16,185,129,0.12)",
-    backdropFilter: "blur(4px)",
   },
   containerHeader: { marginTop: 0, borderBottom: "3px solid #0f766e"},
   h2: {

@@ -1,7 +1,14 @@
 import React from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { Home, Building2, Plus, User, LogOut } from "lucide-react";
+import {
+  FiBriefcase,
+  FiHome,
+  FiLogOut,
+  FiMenu,
+  FiPlus,
+  FiUser,
+} from "react-icons/fi";
 import ProfileMenu from "./ProfileMenu";
 import SavedSearchesMenu from "./SavedSearchesMenu";
 
@@ -53,7 +60,7 @@ const Navbar: React.FC = () => {
           onClick={() => setMobileOpen((v) => !v)}
           aria-label="Toggle menu"
         >
-          ☰
+          <FiMenu size={18} />
         </button>
 
         {/* Nav */}
@@ -64,7 +71,7 @@ const Navbar: React.FC = () => {
               className={`nav-link ${isActive("/") ? "active" : ""}`}
               onClick={() => setMobileOpen(false)}
             >
-              <Home size={16} />
+              <FiHome size={16} />
               Начало
             </Link>
 
@@ -73,7 +80,7 @@ const Navbar: React.FC = () => {
               className={`nav-link ${isActive("/dealers") ? "active" : ""}`}
               onClick={() => setMobileOpen(false)}
             >
-              <Building2 size={16} />
+              <FiBriefcase size={16} />
               Дилъри
             </Link>
 
@@ -85,7 +92,7 @@ const Navbar: React.FC = () => {
                 className={`nav-link ${isActive("/publish") ? "active" : ""}`}
                 onClick={() => setMobileOpen(false)}
               >
-                <Plus size={16} />
+                <FiPlus size={16} />
                 Добави обява
               </Link>
             ) : (
@@ -94,7 +101,7 @@ const Navbar: React.FC = () => {
                 className={`nav-link ${isActive("/publish") ? "active" : ""}`}
                 onClick={() => setMobileOpen(false)}
               >
-                <Plus size={16} />
+                <FiPlus size={16} />
                 Публикуване
               </Link>
             )}
@@ -105,7 +112,7 @@ const Navbar: React.FC = () => {
               <>
                 <ProfileMenu />
                 <button className="btn-ghost btn-logout" onClick={() => setShowLogoutModal(true)}>
-                  <LogOut size={16} />
+                  <FiLogOut size={16} />
                   Изход
                 </button>
               </>
@@ -115,7 +122,7 @@ const Navbar: React.FC = () => {
                 className="btn-primary"
                 onClick={() => setMobileOpen(false)}
               >
-                <User size={16} />
+                <FiUser size={16} />
                 Влизане
               </Link>
             )}
@@ -127,7 +134,7 @@ const Navbar: React.FC = () => {
         <div style={styles.logoutOverlay} onClick={() => !isLoggingOut && setShowLogoutModal(false)}>
           <div style={styles.logoutModal} onClick={(e) => e.stopPropagation()}>
             <div style={styles.logoutIconWrap}>
-              <LogOut size={18} />
+              <FiLogOut size={18} />
             </div>
             <h3 style={styles.logoutTitle}>Потвърди изход</h3>
             <p style={styles.logoutText}>Сигурен ли си, че искаш да излезеш от профила си?</p>
