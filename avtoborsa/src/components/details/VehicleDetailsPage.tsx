@@ -64,6 +64,54 @@ interface CarListing {
   is_top?: boolean;
   is_top_listing?: boolean;
   is_top_ad?: boolean;
+  wheel_for?: string;
+  offer_type?: string;
+  tire_brand?: string;
+  tire_width?: string;
+  tire_height?: string;
+  tire_diameter?: string;
+  tire_season?: string;
+  tire_speed_index?: string;
+  tire_load_index?: string;
+  tire_tread?: string;
+  wheel_brand?: string;
+  material?: string;
+  bolts?: number | string | null;
+  pcd?: string;
+  center_bore?: string;
+  offset?: string;
+  width?: string;
+  diameter?: string;
+  count?: number | string | null;
+  wheel_type?: string;
+  part_for?: string;
+  part_category?: string;
+  part_element?: string;
+  part_year_from?: number | string | null;
+  part_year_to?: number | string | null;
+  axles?: number | string | null;
+  seats?: number | string | null;
+  load_kg?: number | string | null;
+  transmission?: string;
+  engine_type?: string;
+  heavy_euro_standard?: string;
+  displacement_cc?: number | string | null;
+  equipment_type?: string;
+  lift_capacity_kg?: number | string | null;
+  hours?: number | string | null;
+  beds?: number | string | null;
+  length_m?: number | string | null;
+  has_toilet?: boolean;
+  has_heating?: boolean;
+  has_air_conditioning?: boolean;
+  boat_category?: string;
+  engine_count?: number | string | null;
+  width_m?: number | string | null;
+  draft_m?: number | string | null;
+  trailer_category?: string;
+  classified_for?: string;
+  accessory_category?: string;
+  buy_service_category?: string;
 }
 
 interface SimilarListing {
@@ -239,19 +287,23 @@ const VehicleDetailsPage: React.FC = () => {
       setIsSimilarLoading(true);
       setSimilarError(null);
       try {
-        const buildBaseParams = () => {
+        const buildBaseParams = (options?: { includeMainCategory?: boolean; pageSize?: number }) => {
           const params = new URLSearchParams();
           params.set('compact', '1');
           params.set('page', '1');
-          params.set('page_size', '12');
-          if (listing.main_category) {
+          params.set('page_size', String(options?.pageSize ?? 12));
+          const includeMainCategory = options?.includeMainCategory !== false;
+          if (includeMainCategory && listing.main_category) {
             params.set('main_category', String(listing.main_category));
           }
           return params;
         };
 
-        const fetchBy = async (filters: Record<string, string | undefined>) => {
-          const params = buildBaseParams();
+        const fetchBy = async (
+          filters: Record<string, string | undefined>,
+          options?: { includeMainCategory?: boolean; pageSize?: number }
+        ) => {
+          const params = buildBaseParams(options);
           Object.entries(filters).forEach(([key, value]) => {
             if (!value) return;
             params.set(key, value);
@@ -267,6 +319,15 @@ const VehicleDetailsPage: React.FC = () => {
           const data = await response.json();
           const results: SimilarListing[] = Array.isArray(data.results) ? data.results : [];
           return results.filter((item) => item.id !== listing.id);
+        };
+
+        const shuffleListings = (items: SimilarListing[]) => {
+          const shuffled = [...items];
+          for (let i = shuffled.length - 1; i > 0; i -= 1) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+          return shuffled;
         };
 
         const merged = new Map<number, SimilarListing>();
@@ -289,6 +350,11 @@ const VehicleDetailsPage: React.FC = () => {
         // 3) Other models from the same main category
         if (merged.size < 6) {
           pushUnique(await fetchBy({}));
+        }
+        // 4) Fallback: if there are few/no listings in the same category, fill with random listings globally.
+        if (merged.size < 6) {
+          const randomPool = await fetchBy({}, { includeMainCategory: false, pageSize: 60 });
+          pushUnique(shuffleListings(randomPool));
         }
 
         const results = Array.from(merged.values());
@@ -781,11 +847,13 @@ const VehicleDetailsPage: React.FC = () => {
           />
 
           <TechnicalDataSection
+            mainCategory={listing.main_category}
             year={listing.year_from}
             month={listing.month}
             fuel={listing.fuel}
             power={listing.power}
             displacement={listing.displacement}
+            displacementCc={listing.displacement_cc}
             gearbox={listing.gearbox}
             category={listing.category}
             mileage={listing.mileage}
@@ -793,6 +861,54 @@ const VehicleDetailsPage: React.FC = () => {
             vin={listing.vin}
             condition={listing.condition}
             euroStandard={listing.euro_standard}
+            heavyEuroStandard={listing.heavy_euro_standard}
+            city={listing.city}
+            wheelFor={listing.wheel_for}
+            offerType={listing.offer_type}
+            tireBrand={listing.tire_brand}
+            tireWidth={listing.tire_width}
+            tireHeight={listing.tire_height}
+            tireDiameter={listing.tire_diameter}
+            tireSeason={listing.tire_season}
+            tireSpeedIndex={listing.tire_speed_index}
+            tireLoadIndex={listing.tire_load_index}
+            tireTread={listing.tire_tread}
+            wheelBrand={listing.wheel_brand}
+            material={listing.material}
+            bolts={listing.bolts}
+            pcd={listing.pcd}
+            centerBore={listing.center_bore}
+            offset={listing.offset}
+            width={listing.width}
+            diameter={listing.diameter}
+            count={listing.count}
+            wheelType={listing.wheel_type}
+            partFor={listing.part_for}
+            partCategory={listing.part_category}
+            partElement={listing.part_element}
+            partYearFrom={listing.part_year_from}
+            partYearTo={listing.part_year_to}
+            transmission={listing.transmission}
+            engineType={listing.engine_type}
+            axles={listing.axles}
+            seats={listing.seats}
+            loadKg={listing.load_kg}
+            equipmentType={listing.equipment_type}
+            liftCapacityKg={listing.lift_capacity_kg}
+            hours={listing.hours}
+            beds={listing.beds}
+            lengthM={listing.length_m}
+            hasToilet={listing.has_toilet}
+            hasHeating={listing.has_heating}
+            hasAirConditioning={listing.has_air_conditioning}
+            boatCategory={listing.boat_category}
+            engineCount={listing.engine_count}
+            widthM={listing.width_m}
+            draftM={listing.draft_m}
+            trailerCategory={listing.trailer_category}
+            classifiedFor={listing.classified_for}
+            accessoryCategory={listing.accessory_category}
+            buyServiceCategory={listing.buy_service_category}
             isMobile={isMobile}
           />
           <div style={styles.descriptionSection}>

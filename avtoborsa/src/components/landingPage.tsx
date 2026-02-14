@@ -6,7 +6,7 @@ import { useRecentSearches } from "../hooks/useRecentSearches";
 import { useSavedSearches } from "../hooks/useSavedSearches";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 import { CAR_BRANDS, CAR_MODELS } from "../constants/carBrandModels";
-import { APP_MAIN_CATEGORY_OPTIONS } from "../constants/mobileBgData";
+import { APP_MAIN_CATEGORY_OPTIONS, getMainCategoryLabel } from "../constants/mobileBgData";
 import type { IconType } from "react-icons";
 import {
   FaCarSide,
@@ -29,6 +29,7 @@ import {
 type CarListing = {
   id: number;
   slug: string;
+  main_category?: string;
   brand: string;
   model: string;
   year_from: number;
@@ -48,6 +49,8 @@ type CarListing = {
   is_top?: boolean;
   is_top_listing?: boolean;
   is_top_ad?: boolean;
+  part_for?: string;
+  part_element?: string;
   price_change?: {
     delta?: number | string;
     direction?: string;
@@ -304,6 +307,52 @@ export default function LandingPage() {
     if (diffHours > 0) return `преди ${diffHours} ${diffHours === 1 ? "час" : "часа"}`;
     if (diffMins > 0) return `преди ${diffMins} мин`;
     return "току-що";
+  };
+
+  const getLatestListingMeta = (listing: CarListing) => {
+    const isPartsCategory = (listing.main_category || "").toString() === "u";
+    if (isPartsCategory) {
+      const partItems: string[] = [];
+      const partElement = (listing.part_element || "").toString().trim();
+      if (partElement) {
+        partItems.push(partElement);
+      }
+      const partForRaw = (listing.part_for || "").toString().trim();
+      const partForLabel = getMainCategoryLabel(partForRaw) || partForRaw;
+      if (partForLabel) {
+        partItems.push(`За ${partForLabel}`);
+      }
+      return partItems.slice(0, 2);
+    }
+
+    const values: string[] = [];
+    const pushValue = (value: string) => {
+      const normalized = value.trim();
+      if (!normalized) return;
+      if (values.includes(normalized)) return;
+      values.push(normalized);
+    };
+
+    const year = Number(listing.year_from);
+    if (Number.isFinite(year) && year > 0) {
+      pushValue(`${Math.round(year)} г.`);
+    }
+
+    const mileage = Number(listing.mileage);
+    if (Number.isFinite(mileage) && mileage > 0) {
+      pushValue(`${Math.round(mileage).toLocaleString("bg-BG")} км`);
+    }
+
+    pushValue((listing.fuel_display || listing.fuel || "").toString());
+
+    const power = Number(listing.power);
+    if (Number.isFinite(power) && power > 0) {
+      pushValue(`${Math.round(power)} к.с.`);
+    }
+
+    pushValue((listing.gearbox_display || "").toString());
+
+    return values.slice(0, 4);
   };
 
   return (
@@ -875,6 +924,8 @@ export default function LandingPage() {
                   const isTop = isTopListing(listing);
                   const isNew = isListingNew(listing.created_at);
                   const isAboveFold = index < 4;
+                  const listingMeta = getLatestListingMeta(listing);
+                  const showCityInFooter = (listing.main_category || "").toString() !== "1";
                   const listingImageUrl = listing.image_url ? getImageUrl(listing.image_url) : "";
                   const priceChange = listing.price_change || null;
                   const deltaRaw = priceChange?.delta;
@@ -950,9 +1001,9 @@ export default function LandingPage() {
                               borderRadius: 999,
                               fontWeight: 800,
                               fontSize: 12,
-                              background: isUp ? "#fee2e2" : "#dcfce7",
-                              color: isUp ? "#dc2626" : "#16a34a",
-                              border: `1px solid ${isUp ? "#fecaca" : "#bbf7d0"}`,
+                              background: isUp ? "#dcfce7" : "#fee2e2",
+                              color: isUp ? "#16a34a" : "#dc2626",
+                              border: `1px solid ${isUp ? "#bbf7d0" : "#fecaca"}`,
                               boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
                               display: "inline-flex",
                               alignItems: "center",
@@ -987,23 +1038,26 @@ export default function LandingPage() {
                         <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", lineHeight: 1.3 }}>
                           {listing.brand} {listing.model}
                         </div>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, fontSize: 12, color: "#6b7280" }}>
-                          <span>{listing.year_from} г.</span>
-                          <span style={{ color: "#d1d5db" }}>|</span>
-                          <span>{listing.mileage.toLocaleString("bg-BG")} км</span>
-                          <span style={{ color: "#d1d5db" }}>|</span>
-                          <span>{listing.fuel_display}</span>
-                          <span style={{ color: "#d1d5db" }}>|</span>
-                          <span>{listing.power} к.с.</span>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12, color: "#9ca3af", marginTop: "auto" }}>
-                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                              <circle cx="12" cy="10" r="3" />
-                            </svg>
-                            {listing.city}
-                          </span>
+                        {listingMeta.length > 0 && (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, fontSize: 12, color: "#6b7280" }}>
+                            {listingMeta.map((metaValue, metaIndex) => (
+                              <React.Fragment key={`${listing.id}-meta-${metaIndex}`}>
+                                {metaIndex > 0 && <span style={{ color: "#d1d5db" }}>|</span>}
+                                <span>{metaValue}</span>
+                              </React.Fragment>
+                            ))}
+                          </div>
+                        )}
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: showCityInFooter ? "space-between" : "flex-end", fontSize: 12, color: "#9ca3af", marginTop: "auto" }}>
+                          {showCityInFooter && (
+                            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                                <circle cx="12" cy="10" r="3" />
+                              </svg>
+                              {listing.city}
+                            </span>
+                          )}
                           <span style={{ display: "flex", alignItems: "center", gap: 4, color: "#d97706" }}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <circle cx="12" cy="12" r="10" />

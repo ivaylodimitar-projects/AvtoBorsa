@@ -420,7 +420,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                       Number.isFinite(oldPrice) && Number.isFinite(newPrice)
                         ? `${oldPrice.toLocaleString('bg-BG')} → ${newPrice.toLocaleString('bg-BG')}`
                         : `${entry.old_price} → ${entry.new_price}`;
-                    const deltaColor = deltaValue > 0 ? '#dc2626' : deltaValue < 0 ? '#16a34a' : '#64748b';
+                    const deltaColor = deltaValue > 0 ? '#16a34a' : deltaValue < 0 ? '#dc2626' : '#64748b';
                     return (
                       <div
                         key={`${entry.changed_at}-${index}`}
@@ -520,9 +520,9 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                   borderRadius: 999,
                   fontSize: 12,
                   fontWeight: 800,
-                  border: `1px solid ${latestDeltaValue > 0 ? '#fecaca' : '#bbf7d0'}`,
-                  background: latestDeltaValue > 0 ? '#fee2e2' : '#dcfce7',
-                  color: latestDeltaValue > 0 ? '#dc2626' : '#16a34a',
+                  border: `1px solid ${latestDeltaValue > 0 ? '#bbf7d0' : '#fecaca'}`,
+                  background: latestDeltaValue > 0 ? '#dcfce7' : '#fee2e2',
+                  color: latestDeltaValue > 0 ? '#16a34a' : '#dc2626',
                 }}
                 title={latestDeltaValue > 0 ? 'Повишена цена' : 'Намалена цена'}
               >

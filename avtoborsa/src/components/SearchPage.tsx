@@ -18,6 +18,10 @@ import {
   TrendingDown,
   PencilLine,
   Bookmark,
+  Ruler,
+  PackageOpen,
+  ShieldCheck,
+  Leaf,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
@@ -74,6 +78,46 @@ type CarListing = {
   is_top?: boolean;
   is_top_listing?: boolean;
   is_top_ad?: boolean;
+  wheel_for?: string;
+  offer_type?: string;
+  tire_brand?: string;
+  tire_width?: string;
+  tire_height?: string;
+  tire_diameter?: string;
+  tire_season?: string;
+  wheel_brand?: string;
+  material?: string;
+  bolts?: number | string | null;
+  pcd?: string;
+  part_for?: string;
+  part_category?: string;
+  part_element?: string;
+  part_year_from?: number | string | null;
+  part_year_to?: number | string | null;
+  displacement?: number | string | null;
+  axles?: number | string | null;
+  seats?: number | string | null;
+  load_kg?: number | string | null;
+  transmission?: string;
+  engine_type?: string;
+  heavy_euro_standard?: string;
+  displacement_cc?: number | string | null;
+  equipment_type?: string;
+  lift_capacity_kg?: number | string | null;
+  hours?: number | string | null;
+  beds?: number | string | null;
+  length_m?: number | string | null;
+  has_toilet?: boolean;
+  has_heating?: boolean;
+  has_air_conditioning?: boolean;
+  boat_category?: string;
+  engine_count?: number | string | null;
+  width_m?: number | string | null;
+  draft_m?: number | string | null;
+  trailer_category?: string;
+  classified_for?: string;
+  accessory_category?: string;
+  buy_service_category?: string;
 };
 
 const isTopListing = (listing: CarListing) => {
@@ -486,6 +530,205 @@ const SearchPage: React.FC = () => {
     const listingAgeMs = currentTimeMs - createdAtMs;
     return listingAgeMs >= 0 && listingAgeMs <= NEW_LISTING_BADGE_WINDOW_MS;
   };
+
+  const toText = (value: unknown) => {
+    if (value === null || value === undefined) return "";
+    return String(value).trim();
+  };
+
+  const toPositiveNumber = (value: unknown) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+  };
+
+  const formatTopmenuCategory = (value: unknown) => {
+    const code = toText(value);
+    if (!code) return "";
+    return getMainCategoryLabel(code) || code;
+  };
+
+  const formatWheelOfferType = (value: unknown) => {
+    const code = toText(value);
+    if (code === "1") return "Гуми";
+    if (code === "2") return "Джанти";
+    if (code === "3") return "Гуми с джанти";
+    return code;
+  };
+
+  const formatTireSize = (listing: CarListing) => {
+    const width = toText(listing.tire_width);
+    const height = toText(listing.tire_height);
+    const diameter = toText(listing.tire_diameter);
+    if (width && height && diameter) return `${width}/${height} R${diameter}`;
+    if (diameter) return `R${diameter}`;
+    return "";
+  };
+
+  const formatYearRange = (from: unknown, to: unknown) => {
+    const fromYear = toText(from);
+    const toYear = toText(to);
+    if (fromYear && toYear) return `${fromYear}-${toYear}`;
+    return fromYear || toYear;
+  };
+
+  const getListingTechnicalParams = (listing: CarListing) => {
+    const params: Array<{ label: string; value: string; icon: React.ComponentType<any> }> = [];
+    const conditionLabel = toText(listing.condition_display) || formatConditionLabel(toText(listing.condition));
+    const addParam = (label: string, value: unknown, icon: React.ComponentType<any>) => {
+      const normalized = toText(value);
+      if (!normalized) return;
+      params.push({ label, value: normalized, icon });
+    };
+    const addNumeric = (
+      label: string,
+      value: unknown,
+      unit: string,
+      icon: React.ComponentType<any>,
+      formatAsInt = true
+    ) => {
+      const numeric = toPositiveNumber(value);
+      if (numeric === null) return;
+      const rendered = formatAsInt ? Math.round(numeric).toString() : numeric.toString();
+      addParam(label, unit ? `${rendered} ${unit}` : rendered, icon);
+    };
+
+    const mainCategory = toText(listing.main_category);
+
+    switch (mainCategory) {
+      case "u":
+        addParam("Вид част", listing.part_category, PackageOpen);
+        addParam("Част", listing.part_element, Settings);
+        addParam("За", formatTopmenuCategory(listing.part_for), MapPin);
+        addParam("Години", formatYearRange(listing.part_year_from, listing.part_year_to), Calendar);
+        addParam("Състояние", conditionLabel, ShieldCheck);
+        break;
+      case "w":
+        addParam("Оферта", formatWheelOfferType(listing.offer_type), PackageOpen);
+        addParam("За", formatTopmenuCategory(listing.wheel_for), MapPin);
+        addParam("Размер", formatTireSize(listing), Ruler);
+        addParam("Сезон", listing.tire_season, Leaf);
+        addParam("Джанти", listing.wheel_brand, Settings);
+        addParam("PCD", listing.pcd, Ruler);
+        break;
+      case "v":
+        addParam("Вид", listing.accessory_category, PackageOpen);
+        addParam("За", formatTopmenuCategory(listing.classified_for), MapPin);
+        addParam("Състояние", conditionLabel, ShieldCheck);
+        break;
+      case "y":
+        addParam("Купува", listing.buy_service_category, PackageOpen);
+        addParam("За", formatTopmenuCategory(listing.classified_for), MapPin);
+        break;
+      case "z":
+        addParam("Услуга", listing.buy_service_category, PackageOpen);
+        addParam("За", formatTopmenuCategory(listing.classified_for), MapPin);
+        break;
+      case "3":
+      case "4":
+        addNumeric("Оси", listing.axles, "", Settings);
+        addNumeric("Седалки", listing.seats, "", PackageOpen);
+        addNumeric("Товар", listing.load_kg, "кг", Gauge);
+        addParam("Двигател", listing.engine_type, Fuel);
+        addParam("Трансмисия", listing.transmission, Settings);
+        addNumeric("Мощност", listing.power, "к.с.", Zap);
+        break;
+      case "5":
+        addNumeric("Кубатура", listing.displacement_cc ?? listing.displacement, "cc", Ruler);
+        addParam("Двигател", listing.engine_type, Fuel);
+        addParam("Трансмисия", listing.transmission, Settings);
+        addNumeric("Мощност", listing.power, "к.с.", Zap);
+        break;
+      case "6":
+      case "7":
+        addParam("Вид техника", listing.equipment_type, PackageOpen);
+        addParam("Двигател", listing.engine_type, Fuel);
+        addNumeric("Мощност", listing.power, "к.с.", Zap);
+        addParam("Състояние", conditionLabel, ShieldCheck);
+        break;
+      case "8":
+        addParam("Двигател", listing.engine_type, Fuel);
+        addNumeric("Товар", listing.lift_capacity_kg, "кг", Gauge);
+        addNumeric("Часове", listing.hours, "ч", Clock);
+        addNumeric("Мощност", listing.power, "к.с.", Zap);
+        addParam("Състояние", conditionLabel, ShieldCheck);
+        break;
+      case "9":
+        addNumeric("Легла", listing.beds, "", PackageOpen);
+        addNumeric("Дължина", listing.length_m, "м", Ruler, false);
+        addParam("Тоалетна", listing.has_toilet ? "Да" : "", ShieldCheck);
+        addParam("Отопление", listing.has_heating ? "Да" : "", ShieldCheck);
+        addParam("Климатик", listing.has_air_conditioning ? "Да" : "", ShieldCheck);
+        break;
+      case "a":
+        addParam("Вид лодка", listing.boat_category, PackageOpen);
+        addParam("Двигател", listing.engine_type, Fuel);
+        addNumeric("Брой двиг.", listing.engine_count, "", Settings);
+        addNumeric("Дължина", listing.length_m, "м", Ruler, false);
+        addNumeric("Ширина", listing.width_m, "м", Ruler, false);
+        addNumeric("Часове", listing.hours, "ч", Clock);
+        break;
+      case "b":
+        addParam("Вид ремарке", listing.trailer_category, PackageOpen);
+        addNumeric("Товар", listing.load_kg, "кг", Gauge);
+        addNumeric("Оси", listing.axles, "", Settings);
+        addParam("Състояние", conditionLabel, ShieldCheck);
+        break;
+      default:
+        addParam("Година", listing.year_from ? `${listing.year_from} г.` : "", Calendar);
+        addNumeric("Пробег", listing.mileage, "км", Gauge);
+        addParam("Гориво", listing.fuel_display || formatFuelLabel(listing.fuel), Fuel);
+        addNumeric("Мощност", listing.power, "к.с.", Zap);
+        addParam("Кутия", listing.gearbox_display || formatGearboxLabel(listing.gearbox), Settings);
+        break;
+    }
+
+    const fallbackCandidates: Array<{ label: string; value: string; icon: React.ComponentType<any> }> = [
+      {
+        label: "Локация",
+        value: [listing.location_country, listing.city].filter(Boolean).join(", "),
+        icon: MapPin,
+      },
+      {
+        label: "Състояние",
+        value: conditionLabel,
+        icon: ShieldCheck,
+      },
+      {
+        label: "Година",
+        value: listing.year_from ? `${listing.year_from} г.` : "",
+        icon: Calendar,
+      },
+      {
+        label: "Пробег",
+        value: toPositiveNumber(listing.mileage) !== null ? `${Math.round(Number(listing.mileage))} км` : "",
+        icon: Gauge,
+      },
+      {
+        label: ["6", "8"].includes(mainCategory) ? "Категория" : "Марка",
+        value: toText(listing.brand),
+        icon: PackageOpen,
+      },
+      {
+        label: "Модел",
+        value: toText(listing.model),
+        icon: Settings,
+      },
+    ];
+
+    for (const fallback of fallbackCandidates) {
+      if (params.length >= 5) break;
+      if (mainCategory === "u" && fallback.label === "Пробег") continue;
+      if (mainCategory === "u" && fallback.label === "Марка") continue;
+      if (!toText(fallback.value)) continue;
+      const exists = params.some((param) => param.label === fallback.label);
+      if (!exists) {
+        params.push(fallback);
+      }
+    }
+
+    return params.slice(0, 5);
+  };
+
   // Build search criteria display
   const searchCriteriaDisplay = useMemo(() => {
     const criteria: string[] = [];
@@ -531,7 +774,6 @@ const SearchPage: React.FC = () => {
     };
 
     const mainCategory = getParam("main_category", "mainCategory");
-    const mainCategoryLabel = getMainCategoryLabel(mainCategory || "1") || "Категория";
     const category = getParam("category");
     const year = getParam("year");
     const yearFrom = getParam("yearFrom");
@@ -550,7 +792,6 @@ const SearchPage: React.FC = () => {
     const condition = getParam("condition");
     const nup = getParam("nup");
 
-    addCriterion("Категория", mainCategoryLabel);
     if (topmenuLabel && ["w", "u", "v", "y", "z"].includes(mainCategory)) {
       addCriterion("За", topmenuLabel);
     }
@@ -596,6 +837,14 @@ const SearchPage: React.FC = () => {
       addCriterion("Модел авто", model);
       const wheelOfferType = getParam("twrubr");
       addCriterion("Оферта", wheelOfferTypeLabels[wheelOfferType] || wheelOfferType);
+      addCriterion("Марка гуми", getParam("tireBrand"));
+      addCriterion("Ширина гуми", getParam("tireWidth"));
+      addCriterion("Височина гуми", getParam("tireHeight"));
+      addCriterion("Диаметър гуми", getParam("tireDiameter"));
+      addCriterion("Сезонност", getParam("tireSeason"));
+      addCriterion("Скоростен индекс", getParam("tireSpeedIndex"));
+      addCriterion("Тегловен индекс", getParam("tireLoadIndex"));
+      addCriterion("Релеф", getParam("tireTread"));
       addCriterion("Марка джанти", getParam("wheelBrand"));
       addCriterion("Материал", getParam("wheelMaterial"));
       addCriterion("Болтове", getParam("wheelBolts"));
@@ -610,11 +859,7 @@ const SearchPage: React.FC = () => {
     }
 
     if (mainCategory === "u") {
-      const brand = getParam("brand", "marka");
-      const model = getParam("model");
-      addCriterion("Марка", brand);
-      addCriterion("Модел", model);
-      addCriterion("Категория част", getParam("partrub"));
+      addCriterion("Вид част", getParam("partrub"));
       addCriterion("Част", getParam("partelem"));
       addRangeCriterion("Година на част (от)", getParam("partYearFrom", "part_year_from"), "");
       addRangeCriterion("Година на част (до)", "", getParam("partYearTo", "part_year_to"));
@@ -622,18 +867,22 @@ const SearchPage: React.FC = () => {
     }
 
     if (mainCategory === "v") {
-      addCriterion("Категория аксесоар", getParam("marka", "accessoryCategory"));
+      addCriterion("Вид аксесоар", getParam("marka", "accessoryCategory"));
       return criteria;
     }
 
     if (mainCategory === "y" || mainCategory === "z") {
-      addCriterion("Категория", category);
+      addCriterion("Тип", category);
       return criteria;
     }
 
     if (mainCategory === "6") {
-      addCriterion("Категория", getParam("equipmentType", "marka"));
-      addCriterion("Марка", getParam("model"));
+      const equipmentType = getParam("equipmentType", "marka");
+      const equipmentBrandOrModel = getParam("model");
+      addCriterion("Категория", equipmentType);
+      if (equipmentBrandOrModel && equipmentBrandOrModel !== equipmentType) {
+        addCriterion("Марка", equipmentBrandOrModel);
+      }
       addRangeCriterion("Мощност", getParam("engineFrom"), getParam("engineTo"), " к.с.");
       addCriterion("Цвят", getParam("color"));
       return criteria;
@@ -649,7 +898,7 @@ const SearchPage: React.FC = () => {
     }
 
     if (mainCategory === "a") {
-      addCriterion("Категория лодка", getParam("boatCategory", "marka"));
+      addCriterion("Вид лодка", getParam("boatCategory", "marka"));
       addCriterion("Марка", getParam("model"));
       addCriterion("Вид двигател", getParam("fuel"));
       addRangeCriterion("Брой двигатели", getParam("engineCountFrom"), getParam("engineCountTo"));
@@ -663,7 +912,7 @@ const SearchPage: React.FC = () => {
     }
 
     if (mainCategory === "b") {
-      addCriterion("Категория ремарке", getParam("trailerCategory", "marka"));
+      addCriterion("Вид ремарке", getParam("trailerCategory", "marka"));
       addCriterion("Марка", getParam("model"));
       addRangeCriterion("Товароносимост", getParam("loadFrom"), getParam("loadTo"), " кг");
       addRangeCriterion("Оси", getParam("axlesFrom"), getParam("axlesTo"));
@@ -671,7 +920,11 @@ const SearchPage: React.FC = () => {
       return criteria;
     }
 
-    addCriterion("Марка", getParam("brand", "marka"));
+    if (mainCategory === "8") {
+      addCriterion("Категория", getParam("brand", "marka"));
+    } else {
+      addCriterion("Марка", getParam("brand", "marka"));
+    }
     addCriterion("Модел", getParam("model"));
     addCriterion("Тип", mainCategory === "5" ? getParam("motoCategory") : category);
     const fuelOrEngineType = getParam("fuel");
@@ -712,8 +965,8 @@ const SearchPage: React.FC = () => {
       partYearFrom: "Година на част (от)",
       partYearTo: "Година на част (до)",
       equipmentType: "Вид техника",
-      boatCategory: "Категория лодка",
-      trailerCategory: "Категория ремарке",
+      boatCategory: "Вид лодка",
+      trailerCategory: "Вид ремарке",
       liftCapacityFrom: "Товароподемност от",
       liftCapacityTo: "Товароподемност до",
       hasToilet: "Тоалетна",
@@ -1032,8 +1285,8 @@ const SearchPage: React.FC = () => {
       marginLeft: 10,
       lineHeight: 1,
     },
-    priceChangeUp: { background: "#fee2e2", color: "#dc2626", border: "1px solid #fecaca" },
-    priceChangeDown: { background: "#dcfce7", color: "#16a34a", border: "1px solid #bbf7d0" },
+    priceChangeUp: { background: "#dcfce7", color: "#16a34a", border: "1px solid #bbf7d0" },
+    priceChangeDown: { background: "#fee2e2", color: "#dc2626", border: "1px solid #fecaca" },
     priceChangeText: { fontWeight: 800 },
     itemParams: { display: "flex", flexWrap: "wrap", gap: 8, fontSize: 13, color: "#111827", alignItems: "center" },
     itemParam: { display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px", background: "#ecfdf5", border: "1px solid #99f6e4", borderRadius: 999, fontSize: 13, color: "#111827", fontWeight: 700 },
@@ -1330,6 +1583,7 @@ const SearchPage: React.FC = () => {
                 thumbItems.push({ type: "placeholder" });
               }
               const listingTitle = (listing.title || `${listing.brand} ${listing.model}`).trim() || "Обява";
+              const technicalParams = getListingTechnicalParams(listing);
 
                 return (
                   <div
@@ -1464,26 +1718,17 @@ const SearchPage: React.FC = () => {
                             </div>
                           </div>
                           <div style={styles.itemParams}>
-                            <span style={styles.itemParam}>
-                              <Calendar size={16} style={styles.paramIcon} />
-                              <span style={styles.itemParamValueBlack}>{listing.year_from} г.</span>
-                            </span>
-                            <span style={styles.itemParam}>
-                              <Gauge size={16} style={styles.paramIcon} />
-                              {listing.mileage.toLocaleString("bg-BG")} км
-                            </span>
-                            <span style={styles.itemParam}>
-                              <Fuel size={16} style={styles.paramIcon} />
-                              {listing.fuel_display}
-                            </span>
-                            <span style={styles.itemParam}>
-                              <Zap size={16} style={styles.paramIcon} />
-                              <span style={styles.itemParamValueBlack}>{listing.power} к.с.</span>
-                            </span>
-                            <span style={styles.itemParam}>
-                              <Settings size={16} style={styles.paramIcon} />
-                              {listing.gearbox_display}
-                            </span>
+                            {technicalParams.map((param, paramIndex) => {
+                              const Icon = param.icon;
+                              return (
+                                <span key={`${listing.id}-param-${paramIndex}`} style={styles.itemParam}>
+                                  <Icon size={16} style={styles.paramIcon} />
+                                  <span style={styles.itemParamValueBlack}>
+                                    {param.label}: {param.value}
+                                  </span>
+                                </span>
+                              );
+                            })}
                           </div>
                           {(listing.description_preview || listing.description) && (
                             <div style={styles.itemDescription}>{listing.description_preview || listing.description}</div>

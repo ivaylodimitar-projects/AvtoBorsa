@@ -57,13 +57,16 @@ class CarListingLiteSerializer(serializers.ModelSerializer):
     listing_type_display = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
     price_change = serializers.SerializerMethodField()
+    part_for = serializers.SerializerMethodField()
+    part_element = serializers.SerializerMethodField()
 
     class Meta:
         model = CarListing
         fields = [
-            'id', 'slug', 'brand', 'model', 'year_from', 'price', 'mileage',
+            'id', 'slug', 'main_category', 'brand', 'model', 'year_from', 'price', 'mileage',
             'fuel', 'fuel_display', 'power', 'city', 'created_at',
-            'listing_type', 'listing_type_display', 'image_url', 'price_change'
+            'listing_type', 'listing_type_display', 'image_url', 'price_change',
+            'part_for', 'part_element',
         ]
         read_only_fields = fields
 
@@ -118,6 +121,24 @@ class CarListingLiteSerializer(serializers.ModelSerializer):
             'direction': direction,
             'changed_at': changed_at
         }
+
+    def get_part_for(self, obj):
+        if getattr(obj, 'main_category', None) != 'u':
+            return ""
+        try:
+            details = obj.parts_details
+        except PartsListing.DoesNotExist:
+            details = None
+        return getattr(details, 'part_for', "") if details else ""
+
+    def get_part_element(self, obj):
+        if getattr(obj, 'main_category', None) != 'u':
+            return ""
+        try:
+            details = obj.parts_details
+        except PartsListing.DoesNotExist:
+            details = None
+        return getattr(details, 'part_element', "") if details else ""
 
 
 class CarListingListSerializer(serializers.ModelSerializer):
@@ -308,7 +329,10 @@ DETAIL_MODEL_MAP = {
 DETAIL_FIELDS_BY_MAIN_CATEGORY = {
     '1': [],
     'w': [
-        'wheel_for', 'offer_type', 'wheel_brand', 'material', 'bolts', 'pcd',
+        'wheel_for', 'offer_type',
+        'tire_brand', 'tire_width', 'tire_height', 'tire_diameter',
+        'tire_season', 'tire_speed_index', 'tire_load_index', 'tire_tread',
+        'wheel_brand', 'material', 'bolts', 'pcd',
         'center_bore', 'offset', 'width', 'diameter', 'count', 'wheel_type',
     ],
     'u': ['part_for', 'part_category', 'part_element', 'part_year_from', 'part_year_to'],
@@ -355,6 +379,14 @@ class CarListingSerializer(serializers.ModelSerializer):
 
     wheel_for = serializers.CharField(required=False, allow_blank=True)
     offer_type = serializers.CharField(required=False, allow_blank=True)
+    tire_brand = serializers.CharField(required=False, allow_blank=True)
+    tire_width = serializers.CharField(required=False, allow_blank=True)
+    tire_height = serializers.CharField(required=False, allow_blank=True)
+    tire_diameter = serializers.CharField(required=False, allow_blank=True)
+    tire_season = serializers.CharField(required=False, allow_blank=True)
+    tire_speed_index = serializers.CharField(required=False, allow_blank=True)
+    tire_load_index = serializers.CharField(required=False, allow_blank=True)
+    tire_tread = serializers.CharField(required=False, allow_blank=True)
     wheel_brand = serializers.CharField(required=False, allow_blank=True)
     material = serializers.CharField(required=False, allow_blank=True)
     bolts = serializers.IntegerField(required=False, allow_null=True)
@@ -413,8 +445,10 @@ class CarListingSerializer(serializers.ModelSerializer):
             'description', 'phone', 'email', 'features', 'listing_type', 'listing_type_display', 'top_expires_at',
             'view_count', 'is_draft', 'is_active', 'is_archived', 'created_at', 'updated_at', 'images', 'image_url',
             'is_favorited', 'seller_name', 'seller_type', 'seller_created_at', 'price_history', 'images_upload',
-            'wheel_for', 'offer_type', 'wheel_brand', 'material', 'bolts', 'pcd', 'center_bore', 'offset', 'width',
-            'diameter', 'count', 'wheel_type',
+            'wheel_for', 'offer_type',
+            'tire_brand', 'tire_width', 'tire_height', 'tire_diameter',
+            'tire_season', 'tire_speed_index', 'tire_load_index', 'tire_tread',
+            'wheel_brand', 'material', 'bolts', 'pcd', 'center_bore', 'offset', 'width', 'diameter', 'count', 'wheel_type',
             'part_for', 'part_category', 'part_element', 'part_year_from', 'part_year_to',
             'axles', 'seats', 'load_kg', 'transmission', 'engine_type', 'heavy_euro_standard', 'displacement_cc',
             'equipment_type', 'lift_capacity_kg', 'hours',
@@ -565,6 +599,14 @@ class CarListingSerializer(serializers.ModelSerializer):
             "euroStandard": "euro_standard",
             "wheelFor": "wheel_for",
             "wheelOfferType": "offer_type",
+            "wheelTireBrand": "tire_brand",
+            "wheelTireWidth": "tire_width",
+            "wheelTireHeight": "tire_height",
+            "wheelTireDiameter": "tire_diameter",
+            "wheelTireSeason": "tire_season",
+            "wheelTireSpeedIndex": "tire_speed_index",
+            "wheelTireLoadIndex": "tire_load_index",
+            "wheelTireTread": "tire_tread",
             "wheelBrand": "wheel_brand",
             "wheelMaterial": "material",
             "wheelBolts": "bolts",

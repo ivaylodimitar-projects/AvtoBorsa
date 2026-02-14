@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+﻿import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import {
   FiArrowLeft,
@@ -36,6 +36,7 @@ import {
   CLASSIFIED_FOR_OPTIONS as MOBILE_CLASSIFIED_FOR_OPTIONS,
   getAccessoryCategories,
   getBrandOptionsByMainCategory,
+  getMainCategoryFromTopmenu,
   getMainCategoryLabel as getMobileMainCategoryLabel,
   getModelOptionsByMainCategory,
   getPartCategories,
@@ -119,6 +120,14 @@ interface PublishFormData {
   wheelDiameter: string;
   wheelCount: string;
   wheelType: string;
+  wheelTireBrand: string;
+  wheelTireWidth: string;
+  wheelTireHeight: string;
+  wheelTireDiameter: string;
+  wheelTireSeason: string;
+  wheelTireSpeedIndex: string;
+  wheelTireLoadIndex: string;
+  wheelTireTread: string;
   partFor: string;
   partCategory: string;
   partElement: string;
@@ -341,6 +350,78 @@ const WHEEL_DIAMETER_OPTIONS = [
   "28",
 ];
 const WHEEL_COUNT_OPTIONS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
+const WHEEL_TIRE_WIDTH_OPTIONS = [
+  "135",
+  "145",
+  "155",
+  "165",
+  "175",
+  "185",
+  "195",
+  "205",
+  "215",
+  "225",
+  "235",
+  "245",
+  "255",
+  "265",
+  "275",
+  "285",
+  "295",
+  "305",
+  "315",
+  "325",
+  "335",
+];
+const WHEEL_TIRE_HEIGHT_OPTIONS = [
+  "25",
+  "30",
+  "35",
+  "40",
+  "45",
+  "50",
+  "55",
+  "60",
+  "65",
+  "70",
+  "75",
+  "80",
+  "85",
+];
+const WHEEL_TIRE_BRAND_OPTIONS = [
+  "Apollo",
+  "Barum",
+  "BFGoodrich",
+  "Bridgestone",
+  "Continental",
+  "Cooper",
+  "Debica",
+  "Dunlop",
+  "Falken",
+  "Firestone",
+  "Fulda",
+  "General Tire",
+  "Goodyear",
+  "Hankook",
+  "Kleber",
+  "Kumho",
+  "Linglong",
+  "Matador",
+  "Michelin",
+  "Nexen",
+  "Nokian",
+  "Pirelli",
+  "Sava",
+  "Semperit",
+  "Toyo",
+  "Uniroyal",
+  "Vredestein",
+  "Yokohama",
+  "Други",
+];
+const WHEEL_TIRE_SEASON_OPTIONS = ["Летни", "Зимни", "Всесезонни"];
+const WHEEL_TIRE_SPEED_INDEX_OPTIONS = ["Q", "R", "S", "T", "H", "V", "W", "Y", "ZR"];
+const WHEEL_TIRE_TREAD_OPTIONS = ["Симетричен", "Асиметричен", "Посока"];
 
 const PART_CATEGORY_OPTIONS = [
   "Ауспуси, Гърнета",
@@ -530,8 +611,8 @@ const CAR_CATEGORY_OPTIONS = [
 
 const AGRI_DRIVE_TYPE_OPTIONS = ["2x4", "4x4", "Верижно", "Друго"];
 
-const CATEGORY_AS_BRAND_MAIN_CATEGORIES = new Set<MainCategoryKey>(["6", "a", "b"]);
-const UNSORTED_BRAND_OPTION_MAIN_CATEGORIES = new Set<MainCategoryKey>(["6", "a", "b"]);
+const CATEGORY_AS_BRAND_MAIN_CATEGORIES = new Set<MainCategoryKey>(["6", "7", "8", "a", "b"]);
+const UNSORTED_BRAND_OPTION_MAIN_CATEGORIES = new Set<MainCategoryKey>(["6", "7", "8", "a", "b"]);
 
 type AgriFieldVisibility = {
   showEngineType: boolean;
@@ -600,6 +681,33 @@ const INDUSTRIAL_FEATURE_GROUPS = (["komfort", "drugi", "zashtita"] as const)
   .filter((group): group is NonNullable<(typeof HEAVY_FEATURE_GROUPS)[number]> => Boolean(group));
 
 const AGRI_FEATURE_GROUPS = INDUSTRIAL_FEATURE_GROUPS;
+
+const FORKLIFT_FEATURE_GROUPS: CarFeatureGroup[] = [
+  {
+    key: "komfort",
+    title: "Комфорт",
+    items: [
+      "Отопление",
+      "Виличен изправител",
+      "Дуплекс мачта",
+      "Пневматични гуми",
+      "Свободен ход",
+      "Сервоуправление",
+      "Супереластични гуми",
+      "Триплекс стрела",
+    ],
+  },
+  {
+    key: "drugi",
+    title: "Други",
+    items: ["Бартер", "Капариран/Продаден", "Лизинг", "Нов внос", "С регистрация"],
+  },
+  {
+    key: "zashtita",
+    title: "Защита",
+    items: ["Каско"],
+  },
+];
 
 const TRAILER_FEATURE_GROUPS: CarFeatureGroup[] = [
   {
@@ -737,6 +845,7 @@ const getFeatureGroupsByMainCategory = (mainCategory: MainCategoryKey) => {
   if (mainCategory === "5") return MOTO_FEATURE_GROUPS;
   if (mainCategory === "6") return AGRI_FEATURE_GROUPS;
   if (mainCategory === "7") return INDUSTRIAL_FEATURE_GROUPS;
+  if (mainCategory === "8") return FORKLIFT_FEATURE_GROUPS;
   if (mainCategory === "a") return BOAT_FEATURE_GROUPS;
   if (mainCategory === "b") return TRAILER_FEATURE_GROUPS;
   return [];
@@ -837,7 +946,7 @@ const getFallbackBrandModel = (
         getWheelOfferTypeLabel(data.wheelFor, data.wheelOfferType, defaultClassifiedTopmenu) ||
         "Гуми/джанти";
       return {
-        brand: data.wheelBrand.trim() || offerLabel,
+        brand: data.wheelBrand.trim() || data.wheelTireBrand.trim() || offerLabel,
         model: wheelForLabel || classifiedLabel || "Обява",
       };
     }
@@ -892,7 +1001,7 @@ const buildListingTitle = (data: PublishFormData, defaultClassifiedTopmenu: stri
       const offerLabel =
         getWheelOfferTypeLabel(data.wheelFor, data.wheelOfferType, defaultClassifiedTopmenu) ||
         "Гуми/джанти";
-      const mainPart = joinTitleParts(offerLabel, data.wheelBrand);
+      const mainPart = joinTitleParts(offerLabel, data.wheelBrand || data.wheelTireBrand);
       const baseWheelTitle = joinTitleParts(mainPart, wheelForLabel ? `за ${wheelForLabel}` : "");
       const optionalSuffix = normalizeTitleSuffix(data.title, baseWheelTitle);
       return finalizeListingTitle(joinTitleParts(baseWheelTitle, optionalSuffix), `${categoryLabel} обява`);
@@ -974,6 +1083,14 @@ const createInitialFormData = (): PublishFormData => ({
   wheelDiameter: "",
   wheelCount: "",
   wheelType: "",
+  wheelTireBrand: "",
+  wheelTireWidth: "",
+  wheelTireHeight: "",
+  wheelTireDiameter: "",
+  wheelTireSeason: "",
+  wheelTireSpeedIndex: "",
+  wheelTireLoadIndex: "",
+  wheelTireTread: "",
   partFor: getTopmenuFromMainCategory("1") || "1",
   partCategory: "",
   partElement: "",
@@ -1051,11 +1168,18 @@ const PublishPage: React.FC = () => {
 
   const [formData, setFormData] = useState<PublishFormData>(createInitialFormData());
   const defaultClassifiedTopmenu = getTopmenuFromMainCategory("1") || "1";
+  const brandModelMainCategory = useMemo(() => {
+    if (formData.mainCategory !== "w") return formData.mainCategory;
+    return (
+      (getMainCategoryFromTopmenu(formData.wheelFor || defaultClassifiedTopmenu) as MainCategoryKey) ||
+      "1"
+    );
+  }, [defaultClassifiedTopmenu, formData.mainCategory, formData.wheelFor]);
 
   const availableBrandOptions = useMemo(() => {
-    const options = getBrandOptionsByMainCategory(formData.mainCategory);
+    const options = getBrandOptionsByMainCategory(brandModelMainCategory);
     return options.length > 0 ? options : getBrandOptionsByMainCategory("1");
-  }, [formData.mainCategory]);
+  }, [brandModelMainCategory]);
 
   const orderedBrandOptions = useMemo(
     () => Array.from(new Set(availableBrandOptions.map((option) => option.trim()).filter(Boolean))),
@@ -1069,8 +1193,8 @@ const PublishPage: React.FC = () => {
 
   const availableModelOptions = useMemo(() => {
     if (!formData.brand) return [];
-    return getModelOptionsByMainCategory(formData.mainCategory, formData.brand);
-  }, [formData.brand, formData.mainCategory]);
+    return getModelOptionsByMainCategory(brandModelMainCategory, formData.brand);
+  }, [brandModelMainCategory, formData.brand]);
 
   const orderedModelOptions = useMemo(
     () => Array.from(new Set(availableModelOptions.map((option) => option.trim()).filter(Boolean))),
@@ -1084,6 +1208,15 @@ const PublishPage: React.FC = () => {
 
   const isCategoryBasedBrandModel = CATEGORY_AS_BRAND_MAIN_CATEGORIES.has(formData.mainCategory);
   const useUnsortedBrandOptions = UNSORTED_BRAND_OPTION_MAIN_CATEGORIES.has(formData.mainCategory);
+  const showsWheelTireFields =
+    formData.mainCategory === "w" &&
+    (formData.wheelOfferType === "1" || formData.wheelOfferType === "3");
+  const showsWheelRimFields =
+    formData.mainCategory === "w" &&
+    (formData.wheelOfferType === "2" || formData.wheelOfferType === "3");
+  const showsOptionalBrandAndModel = formData.mainCategory === "w" && showsWheelRimFields;
+  const shouldShowBrandAndModelFields =
+    requiresBrandAndModel(formData.mainCategory) || showsOptionalBrandAndModel;
 
   const agriFieldVisibility = useMemo(
     () =>
@@ -1346,6 +1479,53 @@ const PublishPage: React.FC = () => {
       }
       if (key === "wheelFor") {
         next.wheelOfferType = "";
+        next.brand = "";
+        next.model = "";
+        next.wheelBrand = "";
+        next.wheelMaterial = "";
+        next.wheelBolts = "";
+        next.wheelPcd = "";
+        next.wheelCenterBore = "";
+        next.wheelOffset = "";
+        next.wheelWidth = "";
+        next.wheelDiameter = "";
+        next.wheelCount = "";
+        next.wheelType = "";
+        next.wheelTireBrand = "";
+        next.wheelTireWidth = "";
+        next.wheelTireHeight = "";
+        next.wheelTireDiameter = "";
+        next.wheelTireSeason = "";
+        next.wheelTireSpeedIndex = "";
+        next.wheelTireLoadIndex = "";
+        next.wheelTireTread = "";
+      }
+      if (key === "wheelOfferType") {
+        const normalizedOfferType = String(nextValue ?? "").trim();
+        if (normalizedOfferType === "1") {
+          next.brand = "";
+          next.model = "";
+          next.yearFrom = "";
+          next.wheelBrand = "";
+          next.wheelMaterial = "";
+          next.wheelBolts = "";
+          next.wheelPcd = "";
+          next.wheelCenterBore = "";
+          next.wheelOffset = "";
+          next.wheelWidth = "";
+          next.wheelDiameter = "";
+          next.wheelCount = "";
+          next.wheelType = "";
+        } else if (normalizedOfferType === "2") {
+          next.wheelTireBrand = "";
+          next.wheelTireWidth = "";
+          next.wheelTireHeight = "";
+          next.wheelTireDiameter = "";
+          next.wheelTireSeason = "";
+          next.wheelTireSpeedIndex = "";
+          next.wheelTireLoadIndex = "";
+          next.wheelTireTread = "";
+        }
       }
       if (key === "wheelBolts") {
         next.wheelPcd = "";
@@ -1419,8 +1599,7 @@ const PublishPage: React.FC = () => {
     if (mainCategory === "w") {
       requirements.basic.push(
         { key: "wheelFor", label: "Гуми/джанти за" },
-        { key: "wheelOfferType", label: "Тип оферта" },
-        { key: "wheelBrand", label: "Марка джанти" }
+        { key: "wheelOfferType", label: "Тип оферта" }
       );
     }
 
@@ -1571,7 +1750,7 @@ const PublishPage: React.FC = () => {
       {
         key: "vin",
         label: "VIN номер",
-        when: (data) => !["y", "z", "u", "v", "w", "5", "6", "7", "a", "b"].includes(data.mainCategory),
+        when: (data) => !["y", "z", "u", "v", "w", "5", "6", "7", "8", "a", "b"].includes(data.mainCategory),
       }
     );
 
@@ -1815,6 +1994,14 @@ const PublishPage: React.FC = () => {
       wheelDiameter: toStringOrEmpty(data.diameter ?? data.wheelDiameter),
       wheelCount: toStringOrEmpty(data.count ?? data.wheelCount),
       wheelType: toStringOrEmpty(data.wheel_type ?? data.wheelType),
+      wheelTireBrand: toStringOrEmpty(data.tire_brand ?? data.wheelTireBrand),
+      wheelTireWidth: toStringOrEmpty(data.tire_width ?? data.wheelTireWidth),
+      wheelTireHeight: toStringOrEmpty(data.tire_height ?? data.wheelTireHeight),
+      wheelTireDiameter: toStringOrEmpty(data.tire_diameter ?? data.wheelTireDiameter),
+      wheelTireSeason: toStringOrEmpty(data.tire_season ?? data.wheelTireSeason),
+      wheelTireSpeedIndex: toStringOrEmpty(data.tire_speed_index ?? data.wheelTireSpeedIndex),
+      wheelTireLoadIndex: toStringOrEmpty(data.tire_load_index ?? data.wheelTireLoadIndex),
+      wheelTireTread: toStringOrEmpty(data.tire_tread ?? data.wheelTireTread),
       partFor: normalizedPartFor,
       partCategory: toStringOrEmpty(data.part_category ?? data.partCategory),
       partElement: toStringOrEmpty(data.part_element ?? data.partElement),
@@ -2062,16 +2249,20 @@ const PublishPage: React.FC = () => {
       };
 
       const fallbackBrandModel = getFallbackBrandModel(formData, defaultClassifiedTopmenu);
-      const normalizedBrand = requiresBrandAndModel(formData.mainCategory)
-        ? formData.brand.trim()
+      const usesDirectBrandModel =
+        requiresBrandAndModel(formData.mainCategory) ||
+        (formData.mainCategory === "w" &&
+          (formData.wheelOfferType === "2" || formData.wheelOfferType === "3"));
+      const normalizedBrand = usesDirectBrandModel
+        ? formData.brand.trim() || fallbackBrandModel.brand
         : fallbackBrandModel.brand;
-      const normalizedModel = requiresBrandAndModel(formData.mainCategory)
-        ? formData.model.trim()
+      const normalizedModel = usesDirectBrandModel
+        ? formData.model.trim() || fallbackBrandModel.model
         : fallbackBrandModel.model;
       const normalizedYearSource =
         formData.mainCategory === "u"
           ? formData.partYearFrom.trim()
-          : requiresBrandAndModel(formData.mainCategory)
+          : usesDirectBrandModel
             ? formData.yearFrom.trim()
             : "";
       const normalizedYear = normalizedYearSource || String(currentYear);
@@ -2110,7 +2301,7 @@ const PublishPage: React.FC = () => {
       appendIfValue("model", normalizedModel);
       appendIfValue("year_from", normalizedYear);
       appendIfValue("month", formData.month);
-      if (!["y", "z", "u", "v", "w", "5", "6", "7", "a", "b"].includes(formData.mainCategory)) {
+      if (!["y", "z", "u", "v", "w", "5", "6", "7", "8", "a", "b"].includes(formData.mainCategory)) {
         appendIfValue("vin", formData.vin);
       }
       appendIfValue("price", normalizedPrice);
@@ -2155,16 +2346,28 @@ const PublishPage: React.FC = () => {
         case "w":
           appendIfValue("wheel_for", formData.wheelFor);
           appendIfValue("offer_type", formData.wheelOfferType);
-          appendIfValue("wheel_brand", formData.wheelBrand);
-          appendIfValue("material", formData.wheelMaterial);
-          appendIfValue("bolts", formData.wheelBolts);
-          appendIfValue("pcd", formData.wheelPcd);
-          appendIfValue("center_bore", formData.wheelCenterBore);
-          appendIfValue("offset", formData.wheelOffset);
-          appendIfValue("width", formData.wheelWidth);
-          appendIfValue("diameter", formData.wheelDiameter);
-          appendIfValue("count", formData.wheelCount);
-          appendIfValue("wheel_type", formData.wheelType);
+          if (formData.wheelOfferType === "2" || formData.wheelOfferType === "3") {
+            appendIfValue("wheel_brand", formData.wheelBrand);
+            appendIfValue("material", formData.wheelMaterial);
+            appendIfValue("bolts", formData.wheelBolts);
+            appendIfValue("pcd", formData.wheelPcd);
+            appendIfValue("center_bore", formData.wheelCenterBore);
+            appendIfValue("offset", formData.wheelOffset);
+            appendIfValue("width", formData.wheelWidth);
+            appendIfValue("diameter", formData.wheelDiameter);
+            appendIfValue("count", formData.wheelCount);
+            appendIfValue("wheel_type", formData.wheelType);
+          }
+          if (formData.wheelOfferType === "1" || formData.wheelOfferType === "3") {
+            appendIfValue("tire_brand", formData.wheelTireBrand);
+            appendIfValue("tire_width", formData.wheelTireWidth);
+            appendIfValue("tire_height", formData.wheelTireHeight);
+            appendIfValue("tire_diameter", formData.wheelTireDiameter);
+            appendIfValue("tire_season", formData.wheelTireSeason);
+            appendIfValue("tire_speed_index", formData.wheelTireSpeedIndex);
+            appendIfValue("tire_load_index", formData.wheelTireLoadIndex);
+            appendIfValue("tire_tread", formData.wheelTireTread);
+          }
           break;
         case "u":
           appendIfValue("part_for", formData.partFor);
@@ -3217,18 +3420,22 @@ const PublishPage: React.FC = () => {
                   </FormFieldWithTooltip>
                 )}
 
-                {requiresBrandAndModel(formData.mainCategory) && (
+                {shouldShowBrandAndModelFields && (
                   <>
                     <FormFieldWithTooltip
                       label={isCategoryBasedBrandModel ? "Категория" : "Марка"}
-                      required
+                      required={!showsOptionalBrandAndModel}
                       tooltip={
                         isCategoryBasedBrandModel
                           ? formData.mainCategory === "6"
                             ? "Категория на селскостопанската техника"
-                            : formData.mainCategory === "a"
-                              ? "Категория на яхтата/лодката"
-                              : "Категория на ремаркето"
+                            : formData.mainCategory === "7"
+                              ? "Категория на индустриалната техника"
+                              : formData.mainCategory === "8"
+                                ? "Категория на кари техниката"
+                              : formData.mainCategory === "a"
+                                ? "Категория на яхтата/лодката"
+                                : "Категория на ремаркето"
                           : "Марка на превозното средство/техниката"
                       }
                     >
@@ -3237,7 +3444,7 @@ const PublishPage: React.FC = () => {
                         name="brand"
                         value={formData.brand}
                         onChange={handleChange}
-                        required
+                        required={!showsOptionalBrandAndModel}
                       >
                         <option value="">
                           {isCategoryBasedBrandModel ? "Избери категория" : "Избери марка"}
@@ -3262,14 +3469,18 @@ const PublishPage: React.FC = () => {
 
                     <FormFieldWithTooltip
                       label={isCategoryBasedBrandModel ? "Марка" : "Модел"}
-                      required
+                      required={!showsOptionalBrandAndModel}
                       tooltip={
                         isCategoryBasedBrandModel
                           ? formData.mainCategory === "6"
                             ? "Марка на селскостопанската техника"
-                            : formData.mainCategory === "a"
-                              ? "Марка на яхтата/лодката"
-                              : "Марка на ремаркето"
+                            : formData.mainCategory === "7"
+                              ? "Марка на индустриалната техника"
+                              : formData.mainCategory === "8"
+                                ? "Марка на кари техниката"
+                              : formData.mainCategory === "a"
+                                ? "Марка на яхтата/лодката"
+                                : "Марка на ремаркето"
                           : "Модел на превозното средство/техниката"
                       }
                     >
@@ -3278,7 +3489,7 @@ const PublishPage: React.FC = () => {
                         name="model"
                         value={formData.model}
                         onChange={handleChange}
-                        required
+                        required={!showsOptionalBrandAndModel}
                         disabled={!formData.brand}
                       >
                         <option value="">
@@ -3304,7 +3515,7 @@ const PublishPage: React.FC = () => {
 
                     <FormFieldWithTooltip
                       label="Година на производство"
-                      required
+                      required={!showsOptionalBrandAndModel}
                       tooltip="Година на производство"
                     >
                       <select
@@ -3312,7 +3523,7 @@ const PublishPage: React.FC = () => {
                         name="yearFrom"
                         value={formData.yearFrom}
                         onChange={handleChange}
-                        required
+                        required={!showsOptionalBrandAndModel}
                       >
                         <option value="">Избери година</option>
                         {years.map((year) => (
@@ -3381,21 +3592,6 @@ const PublishPage: React.FC = () => {
                       </select>
                     </FormFieldWithTooltip>
 
-                    <FormFieldWithTooltip label="Марка джанти">
-                      <select
-                        style={styles.input}
-                        name="wheelBrand"
-                        value={formData.wheelBrand}
-                        onChange={handleChange}
-                      >
-                        <option value="">Избери</option>
-                        {WHEEL_BRAND_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </FormFieldWithTooltip>
                   </>
                 )}
 
@@ -3689,129 +3885,324 @@ const PublishPage: React.FC = () => {
 
                 {formData.mainCategory === "w" && (
                   <>
-                    <FormFieldWithTooltip label="Материал">
-                      <select
-                        style={styles.input}
-                        name="wheelMaterial"
-                        value={formData.wheelMaterial}
-                        onChange={handleChange}
-                      >
-                        <option value="">Избери</option>
-                        {WHEEL_MATERIAL_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </FormFieldWithTooltip>
+                    {showsWheelTireFields && (
+                      <>
+                        <div
+                          style={{
+                            gridColumn: "1 / -1",
+                            color: "#0f766e",
+                            fontWeight: 700,
+                            borderBottom: "2px solid #0f766e",
+                            paddingBottom: 6,
+                          }}
+                        >
+                          Информация за гуми
+                        </div>
 
-                    <FormFieldWithTooltip label="Болтове">
-                      <select
-                        style={styles.input}
-                        name="wheelBolts"
-                        value={formData.wheelBolts}
-                        onChange={handleChange}
-                      >
-                        <option value="">Избери</option>
-                        {WHEEL_BOLT_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </FormFieldWithTooltip>
+                        <FormFieldWithTooltip label="Марка гуми">
+                          <select
+                            style={styles.input}
+                            name="wheelTireBrand"
+                            value={formData.wheelTireBrand}
+                            onChange={handleChange}
+                          >
+                            <option value="">Избери</option>
+                            {formData.wheelTireBrand &&
+                              !WHEEL_TIRE_BRAND_OPTIONS.includes(formData.wheelTireBrand) && (
+                                <option value={formData.wheelTireBrand}>{formData.wheelTireBrand}</option>
+                              )}
+                            {WHEEL_TIRE_BRAND_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </FormFieldWithTooltip>
 
-                    <FormFieldWithTooltip label="Междуболтово разстояние (PCD)">
-                      <select style={styles.input} name="wheelPcd" value={formData.wheelPcd} onChange={handleChange}>
-                        <option value="">Избери</option>
-                        {wheelPcdOptions.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </FormFieldWithTooltip>
+                        <FormFieldWithTooltip label="Ширина в мм">
+                          <select
+                            style={styles.input}
+                            name="wheelTireWidth"
+                            value={formData.wheelTireWidth}
+                            onChange={handleChange}
+                          >
+                            <option value="">Избери</option>
+                            {WHEEL_TIRE_WIDTH_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </FormFieldWithTooltip>
 
-                    <FormFieldWithTooltip label="Централен отвор">
-                      <select
-                        style={styles.input}
-                        name="wheelCenterBore"
-                        value={formData.wheelCenterBore}
-                        onChange={handleChange}
-                      >
-                        <option value="">Избери</option>
-                        {WHEEL_CENTER_BORE_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </FormFieldWithTooltip>
+                        <FormFieldWithTooltip label="Височина">
+                          <select
+                            style={styles.input}
+                            name="wheelTireHeight"
+                            value={formData.wheelTireHeight}
+                            onChange={handleChange}
+                          >
+                            <option value="">Избери</option>
+                            {WHEEL_TIRE_HEIGHT_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </FormFieldWithTooltip>
 
-                    <FormFieldWithTooltip label="Офсет /ET/">
-                      <select
-                        style={styles.input}
-                        name="wheelOffset"
-                        value={formData.wheelOffset}
-                        onChange={handleChange}
-                      >
-                        <option value="">Избери</option>
-                        {WHEEL_OFFSET_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </FormFieldWithTooltip>
+                        <FormFieldWithTooltip label="Диаметър в инча">
+                          <select
+                            style={styles.input}
+                            name="wheelTireDiameter"
+                            value={formData.wheelTireDiameter}
+                            onChange={handleChange}
+                          >
+                            <option value="">Избери</option>
+                            {WHEEL_DIAMETER_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </FormFieldWithTooltip>
 
-                    <FormFieldWithTooltip label="Ширина (J)">
-                      <select style={styles.input} name="wheelWidth" value={formData.wheelWidth} onChange={handleChange}>
-                        <option value="">Избери</option>
-                        {WHEEL_WIDTH_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </FormFieldWithTooltip>
+                        <FormFieldWithTooltip label="Сезонност">
+                          <select
+                            style={styles.input}
+                            name="wheelTireSeason"
+                            value={formData.wheelTireSeason}
+                            onChange={handleChange}
+                          >
+                            <option value="">Избери</option>
+                            {WHEEL_TIRE_SEASON_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </FormFieldWithTooltip>
 
-                    <FormFieldWithTooltip label="Диаметър (инча)">
-                      <select
-                        style={styles.input}
-                        name="wheelDiameter"
-                        value={formData.wheelDiameter}
-                        onChange={handleChange}
-                      >
-                        <option value="">Избери</option>
-                        {WHEEL_DIAMETER_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </FormFieldWithTooltip>
+                        <FormFieldWithTooltip label="Скоростен индекс">
+                          <select
+                            style={styles.input}
+                            name="wheelTireSpeedIndex"
+                            value={formData.wheelTireSpeedIndex}
+                            onChange={handleChange}
+                          >
+                            <option value="">Избери</option>
+                            {WHEEL_TIRE_SPEED_INDEX_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </FormFieldWithTooltip>
 
-                    <FormFieldWithTooltip label="Брой джанти">
-                      <select style={styles.input} name="wheelCount" value={formData.wheelCount} onChange={handleChange}>
-                        <option value="">Избери</option>
-                        {WHEEL_COUNT_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </FormFieldWithTooltip>
+                        <FormFieldWithTooltip label="Тегловен индекс">
+                          <input
+                            style={styles.input}
+                            type="text"
+                            name="wheelTireLoadIndex"
+                            value={formData.wheelTireLoadIndex}
+                            onChange={handleChange}
+                            placeholder="напр. 91"
+                          />
+                        </FormFieldWithTooltip>
 
-                    <FormFieldWithTooltip label="Вид">
-                      <select style={styles.input} name="wheelType" value={formData.wheelType} onChange={handleChange}>
-                        <option value="">Избери</option>
-                        {WHEEL_TYPE_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </FormFieldWithTooltip>
+                        <FormFieldWithTooltip label="Релеф">
+                          <select
+                            style={styles.input}
+                            name="wheelTireTread"
+                            value={formData.wheelTireTread}
+                            onChange={handleChange}
+                          >
+                            <option value="">Избери</option>
+                            {WHEEL_TIRE_TREAD_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </FormFieldWithTooltip>
+                      </>
+                    )}
+
+                    {showsWheelRimFields && (
+                      <>
+                        <div
+                          style={{
+                            gridColumn: "1 / -1",
+                            color: "#0f766e",
+                            fontWeight: 700,
+                            borderBottom: "2px solid #0f766e",
+                            paddingBottom: 6,
+                          }}
+                        >
+                          Информация за джанти
+                        </div>
+
+                        <FormFieldWithTooltip label="Марка джанти">
+                          <select
+                            style={styles.input}
+                            name="wheelBrand"
+                            value={formData.wheelBrand}
+                            onChange={handleChange}
+                          >
+                            <option value="">Избери</option>
+                            {WHEEL_BRAND_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </FormFieldWithTooltip>
+
+                        <FormFieldWithTooltip label="Материал">
+                          <select
+                            style={styles.input}
+                            name="wheelMaterial"
+                            value={formData.wheelMaterial}
+                            onChange={handleChange}
+                          >
+                            <option value="">Избери</option>
+                            {WHEEL_MATERIAL_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </FormFieldWithTooltip>
+
+                        <FormFieldWithTooltip label="Болтове">
+                          <select
+                            style={styles.input}
+                            name="wheelBolts"
+                            value={formData.wheelBolts}
+                            onChange={handleChange}
+                          >
+                            <option value="">Избери</option>
+                            {WHEEL_BOLT_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </FormFieldWithTooltip>
+
+                        <FormFieldWithTooltip label="Междуболтово разстояние (PCD)">
+                          <select
+                            style={styles.input}
+                            name="wheelPcd"
+                            value={formData.wheelPcd}
+                            onChange={handleChange}
+                          >
+                            <option value="">Избери</option>
+                            {wheelPcdOptions.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </FormFieldWithTooltip>
+
+                        <FormFieldWithTooltip label="Централен отвор">
+                          <select
+                            style={styles.input}
+                            name="wheelCenterBore"
+                            value={formData.wheelCenterBore}
+                            onChange={handleChange}
+                          >
+                            <option value="">Избери</option>
+                            {WHEEL_CENTER_BORE_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </FormFieldWithTooltip>
+
+                        <FormFieldWithTooltip label="Офсет /ET/">
+                          <select
+                            style={styles.input}
+                            name="wheelOffset"
+                            value={formData.wheelOffset}
+                            onChange={handleChange}
+                          >
+                            <option value="">Избери</option>
+                            {WHEEL_OFFSET_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </FormFieldWithTooltip>
+
+                        <FormFieldWithTooltip label="Ширина (J)">
+                          <select
+                            style={styles.input}
+                            name="wheelWidth"
+                            value={formData.wheelWidth}
+                            onChange={handleChange}
+                          >
+                            <option value="">Избери</option>
+                            {WHEEL_WIDTH_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </FormFieldWithTooltip>
+
+                        <FormFieldWithTooltip label="Диаметър (инча)">
+                          <select
+                            style={styles.input}
+                            name="wheelDiameter"
+                            value={formData.wheelDiameter}
+                            onChange={handleChange}
+                          >
+                            <option value="">Избери</option>
+                            {WHEEL_DIAMETER_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </FormFieldWithTooltip>
+
+                        <FormFieldWithTooltip label="Брой джанти">
+                          <select
+                            style={styles.input}
+                            name="wheelCount"
+                            value={formData.wheelCount}
+                            onChange={handleChange}
+                          >
+                            <option value="">Избери</option>
+                            {WHEEL_COUNT_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </FormFieldWithTooltip>
+
+                        <FormFieldWithTooltip label="Вид">
+                          <select
+                            style={styles.input}
+                            name="wheelType"
+                            value={formData.wheelType}
+                            onChange={handleChange}
+                          >
+                            <option value="">Избери</option>
+                            {WHEEL_TYPE_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </FormFieldWithTooltip>
+                      </>
+                    )}
                   </>
                 )}
 
@@ -4198,6 +4589,17 @@ const PublishPage: React.FC = () => {
                       </select>
                     </FormFieldWithTooltip>
 
+                    <FormFieldWithTooltip label="Мощност (к.с.)">
+                      <input
+                        style={styles.input}
+                        type="number"
+                        min="0"
+                        name="power"
+                        value={formData.power}
+                        onChange={handleChange}
+                      />
+                    </FormFieldWithTooltip>
+
                     <FormFieldWithTooltip label="Товароподемност (кг)">
                       <select style={styles.input} name="forkliftLoad" value={formData.forkliftLoad} onChange={handleChange}>
                         <option value="">Избери</option>
@@ -4215,6 +4617,17 @@ const PublishPage: React.FC = () => {
                         {FORKLIFT_HOUR_OPTIONS.map((option) => (
                           <option key={option} value={option}>
                             {option}
+                          </option>
+                          ))}
+                      </select>
+                    </FormFieldWithTooltip>
+
+                    <FormFieldWithTooltip label="Месец на производство">
+                      <select style={styles.input} name="month" value={formData.month} onChange={handleChange}>
+                        <option value="">Избери</option>
+                        {MONTH_OPTIONS.map((monthOption) => (
+                          <option key={monthOption} value={monthOption}>
+                            {monthOption}
                           </option>
                         ))}
                       </select>
@@ -4437,7 +4850,7 @@ const PublishPage: React.FC = () => {
                     </select>
                   </FormFieldWithTooltip>
                 )}
-                {!["y", "z", "u", "v", "w", "5", "6", "7", "a", "b"].includes(formData.mainCategory) && (
+                {!["y", "z", "u", "v", "w", "5", "6", "7", "8", "a", "b"].includes(formData.mainCategory) && (
                   <FormFieldWithTooltip label="VIN номер">
                     <input
                       style={styles.input}
@@ -4523,6 +4936,8 @@ const PublishPage: React.FC = () => {
                   ? "Избери комфорт, други и защита за селскостопанската техника"
                   : formData.mainCategory === "7"
                   ? "Избери комфорт, други и защита за индустриалната техника"
+                  : formData.mainCategory === "8"
+                  ? "Избери комфорт, други и защита за кари техниката"
                   : formData.mainCategory === "b"
                   ? "Избери всички екстри и опции за ремаркето"
                   : formData.mainCategory === "a"

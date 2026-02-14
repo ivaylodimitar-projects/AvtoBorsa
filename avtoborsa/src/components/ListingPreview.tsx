@@ -140,7 +140,7 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
       left: 12,
       padding: "6px 10px",
       borderRadius: 999,
-      background: "linear-gradient(135deg, #f59e0b, #f97316)",
+      background: "linear-gradient(135deg, #f50b0b, #d61111)",
       color: "#fff",
       fontSize: 11,
       fontWeight: 700,

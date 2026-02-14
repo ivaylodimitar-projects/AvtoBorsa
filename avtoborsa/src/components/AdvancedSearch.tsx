@@ -12,6 +12,8 @@ import {
   getBrandOptionsByMainCategory,
   getMainCategoryFromTopmenu,
   getModelOptionsByMainCategory,
+  getWheelOfferTypeOptions,
+  getWheelPcdOptions,
 } from "../constants/mobileBgData";
 import {
   MOTO_CATEGORY_OPTIONS,
@@ -95,6 +97,14 @@ interface SearchCriteria {
   wheelDiameter: string;
   wheelCount: string;
   wheelType: string;
+  wheelTireBrand: string;
+  wheelTireWidth: string;
+  wheelTireHeight: string;
+  wheelTireDiameter: string;
+  wheelTireSeason: string;
+  wheelTireSpeedIndex: string;
+  wheelTireLoadIndex: string;
+  wheelTireTread: string;
   boatLengthFrom: string;
   boatLengthTo: string;
   boatWidthFrom: string;
@@ -413,6 +423,64 @@ const WHEEL_DIAMETER_OPTIONS = [
   "28",
 ];
 const WHEEL_TYPE_OPTIONS = ["Неразглобяеми", "Разглобяеми"];
+const WHEEL_TIRE_WIDTH_OPTIONS = [
+  "135",
+  "145",
+  "155",
+  "165",
+  "175",
+  "185",
+  "195",
+  "205",
+  "215",
+  "225",
+  "235",
+  "245",
+  "255",
+  "265",
+  "275",
+  "285",
+  "295",
+  "305",
+  "315",
+  "325",
+  "335",
+];
+const WHEEL_TIRE_HEIGHT_OPTIONS = ["25", "30", "35", "40", "45", "50", "55", "60", "65", "70", "75", "80", "85"];
+const WHEEL_TIRE_BRAND_OPTIONS = [
+  "Apollo",
+  "Barum",
+  "BFGoodrich",
+  "Bridgestone",
+  "Continental",
+  "Cooper",
+  "Debica",
+  "Dunlop",
+  "Falken",
+  "Firestone",
+  "Fulda",
+  "General Tire",
+  "Goodyear",
+  "Hankook",
+  "Kleber",
+  "Kumho",
+  "Linglong",
+  "Matador",
+  "Michelin",
+  "Nexen",
+  "Nokian",
+  "Pirelli",
+  "Sava",
+  "Semperit",
+  "Toyo",
+  "Uniroyal",
+  "Vredestein",
+  "Yokohama",
+  "Други",
+];
+const WHEEL_TIRE_SEASON_OPTIONS = ["Летни", "Зимни", "Всесезонни"];
+const WHEEL_TIRE_SPEED_INDEX_OPTIONS = ["Q", "R", "S", "T", "H", "V", "W", "Y", "ZR"];
+const WHEEL_TIRE_TREAD_OPTIONS = ["Симетричен", "Асиметричен", "Посока"];
 const BOAT_ENGINE_TYPE_OPTIONS = [
   "Без двигател",
   "Бензинов",
@@ -720,6 +788,14 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     wheelDiameter: "",
     wheelCount: "",
     wheelType: "",
+    wheelTireBrand: "",
+    wheelTireWidth: "",
+    wheelTireHeight: "",
+    wheelTireDiameter: "",
+    wheelTireSeason: "",
+    wheelTireSpeedIndex: "",
+    wheelTireLoadIndex: "",
+    wheelTireTread: "",
     boatLengthFrom: "",
     boatLengthTo: "",
     boatWidthFrom: "",
@@ -770,6 +846,16 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   const usesCompactMainCategoryForm =
     usesVehicleForSelect || isHeavyCategory || isEquipmentCategory || isBuyOrServicesCategory;
   const hasConditionCheckboxes = !isBuyOrServicesCategory;
+  const showsWheelTireFilters =
+    isWheelsCategory &&
+    (searchCriteria.wheelOfferType === "" ||
+      searchCriteria.wheelOfferType === "1" ||
+      searchCriteria.wheelOfferType === "3");
+  const showsWheelRimFilters =
+    isWheelsCategory &&
+    (searchCriteria.wheelOfferType === "" ||
+      searchCriteria.wheelOfferType === "2" ||
+      searchCriteria.wheelOfferType === "3");
   const equipmentTypeOptions = useMemo(() => {
     if (isAgroCategory || isBoatsCategory || isTrailersCategory) {
       const dynamicOptions = getBrandOptionsByMainCategory(mainCategory);
@@ -839,8 +925,20 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     () => groupOptionsByInitial(sortUniqueOptions(availableModels)),
     [availableModels]
   );
+  const wheelOfferTypeOptions = useMemo(() => {
+    const options = getWheelOfferTypeOptions(searchCriteria.wheelFor || "1");
+    if (options.length === 0) return WHEEL_OFFER_TYPE_OPTIONS;
+    return [
+      { value: "", label: "Всички" },
+      ...options.map((option) => ({ value: option.value, label: option.label })),
+    ];
+  }, [searchCriteria.wheelFor]);
   const wheelPcdOptions = useMemo(
-    () => WHEEL_PCD_OPTIONS_BY_BOLTS[searchCriteria.wheelBolts] || [],
+    () => {
+      const dynamicOptions = getWheelPcdOptions(searchCriteria.wheelBolts);
+      if (dynamicOptions.length > 0) return dynamicOptions;
+      return WHEEL_PCD_OPTIONS_BY_BOLTS[searchCriteria.wheelBolts] || [];
+    },
     [searchCriteria.wheelBolts]
   );
 
@@ -869,20 +967,37 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     };
 
     if (isWheelsCategory) {
+      const includesTires =
+        searchCriteria.wheelOfferType === "" ||
+        searchCriteria.wheelOfferType === "1" ||
+        searchCriteria.wheelOfferType === "3";
+      const includesRims =
+        searchCriteria.wheelOfferType === "" ||
+        searchCriteria.wheelOfferType === "2" ||
+        searchCriteria.wheelOfferType === "3";
+
       if (searchCriteria.wheelFor) query.topmenu = searchCriteria.wheelFor;
       if (searchCriteria.wheelOfferType) query.twrubr = searchCriteria.wheelOfferType;
-      if (searchCriteria.brand) query.marka = searchCriteria.brand;
-      if (searchCriteria.model) query.model = searchCriteria.model;
-      if (searchCriteria.wheelBrand) query.wheelBrand = searchCriteria.wheelBrand;
-      if (searchCriteria.wheelMaterial) query.wheelMaterial = searchCriteria.wheelMaterial;
-      if (searchCriteria.wheelBolts) query.wheelBolts = searchCriteria.wheelBolts;
-      if (searchCriteria.wheelPcd) query.wheelPcd = searchCriteria.wheelPcd;
-      if (searchCriteria.wheelCenterBore) query.wheelCenterBore = searchCriteria.wheelCenterBore;
-      if (searchCriteria.wheelOffset) query.wheelOffset = searchCriteria.wheelOffset;
-      if (searchCriteria.wheelWidth) query.wheelWidth = searchCriteria.wheelWidth;
-      if (searchCriteria.wheelDiameter) query.wheelDiameter = searchCriteria.wheelDiameter;
-      if (searchCriteria.wheelCount) query.wheelCount = searchCriteria.wheelCount;
-      if (searchCriteria.wheelType) query.wheelType = searchCriteria.wheelType;
+      if (includesRims && searchCriteria.brand) query.marka = searchCriteria.brand;
+      if (includesRims && searchCriteria.model) query.model = searchCriteria.model;
+      if (includesRims && searchCriteria.wheelBrand) query.wheelBrand = searchCriteria.wheelBrand;
+      if (includesRims && searchCriteria.wheelMaterial) query.wheelMaterial = searchCriteria.wheelMaterial;
+      if (includesRims && searchCriteria.wheelBolts) query.wheelBolts = searchCriteria.wheelBolts;
+      if (includesRims && searchCriteria.wheelPcd) query.wheelPcd = searchCriteria.wheelPcd;
+      if (includesRims && searchCriteria.wheelCenterBore) query.wheelCenterBore = searchCriteria.wheelCenterBore;
+      if (includesRims && searchCriteria.wheelOffset) query.wheelOffset = searchCriteria.wheelOffset;
+      if (includesRims && searchCriteria.wheelWidth) query.wheelWidth = searchCriteria.wheelWidth;
+      if (includesRims && searchCriteria.wheelDiameter) query.wheelDiameter = searchCriteria.wheelDiameter;
+      if (includesRims && searchCriteria.wheelCount) query.wheelCount = searchCriteria.wheelCount;
+      if (includesRims && searchCriteria.wheelType) query.wheelType = searchCriteria.wheelType;
+      if (includesTires && searchCriteria.wheelTireBrand) query.tireBrand = searchCriteria.wheelTireBrand;
+      if (includesTires && searchCriteria.wheelTireWidth) query.tireWidth = searchCriteria.wheelTireWidth;
+      if (includesTires && searchCriteria.wheelTireHeight) query.tireHeight = searchCriteria.wheelTireHeight;
+      if (includesTires && searchCriteria.wheelTireDiameter) query.tireDiameter = searchCriteria.wheelTireDiameter;
+      if (includesTires && searchCriteria.wheelTireSeason) query.tireSeason = searchCriteria.wheelTireSeason;
+      if (includesTires && searchCriteria.wheelTireSpeedIndex) query.tireSpeedIndex = searchCriteria.wheelTireSpeedIndex;
+      if (includesTires && searchCriteria.wheelTireLoadIndex) query.tireLoadIndex = searchCriteria.wheelTireLoadIndex;
+      if (includesTires && searchCriteria.wheelTireTread) query.tireTread = searchCriteria.wheelTireTread;
       if (searchCriteria.region) query.locat = searchCriteria.region;
       if (searchCriteria.city) query.locatc = searchCriteria.city;
       if (searchCriteria.maxPrice) query.price1 = searchCriteria.maxPrice;
@@ -1231,6 +1346,14 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       wheelDiameter: "",
       wheelCount: "",
       wheelType: "",
+      wheelTireBrand: "",
+      wheelTireWidth: "",
+      wheelTireHeight: "",
+      wheelTireDiameter: "",
+      wheelTireSeason: "",
+      wheelTireSpeedIndex: "",
+      wheelTireLoadIndex: "",
+      wheelTireTread: "",
       boatLengthFrom: "",
       boatLengthTo: "",
       boatWidthFrom: "",
@@ -1680,7 +1803,30 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               <label className="adv-label">ГУМИ И ДЖАНТИ ЗА</label>
               <select
                 value={searchCriteria.wheelFor}
-                onChange={(e) => handleInputChange("wheelFor", e.target.value)}
+                onChange={(e) => {
+                  handleInputChange("wheelFor", e.target.value);
+                  handleInputChange("wheelOfferType", "");
+                  handleInputChange("brand", "");
+                  handleInputChange("model", "");
+                  handleInputChange("wheelBrand", "");
+                  handleInputChange("wheelMaterial", "");
+                  handleInputChange("wheelBolts", "");
+                  handleInputChange("wheelPcd", "");
+                  handleInputChange("wheelCenterBore", "");
+                  handleInputChange("wheelOffset", "");
+                  handleInputChange("wheelWidth", "");
+                  handleInputChange("wheelDiameter", "");
+                  handleInputChange("wheelCount", "");
+                  handleInputChange("wheelType", "");
+                  handleInputChange("wheelTireBrand", "");
+                  handleInputChange("wheelTireWidth", "");
+                  handleInputChange("wheelTireHeight", "");
+                  handleInputChange("wheelTireDiameter", "");
+                  handleInputChange("wheelTireSeason", "");
+                  handleInputChange("wheelTireSpeedIndex", "");
+                  handleInputChange("wheelTireLoadIndex", "");
+                  handleInputChange("wheelTireTread", "");
+                }}
                 className="adv-select"
               >
                 {WHEEL_FOR_OPTIONS.map((option) => (
@@ -1695,10 +1841,36 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               <label className="adv-label">ТЪРСЕНЕТО Е ЗА</label>
               <select
                 value={searchCriteria.wheelOfferType}
-                onChange={(e) => handleInputChange("wheelOfferType", e.target.value)}
+                onChange={(e) => {
+                  const nextOfferType = e.target.value;
+                  handleInputChange("wheelOfferType", nextOfferType);
+                  if (nextOfferType === "1") {
+                    handleInputChange("brand", "");
+                    handleInputChange("model", "");
+                    handleInputChange("wheelBrand", "");
+                    handleInputChange("wheelMaterial", "");
+                    handleInputChange("wheelBolts", "");
+                    handleInputChange("wheelPcd", "");
+                    handleInputChange("wheelCenterBore", "");
+                    handleInputChange("wheelOffset", "");
+                    handleInputChange("wheelWidth", "");
+                    handleInputChange("wheelDiameter", "");
+                    handleInputChange("wheelCount", "");
+                    handleInputChange("wheelType", "");
+                  } else if (nextOfferType === "2") {
+                    handleInputChange("wheelTireBrand", "");
+                    handleInputChange("wheelTireWidth", "");
+                    handleInputChange("wheelTireHeight", "");
+                    handleInputChange("wheelTireDiameter", "");
+                    handleInputChange("wheelTireSeason", "");
+                    handleInputChange("wheelTireSpeedIndex", "");
+                    handleInputChange("wheelTireLoadIndex", "");
+                    handleInputChange("wheelTireTread", "");
+                  }
+                }}
                 className="adv-select"
               >
-                {WHEEL_OFFER_TYPE_OPTIONS.map((option) => (
+                {wheelOfferTypeOptions.map((option) => (
                   <option key={option.value || "all"} value={option.value}>
                     {option.label}
                   </option>
@@ -2795,188 +2967,322 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
 
                   {isWheelsCategory && (
                     <>
-                      <div className="adv-field">
-                        <label className="adv-label">МАРКА (АВТОМОБИЛ)</label>
-                        <BrandSelector
-                          value={searchCriteria.brand}
-                          onChange={(brand) => {
-                            handleInputChange("brand", brand);
-                            handleInputChange("model", "");
-                          }}
-                          brands={sortedAvailableBrands}
-                          placeholder="Всички"
-                        />
-                      </div>
-                      <div className="adv-field">
-                        <label className="adv-label">МОДЕЛ (АВТОМОБИЛ)</label>
-                        <div style={{ position: "relative" }}>
-                          <select
-                            value={searchCriteria.model}
-                            onChange={(e) => handleInputChange("model", e.target.value)}
-                            className={`adv-select ${!searchCriteria.brand ? "adv-select--disabled" : ""}`}
-                            disabled={!searchCriteria.brand}
-                          >
-                            <option value="">{searchCriteria.brand ? "Всички" : "Избери марка първо"}</option>
-                            {groupedAvailableModels.map((group) => (
-                              <optgroup key={group.label} label={group.label}>
-                                {group.options.map((model) => (
-                                  <option key={model} value={model}>
-                                    {model}
-                                  </option>
+                      {showsWheelTireFilters && (
+                        <>
+                          <div className="adv-field" style={{ gridColumn: "1 / -1", borderBottom: "1px solid #bbf7d0", paddingBottom: 6 }}>
+                            <label className="adv-label" style={{ color: "#16a34a", fontWeight: 800 }}>ИНФОРМАЦИЯ ЗА ГУМИ</label>
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">МАРКА ГУМИ</label>
+                            <select
+                              value={searchCriteria.wheelTireBrand}
+                              onChange={(e) => handleInputChange("wheelTireBrand", e.target.value)}
+                              className="adv-select"
+                            >
+                              <option value="">Всички</option>
+                              {searchCriteria.wheelTireBrand &&
+                                !WHEEL_TIRE_BRAND_OPTIONS.includes(searchCriteria.wheelTireBrand) && (
+                                  <option value={searchCriteria.wheelTireBrand}>{searchCriteria.wheelTireBrand}</option>
+                                )}
+                              {WHEEL_TIRE_BRAND_OPTIONS.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">ШИРИНА В ММ</label>
+                            <select
+                              value={searchCriteria.wheelTireWidth}
+                              onChange={(e) => handleInputChange("wheelTireWidth", e.target.value)}
+                              className="adv-select"
+                            >
+                              <option value="">Всички</option>
+                              {WHEEL_TIRE_WIDTH_OPTIONS.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">ВИСОЧИНА</label>
+                            <select
+                              value={searchCriteria.wheelTireHeight}
+                              onChange={(e) => handleInputChange("wheelTireHeight", e.target.value)}
+                              className="adv-select"
+                            >
+                              <option value="">Всички</option>
+                              {WHEEL_TIRE_HEIGHT_OPTIONS.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">ДИАМЕТЪР В ИНЧА</label>
+                            <select
+                              value={searchCriteria.wheelTireDiameter}
+                              onChange={(e) => handleInputChange("wheelTireDiameter", e.target.value)}
+                              className="adv-select"
+                            >
+                              <option value="">Всички</option>
+                              {WHEEL_DIAMETER_OPTIONS.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">СЕЗОННОСТ</label>
+                            <select
+                              value={searchCriteria.wheelTireSeason}
+                              onChange={(e) => handleInputChange("wheelTireSeason", e.target.value)}
+                              className="adv-select"
+                            >
+                              <option value="">Всички</option>
+                              {WHEEL_TIRE_SEASON_OPTIONS.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">СКОРОСТЕН ИНДЕКС</label>
+                            <select
+                              value={searchCriteria.wheelTireSpeedIndex}
+                              onChange={(e) => handleInputChange("wheelTireSpeedIndex", e.target.value)}
+                              className="adv-select"
+                            >
+                              <option value="">Всички</option>
+                              {WHEEL_TIRE_SPEED_INDEX_OPTIONS.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">ТЕГЛОВЕН ИНДЕКС</label>
+                            <input
+                              type="text"
+                              placeholder="Напр. 91"
+                              value={searchCriteria.wheelTireLoadIndex}
+                              onChange={(e) => handleInputChange("wheelTireLoadIndex", e.target.value)}
+                              className="adv-input"
+                            />
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">РЕЛЕФ</label>
+                            <select
+                              value={searchCriteria.wheelTireTread}
+                              onChange={(e) => handleInputChange("wheelTireTread", e.target.value)}
+                              className="adv-select"
+                            >
+                              <option value="">Всички</option>
+                              {WHEEL_TIRE_TREAD_OPTIONS.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </>
+                      )}
+
+                      {showsWheelRimFilters && (
+                        <>
+                          <div className="adv-field" style={{ gridColumn: "1 / -1", borderBottom: "1px solid #bbf7d0", paddingBottom: 6 }}>
+                            <label className="adv-label" style={{ color: "#16a34a", fontWeight: 800 }}>ИНФОРМАЦИЯ ЗА ДЖАНТИ</label>
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">МАРКА (АВТОМОБИЛ)</label>
+                            <BrandSelector
+                              value={searchCriteria.brand}
+                              onChange={(brand) => {
+                                handleInputChange("brand", brand);
+                                handleInputChange("model", "");
+                              }}
+                              brands={sortedAvailableBrands}
+                              placeholder="Всички"
+                            />
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">МОДЕЛ (АВТОМОБИЛ)</label>
+                            <div style={{ position: "relative" }}>
+                              <select
+                                value={searchCriteria.model}
+                                onChange={(e) => handleInputChange("model", e.target.value)}
+                                className={`adv-select ${!searchCriteria.brand ? "adv-select--disabled" : ""}`}
+                                disabled={!searchCriteria.brand}
+                              >
+                                <option value="">{searchCriteria.brand ? "Всички" : "Избери марка първо"}</option>
+                                {groupedAvailableModels.map((group) => (
+                                  <optgroup key={group.label} label={group.label}>
+                                    {group.options.map((model) => (
+                                      <option key={model} value={model}>
+                                        {model}
+                                      </option>
+                                    ))}
+                                  </optgroup>
                                 ))}
-                              </optgroup>
-                            ))}
-                          </select>
-                          {!searchCriteria.brand && (
-                            <span className="adv-lock-icon" title="Избери марка първо">
-                              <Lock size={14} />
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="adv-field">
-                        <label className="adv-label">МАРКА ДЖАНТИ</label>
-                        <input
-                          type="text"
-                          placeholder="Напр. BBS, OZ, AMG"
-                          value={searchCriteria.wheelBrand}
-                          onChange={(e) => handleInputChange("wheelBrand", e.target.value)}
-                          className="adv-input"
-                        />
-                      </div>
-                      <div className="adv-field">
-                        <label className="adv-label">МАТЕРИАЛ</label>
-                        <select
-                          value={searchCriteria.wheelMaterial}
-                          onChange={(e) => handleInputChange("wheelMaterial", e.target.value)}
-                          className="adv-select"
-                        >
-                          <option value="">Всички</option>
-                          {WHEEL_MATERIAL_OPTIONS.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="adv-field">
-                        <label className="adv-label">БОЛТОВЕ</label>
-                        <select
-                          value={searchCriteria.wheelBolts}
-                          onChange={(e) => {
-                            handleInputChange("wheelBolts", e.target.value);
-                            handleInputChange("wheelPcd", "");
-                          }}
-                          className="adv-select"
-                        >
-                          <option value="">Всички</option>
-                          {WHEEL_BOLT_OPTIONS.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="adv-field">
-                        <label className="adv-label">МЕЖДУБОЛТОВО РАЗСТОЯНИЕ</label>
-                        <select
-                          value={searchCriteria.wheelPcd}
-                          onChange={(e) => handleInputChange("wheelPcd", e.target.value)}
-                          className={`adv-select ${!searchCriteria.wheelBolts ? "adv-select--disabled" : ""}`}
-                          disabled={!searchCriteria.wheelBolts}
-                        >
-                          <option value="">
-                            {searchCriteria.wheelBolts ? "Избери" : "Избери болтове първо"}
-                          </option>
-                          {wheelPcdOptions.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="adv-field">
-                        <label className="adv-label">ЦЕНТРАЛЕН ОТВОР</label>
-                        <input
-                          type="text"
-                          placeholder="Напр. 66.6"
-                          value={searchCriteria.wheelCenterBore}
-                          onChange={(e) => handleInputChange("wheelCenterBore", e.target.value)}
-                          className="adv-input"
-                        />
-                      </div>
-                      <div className="adv-field">
-                        <label className="adv-label">ОФСЕТ /ET/</label>
-                        <select
-                          value={searchCriteria.wheelOffset}
-                          onChange={(e) => handleInputChange("wheelOffset", e.target.value)}
-                          className="adv-select"
-                        >
-                          <option value="">Всички</option>
-                          {WHEEL_OFFSET_OPTIONS.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="adv-field">
-                        <label className="adv-label">ШИРИНА [Jx]</label>
-                        <select
-                          value={searchCriteria.wheelWidth}
-                          onChange={(e) => handleInputChange("wheelWidth", e.target.value)}
-                          className="adv-select"
-                        >
-                          <option value="">Всички</option>
-                          {WHEEL_WIDTH_OPTIONS.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="adv-field">
-                        <label className="adv-label">ДИАМЕТЪР [ИНЧА]</label>
-                        <select
-                          value={searchCriteria.wheelDiameter}
-                          onChange={(e) => handleInputChange("wheelDiameter", e.target.value)}
-                          className="adv-select"
-                        >
-                          <option value="">Всички</option>
-                          {WHEEL_DIAMETER_OPTIONS.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="adv-field">
-                        <label className="adv-label">БРОЙ ДЖАНТИ</label>
-                        <input
-                          type="number"
-                          min="1"
-                          max="12"
-                          placeholder="Напр. 4"
-                          value={searchCriteria.wheelCount}
-                          onChange={(e) => handleInputChange("wheelCount", e.target.value)}
-                          className="adv-input"
-                        />
-                      </div>
-                      <div className="adv-field">
-                        <label className="adv-label">ВИД</label>
-                        <select
-                          value={searchCriteria.wheelType}
-                          onChange={(e) => handleInputChange("wheelType", e.target.value)}
-                          className="adv-select"
-                        >
-                          <option value="">Всички</option>
-                          {WHEEL_TYPE_OPTIONS.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                              </select>
+                              {!searchCriteria.brand && (
+                                <span className="adv-lock-icon" title="Избери марка първо">
+                                  <Lock size={14} />
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">МАРКА ДЖАНТИ</label>
+                            <input
+                              type="text"
+                              placeholder="Напр. BBS, OZ, AMG"
+                              value={searchCriteria.wheelBrand}
+                              onChange={(e) => handleInputChange("wheelBrand", e.target.value)}
+                              className="adv-input"
+                            />
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">МАТЕРИАЛ</label>
+                            <select
+                              value={searchCriteria.wheelMaterial}
+                              onChange={(e) => handleInputChange("wheelMaterial", e.target.value)}
+                              className="adv-select"
+                            >
+                              <option value="">Всички</option>
+                              {WHEEL_MATERIAL_OPTIONS.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">БОЛТОВЕ</label>
+                            <select
+                              value={searchCriteria.wheelBolts}
+                              onChange={(e) => {
+                                handleInputChange("wheelBolts", e.target.value);
+                                handleInputChange("wheelPcd", "");
+                              }}
+                              className="adv-select"
+                            >
+                              <option value="">Всички</option>
+                              {WHEEL_BOLT_OPTIONS.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">МЕЖДУБОЛТОВО РАЗСТОЯНИЕ</label>
+                            <select
+                              value={searchCriteria.wheelPcd}
+                              onChange={(e) => handleInputChange("wheelPcd", e.target.value)}
+                              className={`adv-select ${!searchCriteria.wheelBolts ? "adv-select--disabled" : ""}`}
+                              disabled={!searchCriteria.wheelBolts}
+                            >
+                              <option value="">
+                                {searchCriteria.wheelBolts ? "Избери" : "Избери болтове първо"}
+                              </option>
+                              {wheelPcdOptions.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">ЦЕНТРАЛЕН ОТВОР</label>
+                            <input
+                              type="text"
+                              placeholder="Напр. 66.6"
+                              value={searchCriteria.wheelCenterBore}
+                              onChange={(e) => handleInputChange("wheelCenterBore", e.target.value)}
+                              className="adv-input"
+                            />
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">ОФСЕТ /ET/</label>
+                            <select
+                              value={searchCriteria.wheelOffset}
+                              onChange={(e) => handleInputChange("wheelOffset", e.target.value)}
+                              className="adv-select"
+                            >
+                              <option value="">Всички</option>
+                              {WHEEL_OFFSET_OPTIONS.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">ШИРИНА [Jx]</label>
+                            <select
+                              value={searchCriteria.wheelWidth}
+                              onChange={(e) => handleInputChange("wheelWidth", e.target.value)}
+                              className="adv-select"
+                            >
+                              <option value="">Всички</option>
+                              {WHEEL_WIDTH_OPTIONS.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">ДИАМЕТЪР [ИНЧА]</label>
+                            <select
+                              value={searchCriteria.wheelDiameter}
+                              onChange={(e) => handleInputChange("wheelDiameter", e.target.value)}
+                              className="adv-select"
+                            >
+                              <option value="">Всички</option>
+                              {WHEEL_DIAMETER_OPTIONS.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">БРОЙ ДЖАНТИ</label>
+                            <input
+                              type="number"
+                              min="1"
+                              max="12"
+                              placeholder="Напр. 4"
+                              value={searchCriteria.wheelCount}
+                              onChange={(e) => handleInputChange("wheelCount", e.target.value)}
+                              className="adv-input"
+                            />
+                          </div>
+                          <div className="adv-field">
+                            <label className="adv-label">ВИД</label>
+                            <select
+                              value={searchCriteria.wheelType}
+                              onChange={(e) => handleInputChange("wheelType", e.target.value)}
+                              className="adv-select"
+                            >
+                              <option value="">Всички</option>
+                              {WHEEL_TYPE_OPTIONS.map((option) => (
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </>
+                      )}
                     </>
                   )}
 
@@ -4032,5 +4338,3 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     </div>
   );
 };
-
-

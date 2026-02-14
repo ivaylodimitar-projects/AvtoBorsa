@@ -82,6 +82,54 @@ interface CarListing {
     delta: number | string;
     changed_at: string;
   }>;
+  wheel_for?: string;
+  offer_type?: string;
+  tire_brand?: string;
+  tire_width?: string;
+  tire_height?: string;
+  tire_diameter?: string;
+  tire_season?: string;
+  tire_speed_index?: string;
+  tire_load_index?: string;
+  tire_tread?: string;
+  wheel_brand?: string;
+  material?: string;
+  bolts?: number | string | null;
+  pcd?: string;
+  center_bore?: string;
+  offset?: string;
+  width?: string;
+  diameter?: string;
+  count?: number | string | null;
+  wheel_type?: string;
+  part_for?: string;
+  part_category?: string;
+  part_element?: string;
+  part_year_from?: number | string | null;
+  part_year_to?: number | string | null;
+  axles?: number | string | null;
+  seats?: number | string | null;
+  load_kg?: number | string | null;
+  transmission?: string;
+  engine_type?: string;
+  heavy_euro_standard?: string;
+  displacement_cc?: number | string | null;
+  equipment_type?: string;
+  lift_capacity_kg?: number | string | null;
+  hours?: number | string | null;
+  beds?: number | string | null;
+  length_m?: number | string | null;
+  has_toilet?: boolean;
+  has_heating?: boolean;
+  has_air_conditioning?: boolean;
+  boat_category?: string;
+  engine_count?: number | string | null;
+  width_m?: number | string | null;
+  draft_m?: number | string | null;
+  trailer_category?: string;
+  classified_for?: string;
+  accessory_category?: string;
+  buy_service_category?: string;
 }
 
 type PreviewImageSource = {
@@ -729,6 +777,193 @@ const MyAdsPage: React.FC = () => {
     }
   };
 
+  const toText = (value: unknown) => {
+    if (value === null || value === undefined) return "";
+    return String(value).trim();
+  };
+
+  const toPositiveNumber = (value: unknown) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+  };
+
+  const formatTopmenuCategory = (value: unknown) => {
+    const code = toText(value);
+    if (!code) return "";
+    return getMainCategoryLabel(code) || code;
+  };
+
+  const formatWheelOfferType = (value: unknown) => {
+    const code = toText(value);
+    if (code === "1") return "Гуми";
+    if (code === "2") return "Джанти";
+    if (code === "3") return "Гуми с джанти";
+    return code;
+  };
+
+  const formatTireSize = (listing: CarListing) => {
+    const width = toText(listing.tire_width);
+    const height = toText(listing.tire_height);
+    const diameter = toText(listing.tire_diameter);
+    if (width && height && diameter) return `${width}/${height} R${diameter}`;
+    if (diameter) return `R${diameter}`;
+    return "";
+  };
+
+  const formatYearRange = (from: unknown, to: unknown) => {
+    const fromYear = toText(from);
+    const toYear = toText(to);
+    if (fromYear && toYear) return `${fromYear} - ${toYear}`;
+    return fromYear || toYear;
+  };
+
+  const getTechnicalSpecs = (listing: CarListing) => {
+    const specs: Array<{ label: string; value: string; icon: React.ComponentType<any> }> = [];
+    const addSpec = (label: string, value: unknown, icon: React.ComponentType<any>) => {
+      const normalized = toText(value);
+      if (!normalized) return;
+      specs.push({ label, value: normalized, icon });
+    };
+    const addNumeric = (
+      label: string,
+      value: unknown,
+      unit: string,
+      icon: React.ComponentType<any>,
+      formatAsInt = true
+    ) => {
+      const numeric = toPositiveNumber(value);
+      if (numeric === null) return;
+      const rendered = formatAsInt ? Math.round(numeric).toString() : numeric.toString();
+      addSpec(label, unit ? `${rendered} ${unit}` : rendered, icon);
+    };
+    const addBoolean = (label: string, value: unknown, icon: React.ComponentType<any>) => {
+      if (value === true || toText(value).toLowerCase() === "true") {
+        addSpec(label, "Да", icon);
+      }
+    };
+
+    const mainCategory = toText(listing.main_category);
+    const conditionLabel = formatConditionLabel(listing.condition);
+
+    switch (mainCategory) {
+      case "u":
+        addSpec("Категория", listing.part_category, PackageOpen);
+        addSpec("Част", listing.part_element, Settings);
+        addSpec("За", formatTopmenuCategory(listing.part_for), Car);
+        addSpec("Години", formatYearRange(listing.part_year_from, listing.part_year_to), Calendar);
+        addSpec("Състояние", conditionLabel, ShieldCheck);
+        break;
+      case "w":
+        addSpec("Оферта", formatWheelOfferType(listing.offer_type), PackageOpen);
+        addSpec("За", formatTopmenuCategory(listing.wheel_for), Car);
+        addSpec("Марка гуми", listing.tire_brand, PackageOpen);
+        addSpec("Размер гуми", formatTireSize(listing), Ruler);
+        addSpec("Сезон", listing.tire_season, Leaf);
+        addSpec("Марка джанти", listing.wheel_brand, PackageOpen);
+        addSpec("Материал", listing.material, Palette);
+        addSpec("Болтове", listing.bolts, Settings);
+        addSpec("PCD", listing.pcd, Ruler);
+        break;
+      case "v":
+        addSpec("Категория", listing.accessory_category, PackageOpen);
+        addSpec("За", formatTopmenuCategory(listing.classified_for), Car);
+        addSpec("Състояние", conditionLabel, ShieldCheck);
+        break;
+      case "y":
+        addSpec("Купува", listing.buy_service_category, PackageOpen);
+        addSpec("За", formatTopmenuCategory(listing.classified_for), Car);
+        break;
+      case "z":
+        addSpec("Услуга", listing.buy_service_category, PackageOpen);
+        addSpec("За", formatTopmenuCategory(listing.classified_for), Car);
+        break;
+      case "3":
+      case "4":
+        addNumeric("Оси", listing.axles, "", Settings);
+        addNumeric("Седалки", listing.seats, "", PackageOpen);
+        addNumeric("Товар", listing.load_kg, "кг", Gauge);
+        addSpec("Трансмисия", listing.transmission, Settings);
+        addSpec("Двигател", listing.engine_type, Fuel);
+        addSpec(
+          "Еко",
+          formatEuroStandardLabel(toText(listing.heavy_euro_standard) || toText(listing.euro_standard)),
+          Leaf
+        );
+        addNumeric("Мощност", listing.power, "к.с.", Zap);
+        break;
+      case "5":
+        addNumeric("Кубатура", listing.displacement_cc ?? listing.displacement, "cc", Ruler);
+        addSpec("Двигател", listing.engine_type, Fuel);
+        addSpec("Трансмисия", listing.transmission, Settings);
+        addNumeric("Мощност", listing.power, "к.с.", Zap);
+        break;
+      case "6":
+      case "7":
+        addSpec("Категория", listing.equipment_type, PackageOpen);
+        addSpec("Двигател", listing.engine_type, Fuel);
+        addNumeric("Мощност", listing.power, "к.с.", Zap);
+        addSpec("Състояние", conditionLabel, ShieldCheck);
+        break;
+      case "8":
+        addSpec("Двигател", listing.engine_type, Fuel);
+        addNumeric("Товар", listing.lift_capacity_kg, "кг", Gauge);
+        addNumeric("Часове", listing.hours, "ч", Clock);
+        addNumeric("Мощност", listing.power, "к.с.", Zap);
+        addSpec("Състояние", conditionLabel, ShieldCheck);
+        break;
+      case "9":
+        addNumeric("Легла", listing.beds, "", PackageOpen);
+        addNumeric("Дължина", listing.length_m, "м", Ruler, false);
+        addBoolean("Тоалетна", listing.has_toilet, ShieldCheck);
+        addBoolean("Отопление", listing.has_heating, ShieldCheck);
+        addBoolean("Климатик", listing.has_air_conditioning, ShieldCheck);
+        break;
+      case "a":
+        addSpec("Категория", listing.boat_category, PackageOpen);
+        addSpec("Двигател", listing.engine_type, Fuel);
+        addNumeric("Брой двигатели", listing.engine_count, "", Settings);
+        addSpec("Материал", listing.material, Palette);
+        addNumeric("Дължина", listing.length_m, "м", Ruler, false);
+        addNumeric("Ширина", listing.width_m, "м", Ruler, false);
+        addNumeric("Газене", listing.draft_m, "м", Ruler, false);
+        addNumeric("Часове", listing.hours, "ч", Clock);
+        break;
+      case "b":
+        addSpec("Категория", listing.trailer_category, PackageOpen);
+        addNumeric("Товар", listing.load_kg, "кг", Gauge);
+        addNumeric("Оси", listing.axles, "", Settings);
+        break;
+      default:
+        addSpec("Гориво", formatFuelLabel(listing.fuel), Fuel);
+        addSpec("Кутия", formatGearboxLabel(listing.gearbox), Settings);
+        addNumeric("Пробег", listing.mileage, "км", Gauge);
+        addNumeric("Мощност", listing.power, "к.с.", Zap);
+        addNumeric("Кубатура", listing.displacement, "cc", Ruler);
+        addSpec(
+          "Еко",
+          listing.euro_standard && listing.euro_standard !== "0"
+            ? formatEuroStandardLabel(listing.euro_standard)
+            : "",
+          Leaf
+        );
+        addSpec("Цвят", listing.color, Palette);
+        break;
+    }
+
+    if (specs.length === 0) {
+      addSpec("Състояние", conditionLabel, ShieldCheck);
+      addSpec("Град", listing.city, MapPin);
+    }
+
+    return specs;
+  };
+
+  const getListingCategoryBadge = (listing: CarListing) => {
+    const mainCode = toText(listing.main_category);
+    const mainLabel = getMainCategoryLabel(mainCode) || mainCode;
+    return mainLabel || "";
+  };
+
   const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: "100vh",
@@ -1235,8 +1470,8 @@ const MyAdsPage: React.FC = () => {
     fontSize: 12,
     fontWeight: 800,
   },
-  previewPriceChangeUp: { background: "#fee2e2", color: "#dc2626", border: "1px solid #fecaca" },
-  previewPriceChangeDown: { background: "#dcfce7", color: "#16a34a", border: "1px solid #bbf7d0" },
+  previewPriceChangeUp: { background: "#dcfce7", color: "#16a34a", border: "1px solid #bbf7d0" },
+  previewPriceChangeDown: { background: "#fee2e2", color: "#dc2626", border: "1px solid #fecaca" },
   previewSpecs: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
@@ -1423,6 +1658,25 @@ const MyAdsPage: React.FC = () => {
     textTransform: "uppercase" as const,
     zIndex: 2,
   },
+  listingCategoryBadge: {
+    position: "absolute" as const,
+    top: 12,
+    right: 12,
+    maxWidth: "78%",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap" as const,
+    padding: "6px 10px",
+    borderRadius: 999,
+    background: "#ffffff",
+    color: "#111111",
+    border: "1px solid #111111",
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: 0.2,
+    textTransform: "uppercase" as const,
+    zIndex: 2,
+  },
   statusBadgeExpired: {
     background: "#dc2626",
     boxShadow: "0 6px 16px rgba(220, 38, 38, 0.35)",
@@ -1455,8 +1709,8 @@ const MyAdsPage: React.FC = () => {
     fontWeight: 800,
     lineHeight: 1,
   },
-  listingPriceChangeUp: { background: "#fee2e2", color: "#dc2626", border: "1px solid #fecaca" },
-  listingPriceChangeDown: { background: "#dcfce7", color: "#16a34a", border: "1px solid #bbf7d0" },
+  listingPriceChangeUp: { background: "#dcfce7", color: "#16a34a", border: "1px solid #bbf7d0" },
+  listingPriceChangeDown: { background: "#fee2e2", color: "#dc2626", border: "1px solid #fecaca" },
   listingContent: {
     padding: "18px",
     display: "flex",
@@ -1826,42 +2080,7 @@ const MyAdsPage: React.FC = () => {
     ? `${Math.abs(previewDeltaValue).toLocaleString("bg-BG")} €`
     : "";
   const PreviewChangeIcon = previewChangeDirection === "up" ? TrendingUp : TrendingDown;
-  const previewSpecs = previewListing
-    ? [
-        {
-          label: "Година",
-          value: previewListing.year_from ? String(previewListing.year_from) : "",
-          icon: Calendar,
-        },
-        { label: "Град", value: previewListing.city || "", icon: MapPin },
-        { label: "Гориво", value: formatFuelLabel(previewListing.fuel), icon: Fuel },
-        { label: "Скоростна кутия", value: formatGearboxLabel(previewListing.gearbox), icon: Settings },
-        {
-          label: "Пробег",
-          value: Number.isFinite(previewListing.mileage)
-            ? `${previewListing.mileage.toLocaleString("bg-BG")} км`
-            : "",
-          icon: Gauge,
-        },
-        {
-          label: "Мощност",
-          value: Number.isFinite(previewListing.power)
-            ? `${previewListing.power} к.с.`
-            : "",
-          icon: Zap,
-        },
-        {
-          label: "Кубатура",
-          value: Number.isFinite(previewListing.displacement)
-            ? `${previewListing.displacement} cc`
-            : "",
-          icon: Ruler,
-        },
-        { label: "Състояние", value: formatConditionLabel(previewListing.condition), icon: ShieldCheck },
-        { label: "Еко стандарт", value: formatEuroStandardLabel(previewListing.euro_standard), icon: Leaf },
-        { label: "Цвят", value: previewListing.color, icon: Palette },
-      ].filter((spec) => spec.value)
-    : [];
+  const previewSpecs = previewListing ? getTechnicalSpecs(previewListing).slice(0, 4) : [];
   const previewStatusLabel = getPreviewStatusLabel(previewTab);
   const previewStatusStyle =
     previewStatusLabel === "Изтекла"
@@ -2367,8 +2586,11 @@ const MyAdsPage: React.FC = () => {
                   const statusLabel = getPreviewStatusLabel(activeTab);
                   const fallbackTitle = `${listing.brand || ""} ${listing.model || ""}`.trim();
                   const listingTitle = (listing.title || fallbackTitle || "Без заглавие").trim();
+                  const shouldShowYearInSubtitle = !["v", "y", "z"].includes(
+                    toText(listing.main_category)
+                  );
                   const subtitleParts = [
-                    listing.year_from ? `${listing.year_from} г.` : "",
+                    shouldShowYearInSubtitle && listing.year_from ? `${listing.year_from} г.` : "",
                     listing.city || "",
                     formatConditionLabel(listing.condition),
                   ].filter(Boolean);
@@ -2403,47 +2625,12 @@ const MyAdsPage: React.FC = () => {
                     statusLabel === "Изтекла"
                       ? { ...styles.statusBadge, ...styles.statusBadgeExpired }
                       : styles.statusBadge;
-                  const chips = [
-                    { label: "Гориво", value: formatFuelLabel(listing.fuel), icon: Fuel },
-                    { label: "Кутия", value: formatGearboxLabel(listing.gearbox), icon: Settings },
-                    {
-                      label: "Пробег",
-                      value:
-                        Number.isFinite(listing.mileage) && listing.mileage > 0
-                          ? `${listing.mileage.toLocaleString("bg-BG")} км`
-                          : "",
-                      icon: Gauge,
-                    },
-                    {
-                      label: "Мощност",
-                      value:
-                        Number.isFinite(listing.power) && listing.power > 0
-                          ? `${listing.power} к.с.`
-                          : "",
-                      icon: Zap,
-                    },
-                    {
-                      label: "Кубатура",
-                      value:
-                        Number.isFinite(listing.displacement) && listing.displacement > 0
-                          ? `${listing.displacement} cc`
-                          : "",
-                      icon: Ruler,
-                    },
-                    {
-                      label: "Еко",
-                value:
-                  listing.euro_standard && listing.euro_standard !== "0"
-                    ? formatEuroStandardLabel(listing.euro_standard)
-                    : "",
-                icon: Leaf,
-              },
-              { label: "Цвят", value: listing.color, icon: Palette },
-            ].filter((chip) => chip.value);
-            const visibleChips = chips.slice(0, 6);
-            const isNewListing = isListingNew(listing.created_at);
-            const cardImage = getCardImageSources(listing);
-            const isPriorityImage = index < 4;
+                  const chips = getTechnicalSpecs(listing);
+                  const visibleChips = chips.slice(0, 4);
+                  const isNewListing = isListingNew(listing.created_at);
+                  const cardImage = getCardImageSources(listing);
+                  const isPriorityImage = index < 4;
+                  const categoryBadgeLabel = getListingCategoryBadge(listing);
 
             return (
             <div
@@ -2481,8 +2668,20 @@ const MyAdsPage: React.FC = () => {
                     Нова
                   </div>
                 )}
+                {categoryBadgeLabel && (
+                  <div style={styles.listingCategoryBadge} title={categoryBadgeLabel}>
+                    {categoryBadgeLabel}
+                  </div>
+                )}
                 {statusLabel && (
-                  <div style={statusBadgeStyle}>{statusLabel}</div>
+                  <div
+                    style={{
+                      ...statusBadgeStyle,
+                      top: categoryBadgeLabel ? 42 : 12,
+                    }}
+                  >
+                    {statusLabel}
+                  </div>
                 )}
                 {cardImage.display ? (
                   <img

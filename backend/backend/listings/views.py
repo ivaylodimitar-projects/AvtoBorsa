@@ -35,7 +35,7 @@ LISTINGS_PUBLIC_STALE_SECONDS = 120
 TOP_DEMOTION_MIN_INTERVAL_SECONDS = 60
 TOP_DEMOTION_LOCK_KEY = "listings:demote-expired-top:lock"
 LATEST_LISTINGS_CACHE_SECONDS = 30
-LATEST_LISTINGS_CACHE_KEY = "listings:latest:v2"
+LATEST_LISTINGS_CACHE_KEY = "listings:latest:v3"
 
 
 class ListingsPagination(PageNumberPagination):
@@ -399,6 +399,30 @@ class CarListingViewSet(viewsets.ModelViewSet):
             twrubr = get_param('twrubr')
             if twrubr:
                 queryset = queryset.filter(wheels_details__offer_type=twrubr)
+            tire_brand = get_param('tireBrand')
+            if tire_brand:
+                queryset = queryset.filter(wheels_details__tire_brand__icontains=tire_brand)
+            tire_width = get_param('tireWidth')
+            if tire_width:
+                queryset = queryset.filter(wheels_details__tire_width__icontains=tire_width)
+            tire_height = get_param('tireHeight')
+            if tire_height:
+                queryset = queryset.filter(wheels_details__tire_height__icontains=tire_height)
+            tire_diameter = get_param('tireDiameter')
+            if tire_diameter:
+                queryset = queryset.filter(wheels_details__tire_diameter__icontains=tire_diameter)
+            tire_season = get_param('tireSeason')
+            if tire_season:
+                queryset = queryset.filter(wheels_details__tire_season__icontains=tire_season)
+            tire_speed_index = get_param('tireSpeedIndex')
+            if tire_speed_index:
+                queryset = queryset.filter(wheels_details__tire_speed_index__icontains=tire_speed_index)
+            tire_load_index = get_param('tireLoadIndex')
+            if tire_load_index:
+                queryset = queryset.filter(wheels_details__tire_load_index__icontains=tire_load_index)
+            tire_tread = get_param('tireTread')
+            if tire_tread:
+                queryset = queryset.filter(wheels_details__tire_tread__icontains=tire_tread)
             wheel_brand = get_param('wheelBrand')
             if wheel_brand:
                 queryset = queryset.filter(wheels_details__wheel_brand__icontains=wheel_brand)
@@ -1115,6 +1139,7 @@ def latest_listings(request):
             is_archived=False,
             created_at__gte=cutoff
         )
+        .select_related('parts_details')
         .annotate(
             top_rank=Case(
                 When(listing_type='top', then=Value(0)),
@@ -1129,8 +1154,9 @@ def latest_listings(request):
             last_price_change_at=Subquery(latest_price_change.values('changed_at')[:1]),
         )
         .only(
-            'id', 'slug', 'brand', 'model', 'year_from', 'price', 'mileage',
-            'fuel', 'power', 'city', 'created_at', 'listing_type'
+            'id', 'slug', 'main_category', 'brand', 'model', 'year_from', 'price', 'mileage',
+            'fuel', 'power', 'city', 'created_at', 'listing_type',
+            'parts_details__part_for', 'parts_details__part_element'
         )
         .order_by('top_rank', '-created_at')[:16]
     )
