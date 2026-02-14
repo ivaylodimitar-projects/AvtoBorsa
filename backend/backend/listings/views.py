@@ -466,12 +466,25 @@ class CarListingViewSet(viewsets.ModelViewSet):
                 queryset = queryset.filter(**{f'{relation}__euro_standard__icontains': euro_standard})
 
         if main_category == '5':
+            moto_category = get_param('motoCategory')
+            if moto_category:
+                queryset = queryset.filter(features__contains=[f'Категория: {moto_category}'])
+            moto_cooling_type = get_param('motoCoolingType')
+            if moto_cooling_type:
+                queryset = queryset.filter(features__contains=[f'Охлаждане: {moto_cooling_type}'])
+            moto_engine_kind = get_param('motoEngineKind')
+            if moto_engine_kind:
+                queryset = queryset.filter(features__contains=[f'Вид двигател: {moto_engine_kind}'])
             displacement_from = to_int(get_param('displacementFrom'))
             if displacement_from is not None:
                 queryset = queryset.filter(moto_details__displacement_cc__gte=displacement_from)
             displacement_to = to_int(get_param('displacementTo'))
             if displacement_to is not None:
                 queryset = queryset.filter(moto_details__displacement_cc__lte=displacement_to)
+            moto_features = get_param('motoFeatures')
+            if moto_features:
+                for feature in [item.strip() for item in moto_features.split(',') if item.strip()]:
+                    queryset = queryset.filter(features__contains=[feature])
 
         if main_category == '8':
             lift_from = to_int(get_param('liftCapacityFrom'))

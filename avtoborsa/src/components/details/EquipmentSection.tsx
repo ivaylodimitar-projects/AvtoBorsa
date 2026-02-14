@@ -2,6 +2,7 @@
 import { ChevronDown, Check } from 'lucide-react';
 import { CAR_FEATURE_GROUPS, normalizeCarFeatureLabel } from '../../constants/carFeatures';
 import { HEAVY_FEATURE_GROUPS } from '../../constants/heavyFeatures';
+import { MOTO_FEATURE_GROUPS, isMotoMetaFeature } from '../../constants/motoData';
 
 interface EquipmentSectionProps {
   features: string[] | string;
@@ -10,7 +11,12 @@ interface EquipmentSectionProps {
 
 const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features, mainCategory }) => {
   const featureGroups = React.useMemo(
-    () => (mainCategory === '3' || mainCategory === '4' ? HEAVY_FEATURE_GROUPS : CAR_FEATURE_GROUPS),
+    () =>
+      mainCategory === '3' || mainCategory === '4'
+        ? HEAVY_FEATURE_GROUPS
+        : mainCategory === '5'
+          ? MOTO_FEATURE_GROUPS
+          : CAR_FEATURE_GROUPS,
     [mainCategory]
   );
 
@@ -126,12 +132,15 @@ const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features, mainCateg
         }
         return [];
       })();
+  const visibleFeatures = mainCategory === '5'
+    ? normalizedFeatures.filter((feature) => !isMotoMetaFeature(feature))
+    : normalizedFeatures;
   const usedFeatures = new Set<string>();
 
   return (
     <div style={styles.container}>
       {featureGroups.map((group) => {
-        const categoryFeaturesList = normalizedFeatures.filter((f) =>
+        const categoryFeaturesList = visibleFeatures.filter((f) =>
           group.items.includes(f)
         );
         categoryFeaturesList.forEach((feature) => usedFeatures.add(feature));
@@ -199,9 +208,9 @@ const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features, mainCateg
         );
       })}
 
-      {normalizedFeatures.length > 0 && (
+      {visibleFeatures.length > 0 && (
         (() => {
-          const otherFeatures = normalizedFeatures.filter(
+          const otherFeatures = visibleFeatures.filter(
             (feature) => !usedFeatures.has(feature)
           );
 

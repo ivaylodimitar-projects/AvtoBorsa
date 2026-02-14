@@ -15,7 +15,6 @@ import {
   PackageOpen,
   Clock,
   X,
-  Euro,
   TrendingUp,
   TrendingDown,
   Calendar,
@@ -82,12 +81,6 @@ interface CarListing {
     delta: number | string;
     changed_at: string;
   }>;
-}
-
-interface Favorite {
-  id: number;
-  listing: CarListing;
-  created_at: string;
 }
 
 type PreviewImageSource = {
@@ -170,50 +163,98 @@ const MyAdsPage: React.FC = () => {
     const fetchUserListings = async () => {
       try {
         const token = localStorage.getItem("authToken");
+        if (!token) {
+          throw new Error("Липсва токен за достъп");
+        }
 
-        // Fetch all listing types in parallel
-        const [activeRes, archivedRes, draftsRes, expiredRes, favoritesRes] = await Promise.all([
-          fetch("http://localhost:8000/api/my-listings/", {
+        const normalizeArrayPayload = (payload: unknown): unknown[] => {
+          if (Array.isArray(payload)) return payload;
+          if (
+            payload &&
+            typeof payload === "object" &&
+            Array.isArray((payload as { results?: unknown[] }).results)
+          ) {
+            return (payload as { results: unknown[] }).results;
+          }
+          return [];
+        };
+
+        const fetchList = async (url: string): Promise<unknown[]> => {
+          const response = await fetch(url, {
             headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch("http://localhost:8000/api/my-archived/", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch("http://localhost:8000/api/my-drafts/", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch("http://localhost:8000/api/my-expired/", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch("http://localhost:8000/api/my-favorites/", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
+          });
+
+          if (!response.ok) {
+            throw new Error(`${url} -> ${response.status}`);
+          }
+
+          const raw = await response.text();
+          if (!raw) return [];
+
+          try {
+            return normalizeArrayPayload(JSON.parse(raw));
+          } catch {
+            return [];
+          }
+        };
+
+        const [activeRes, archivedRes, draftsRes, expiredRes, favoritesRes] = await Promise.allSettled([
+          fetchList("http://localhost:8000/api/my-listings/"),
+          fetchList("http://localhost:8000/api/my-archived/"),
+          fetchList("http://localhost:8000/api/my-drafts/"),
+          fetchList("http://localhost:8000/api/my-expired/"),
+          fetchList("http://localhost:8000/api/my-favorites/"),
         ]);
 
-        if (!activeRes.ok || !archivedRes.ok || !draftsRes.ok || !expiredRes.ok || !favoritesRes.ok) {
+        const allResults = [activeRes, archivedRes, draftsRes, expiredRes, favoritesRes];
+        const hasAnySuccess = allResults.some((result) => result.status === "fulfilled");
+        if (!hasAnySuccess) {
           throw new Error("Failed to fetch listings");
         }
 
-        const activeData = await activeRes.json();
-        const archivedData = await archivedRes.json();
-        const draftsData = await draftsRes.json();
-        const expiredData = await expiredRes.json();
-        const favoritesData = await favoritesRes.json();
+        const settledValue = (result: PromiseSettledResult<unknown[]>) =>
+          result.status === "fulfilled" ? result.value : [];
+
+        const activeData = settledValue(activeRes) as CarListing[];
+        const archivedData = settledValue(archivedRes) as CarListing[];
+        const draftsData = settledValue(draftsRes) as CarListing[];
+        const expiredData = settledValue(expiredRes) as CarListing[];
+        const favoritesData = settledValue(favoritesRes);
+
+        const likedFromFavorites = favoritesData
+          .map((item) => {
+            if (!item || typeof item !== "object") return null;
+            const favoriteItem = item as { listing?: unknown };
+            if (favoriteItem.listing && typeof favoriteItem.listing === "object") {
+              return favoriteItem.listing as CarListing;
+            }
+            return item as CarListing;
+          })
+          .filter(
+            (listing): listing is CarListing =>
+              Boolean(listing && typeof listing === "object" && "id" in listing)
+          );
 
         setActiveListings(activeData);
         setArchivedListings(archivedData);
         setDraftListings(draftsData);
         setExpiredListings(expiredData);
-        // Extract listings from favorites (which have a nested listing property)
-        const likedFromFavorites = favoritesData.map((fav: Favorite) => fav.listing);
         setLikedListings(likedFromFavorites);
-        writeMyAdsCache<CarListing>(user?.id, {
-          activeListings: activeData,
-          archivedListings: archivedData,
-          draftListings: draftsData,
-          expiredListings: expiredData,
-          likedListings: likedFromFavorites,
-        });
+
+        const hasFailedRequests = allResults.some((result) => result.status === "rejected");
+        if (!hasFailedRequests) {
+          writeMyAdsCache<CarListing>(user?.id, {
+            activeListings: activeData,
+            archivedListings: archivedData,
+            draftListings: draftsData,
+            expiredListings: expiredData,
+            likedListings: likedFromFavorites,
+          });
+        } else {
+          invalidateMyAdsCache(user?.id);
+          console.warn("MyAds: partial fetch failure", allResults);
+        }
+
         setError(null);
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : "An error occurred";

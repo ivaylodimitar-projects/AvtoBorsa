@@ -524,6 +524,10 @@ const SearchPage: React.FC = () => {
     const brand = getParam("brand");
     const model = getParam("model");
     const category = getParam("category");
+    const motoCategory = getParam("motoCategory");
+    const motoCoolingType = getParam("motoCoolingType");
+    const motoEngineKind = getParam("motoEngineKind");
+    const motoFeatures = getParam("motoFeatures");
     const year = getParam("year");
     const yearFrom = getParam("yearFrom");
     const yearTo = getParam("yearTo");
@@ -635,13 +639,18 @@ const SearchPage: React.FC = () => {
     addCriterion("Модел", model);
     if (mainCategory === "a") addCriterion("Категория лодка", getParam("boatCategory"));
     if (mainCategory === "b") addCriterion("Категория ремарке", getParam("trailerCategory"));
-    addCriterion("Тип", category);
+    addCriterion("Тип", mainCategory === "5" ? motoCategory : category);
     const fuelOrEngineType = getParam("fuel");
     if (mainCategory === "1") {
       addCriterion("Гориво", formatFuelLabel(fuelOrEngineType));
       addCriterion("Скоростна кутия", formatGearboxLabel(getParam("gearbox")));
     } else {
       addCriterion("Вид двигател", fuelOrEngineType);
+    }
+    if (mainCategory === "5") {
+      addCriterion("Вид охлаждане", motoCoolingType);
+      addCriterion("Вид двигател (конфигурация)", motoEngineKind);
+      addCriterion("Екстри", motoFeatures.split(",").filter(Boolean).join(", "));
     }
     addCriterion("Трансмисия", getParam("transmission"));
     addCriterion("Евростандарт", getParam("euroStandard"));
@@ -730,6 +739,19 @@ const SearchPage: React.FC = () => {
       const model = getParam("model");
       if (trailerCategory && brand) return `${mainCategoryLabel} • ${trailerCategory} • ${brand}${model ? ` / ${model}` : ""}`;
       if (trailerCategory) return `${mainCategoryLabel} • ${trailerCategory}`;
+      if (brand && model) return `${mainCategoryLabel} • ${brand} / ${model}`;
+      if (brand) return `${mainCategoryLabel} • ${brand}`;
+      return mainCategoryLabel;
+    }
+
+    if (mainCategory === "5") {
+      const motoCategory = getParam("motoCategory");
+      const brand = getParam("brand", "marka");
+      const model = getParam("model");
+      if (motoCategory && brand) {
+        return `${mainCategoryLabel} • ${motoCategory} • ${brand}${model ? ` / ${model}` : ""}`;
+      }
+      if (motoCategory) return `${mainCategoryLabel} • ${motoCategory}`;
       if (brand && model) return `${mainCategoryLabel} • ${brand} / ${model}`;
       if (brand) return `${mainCategoryLabel} • ${brand}`;
       return mainCategoryLabel;

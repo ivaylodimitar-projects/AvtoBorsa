@@ -89,6 +89,9 @@ const generateSearchLabel = (criteria: Record<string, any>): string => {
   if (criteria.category) {
     parts.push(criteria.category);
   }
+  if (criteria.motoCategory) {
+    parts.push(criteria.motoCategory);
+  }
 
   // Year Range
   if (criteria.yearFrom) {

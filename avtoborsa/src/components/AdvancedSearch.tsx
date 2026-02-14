@@ -13,6 +13,12 @@ import {
   getMainCategoryFromTopmenu,
   getModelOptionsByMainCategory,
 } from "../constants/mobileBgData";
+import {
+  MOTO_CATEGORY_OPTIONS,
+  MOTO_COOLING_TYPE_OPTIONS,
+  MOTO_ENGINE_KIND_OPTIONS,
+  MOTO_FEATURE_GROUPS,
+} from "../constants/motoData";
 
 interface SearchCriteria {
   mainCategory?: string;
@@ -63,6 +69,9 @@ interface SearchCriteria {
   heavyLoadFrom: string;
   heavyLoadTo: string;
   heavyEuroStandard: string;
+  motoCategory: string;
+  motoCoolingType: string;
+  motoEngineKind: string;
   motoDisplacementFrom: string;
   motoDisplacementTo: string;
   forkliftLoadFrom: string;
@@ -102,6 +111,7 @@ interface SearchCriteria {
   trailerAxlesFrom: string;
   trailerAxlesTo: string;
   buyServiceCategory: string;
+  motoFeatures: string[];
   boatFeatures: string[];
   trailerFeatures: string[];
 }
@@ -614,6 +624,9 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     heavyLoadFrom: "",
     heavyLoadTo: "",
     heavyEuroStandard: "",
+    motoCategory: "",
+    motoCoolingType: "",
+    motoEngineKind: "",
     motoDisplacementFrom: "",
     motoDisplacementTo: "",
     forkliftLoadFrom: "",
@@ -653,6 +666,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     trailerAxlesFrom: "",
     trailerAxlesTo: "",
     buyServiceCategory: "",
+    motoFeatures: [],
     boatFeatures: [],
     trailerFeatures: [],
   });
@@ -750,7 +764,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     });
   };
 
-  const toggleFeature = (field: "boatFeatures" | "trailerFeatures", feature: string) => {
+  const toggleFeature = (field: "motoFeatures" | "boatFeatures" | "trailerFeatures", feature: string) => {
     setSearchCriteria((prev) => {
       const current = prev[field];
       const updated = current.includes(feature)
@@ -862,8 +876,14 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         if (searchCriteria.heavyEuroStandard) query.euroStandard = searchCriteria.heavyEuroStandard;
       }
       if (isMotoCategory) {
+        if (searchCriteria.motoCategory) query.motoCategory = searchCriteria.motoCategory;
+        if (searchCriteria.motoCoolingType) query.motoCoolingType = searchCriteria.motoCoolingType;
+        if (searchCriteria.motoEngineKind) query.motoEngineKind = searchCriteria.motoEngineKind;
         if (searchCriteria.motoDisplacementFrom) query.displacementFrom = searchCriteria.motoDisplacementFrom;
         if (searchCriteria.motoDisplacementTo) query.displacementTo = searchCriteria.motoDisplacementTo;
+        if (searchCriteria.motoFeatures.length > 0) {
+          query.motoFeatures = searchCriteria.motoFeatures.join(",");
+        }
       }
       appendExtendedListingFilters();
 
@@ -1078,6 +1098,9 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       heavyLoadFrom: "",
       heavyLoadTo: "",
       heavyEuroStandard: "",
+      motoCategory: "",
+      motoCoolingType: "",
+      motoEngineKind: "",
       motoDisplacementFrom: "",
       motoDisplacementTo: "",
       forkliftLoadFrom: "",
@@ -1117,6 +1140,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       trailerAxlesFrom: "",
       trailerAxlesTo: "",
       buyServiceCategory: "",
+      motoFeatures: [],
       boatFeatures: [],
       trailerFeatures: [],
     });
@@ -1245,6 +1269,25 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
+    }
+    .adv-feature-groups {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    .adv-feature-group {
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 10px;
+      background: #f8fafc;
+    }
+    .adv-feature-group-title {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #0f172a;
+      margin-bottom: 8px;
     }
     .adv-chip {
       display: inline-flex;
@@ -1771,6 +1814,24 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                 )}
               </div>
             </div>
+
+            {isMotoCategory && (
+              <div className="adv-field">
+                <label className="adv-label">КАТЕГОРИЯ</label>
+                <select
+                  value={searchCriteria.motoCategory}
+                  onChange={(e) => handleInputChange("motoCategory", e.target.value)}
+                  className="adv-select"
+                >
+                  <option value="">Всички категории</option>
+                  {MOTO_CATEGORY_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="adv-field">
               <label className="adv-label">НАМИРА СЕ В</label>
@@ -3067,6 +3128,62 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                             </option>
                           ))}
                         </select>
+                      </div>
+                      <div className="adv-field">
+                        <label className="adv-label">ВИД ОХЛАЖДАНЕ</label>
+                        <select
+                          value={searchCriteria.motoCoolingType}
+                          onChange={(e) => handleInputChange("motoCoolingType", e.target.value)}
+                          className="adv-select"
+                        >
+                          <option value="">Без значение</option>
+                          {MOTO_COOLING_TYPE_OPTIONS.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="adv-field">
+                        <label className="adv-label">ВИД ДВИГАТЕЛ</label>
+                        <select
+                          value={searchCriteria.motoEngineKind}
+                          onChange={(e) => handleInputChange("motoEngineKind", e.target.value)}
+                          className="adv-select"
+                        >
+                          <option value="">Без значение</option>
+                          {MOTO_ENGINE_KIND_OPTIONS.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="adv-field" style={{ gridColumn: "1 / -1" }}>
+                        <label className="adv-label">ЕКСТРИ</label>
+                        <div className="adv-feature-groups">
+                          {MOTO_FEATURE_GROUPS.map((group) => (
+                            <div key={group.key} className="adv-feature-group">
+                              <div className="adv-feature-group-title">{group.title}</div>
+                              <div className="adv-chips-row">
+                                {group.items.map((feature) => (
+                                  <label
+                                    key={feature}
+                                    className={`adv-chip ${searchCriteria.motoFeatures.includes(feature) ? "adv-chip--active" : ""}`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={searchCriteria.motoFeatures.includes(feature)}
+                                      onChange={() => toggleFeature("motoFeatures", feature)}
+                                      style={{ display: "none" }}
+                                    />
+                                    {feature}
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </>
                   )}
