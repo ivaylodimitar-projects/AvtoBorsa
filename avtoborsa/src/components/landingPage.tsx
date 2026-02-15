@@ -1,10 +1,14 @@
-﻿import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { CAR_FEATURES } from "../constants/carFeatures";
 import { AdvancedSearch } from "./AdvancedSearch";
 import { useRecentSearches } from "../hooks/useRecentSearches";
 import { useSavedSearches } from "../hooks/useSavedSearches";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
+import {
+  readLatestListingsCache,
+  writeLatestListingsCache,
+} from "../utils/latestListingsCache";
 import { CAR_BRANDS, CAR_MODELS } from "../constants/carBrandModels";
 import { APP_MAIN_CATEGORY_OPTIONS, getMainCategoryLabel } from "../constants/mobileBgData";
 import { formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
@@ -42,10 +46,12 @@ type CarListing = {
   gearbox_display?: string;
   power: number;
   city: string;
+  location_region?: string;
+  location_country?: string;
   image_url?: string;
   is_active: boolean;
   created_at: string;
-  listing_type?: "top" | "normal" | string | number;
+  listing_type?: "top" | "vip" | "normal" | string | number;
   listing_type_display?: string;
   is_top?: boolean;
   is_top_listing?: boolean;
@@ -69,9 +75,18 @@ const isTopListing = (listing: CarListing) => {
   return display.includes("топ");
 };
 
+const isVipListing = (listing: CarListing) => {
+  if (isTopListing(listing)) return false;
+  const numericType = Number(listing.listing_type);
+  if (!Number.isNaN(numericType) && numericType === 2) return true;
+  const rawType = (listing.listing_type || "").toString().toLowerCase().trim();
+  if (rawType === "vip") return true;
+  const display = (listing.listing_type_display || "").toString().toLowerCase();
+  return display.includes("vip");
+};
+
 const NEW_LISTING_BADGE_MINUTES = 10;
 const NEW_LISTING_BADGE_WINDOW_MS = NEW_LISTING_BADGE_MINUTES * 60 * 1000;
-let latestListingsTabCache: CarListing[] | null = null;
 
 type Fuel = "Бензин" | "Дизел" | "Газ/Бензин" | "Хибрид" | "Електро";
 type Gearbox = "Ръчна" | "Автоматик";
@@ -158,51 +173,88 @@ export default function LandingPage() {
   const { searches } = useRecentSearches();
   const { savedSearches } = useSavedSearches();
   const getImageUrl = useImageUrl();
+  const initialLatestListingsRef = useRef<CarListing[] | null>(
+    readLatestListingsCache<CarListing>()
+  );
 
   // Latest listings
   const [latestListings, setLatestListings] = useState<CarListing[]>(
-    () => latestListingsTabCache ?? []
+    () => initialLatestListingsRef.current ?? []
   );
   const [listingsLoading, setListingsLoading] = useState(
-    () => latestListingsTabCache === null
+    () => initialLatestListingsRef.current === null
   );
 
   useEffect(() => {
     const controller = new AbortController();
+    const cachedLatestListings = initialLatestListingsRef.current;
 
-    if (latestListingsTabCache !== null) {
-      setLatestListings(latestListingsTabCache);
+    if (cachedLatestListings) {
+      setLatestListings(cachedLatestListings);
       setListingsLoading(false);
-      return () => controller.abort();
     }
+
+    const parseListingPayload = (payload: unknown): CarListing[] => {
+      if (Array.isArray(payload)) return payload as CarListing[];
+      if (
+        payload &&
+        typeof payload === "object" &&
+        Array.isArray((payload as { results?: unknown[] }).results)
+      ) {
+        return (payload as { results: CarListing[] }).results;
+      }
+      return [];
+    };
 
     const fetchLatest = async () => {
       try {
-        setListingsLoading(true);
-        const latestResponse = await fetch(
-          "http://localhost:8000/api/listings/latest/",
-          { signal: controller.signal }
-        );
-
-        let latest: CarListing[] = [];
-        if (latestResponse.ok) {
-          const latestData = await latestResponse.json();
-          latest = Array.isArray(latestData) ? latestData : [];
-        } else {
-          const fallbackResponse = await fetch(
-            "http://localhost:8000/api/listings/?page=1&page_size=16&lite=1",
-            { signal: controller.signal }
-          );
-          if (!fallbackResponse.ok) throw new Error("Failed to fetch latest listings");
-          const fallbackData = await fallbackResponse.json();
-          const fallbackListings: CarListing[] = Array.isArray(fallbackData)
-            ? fallbackData
-            : (fallbackData.results || []);
-          latest = fallbackListings.slice(0, 16);
+        if (!cachedLatestListings) {
+          setListingsLoading(true);
         }
 
-        setLatestListings(latest);
-        latestListingsTabCache = latest;
+        const [latestResponse, fallbackResponse] = await Promise.all([
+          fetch("http://localhost:8000/api/listings/latest/", { signal: controller.signal }),
+          fetch(
+            `http://localhost:8000/api/listings/?page=1&page_size=24&lite=1&sortBy=newest&_ts=${Date.now()}`,
+            {
+              signal: controller.signal,
+            }
+          ),
+        ]);
+
+        let latestFromDedicated: CarListing[] = [];
+        if (latestResponse.ok) {
+          const latestData = await latestResponse.json();
+          latestFromDedicated = parseListingPayload(latestData);
+        }
+
+        let latestFromFallback: CarListing[] = [];
+        if (fallbackResponse.ok) {
+          const fallbackData = await fallbackResponse.json();
+          latestFromFallback = parseListingPayload(fallbackData);
+        }
+
+        const latest = [...latestFromDedicated, ...latestFromFallback];
+
+        if (latest.length === 0) {
+          throw new Error("Failed to fetch latest listings");
+        }
+
+        const deduped = Array.from(
+          new Map(latest.map((listing) => [listing.id, listing])).values()
+        );
+        deduped.sort((a, b) => {
+          const aTime = new Date(a.created_at || "").getTime();
+          const bTime = new Date(b.created_at || "").getTime();
+          if (!Number.isFinite(aTime) && !Number.isFinite(bTime)) return 0;
+          if (!Number.isFinite(aTime)) return 1;
+          if (!Number.isFinite(bTime)) return -1;
+          return bTime - aTime;
+        });
+
+        const latestNormalized = deduped.slice(0, 16);
+        setLatestListings(latestNormalized);
+        writeLatestListingsCache(latestNormalized);
       } catch (err) {
         if (!controller.signal.aborted) {
           console.error("Error fetching latest listings:", err);
@@ -308,6 +360,16 @@ export default function LandingPage() {
     if (diffHours > 0) return `преди ${diffHours} ${diffHours === 1 ? "час" : "часа"}`;
     if (diffMins > 0) return `преди ${diffMins} мин`;
     return "току-що";
+  };
+
+  const getListingLocationLabel = (listing: CarListing) => {
+    const city = (listing.city || "").toString().trim();
+    if (city) return city;
+    const region = (listing.location_region || "").toString().trim();
+    if (region) return region;
+    const country = (listing.location_country || "").toString().trim();
+    if (country) return country;
+    return "Непосочен";
   };
 
   const getLatestListingMeta = (listing: CarListing) => {
@@ -883,6 +945,21 @@ export default function LandingPage() {
               box-shadow: 0 4px 10px rgba(5,150,105,0.35);
               z-index: 2;
             }
+            .listing-vip-badge {
+              position: absolute;
+              top: 10px;
+              left: 10px;
+              background: linear-gradient(135deg, #0ea5e9, #0284c7);
+              color: #fff;
+              padding: 4px 10px;
+              border-radius: 999px;
+              font-size: 11px;
+              font-weight: 700;
+              letter-spacing: 0.3px;
+              text-transform: uppercase;
+              box-shadow: 0 4px 10px rgba(2,132,199,0.3);
+              z-index: 2;
+            }
             .latest-grid {
               display: grid;
               grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -923,10 +1000,11 @@ export default function LandingPage() {
                 <div className="latest-grid">
                 {latestListings.map((listing, index) => {
                   const isTop = isTopListing(listing);
+                  const isVip = isVipListing(listing);
                   const isNew = isListingNew(listing.created_at);
                   const isAboveFold = index < 4;
                   const listingMeta = getLatestListingMeta(listing);
-                  const showCityInFooter = (listing.main_category || "").toString() !== "1";
+                  const locationLabel = getListingLocationLabel(listing);
                   const listingImageUrl = listing.image_url ? getImageUrl(listing.image_url) : "";
                   const priceChange = listing.price_change || null;
                   const deltaRaw = priceChange?.delta;
@@ -945,7 +1023,7 @@ export default function LandingPage() {
                       style={{
                         borderRadius: 10,
                         overflow: "hidden",
-                        border: isTop ? "#dc2626" : "1px solid #eef2f7",
+                        border: "1px solid #eef2f7",
                         background: "linear-gradient(rgb(248, 250, 252) 0%, rgb(241, 245, 249) 100%)",
                         boxShadow: "0 2px 8px rgba(15,23,42,0.06)",
                         display: "flex",
@@ -959,10 +1037,11 @@ export default function LandingPage() {
                       {/* Image */}
                       <div style={{ position: "relative", height: 170, background: "#f0f0f0", overflow: "hidden" }}>
                         {isTop && <div className="listing-top-badge">TOP</div>}
+                        {isVip && <div className="listing-vip-badge">VIP</div>}
                         {isNew && (
                           <div
                             className="listing-new-badge"
-                            style={{ top: isTop ? 38 : 10 }}
+                            style={{ top: isTop || isVip ? 38 : 10 }}
                           >
                             Нова
                           </div>
@@ -1020,21 +1099,20 @@ export default function LandingPage() {
                         <div
                           style={{
                             position: "absolute",
-                            right: 12,
-                            bottom: 12,
-                            padding: "3px 6px",
-                            borderRadius: 14,
-                            background: "linear-gradient(rgb(248, 250, 252) 0%, rgb(241, 245, 249) 100%)",
-                            color: "#000",
-                            fontSize: 14,
+                            right: 0,
+                            bottom: 0,
+                            padding: "8px 12px 7px 14px",
+                            borderTop: "1px solid #e2e8f0",
+                            borderLeft: "1px solid #e2e8f0",
+                            borderTopLeftRadius: 12,
+                            background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+                            color: "#0f172a",
+                            fontSize: 17,
                             fontWeight: 800,
-                            border: "1px solid rgb(224, 224, 224)",
-                            boxShadow: "rgba(0, 0, 0, 0.12) 0px 2px 6px",
+                            letterSpacing: 0.2,
+                            boxShadow: "0 2px 8px rgba(15, 23, 42, 0.08)",
                             zIndex: 2,
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "flex-end",
-                            gap: 4,
+                            lineHeight: 1,
                           }}
                         >
                           <span>{listing.price.toLocaleString("bg-BG")} €</span>
@@ -1056,16 +1134,14 @@ export default function LandingPage() {
                             ))}
                           </div>
                         )}
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: showCityInFooter ? "space-between" : "flex-end", fontSize: 12, color: "#9ca3af", marginTop: "auto" }}>
-                          {showCityInFooter && (
-                            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                                <circle cx="12" cy="10" r="3" />
-                              </svg>
-                              {listing.city}
-                            </span>
-                          )}
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12, color: "#9ca3af", marginTop: "auto" }}>
+                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                              <circle cx="12" cy="10" r="3" />
+                            </svg>
+                            {locationLabel}
+                          </span>
                           <span style={{ display: "flex", alignItems: "center", gap: 4, color: "#d97706" }}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <circle cx="12" cy="12" r="10" />
@@ -1804,5 +1880,6 @@ const globalCss = `
     }
   }
 `;
+
 
 

@@ -51,7 +51,7 @@ LISTINGS_PUBLIC_STALE_SECONDS = 120
 TOP_DEMOTION_MIN_INTERVAL_SECONDS = 60
 TOP_DEMOTION_LOCK_KEY = "listings:demote-expired-top:lock"
 LATEST_LISTINGS_CACHE_SECONDS = 30
-LATEST_LISTINGS_CACHE_KEY = "listings:latest:v3"
+LATEST_LISTINGS_CACHE_KEY = "listings:latest:v4"
 
 
 class ListingsPagination(PageNumberPagination):
@@ -80,6 +80,10 @@ def _demote_expired_top_listings():
     if not cache.add(TOP_DEMOTION_LOCK_KEY, 1, TOP_DEMOTION_MIN_INTERVAL_SECONDS):
         return 0
     return CarListing.demote_expired_top_listings()
+
+
+def _invalidate_latest_listings_cache():
+    cache.delete(LATEST_LISTINGS_CACHE_KEY)
 
 
 def _normalize_vip_plan(raw_plan):
@@ -927,6 +931,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
                         "vip_expires_at",
                     ]
                 )
+        _invalidate_latest_listings_cache()
 
     def perform_update(self, serializer):
         """Update listing - only owner can update"""
@@ -1015,12 +1020,14 @@ class CarListingViewSet(viewsets.ModelViewSet):
                         "vip_expires_at",
                     ]
                 )
+        _invalidate_latest_listings_cache()
 
     def perform_destroy(self, instance):
         """Delete listing - only owner can delete"""
         if instance.user != self.request.user:
             raise PermissionError("You can only delete your own listings")
         instance.delete()
+        _invalidate_latest_listings_cache()
 
 
 @api_view(['GET'])
@@ -1084,6 +1091,7 @@ def archive_listing(request, listing_id):
     listing.is_archived = True
     listing.is_active = False
     listing.save()
+    _invalidate_latest_listings_cache()
     serializer = CarListingSerializer(listing)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -1097,6 +1105,7 @@ def unarchive_listing(request, listing_id):
     listing.is_active = True
     listing.created_at = timezone.now()
     listing.save()
+    _invalidate_latest_listings_cache()
     serializer = CarListingSerializer(listing)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -1107,6 +1116,7 @@ def delete_listing(request, listing_id):
     """Delete a listing"""
     listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
     listing.delete()
+    _invalidate_latest_listings_cache()
     return Response(
         {
             'message': 'Listing deleted successfully'},
@@ -1157,6 +1167,7 @@ def republish_listing(request, listing_id):
             _clear_vip_listing_window(listing)
 
         listing.save()
+    _invalidate_latest_listings_cache()
 
     serializer = CarListingSerializer(listing, context={'request': request})
     return Response(serializer.data, status=status.HTTP_200_OK)
@@ -1214,6 +1225,7 @@ def update_listing_type(request, listing_id):
             _clear_vip_listing_window(listing)
 
         listing.save()
+    _invalidate_latest_listings_cache()
 
     serializer = CarListingSerializer(listing, context={'request': request})
     return Response(serializer.data, status=status.HTTP_200_OK)
@@ -1235,6 +1247,7 @@ def upload_listing_images(request, listing_id):
             order=index,
             is_cover=is_cover
         )
+    _invalidate_latest_listings_cache()
 
     return Response(
         {'message': f'{len(images)} images uploaded successfully'},
@@ -1271,6 +1284,7 @@ def update_listing_images(request, listing_id):
     CarImage.objects.filter(listing=listing).exclude(
         id__in=[img.get('id') for img in images_data if img.get('is_cover')]
     ).update(is_cover=False)
+    _invalidate_latest_listings_cache()
 
     serializer = CarImageSerializer(
         listing.images.all(),
@@ -1368,11 +1382,6 @@ def latest_listings(request):
         )
         .select_related('parts_details')
         .annotate(
-            top_rank=Case(
-                When(listing_type='top', then=Value(0)),
-                default=Value(1),
-                output_field=IntegerField(),
-            ),
             first_image=Coalesce(
                 Subquery(first_thumbnail_subquery),
                 Subquery(first_image_subquery),
@@ -1385,7 +1394,7 @@ def latest_listings(request):
             'fuel', 'power', 'city', 'created_at', 'listing_type',
             'parts_details__part_for', 'parts_details__part_element'
         )
-        .order_by('top_rank', '-created_at')[:16]
+        .order_by('-created_at')[:16]
     )
 
     payload = CarListingLiteSerializer(queryset, many=True, context={'request': request}).data

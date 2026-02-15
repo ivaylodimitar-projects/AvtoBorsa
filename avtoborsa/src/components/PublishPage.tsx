@@ -13,6 +13,8 @@ import {
   FiTag,
 } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
+import { invalidateMyAdsCache } from "../utils/myAdsCache";
+import { invalidateLatestListingsCache } from "../utils/latestListingsCache";
 import { BULGARIAN_CITIES_BY_REGION } from "../constants/bulgarianCities";
 import ListingFormStepper from "./ListingFormStepper";
 import AdvancedImageUpload from "./AdvancedImageUpload";
@@ -1147,6 +1149,40 @@ interface ImageItem {
   isCover: boolean;
 }
 
+const buildImageFingerprint = (file: File) =>
+  [file.name.trim().toLowerCase(), file.size, file.lastModified, file.type].join("::");
+
+const dedupeImageItems = (items: ImageItem[]) => {
+  const seen = new Set<string>();
+  let removedCount = 0;
+  let hasCover = false;
+
+  const uniqueImages = items
+    .filter((item) => {
+      const fingerprint = buildImageFingerprint(item.file);
+      if (seen.has(fingerprint)) {
+        removedCount += 1;
+        return false;
+      }
+      seen.add(fingerprint);
+      return true;
+    })
+    .map((item) => {
+      if (item.isCover && !hasCover) {
+        hasCover = true;
+        return item;
+      }
+      if (!item.isCover) return item;
+      return { ...item, isCover: false };
+    });
+
+  if (!hasCover && uniqueImages.length > 0) {
+    uniqueImages[0] = { ...uniqueImages[0], isCover: true };
+  }
+
+  return { uniqueImages, removedCount };
+};
+
 const PublishPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -1161,6 +1197,7 @@ const PublishPage: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [loadingListing, setLoadingListing] = useState(false);
+  const [redirectingAfterPublish, setRedirectingAfterPublish] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
@@ -1326,6 +1363,17 @@ const PublishPage: React.FC = () => {
 
   const initialFormSnapshotRef = useRef<string | null>(null);
   const [images, setImages] = useState<ImageItem[]>([]);
+  const handleImagesChange = (nextImages: ImageItem[]) => {
+    const { uniqueImages, removedCount } = dedupeImageItems(nextImages);
+    if (removedCount > 0) {
+      const duplicateLabel = removedCount === 1 ? "дублирана снимка" : "дублирани снимки";
+      setToast({
+        message: `Премахнати са ${removedCount} ${duplicateLabel}.`,
+        type: "error",
+      });
+    }
+    setImages(uniqueImages);
+  };
   const [currentStep, setCurrentStep] = useState(1);
   const formRef = useRef<HTMLFormElement>(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -2272,6 +2320,7 @@ const PublishPage: React.FC = () => {
     }
 
     setLoading(true);
+    setRedirectingAfterPublish(false);
 
     try {
       const formDataToSend = new FormData();
@@ -2615,29 +2664,22 @@ const PublishPage: React.FC = () => {
         });
       }
 
-      setToast({
-        message: isEditMode
-          ? "Промените са запазени успешно!"
-          : "Обявата е успешно публикувана!",
-        type: "success",
+      invalidateMyAdsCache(user?.id);
+      invalidateLatestListingsCache();
+      setRedirectingAfterPublish(true);
+      navigate("/my-ads", {
+        replace: true,
+        state: {
+          forceRefresh: true,
+          publishedListingId: savedListing?.id ?? null,
+          publishMessage: isEditMode
+            ? "Промените са запазени успешно!"
+            : "Обявата е успешно публикувана!",
+        },
       });
-
-      if (!isEditMode) {
-        setFormData({
-          ...createInitialFormData(),
-          email: user?.email || "",
-        });
-        setImages([]);
-      } else {
-        setImages([]);
-        setExistingCoverImage(savedListing.image_url || existingCoverImage);
-        initialFormSnapshotRef.current = normalizeFormSnapshot(formData);
-      }
-
-      setTimeout(() => {
-        navigate("/my-ads");
-      }, 2000);
+      return;
     } catch (error) {
+      setRedirectingAfterPublish(false);
       const message = error instanceof Error ? error.message : "Грешка при изпращане на обявата";
       setErrors({ submit: message });
       console.error("Error submitting listing:", error);
@@ -2775,7 +2817,7 @@ const PublishPage: React.FC = () => {
       fontSize: 14,
       fontFamily: "inherit",
       minHeight: 120,
-      resize: "vertical",
+      resize: "none",
       width: "100%",
       boxSizing: "border-box",
       background: "#fff",
@@ -3094,6 +3136,9 @@ const PublishPage: React.FC = () => {
 
     .listing-type-card {
       position: relative;
+      display: grid;
+      gap: 8px;
+      align-content: start;
       border-radius: 14px;
       border: 1px solid var(--border);
       padding: 16px;
@@ -3112,9 +3157,10 @@ const PublishPage: React.FC = () => {
     }
 
     .listing-type-card input {
-      position: absolute;
-      opacity: 0;
-      pointer-events: none;
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      accent-color: #0f766e;
     }
 
     .listing-type-title {
@@ -3128,6 +3174,79 @@ const PublishPage: React.FC = () => {
       font-size: 12px;
       color: var(--muted);
       margin: 0;
+    }
+
+    .listing-type-price {
+      margin-top: 2px;
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: #ecfdf5;
+      color: #0f766e;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .listing-plan-wrap {
+      margin-top: 16px;
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+    }
+
+    .listing-plan-label {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 700;
+      color: #334155;
+    }
+
+    .listing-plan-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+    }
+
+    .listing-plan-card {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    .listing-plan-card:hover {
+      transform: translateY(-1px);
+    }
+
+    .listing-plan-card.is-selected {
+      border-color: #0f766e;
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
+      background: #ecfdf5;
+    }
+
+    .listing-plan-card input[type="radio"] {
+      width: 16px;
+      height: 16px;
+      margin: 0;
+      accent-color: #0f766e;
+    }
+
+    .listing-plan-text {
+      font-size: 13px;
+      color: #0f172a;
+      font-weight: 600;
+      line-height: 1.4;
     }
 
     .publish-form input:not([type="checkbox"]):not([type="file"]),
@@ -3333,6 +3452,59 @@ const PublishPage: React.FC = () => {
     }
   `;
 
+  const showPublishLoadingScreen = loading || redirectingAfterPublish;
+  const publishLoadingMessage = redirectingAfterPublish
+    ? "Пренасочваме към Моите обяви..."
+    : isEditMode
+      ? "Запазваме промените..."
+      : "Публикуваме обявата...";
+
+  if (showPublishLoadingScreen) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          background: "linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%)",
+          padding: 20,
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 420,
+            background: "#ffffff",
+            border: "1px solid #e2e8f0",
+            borderRadius: 14,
+            boxShadow: "0 16px 32px rgba(15, 23, 42, 0.12)",
+            padding: "28px 24px",
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: "50%",
+              border: "3px solid #ccfbf1",
+              borderTopColor: "#0f766e",
+              margin: "0 auto 14px",
+              animation: "publish-spin 1s linear infinite",
+            }}
+          />
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#0f172a" }}>
+            {publishLoadingMessage}
+          </h2>
+          <p style={{ margin: "10px 0 0", fontSize: 13, color: "#475569" }}>
+            Моля, изчакайте.
+          </p>
+        </div>
+        <style>{`@keyframes publish-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.page} className="publish-page">
       <style>{css}</style>
@@ -3421,7 +3593,11 @@ const PublishPage: React.FC = () => {
                   </span>
                 </p>
               )}
-              <AdvancedImageUpload images={images} onImagesChange={setImages} maxImages={15} />
+              <AdvancedImageUpload
+                images={images}
+                onImagesChange={handleImagesChange}
+                maxImages={15}
+              />
             </div>
           )}
 
@@ -5160,8 +5336,9 @@ const PublishPage: React.FC = () => {
                   <p className="listing-type-desc">
                     Приоритетна видимост и изкарване по-напред в резултатите.
                   </p>
-                  <p className="listing-type-desc" style={{ marginTop: 8, fontWeight: 700 }}>
-                    Цена:{" "}
+                  <p className="listing-type-price">
+                    Цена:
+                    {" "}
                     {formData.topPlan === "7d"
                       ? `${TOP_LISTING_PRICE_7D_EUR.toFixed(2)} EUR`
                       : `${TOP_LISTING_PRICE_1D_EUR.toFixed(2)} EUR`}
@@ -5184,8 +5361,9 @@ const PublishPage: React.FC = () => {
                   <p className="listing-type-desc">
                     Визуално открояване с VIP етикет (без приоритет в класирането).
                   </p>
-                  <p className="listing-type-desc" style={{ marginTop: 8, fontWeight: 700 }}>
-                    Цена:{" "}
+                  <p className="listing-type-price">
+                    Цена:
+                    {" "}
                     {formData.vipPlan === "lifetime"
                       ? `${VIP_LISTING_PRICE_LIFETIME_EUR.toFixed(2)} EUR`
                       : `${VIP_LISTING_PRICE_7D_EUR.toFixed(2)} EUR`}
@@ -5194,24 +5372,15 @@ const PublishPage: React.FC = () => {
               </div>
 
               {formData.listingType === "top" && (
-                <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
-                  <label style={{ fontSize: 13, fontWeight: 700, color: "#334155" }}>
+                <div className="listing-plan-wrap">
+                  <p className="listing-plan-label">
                     TOP пакет
-                  </label>
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  </p>
+                  <div className="listing-plan-grid">
                     <label
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        padding: "8px 10px",
-                        borderRadius: 10,
-                        border: "1px solid #e2e8f0",
-                        background: "#fff",
-                        cursor: "pointer",
-                        fontSize: 13,
-                        fontWeight: 600,
-                      }}
+                      className={`listing-plan-card ${
+                        formData.topPlan === "1d" ? "is-selected" : ""
+                      }`}
                     >
                       <input
                         type="radio"
@@ -5222,21 +5391,14 @@ const PublishPage: React.FC = () => {
                           updateFormField("topPlan", e.target.value as PublishFormData["topPlan"])
                         }
                       />
-                      1 ден ({TOP_LISTING_PRICE_1D_EUR.toFixed(2)} EUR)
+                      <span className="listing-plan-text">
+                        1 ден ({TOP_LISTING_PRICE_1D_EUR.toFixed(2)} EUR)
+                      </span>
                     </label>
                     <label
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        padding: "8px 10px",
-                        borderRadius: 10,
-                        border: "1px solid #e2e8f0",
-                        background: "#fff",
-                        cursor: "pointer",
-                        fontSize: 13,
-                        fontWeight: 600,
-                      }}
+                      className={`listing-plan-card ${
+                        formData.topPlan === "7d" ? "is-selected" : ""
+                      }`}
                     >
                       <input
                         type="radio"
@@ -5247,31 +5409,24 @@ const PublishPage: React.FC = () => {
                           updateFormField("topPlan", e.target.value as PublishFormData["topPlan"])
                         }
                       />
-                      7 дни ({TOP_LISTING_PRICE_7D_EUR.toFixed(2)} EUR)
+                      <span className="listing-plan-text">
+                        7 дни ({TOP_LISTING_PRICE_7D_EUR.toFixed(2)} EUR)
+                      </span>
                     </label>
                   </div>
                 </div>
               )}
 
               {formData.listingType === "vip" && (
-                <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
-                  <label style={{ fontSize: 13, fontWeight: 700, color: "#334155" }}>
+                <div className="listing-plan-wrap">
+                  <p className="listing-plan-label">
                     VIP пакет
-                  </label>
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  </p>
+                  <div className="listing-plan-grid">
                     <label
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        padding: "8px 10px",
-                        borderRadius: 10,
-                        border: "1px solid #e2e8f0",
-                        background: "#fff",
-                        cursor: "pointer",
-                        fontSize: 13,
-                        fontWeight: 600,
-                      }}
+                      className={`listing-plan-card ${
+                        formData.vipPlan === "7d" ? "is-selected" : ""
+                      }`}
                     >
                       <input
                         type="radio"
@@ -5282,21 +5437,14 @@ const PublishPage: React.FC = () => {
                           updateFormField("vipPlan", e.target.value as PublishFormData["vipPlan"])
                         }
                       />
-                      7 дни ({VIP_LISTING_PRICE_7D_EUR.toFixed(2)} EUR)
+                      <span className="listing-plan-text">
+                        7 дни ({VIP_LISTING_PRICE_7D_EUR.toFixed(2)} EUR)
+                      </span>
                     </label>
                     <label
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        padding: "8px 10px",
-                        borderRadius: 10,
-                        border: "1px solid #e2e8f0",
-                        background: "#fff",
-                        cursor: "pointer",
-                        fontSize: 13,
-                        fontWeight: 600,
-                      }}
+                      className={`listing-plan-card ${
+                        formData.vipPlan === "lifetime" ? "is-selected" : ""
+                      }`}
                     >
                       <input
                         type="radio"
@@ -5307,7 +5455,9 @@ const PublishPage: React.FC = () => {
                           updateFormField("vipPlan", e.target.value as PublishFormData["vipPlan"])
                         }
                       />
-                      До изтичане на обявата ({VIP_LISTING_PRICE_LIFETIME_EUR.toFixed(2)} EUR)
+                      <span className="listing-plan-text">
+                        До изтичане на обявата ({VIP_LISTING_PRICE_LIFETIME_EUR.toFixed(2)} EUR)
+                      </span>
                     </label>
                   </div>
                 </div>

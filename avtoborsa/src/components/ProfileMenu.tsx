@@ -16,6 +16,7 @@ import { useToast } from "../context/ToastContext";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 const STRIPE_SESSION_STORAGE_KEY = "stripe_checkout_session_id";
+const PAYMENT_SYNC_MIN_MS = 650;
 
 const ProfileMenu: React.FC = () => {
   const { user, updateBalance } = useAuth();
@@ -27,6 +28,8 @@ const ProfileMenu: React.FC = () => {
   const [hoveredIcon, setHoveredIcon] = useState(false);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [isPaymentSyncing, setIsPaymentSyncing] = useState(false);
+  const processedPaymentKeyRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -34,36 +37,50 @@ const ProfileMenu: React.FC = () => {
 
     const params = new URLSearchParams(location.search);
     const paymentState = params.get("payment");
-    if (!paymentState) return;
+    if (!paymentState) {
+      processedPaymentKeyRef.current = null;
+      return;
+    }
 
     const token = localStorage.getItem("authToken");
     if (!token) return;
 
+    const sessionId = params.get("session_id") || localStorage.getItem(STRIPE_SESSION_STORAGE_KEY) || "";
+    const paymentKey = `${paymentState}:${sessionId || "no-session"}`;
+    if (processedPaymentKeyRef.current === paymentKey) return;
+    processedPaymentKeyRef.current = paymentKey;
+
     const clearPaymentQueryParams = () => {
-      navigate(location.pathname, { replace: true });
+      navigate({ pathname: location.pathname, hash: location.hash }, { replace: true });
     };
 
     const clearStoredSessionId = () => {
       localStorage.removeItem(STRIPE_SESSION_STORAGE_KEY);
     };
 
-    if (paymentState === "cancelled") {
-      clearStoredSessionId();
-      showToast("Payment was cancelled.", { type: "info" });
-      clearPaymentQueryParams();
-      return;
-    }
-
-    if (paymentState !== "success") {
-      clearStoredSessionId();
-      clearPaymentQueryParams();
-      return;
-    }
-
-    const sessionId = params.get("session_id") || localStorage.getItem(STRIPE_SESSION_STORAGE_KEY);
+    const applyMinimumSyncDuration = async (startedAt: number) => {
+      const elapsed = Date.now() - startedAt;
+      if (elapsed >= PAYMENT_SYNC_MIN_MS) return;
+      await new Promise((resolve) => setTimeout(resolve, PAYMENT_SYNC_MIN_MS - elapsed));
+    };
 
     const syncBalanceAfterPayment = async () => {
+      const startedAt = Date.now();
+      setIsPaymentSyncing(true);
+
       try {
+        if (paymentState === "cancelled") {
+          showToast("Плащането беше отменено.", { type: "info" });
+          return;
+        }
+
+        if (paymentState !== "success") {
+          return;
+        }
+
+        let paymentStatus: string | null = null;
+        let nextBalance: number | null = null;
+
         if (sessionId) {
           const statusResponse = await fetch(
             `${API_BASE_URL}/api/payments/session-status/?session_id=${encodeURIComponent(sessionId)}`,
@@ -71,48 +88,73 @@ const ProfileMenu: React.FC = () => {
               headers: { Authorization: `Bearer ${token}` },
             }
           );
-
           if (statusResponse.ok) {
             const statusData = await statusResponse.json();
+            paymentStatus = typeof statusData.status === "string" ? statusData.status : null;
             if (typeof statusData.balance === "number") {
-              updateBalance(statusData.balance);
+              nextBalance = statusData.balance;
             }
+          }
+        }
 
-            if (statusData.status === "succeeded") {
-              showToast("Balance updated successfully.", { type: "success" });
-            } else if (statusData.status === "pending") {
-              showToast("Payment is processing. Balance will update shortly.", { type: "info" });
-            } else if (statusData.status === "failed" || statusData.status === "cancelled") {
-              showToast("Payment was not completed.", { type: "error" });
-            } else {
-              showToast("Payment status received.", { type: "info" });
+        if (nextBalance === null) {
+          const meResponse = await fetch(`${API_BASE_URL}/api/auth/me/`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (meResponse.ok) {
+            const meData = await meResponse.json();
+            if (typeof meData.balance === "number") {
+              nextBalance = meData.balance;
             }
+          }
+        }
 
+        if (typeof nextBalance === "number") {
+          const previousBalance =
+            typeof user.balance === "number" && Number.isFinite(user.balance) ? user.balance : null;
+          updateBalance(nextBalance);
+
+          if (paymentStatus === "pending") {
+            showToast("Плащането се обработва. Балансът ще се обнови автоматично.", { type: "info" });
             return;
           }
-        }
 
-        const meResponse = await fetch(`${API_BASE_URL}/api/auth/me/`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (meResponse.ok) {
-          const meData = await meResponse.json();
-          if (typeof meData.balance === "number") {
-            updateBalance(meData.balance);
+          if (paymentStatus === "failed" || paymentStatus === "cancelled") {
+            showToast("Плащането не беше завършено успешно.", { type: "error" });
+            return;
           }
+
+          if (previousBalance !== null && nextBalance > previousBalance) {
+            const delta = nextBalance - previousBalance;
+            showToast(
+              `Балансът е обновен: €${nextBalance.toFixed(2)} (+€${delta.toFixed(2)}).`,
+              { type: "success" }
+            );
+            return;
+          }
+
+          showToast(`Балансът е обновен: €${nextBalance.toFixed(2)}.`, { type: "success" });
+          return;
         }
 
-        showToast("Payment completed.", { type: "success" });
+        if (paymentStatus === "pending") {
+          showToast("Плащането се обработва. Балансът ще се обнови автоматично.", { type: "info" });
+          return;
+        }
+
+        showToast("Плащането е потвърдено. Обновяваме баланса.", { type: "info" });
       } catch {
-        showToast("Payment completed. Balance refresh failed.", { type: "info" });
+        showToast("Плащането е завършено, но балансът не се обнови веднага.", { type: "info" });
       } finally {
+        await applyMinimumSyncDuration(startedAt);
+        setIsPaymentSyncing(false);
         clearStoredSessionId();
         clearPaymentQueryParams();
       }
     };
 
     syncBalanceAfterPayment();
-  }, [location.pathname, location.search, navigate, showToast, updateBalance, user]);
+  }, [location.hash, location.pathname, location.search, navigate, showToast, updateBalance, user]);
 
   // Fetch profile image for current user
   useEffect(() => {
@@ -508,7 +550,7 @@ const ProfileMenu: React.FC = () => {
                       €{balance.toFixed(2)}
                     </div>
                     <div style={styles.balanceSubtext}>
-                      EUR balance
+                      EUR баланс
                     </div>
                   </div>
                 </div>
@@ -601,6 +643,57 @@ const ProfileMenu: React.FC = () => {
           onClose={() => setIsTopUpModalOpen(false)}
           onSuccess={() => setIsTopUpModalOpen(false)}
         />
+      )}
+      {isPaymentSyncing && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 5200,
+            display: "grid",
+            placeItems: "center",
+            background: "rgba(248, 250, 252, 0.94)",
+            backdropFilter: "blur(4px)",
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 420,
+              background: "#ffffff",
+              border: "1px solid #e2e8f0",
+              borderRadius: 14,
+              padding: "24px 22px",
+              textAlign: "center",
+              boxShadow: "0 14px 36px rgba(15, 23, 42, 0.14)",
+            }}
+          >
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                margin: "0 auto 12px",
+                border: "3px solid #ccfbf1",
+                borderTopColor: "#0f766e",
+                animation: "payment-sync-spin 0.9s linear infinite",
+              }}
+            />
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#0f172a" }}>
+              Обновяване на баланса...
+            </h2>
+            <p style={{ margin: "8px 0 0", fontSize: 13, color: "#475569" }}>
+              Моля, изчакайте секунда.
+            </p>
+          </div>
+          <style>{`
+            @keyframes payment-sync-spin {
+              from { transform: rotate(0deg); }
+              to { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
       )}
     </>
   );

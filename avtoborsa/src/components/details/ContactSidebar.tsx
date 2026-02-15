@@ -22,6 +22,7 @@ import { useToast } from '../../context/ToastContext';
 
 const API_BASE_URL = 'http://localhost:8000';
 const DUPLICATE_REPORT_MESSAGE = 'Можете да съобщите за нередност с тази обява само веднъж, благодаря.';
+const SAVE_ACCENT_COLOR = 'rgb(233, 30, 99)';
 
 interface ContactSidebarProps {
   price: number;
@@ -376,6 +377,30 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
     .toUpperCase()
     .slice(0, 2);
 
+  const hiddenCheckboxStyle: React.CSSProperties = {
+    position: 'absolute',
+    opacity: 0,
+    width: 0,
+    height: 0,
+    pointerEvents: 'none',
+  };
+
+  const getCustomCheckboxStyle = (checked: boolean, compact = false): React.CSSProperties => ({
+    width: compact ? 16 : 18,
+    height: compact ? 16 : 18,
+    borderRadius: 5,
+    border: checked ? '1px solid #0f766e' : '1px solid #cbd5e1',
+    background: checked ? 'linear-gradient(135deg, #0f766e 0%, #0b5f58 100%)' : '#ffffff',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: checked
+      ? '0 4px 10px rgba(15, 118, 110, 0.25)'
+      : 'inset 0 1px 0 rgba(255,255,255,0.9)',
+    transition: 'all 0.2s ease',
+    flexShrink: 0,
+  });
+
   if (isMobile) {
     return (
       <div
@@ -417,9 +442,9 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
         <button
           style={{
             padding: '12px 16px',
-            background: isFavorite ? '#fef2f2' : '#f8fafc',
-            color: isFavorite ? '#dc2626' : '#374151',
-            border: `1px solid ${isFavorite ? '#fecaca' : '#eef2f7'}`,
+            background: isFavorite ? '#fff1f7' : '#f8fafc',
+            color: isFavorite ? SAVE_ACCENT_COLOR : '#374151',
+            border: `1px solid ${isFavorite ? '#f8bbd0' : '#eef2f7'}`,
             borderRadius: 10,
             fontSize: 14,
             fontWeight: 600,
@@ -814,11 +839,11 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
               gap: 6,
               fontSize: 12,
               fontWeight: 600,
-              color: isFavorite ? '#dc2626' : '#6b7280',
+              color: isFavorite ? SAVE_ACCENT_COLOR : '#6b7280',
               transition: 'all 0.2s ease',
             }}
             onMouseEnter={(e) => {
-              if (!isFavorite) e.currentTarget.style.color = '#0f766e';
+              if (!isFavorite) e.currentTarget.style.color = SAVE_ACCENT_COLOR;
               e.currentTarget.style.background = '#f8fafc';
             }}
             onMouseLeave={(e) => {
@@ -1033,7 +1058,11 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                   type="checkbox"
                   checked={reportIncorrectPrice}
                   onChange={(event) => setReportIncorrectPrice(event.target.checked)}
+                  style={hiddenCheckboxStyle}
                 />
+                <span aria-hidden="true" style={getCustomCheckboxStyle(reportIncorrectPrice)}>
+                  {reportIncorrectPrice && <Check size={12} color="#fff" strokeWidth={3} />}
+                </span>
                 Невярна цена
               </label>
 
@@ -1058,7 +1087,11 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                       setReportMessage('');
                     }
                   }}
+                  style={hiddenCheckboxStyle}
                 />
+                <span aria-hidden="true" style={getCustomCheckboxStyle(reportOtherIssue)}>
+                  {reportOtherIssue && <Check size={12} color="#fff" strokeWidth={3} />}
+                </span>
                 Друга нередност
               </label>
 
@@ -1070,7 +1103,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                 onChange={(event) => setReportMessage(event.target.value)}
                 style={{
                   width: '100%',
-                  resize: 'vertical',
+                  resize: 'none',
                   borderRadius: 10,
                   border: '1px solid #d1d5db',
                   padding: '10px 11px',
@@ -1096,8 +1129,14 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                   type="checkbox"
                   checked={reportAcceptedTerms}
                   onChange={(event) => setReportAcceptedTerms(event.target.checked)}
-                  style={{ marginTop: 2 }}
+                  style={hiddenCheckboxStyle}
                 />
+                <span
+                  aria-hidden="true"
+                  style={{ ...getCustomCheckboxStyle(reportAcceptedTerms, true), marginTop: 2 }}
+                >
+                  {reportAcceptedTerms && <Check size={11} color="#fff" strokeWidth={3} />}
+                </span>
                 <span>
                   Съгласявам се с{' '}
                   <a

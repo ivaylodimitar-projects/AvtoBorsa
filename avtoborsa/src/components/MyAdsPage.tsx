@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Archive,
   Trash2,
@@ -139,6 +139,12 @@ type PreviewImageSource = {
   thumb: string;
 };
 
+type MyAdsNavigationState = {
+  forceRefresh?: boolean;
+  publishMessage?: string;
+  publishedListingId?: number | null;
+};
+
 type TabType = "active" | "archived" | "drafts" | "liked" | "top" | "expired";
 type ListingType = "normal" | "top" | "vip";
 type VipPlan = "7d" | "lifetime";
@@ -150,6 +156,38 @@ const TOP_LISTING_PRICE_1D_EUR = 2.49;
 const VIP_LISTING_PRICE_7D_EUR = 1.99;
 const VIP_LISTING_PRICE_LIFETIME_EUR = 6.99;
 const PAGE_SIZE = 21;
+const CATEGORY_AS_BRAND_MAIN_CATEGORIES = new Set(["6", "7", "8", "a", "b"]);
+const GENERIC_BRAND_TERMS = new Set([
+  "трактор",
+  "трактори",
+  "багер",
+  "багери",
+  "товарач",
+  "товарачи",
+  "челен товарач",
+  "комбайн",
+  "комбайни",
+  "кран",
+  "кранове",
+  "мотокар",
+  "мотокари",
+  "булдозер",
+  "булдозери",
+  "грейдер",
+  "грейдери",
+  "валяк",
+  "валяци",
+  "tractor",
+  "excavator",
+  "loader",
+  "combine",
+  "crane",
+  "forklift",
+  "bulldozer",
+  "grader",
+  "roller",
+  "telehandler",
+]);
 
 const globalCss = `
   @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
@@ -160,6 +198,9 @@ const globalCss = `
 
 const MyAdsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const navigationState = (location.state as MyAdsNavigationState | null) ?? null;
+  const forceRefreshFromPublish = navigationState?.forceRefresh === true;
   const { isAuthenticated, user, updateBalance } = useAuth();
   const getImageUrl = useImageUrl();
   const [activeListings, setActiveListings] = useState<CarListing[]>([]);
@@ -206,7 +247,11 @@ const MyAdsPage: React.FC = () => {
       return;
     }
 
-    const cachedPayload = readMyAdsCache<CarListing>(user?.id);
+    if (forceRefreshFromPublish) {
+      invalidateMyAdsCache(user?.id);
+    }
+
+    const cachedPayload = forceRefreshFromPublish ? null : readMyAdsCache<CarListing>(user?.id);
     if (cachedPayload) {
       setActiveListings(cachedPayload.activeListings);
       setArchivedListings(cachedPayload.archivedListings);
@@ -329,7 +374,12 @@ const MyAdsPage: React.FC = () => {
     };
 
     fetchUserListings();
-  }, [isAuthenticated, user?.id]);
+  }, [forceRefreshFromPublish, isAuthenticated, user?.id]);
+
+  useEffect(() => {
+    if (!navigationState?.publishMessage) return;
+    setToast({ message: navigationState.publishMessage, type: "success" });
+  }, [navigationState?.publishMessage]);
 
   // Toast notification effect
   useEffect(() => {
@@ -879,6 +929,75 @@ const MyAdsPage: React.FC = () => {
     const toYear = toText(to);
     if (fromYear && toYear) return `${fromYear} - ${toYear}`;
     return fromYear || toYear;
+  };
+
+  const normalizeBrandText = (value: unknown) =>
+    toText(value)
+      .toLowerCase()
+      .replace(/[^a-zA-Z0-9а-яА-Я]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const isGenericBrandLabel = (value: unknown) => {
+    const normalized = normalizeBrandText(value);
+    if (!normalized) return false;
+    return GENERIC_BRAND_TERMS.has(normalized);
+  };
+
+  const pickBrandFromTitle = (title: string, blockedNormalized: Set<string>) => {
+    const parts = title
+      .split(/\s+/)
+      .map((token) => token.replace(/[^a-zA-Z0-9а-яА-Я]+/g, "").trim())
+      .filter(Boolean);
+
+    for (const token of parts) {
+      const normalized = normalizeBrandText(token);
+      if (!normalized || normalized.length < 2) continue;
+      if (!/^[a-zA-Zа-яА-Я]/.test(token)) continue;
+      if (isGenericBrandLabel(token)) continue;
+      if (blockedNormalized.has(normalized)) continue;
+      return token;
+    }
+    return "";
+  };
+
+  const getEffectiveListingBrand = (listing: CarListing) => {
+    const mainCategory = toText(listing.main_category);
+    const rawBrand = toText(listing.brand);
+    const rawModel = toText(listing.model);
+
+    // For these categories, listing.brand stores type/category, and listing.model stores the actual brand.
+    if (CATEGORY_AS_BRAND_MAIN_CATEGORIES.has(mainCategory)) {
+      if (rawModel && !isGenericBrandLabel(rawModel)) return rawModel;
+      if (rawBrand && !isGenericBrandLabel(rawBrand)) return rawBrand;
+    }
+
+    if (rawBrand && !isGenericBrandLabel(rawBrand)) return rawBrand;
+
+    const wheelOrTireBrand = toText(listing.wheel_brand || listing.tire_brand);
+    if (wheelOrTireBrand && !isGenericBrandLabel(wheelOrTireBrand)) return wheelOrTireBrand;
+
+    const modelFirstToken = rawModel.split(/\s+/).find(Boolean) || "";
+    if (
+      modelFirstToken &&
+      /^[a-zA-Zа-яА-Я]/.test(modelFirstToken) &&
+      !isGenericBrandLabel(modelFirstToken)
+    ) {
+      return modelFirstToken;
+    }
+
+    const blockedNormalized = new Set<string>(
+      [
+        normalizeBrandText(rawBrand),
+        normalizeBrandText(rawModel),
+        normalizeBrandText(modelFirstToken),
+        normalizeBrandText(listing.category),
+      ].filter(Boolean)
+    );
+    const brandFromTitle = pickBrandFromTitle(toText(listing.title), blockedNormalized);
+    if (brandFromTitle) return brandFromTitle;
+
+    return rawBrand || modelFirstToken || rawModel;
   };
 
   const getTechnicalSpecs = (listing: CarListing) => {
@@ -1791,16 +1910,17 @@ const MyAdsPage: React.FC = () => {
   },
   listingPricePill: {
     position: "absolute" as const,
-    right: 12,
-    bottom: 12,
-    padding: "3px 6px",
-    borderRadius: 14,
-    background: "linear-gradient(rgb(248, 250, 252) 0%, rgb(241, 245, 249) 100%)",
-    color: "black",
-    fontSize: 14,
+    right: 0,
+    bottom: 0,
+    padding: "8px 12px 7px 14px",
+    borderTop: "1px solid #e2e8f0",
+    borderLeft: "1px solid #e2e8f0",
+    borderTopLeftRadius: 12,
+    background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+    color: "#0f172a",
+    fontSize: 17,
     fontWeight: 800,
-    border: "1px solid #e0e0e0",
-    boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
+    boxShadow: "0 2px 8px rgba(15, 23, 42, 0.08)",
     zIndex: 2,
     display: "flex",
     flexDirection: "column" as const,
@@ -1866,6 +1986,16 @@ const MyAdsPage: React.FC = () => {
   topTimer: {
     fontSize: 12,
     color: "#dc2626",
+    fontWeight: 700,
+  },
+  vipTimer: {
+    fontSize: 12,
+    color: "#0284c7",
+    fontWeight: 700,
+  },
+  nonPromotedTimer: {
+    fontSize: 12,
+    color: "#111111",
     fontWeight: 700,
   },
   listingSubtitle: {
@@ -2096,8 +2226,8 @@ const MyAdsPage: React.FC = () => {
   const brandOptions = Array.from(
     new Set(
       categoryScopedListings
-        .map((listing) => (listing.brand || "").trim())
-        .filter(Boolean)
+        .map((listing) => getEffectiveListingBrand(listing))
+        .filter((brand) => Boolean(brand) && !isGenericBrandLabel(brand))
     )
   ).sort((a, b) => a.localeCompare(b, "bg", { sensitivity: "base" }));
 
@@ -2107,7 +2237,9 @@ const MyAdsPage: React.FC = () => {
   const brandScopedListings =
     selectedBrand === "all"
       ? categoryScopedListings
-      : categoryScopedListings.filter((listing) => (listing.brand || "").trim() === selectedBrand);
+      : categoryScopedListings.filter(
+          (listing) => getEffectiveListingBrand(listing) === selectedBrand
+        );
 
   const modelOptions = Array.from(
     new Set(
@@ -2787,6 +2919,8 @@ const MyAdsPage: React.FC = () => {
                   const isPromotedActive = isTopActive || isVipActive;
                   const topRemainingLabel = isTopActive ? getTopRemainingLabel(listing) : "";
                   const vipRemainingLabel = isVipActive ? getVipRemainingLabel(listing) : "";
+                  const nonPromotedLabel =
+                    !topRemainingLabel && !vipRemainingLabel ? "Непромотирана обява" : "";
                   const priceValue = Number(listing.price);
                   const priceLabel =
                     Number.isFinite(priceValue) && priceValue > 0
@@ -2904,7 +3038,7 @@ const MyAdsPage: React.FC = () => {
               <div style={styles.listingContent}>
                 <div style={styles.listingTitleRow}>
                   <h3 style={styles.listingTitle}>{listingTitle}</h3>
-                  {(createdLabel || topRemainingLabel || vipRemainingLabel) && (
+                  {(createdLabel || topRemainingLabel || vipRemainingLabel || nonPromotedLabel) && (
                     <div style={styles.listingMetaStack}>
                       {createdLabel && (
                         <span style={styles.listingMetaCreated}>Създадена: {createdLabel}</span>
@@ -2916,7 +3050,10 @@ const MyAdsPage: React.FC = () => {
                         <span style={styles.topTimer}>{topRemainingLabel}</span>
                       )}
                       {vipRemainingLabel && (
-                        <span style={styles.topTimer}>{vipRemainingLabel}</span>
+                        <span style={styles.vipTimer}>{vipRemainingLabel}</span>
+                      )}
+                      {nonPromotedLabel && (
+                        <span style={styles.nonPromotedTimer}>{nonPromotedLabel}</span>
                       )}
                     </div>
                   )}
@@ -3470,4 +3607,5 @@ const MyAdsPage: React.FC = () => {
 };
 
 export default MyAdsPage;
+
 

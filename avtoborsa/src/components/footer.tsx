@@ -30,7 +30,7 @@ export default function Footer() {
 const styles: Record<string, React.CSSProperties> = {
   footer: {
     marginTop: 0,
-    borderTop: "1px solid #ecfdf5",
+    borderTop: "none",
     background: "#fff",
   },
   topRow: {

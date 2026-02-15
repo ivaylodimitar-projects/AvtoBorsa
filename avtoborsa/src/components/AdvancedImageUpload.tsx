@@ -1,5 +1,5 @@
-﻿import React, { useState } from "react";
-import { Image, Star, Trash2, UploadCloud } from "lucide-react";
+﻿import React, { useEffect, useRef, useState } from "react";
+import { Star, Trash2, UploadCloud } from "lucide-react";
 
 interface ImageItem {
   file: File;
@@ -13,6 +13,48 @@ interface AdvancedImageUploadProps {
   maxImages?: number;
 }
 
+type UploadFeedback = {
+  message: string;
+  tone: "info" | "error";
+};
+
+const isBlobPreview = (preview: string) => preview.startsWith("blob:");
+
+const revokePreview = (preview: string) => {
+  if (isBlobPreview(preview)) {
+    URL.revokeObjectURL(preview);
+  }
+};
+
+const buildFileFingerprint = (file: File) =>
+  [file.name.trim().toLowerCase(), file.size, file.lastModified, file.type].join("::");
+
+const hashFileSha256 = async (file: File): Promise<string> => {
+  const buffer = await file.arrayBuffer();
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", buffer);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+};
+
+const normalizeCoverSelection = (items: ImageItem[]): ImageItem[] => {
+  let hasCover = false;
+  const normalized = items.map((item) => {
+    if (item.isCover && !hasCover) {
+      hasCover = true;
+      return item;
+    }
+    if (!item.isCover) return item;
+    return { ...item, isCover: false };
+  });
+
+  if (!hasCover && normalized.length > 0) {
+    normalized[0] = { ...normalized[0], isCover: true };
+  }
+
+  return normalized;
+};
+
 const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
   images,
   onImagesChange,
@@ -20,10 +62,45 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [isAddingImages, setIsAddingImages] = useState(false);
+  const [uploadFeedback, setUploadFeedback] = useState<UploadFeedback | null>(null);
+  const previousPreviewsRef = useRef<string[]>([]);
+  const fileHashCacheRef = useRef<WeakMap<File, string>>(new WeakMap());
+
+  useEffect(() => {
+    const currentPreviews = images.map((img) => img.preview);
+    const currentPreviewSet = new Set(currentPreviews);
+
+    previousPreviewsRef.current.forEach((preview) => {
+      if (!currentPreviewSet.has(preview)) {
+        revokePreview(preview);
+      }
+    });
+
+    previousPreviewsRef.current = currentPreviews;
+  }, [images]);
+
+  useEffect(() => {
+    return () => {
+      previousPreviewsRef.current.forEach((preview) => revokePreview(preview));
+      previousPreviewsRef.current = [];
+    };
+  }, []);
+
+  const supportsContentHashing = Boolean(globalThis.crypto?.subtle);
+
+  const getFileHash = async (file: File): Promise<string> => {
+    const cached = fileHashCacheRef.current.get(file);
+    if (cached) return cached;
+    const hash = await hashFileSha256(file);
+    fileHashCacheRef.current.set(file, hash);
+    return hash;
+  };
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isAddingImages) return;
     if (e.type === "dragenter" || e.type === "dragover") {
       setDragActive(true);
     } else if (e.type === "dragleave") {
@@ -35,50 +112,157 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
+    if (isAddingImages) return;
 
-    const files = Array.from(e.dataTransfer.files).filter((file) =>
-      file.type.startsWith("image/")
-    );
-    addImages(files);
+    const files = Array.from(e.dataTransfer.files);
+    void addImages(files);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      addImages(Array.from(e.target.files));
+      void addImages(Array.from(e.target.files));
+      e.target.value = "";
     }
   };
 
-  const addImages = (files: File[]) => {
-    const newImages = files.slice(0, maxImages - images.length).map((file) => ({
-      file,
-      preview: URL.createObjectURL(file),
-      isCover: images.length === 0 && files.indexOf(file) === 0,
-    }));
+  const addImages = async (files: File[]) => {
+    if (files.length === 0 || isAddingImages) return;
 
-    onImagesChange([...images, ...newImages]);
+    const slotsLeft = Math.max(maxImages - images.length, 0);
+    if (slotsLeft === 0) {
+      setUploadFeedback({
+        message: `Достигнат е лимитът от ${maxImages} снимки.`,
+        tone: "error",
+      });
+      return;
+    }
+
+    setUploadFeedback(null);
+    setIsAddingImages(true);
+
+    try {
+      const existingFingerprints = new Set(images.map((img) => buildFileFingerprint(img.file)));
+      const acceptedFingerprints = new Set<string>();
+      const existingHashes = new Set<string>();
+      const acceptedHashes = new Set<string>();
+
+      if (supportsContentHashing) {
+        for (const image of images) {
+          try {
+            existingHashes.add(await getFileHash(image.file));
+          } catch {
+            // Hashing fallback keeps fingerprint-based protection.
+          }
+        }
+      }
+
+      const acceptedImages: ImageItem[] = [];
+      let skippedDuplicates = 0;
+      let skippedOverflow = 0;
+      let skippedInvalidFiles = 0;
+
+      for (const file of files) {
+        if (!file.type.startsWith("image/")) {
+          skippedInvalidFiles += 1;
+          continue;
+        }
+
+        if (acceptedImages.length >= slotsLeft) {
+          skippedOverflow += 1;
+          continue;
+        }
+
+        const fingerprint = buildFileFingerprint(file);
+        if (existingFingerprints.has(fingerprint) || acceptedFingerprints.has(fingerprint)) {
+          skippedDuplicates += 1;
+          continue;
+        }
+
+        if (supportsContentHashing) {
+          try {
+            const hash = await getFileHash(file);
+            if (existingHashes.has(hash) || acceptedHashes.has(hash)) {
+              skippedDuplicates += 1;
+              continue;
+            }
+            acceptedHashes.add(hash);
+          } catch {
+            // If hashing fails for one file, fingerprint check still applies.
+          }
+        }
+
+        acceptedFingerprints.add(fingerprint);
+        acceptedImages.push({
+          file,
+          preview: URL.createObjectURL(file),
+          isCover: false,
+        });
+      }
+
+      if (acceptedImages.length > 0) {
+        const shouldAssignCover = images.length === 0 && !images.some((img) => img.isCover);
+        if (shouldAssignCover) {
+          acceptedImages[0].isCover = true;
+        }
+        onImagesChange(normalizeCoverSelection([...images, ...acceptedImages]));
+      }
+
+      if (skippedDuplicates > 0) {
+        const extraDetails: string[] = [];
+        if (skippedInvalidFiles > 0) extraDetails.push(`невалидни: ${skippedInvalidFiles}`);
+        if (skippedOverflow > 0) extraDetails.push(`над лимита: ${skippedOverflow}`);
+
+        setUploadFeedback({
+          message:
+            extraDetails.length > 0
+              ? `Не може да качваш дублирани снимки (${skippedDuplicates}). Пропуснати: ${extraDetails.join(", ")}.`
+              : `Не може да качваш дублирани снимки (${skippedDuplicates}).`,
+          tone: "error",
+        });
+      } else {
+        const feedbackParts: string[] = [];
+        if (skippedInvalidFiles > 0) feedbackParts.push(`невалидни файлове: ${skippedInvalidFiles}`);
+        if (skippedOverflow > 0) feedbackParts.push(`над лимита: ${skippedOverflow}`);
+
+        if (feedbackParts.length > 0) {
+          setUploadFeedback({
+            message: `Пропуснати файлове (${feedbackParts.join(", ")}).`,
+            tone: "info",
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Image upload processing error:", error);
+      setUploadFeedback({
+        message: "Възникна проблем при обработката на снимките. Опитай отново.",
+        tone: "error",
+      });
+    } finally {
+      setIsAddingImages(false);
+    }
   };
 
   const removeImage = (index: number) => {
+    if (isAddingImages) return;
     const newImages = images.filter((_, i) => i !== index);
-    if (images[index].isCover && newImages.length > 0) {
-      newImages[0].isCover = true;
-    }
-    onImagesChange(newImages);
+    onImagesChange(normalizeCoverSelection(newImages));
   };
 
   const setCoverImage = (index: number) => {
+    if (isAddingImages) return;
     const newImages = images.map((img, i) => ({
       ...img,
       isCover: i === index,
     }));
-    onImagesChange(newImages);
+    onImagesChange(normalizeCoverSelection(newImages));
   };
 
   const moveImage = (fromIndex: number, toIndex: number) => {
+    if (isAddingImages) return;
     const newImages = [...images];
     const [movedImage] = newImages.splice(fromIndex, 1);
     newImages.splice(toIndex, 0, movedImage);
-    onImagesChange(newImages);
+    onImagesChange(normalizeCoverSelection(newImages));
   };
 
   const styles: Record<string, React.CSSProperties> = {
@@ -112,10 +296,11 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
       borderRadius: 14,
       padding: "28px 20px",
       textAlign: "center" as const,
-      cursor: "pointer",
+      cursor: isAddingImages ? "wait" : "pointer",
       background: dragActive ? "#ecfdf5" : "#f8fafc",
       transition: "all 0.2s ease",
       marginBottom: 20,
+      opacity: isAddingImages ? 0.72 : 1,
     },
     uploadIcon: {
       display: "inline-flex",
@@ -151,6 +336,18 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
       fontSize: 13,
       fontWeight: 700,
       boxShadow: "0 8px 16px rgba(15, 118, 110, 0.25)",
+    },
+    helperMessage: {
+      marginTop: 8,
+      marginBottom: 0,
+      fontSize: 12,
+      fontWeight: 600,
+    },
+    helperMessageInfo: {
+      color: "#0f766e",
+    },
+    helperMessageError: {
+      color: "#b91c1c",
     },
     gallery: {
       display: "grid",
@@ -214,6 +411,7 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
       justifyContent: "center",
       gap: 6,
       transition: "background 0.2s ease",
+      opacity: isAddingImages ? 0.75 : 1,
     },
     emptyState: {
       textAlign: "center" as const,
@@ -252,20 +450,42 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
           </div>
           <p style={styles.uploadText}>Плъзни снимки тук</p>
           <p style={styles.uploadSubtext}>
-            или кликни за избор (до {maxImages} снимки)
+            {isAddingImages
+              ? "Обработваме файловете..."
+              : `или кликни за избор (до ${maxImages} снимки)`}
           </p>
           <input
             type="file"
             accept="image/*"
             multiple
             onChange={handleFileChange}
+            disabled={isAddingImages}
             style={{ display: "none" }}
             id="image-input"
           />
-          <label htmlFor="image-input" style={styles.uploadButton}>
+          <label
+            htmlFor="image-input"
+            style={{
+              ...styles.uploadButton,
+              opacity: isAddingImages ? 0.75 : 1,
+              pointerEvents: isAddingImages ? "none" : "auto",
+            }}
+          >
             <UploadCloud size={16} />
-            Избери снимки
+            {isAddingImages ? "Обработване..." : "Избери снимки"}
           </label>
+          {uploadFeedback && (
+            <p
+              style={{
+                ...styles.helperMessage,
+                ...(uploadFeedback.tone === "error"
+                  ? styles.helperMessageError
+                  : styles.helperMessageInfo),
+              }}
+            >
+              {uploadFeedback.message}
+            </p>
+          )}
         </div>
       )}
 
@@ -273,7 +493,7 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
         <div style={styles.gallery}>
           {images.map((item, index) => (
             <div
-              key={index}
+              key={`${item.preview}-${index}`}
               style={{
                 ...styles.imageCard,
                 ...(item.isCover ? styles.imageCardCover : {}),
@@ -281,17 +501,20 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
                   ? { boxShadow: "0 0 0 2px #93c5fd" }
                   : {}),
               }}
-              draggable
+              draggable={!isAddingImages}
               onDragStart={(e) => {
+                if (isAddingImages) return;
                 e.dataTransfer.effectAllowed = "move";
                 e.dataTransfer.setData("text/plain", index.toString());
               }}
               onDragOver={(e) => {
+                if (isAddingImages) return;
                 e.preventDefault();
                 setDragOverIndex(index);
               }}
               onDragLeave={() => setDragOverIndex(null)}
               onDrop={(e) => {
+                if (isAddingImages) return;
                 e.preventDefault();
                 const fromIndex = parseInt(e.dataTransfer.getData("text/plain"));
                 if (fromIndex !== index) {
@@ -314,6 +537,7 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
                     style={styles.actionButton}
                     onClick={() => setCoverImage(index)}
                     title="Задай като корица"
+                    disabled={isAddingImages}
                   >
                     <Star size={12} />
                     Корица
@@ -324,6 +548,7 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
                   style={styles.actionButton}
                   onClick={() => removeImage(index)}
                   title="Премахни снимка"
+                  disabled={isAddingImages}
                 >
                   <Trash2 size={12} />
                   Премахни

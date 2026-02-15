@@ -78,6 +78,11 @@ type CarListing = {
   is_top?: boolean;
   is_top_listing?: boolean;
   is_top_ad?: boolean;
+  is_vip?: boolean;
+  is_vip_listing?: boolean;
+  is_vip_ad?: boolean;
+  vip_plan?: string | null;
+  vip_expires_at?: string | null;
   wheel_for?: string;
   offer_type?: string;
   tire_brand?: string;
@@ -134,12 +139,26 @@ const isTopListing = (listing: CarListing) => {
 
 const isVipListing = (listing: CarListing) => {
   if (isTopListing(listing)) return false;
+  if (listing.is_vip || listing.is_vip_listing || listing.is_vip_ad) return true;
+
   const numericType = Number(listing.listing_type);
   if (!Number.isNaN(numericType) && numericType === 2) return true;
+
   const rawType = (listing.listing_type || "").toString().toLowerCase().trim();
-  if (rawType === "vip") return true;
+  if (rawType === "vip" || rawType.includes("vip")) return true;
+
   const display = (listing.listing_type_display || "").toString().toLowerCase();
-  return display.includes("vip");
+  if (display.includes("vip")) return true;
+
+  const vipPlan = (listing.vip_plan || "").toString().toLowerCase().trim();
+  if (vipPlan && !["none", "normal", "null", "undefined"].includes(vipPlan)) return true;
+
+  if (listing.vip_expires_at) {
+    const vipExpiresAtMs = Date.parse(listing.vip_expires_at);
+    if (!Number.isNaN(vipExpiresAtMs) && vipExpiresAtMs > Date.now()) return true;
+  }
+
+  return false;
 };
 
 const NEW_LISTING_BADGE_MINUTES = 10;
@@ -1611,7 +1630,7 @@ const SearchPage: React.FC = () => {
                       <div style={styles.itemPhoto}>
                         <div style={styles.photoMain}>
                           {isTop && <div style={styles.topBadge}>Топ обява</div>}
-                          {isVip && <div style={styles.vipBadge}>VIP</div>}
+                          {isVip && <div style={styles.vipBadge}>{"VIP \u043e\u0431\u044f\u0432\u0430"}</div>}
                           {isNewListing && (
                             <div style={{ ...styles.newBadge, top: hasHighlightBadge ? 38 : 10 }}>
                               Нова

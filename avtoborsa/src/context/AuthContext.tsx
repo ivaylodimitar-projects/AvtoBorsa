@@ -15,6 +15,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
+  authTransition: "login" | "logout" | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   setUserFromToken: (userData: User, accessToken: string, refreshToken?: string) => void;
@@ -27,8 +28,18 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [authTransition, setAuthTransition] = useState<"login" | "logout" | null>(null);
   const ACCESS_TOKEN_KEY = "authToken";
   const REFRESH_TOKEN_KEY = "refreshToken";
+  const AUTH_TRANSITION_MIN_MS = 550;
+
+  const applyMinimumTransitionDuration = async (startedAt: number) => {
+    const elapsed = Date.now() - startedAt;
+    if (elapsed >= AUTH_TRANSITION_MIN_MS) return;
+    await new Promise((resolve) =>
+      setTimeout(resolve, AUTH_TRANSITION_MIN_MS - elapsed)
+    );
+  };
 
   // Check if user is already logged in on mount
   useEffect(() => {
@@ -88,39 +99,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string) => {
-    const response = await fetch("http://localhost:8000/api/auth/login/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-
-    if (!response.ok) {
-      try {
-        const errorData = await response.json();
-        throw new Error(errorData?.error || "Невалиден email или парола");
-      } catch {
-        throw new Error("Невалиден email или парола");
-      }
-    }
-
-    const data = await response.json();
-    if (!data?.access || !data?.refresh || !data?.user) {
-      throw new Error("Непълен отговор от сървъра при вход");
-    }
-    localStorage.setItem(ACCESS_TOKEN_KEY, data.access);
-    localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh);
-    setUser(data.user);
+    const transitionStartedAt = Date.now();
+    setAuthTransition("login");
 
     try {
-      const meRes = await fetch("http://localhost:8000/api/auth/me/", {
-        headers: { Authorization: `Bearer ${data.access}` },
+      const response = await fetch("http://localhost:8000/api/auth/login/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
       });
-      if (meRes.ok) {
-        const meData = await meRes.json();
-        setUser(meData);
+
+      if (!response.ok) {
+        try {
+          const errorData = await response.json();
+          throw new Error(errorData?.error || "Невалиден email или парола");
+        } catch {
+          throw new Error("Невалиден email или парола");
+        }
       }
-    } catch {
-      // Keep login payload if refresh fails
+
+      const data = await response.json();
+      if (!data?.access || !data?.refresh || !data?.user) {
+        throw new Error("Непълен отговор от сървъра при вход");
+      }
+      localStorage.setItem(ACCESS_TOKEN_KEY, data.access);
+      localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh);
+      setUser(data.user);
+
+      try {
+        const meRes = await fetch("http://localhost:8000/api/auth/me/", {
+          headers: { Authorization: `Bearer ${data.access}` },
+        });
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          setUser(meData);
+        }
+      } catch {
+        // Keep login payload if refresh fails
+      }
+    } finally {
+      await applyMinimumTransitionDuration(transitionStartedAt);
+      setAuthTransition(null);
     }
   };
 
@@ -139,6 +158,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    const transitionStartedAt = Date.now();
+    setAuthTransition("logout");
+
     try {
       const token = localStorage.getItem(ACCESS_TOKEN_KEY);
       if (token) {
@@ -155,6 +177,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem(ACCESS_TOKEN_KEY);
       localStorage.removeItem(REFRESH_TOKEN_KEY);
       setUser(null);
+      await applyMinimumTransitionDuration(transitionStartedAt);
+      setAuthTransition(null);
     }
   };
 
@@ -163,6 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         user,
         isLoading,
+        authTransition,
         login,
         logout,
         setUserFromToken,

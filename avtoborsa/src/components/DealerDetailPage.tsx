@@ -1,11 +1,13 @@
-﻿import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { MapPin, Fuel, Gauge, Zap, Settings } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { formatConditionLabel, formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 
 type CarListing = {
   id: number;
   slug: string;
+  main_category?: string;
   brand: string;
   model: string;
   year_from: number;
@@ -25,7 +27,16 @@ type CarListing = {
   listing_type?: string | number;
   listing_type_display?: string;
   is_top?: boolean;
+  is_top_listing?: boolean;
+  is_top_ad?: boolean;
+  is_vip?: boolean;
+  is_vip_listing?: boolean;
+  is_vip_ad?: boolean;
+  vip_plan?: string | null;
+  vip_expires_at?: string | null;
 };
+
+const CATEGORY_AS_BRAND_MAIN_CATEGORIES = new Set(["6", "7", "8", "a", "b"]);
 
 type DealerDetail = {
   id: number;
@@ -45,13 +56,37 @@ type DealerDetail = {
 };
 
 const isTopListing = (listing: CarListing) => {
-  if (listing.is_top) return true;
+  if (listing.is_top || listing.is_top_listing || listing.is_top_ad) return true;
   const numericType = Number(listing.listing_type);
   if (!Number.isNaN(numericType) && numericType === 1) return true;
   const rawType = (listing.listing_type || "").toString().toLowerCase().trim();
   if (["top", "top_ad", "top_listing", "topad", "toplisting"].includes(rawType)) return true;
   const display = (listing.listing_type_display || "").toString().toLowerCase();
   return display.includes("топ");
+};
+
+const isVipListing = (listing: CarListing) => {
+  if (isTopListing(listing)) return false;
+  if (listing.is_vip || listing.is_vip_listing || listing.is_vip_ad) return true;
+
+  const numericType = Number(listing.listing_type);
+  if (!Number.isNaN(numericType) && numericType === 2) return true;
+
+  const rawType = (listing.listing_type || "").toString().toLowerCase().trim();
+  if (rawType === "vip" || rawType.includes("vip")) return true;
+
+  const display = (listing.listing_type_display || "").toString().toLowerCase();
+  if (display.includes("vip")) return true;
+
+  const vipPlan = (listing.vip_plan || "").toString().toLowerCase().trim();
+  if (vipPlan && !["none", "normal", "null", "undefined"].includes(vipPlan)) return true;
+
+  if (listing.vip_expires_at) {
+    const vipExpiresAtMs = Date.parse(listing.vip_expires_at);
+    if (!Number.isNaN(vipExpiresAtMs) && vipExpiresAtMs > Date.now()) return true;
+  }
+
+  return false;
 };
 
 const NEW_LISTING_BADGE_MINUTES = 10;
@@ -69,6 +104,7 @@ const DealerDetailPage: React.FC = () => {
   const [editingAbout, setEditingAbout] = useState(false);
   const [aboutDraft, setAboutDraft] = useState("");
   const [savingAbout, setSavingAbout] = useState(false);
+  const [listingBrandFilter, setListingBrandFilter] = useState<string>("all");
   const [listingModelFilter, setListingModelFilter] = useState<string>("all");
   const [listingSort, setListingSort] = useState<"default" | "latest">("default");
   const [currentPage, setCurrentPage] = useState(1);
@@ -94,13 +130,14 @@ const DealerDetailPage: React.FC = () => {
   }, [id]);
 
   useEffect(() => {
+    setListingBrandFilter("all");
     setListingModelFilter("all");
     setListingSort("default");
   }, [dealer?.id]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [dealer?.id, listingModelFilter, listingSort]);
+  }, [dealer?.id, listingBrandFilter, listingModelFilter, listingSort]);
 
   const handleSaveAbout = async () => {
     setSavingAbout(true);
@@ -161,21 +198,97 @@ const DealerDetailPage: React.FC = () => {
     return `${clean.slice(0, maxLength).trim()}…`;
   };
 
-  const modelOptions = useMemo(() => {
+  const getTechnicalSpecs = (listing: CarListing) => {
+    const specs: Array<{ label: string; value: string; icon: React.ComponentType<any> }> = [];
+
+    const addSpec = (label: string, value: unknown, icon: React.ComponentType<any>) => {
+      const normalized =
+        typeof value === "string"
+          ? value.trim()
+          : value !== null && value !== undefined
+            ? String(value).trim()
+            : "";
+      if (!normalized) return;
+      specs.push({ label, value: normalized, icon });
+    };
+
+    const addNumeric = (label: string, value: unknown, unit: string, icon: React.ComponentType<any>) => {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric) || numeric <= 0) return;
+      addSpec(label, `${Math.round(numeric).toLocaleString("bg-BG")} ${unit}`.trim(), icon);
+    };
+
+    addSpec("Гориво", formatFuelLabel(listing.fuel_display || listing.fuel || ""), Fuel);
+    addSpec("Кутия", formatGearboxLabel(listing.gearbox_display || listing.gearbox || ""), Settings);
+    addNumeric("Пробег", listing.mileage, "км", Gauge);
+    addNumeric("Мощност", listing.power, "к.с.", Zap);
+
+    if (specs.length === 0) {
+      addSpec("Град", listing.city, MapPin);
+    }
+
+    return specs;
+  };
+
+  const toText = (value: unknown) => {
+    if (value === null || value === undefined) return "";
+    return String(value).trim();
+  };
+
+  const getEffectiveListingBrand = (listing: CarListing) => {
+    const mainCategory = toText(listing.main_category);
+    const rawBrand = toText(listing.brand);
+    const rawModel = toText(listing.model);
+
+    if (CATEGORY_AS_BRAND_MAIN_CATEGORIES.has(mainCategory)) {
+      return rawModel || rawBrand;
+    }
+
+    return rawBrand || rawModel;
+  };
+
+  const brandOptions = useMemo(() => {
     if (!dealer?.listings) return [];
-    const models = new Set<string>();
-    dealer.listings.forEach((listing) => {
-      if (listing.model) models.add(listing.model);
-    });
-    return Array.from(models).sort();
+    return Array.from(
+      new Set(
+        dealer.listings
+          .map((listing) => getEffectiveListingBrand(listing))
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b, "bg", { sensitivity: "base" }));
   }, [dealer?.listings]);
 
-  const visibleListings = useMemo(() => {
+  const selectedBrand =
+    listingBrandFilter === "all" || brandOptions.includes(listingBrandFilter)
+      ? listingBrandFilter
+      : "all";
+
+  const brandScopedListings = useMemo(() => {
     if (!dealer?.listings) return [];
-    let items = dealer.listings;
-    if (listingModelFilter !== "all") {
-      items = items.filter((listing) => listing.model === listingModelFilter);
-    }
+    return selectedBrand === "all"
+      ? dealer.listings
+      : dealer.listings.filter((listing) => getEffectiveListingBrand(listing) === selectedBrand);
+  }, [dealer?.listings, selectedBrand]);
+
+  const modelOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        brandScopedListings
+          .map((listing) => (listing.model || "").trim())
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b, "bg", { sensitivity: "base" }));
+  }, [brandScopedListings]);
+
+  const selectedModel =
+    listingModelFilter === "all" || modelOptions.includes(listingModelFilter)
+      ? listingModelFilter
+      : "all";
+
+  const visibleListings = useMemo(() => {
+    let items = selectedModel === "all"
+      ? brandScopedListings
+      : brandScopedListings.filter((listing) => (listing.model || "").trim() === selectedModel);
     if (listingSort === "latest") {
       items = [...items].sort((a, b) => {
         const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
@@ -184,7 +297,7 @@ const DealerDetailPage: React.FC = () => {
       });
     }
     return items;
-  }, [dealer?.listings, listingModelFilter, listingSort]);
+  }, [brandScopedListings, selectedModel, listingSort]);
 
   const totalPages = Math.ceil(visibleListings.length / PAGE_SIZE);
   const safePage = totalPages > 0 ? Math.min(currentPage, totalPages) : 1;
@@ -427,41 +540,45 @@ const DealerDetailPage: React.FC = () => {
       color: "#64748b",
       fontWeight: 600,
     },
-    listingsFilters: {
+    filterRow: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+      flexWrap: "wrap",
+      padding: "12px 16px",
+      marginBottom: 24,
+      borderRadius: 10,
+      border: "1px solid rgb(15, 118, 110)",
+      background: "rgb(15, 118, 110)",
+    },
+    filterLabel: {
+      fontSize: 13,
+      fontWeight: 700,
+      color: "#fff",
+    },
+    filterControls: {
       display: "flex",
       alignItems: "center",
       gap: 10,
       flexWrap: "wrap",
-      marginBottom: 16,
     },
-    listingsFilterButton: {
-      padding: "8px 14px",
-      borderRadius: 999,
-      border: "1px solid #e0e0e0",
-      background: "#fff",
-      fontSize: 12,
-      fontWeight: 600,
-      color: "#666",
-      cursor: "pointer",
-      transition: "all 0.2s",
-    },
-    listingsFilterButtonActive: {
-      background: "#0f766e",
-      color: "#fff",
-      borderColor: "#0f766e",
-      boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-    },
-    listingsFilterSelect: {
-      height: 34,
+    filterSelect: {
+      height: 38,
+      minWidth: 180,
       padding: "0 12px",
-      borderRadius: 999,
-      border: "1px solid #e0e0e0",
-      background: "#fff",
+      borderRadius: 8,
+      border: "1px solid rgba(0,0,0,0.24)",
+      background: "#ffffff",
+      color: "#000",
+      fontSize: 14,
+      fontWeight: 600,
+      cursor: "pointer",
+    },
+    filterCount: {
       fontSize: 12,
       fontWeight: 600,
-      color: "#333",
-      outline: "none",
-      cursor: "pointer",
+      color: "#fff",
     },
     listingCard: {
       background: "#fff",
@@ -469,7 +586,7 @@ const DealerDetailPage: React.FC = () => {
       overflow: "hidden",
       border: "1px solid #e0e0e0",
       boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
-      transition: "transform 0.2s ease, box-shadow 0.2s ease",
+      transition: "box-shadow 0.2s",
       cursor: "pointer",
       position: "relative",
       display: "flex",
@@ -477,7 +594,6 @@ const DealerDetailPage: React.FC = () => {
       minHeight: "100%",
     },
     listingCardHover: {
-      transform: "translateY(-2px)",
       boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
     },
     listingMedia: {
@@ -521,6 +637,21 @@ const DealerDetailPage: React.FC = () => {
       boxShadow: "0 4px 10px rgba(220, 38, 38, 0.3)",
       zIndex: 2,
     },
+    vipBadge: {
+      position: "absolute",
+      top: 10,
+      left: 10,
+      padding: "4px 10px",
+      borderRadius: 999,
+      background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: 0.3,
+      textTransform: "uppercase",
+      boxShadow: "0 4px 10px rgba(2, 132, 199, 0.3)",
+      zIndex: 2,
+    },
     newBadge: {
       position: "absolute",
       left: 12,
@@ -537,17 +668,22 @@ const DealerDetailPage: React.FC = () => {
     },
     listingPricePill: {
       position: "absolute",
-      right: 12,
-      bottom: 12,
-      padding: "6px 12px",
-      borderRadius: 4,
-      background: "#0f766e",
-      color: "#fff",
-      fontSize: 14,
+      right: 0,
+      bottom: 0,
+      padding: "8px 12px 7px 14px",
+      borderTop: "1px solid #e2e8f0",
+      borderLeft: "1px solid #e2e8f0",
+      borderTopLeftRadius: 12,
+      background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+      color: "#0f172a",
+      fontSize: 17,
       fontWeight: 800,
-      border: "1px solid #e0e0e0",
-      boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
+      boxShadow: "0 2px 8px rgba(15, 23, 42, 0.08)",
       zIndex: 2,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "flex-end",
+      gap: 4,
     },
     listingContent: {
       padding: "18px",
@@ -572,12 +708,16 @@ const DealerDetailPage: React.FC = () => {
     },
     listingSubtitle: {
       fontSize: 13,
-      color: "#666",
+      color: "#6b7280",
     },
     listingDescription: {
       fontSize: 13,
       color: "#6b7280",
-      lineHeight: 1.5,
+      lineHeight: 1.6,
+      display: "-webkit-box",
+      WebkitLineClamp: 2,
+      WebkitBoxOrient: "vertical",
+      overflow: "hidden",
     },
     listingFooter: {
       display: "flex",
@@ -615,12 +755,18 @@ const DealerDetailPage: React.FC = () => {
     },
     listingChip: {
       fontSize: 12,
-      color: "#0f766e",
+      color: "#111827",
       background: "#ecfdf5",
-      border: "1px solid #99f6e4",
+      border: "1px solid #bbf7d0",
       padding: "4px 8px",
       borderRadius: 3,
       fontWeight: 600,
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+    },
+    listingChipIcon: {
+      color: "#0f766e",
     },
     // About tab
     aboutCard: {
@@ -916,35 +1062,56 @@ const DealerDetailPage: React.FC = () => {
           <>
             {dealer.listings && dealer.listings.length > 0 ? (
               <>
-                <div style={styles.listingsFilters}>
-                  <button
-                    type="button"
-                    style={{
-                      ...styles.listingsFilterButton,
-                      ...(listingSort === "latest" ? styles.listingsFilterButtonActive : {}),
-                    }}
-                    onClick={() => setListingSort(listingSort === "latest" ? "default" : "latest")}
-                  >
-                    Най-нови
-                  </button>
-                  <select
-                    value={listingModelFilter}
-                    onChange={(e) => setListingModelFilter(e.target.value)}
-                    style={styles.listingsFilterSelect}
-                  >
-                    <option value="all">Всички модели</option>
-                    {modelOptions.map((model) => (
-                      <option key={model} value={model}>
-                        {model}
-                      </option>
-                    ))}
-                  </select>
+                <div style={styles.filterRow}>
+                  <div style={styles.filterLabel}>Филтри</div>
+                  <div style={styles.filterControls}>
+                    <select
+                      value={listingSort}
+                      onChange={(e) => setListingSort(e.target.value as "default" | "latest")}
+                      style={styles.filterSelect}
+                    >
+                      <option value="default">По подразбиране</option>
+                      <option value="latest">Най-нови</option>
+                    </select>
+                    <select
+                      value={selectedBrand}
+                      onChange={(e) => {
+                        setListingBrandFilter(e.target.value);
+                        setListingModelFilter("all");
+                      }}
+                      style={styles.filterSelect}
+                    >
+                      <option value="all">Всички марки</option>
+                      {brandOptions.map((brand) => (
+                        <option key={brand} value={brand}>
+                          {brand}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={selectedModel}
+                      onChange={(e) => setListingModelFilter(e.target.value)}
+                      style={styles.filterSelect}
+                    >
+                      <option value="all">Всички модели</option>
+                      {modelOptions.map((model) => (
+                        <option key={model} value={model}>
+                          {model}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div style={styles.filterCount}>
+                    Показва {paginatedListings.length} от {visibleListings.length}
+                  </div>
                 </div>
                 <div style={styles.listingsGrid} className="dealer-listings-grid">
                 {paginatedListings.map((listing) => {
                   const isTop = isTopListing(listing);
+                  const isVip = isVipListing(listing);
+                  const hasHighlightBadge = isTop || isVip;
                   const isNew = isListingNew(listing.created_at);
-                  const priceLabel = `${listing.price.toLocaleString("bg-BG")} лв`;
+                  const priceLabel = `${listing.price.toLocaleString("bg-BG")} €`;
                   const conditionLabel = formatConditionLabel(
                     listing.condition_display ||
                       (listing.condition ? String(listing.condition) : "")
@@ -955,14 +1122,8 @@ const DealerDetailPage: React.FC = () => {
                   ].filter(Boolean);
                   const subtitle = subtitleParts.join(" · ");
                   const descriptionSnippet = getShortDescription(listing.description);
-                  const chips = [
-                    formatFuelLabel(listing.fuel_display || listing.fuel || ""),
-                    formatGearboxLabel(listing.gearbox_display || listing.gearbox || ""),
-                    Number.isFinite(listing.power) && listing.power > 0 ? `${listing.power} к.с.` : "",
-                    Number.isFinite(listing.mileage) && listing.mileage > 0
-                      ? `${listing.mileage.toLocaleString("bg-BG")} км`
-                      : "",
-                  ].filter(Boolean);
+                  const technicalSpecs = getTechnicalSpecs(listing);
+                  const visibleChips = technicalSpecs.slice(0, 4);
                   const createdLabel = getRelativeTime(listing.created_at);
 
                   return (
@@ -978,8 +1139,9 @@ const DealerDetailPage: React.FC = () => {
                   >
                     <div style={styles.listingMedia}>
                       {isTop && <div style={styles.topBadge}>Топ обява</div>}
+                      {isVip && <div style={styles.vipBadge}>VIP обява</div>}
                       {isNew && (
-                        <div style={{ ...styles.newBadge, top: isTop ? 46 : 12 }}>
+                        <div style={{ ...styles.newBadge, top: hasHighlightBadge ? 46 : 12 }}>
                           Нова
                         </div>
                       )}
@@ -1012,13 +1174,17 @@ const DealerDetailPage: React.FC = () => {
                       {descriptionSnippet && (
                         <div style={styles.listingDescription}>{descriptionSnippet}</div>
                       )}
-                      {chips.length > 0 && (
+                      {visibleChips.length > 0 && (
                         <div style={styles.listingChips}>
-                          {chips.map((chip, index) => (
-                            <span key={`${listing.id}-chip-${index}`} style={styles.listingChip}>
-                              {chip}
-                            </span>
-                          ))}
+                          {visibleChips.map((chip, index) => {
+                            const Icon = chip.icon;
+                            return (
+                              <span key={`${listing.id}-chip-${index}`} style={styles.listingChip}>
+                                <Icon size={12} style={styles.listingChipIcon} />
+                                {chip.label}: {chip.value}
+                              </span>
+                            );
+                          })}
                         </div>
                       )}
                       <div style={styles.listingFooter}>
