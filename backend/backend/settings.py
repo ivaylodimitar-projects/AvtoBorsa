@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     "backend.accounts",
     "backend.listings",
     "backend.payments",
+    "backend.reports",
 ]
 
 MIDDLEWARE = [

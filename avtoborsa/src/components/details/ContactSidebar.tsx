@@ -4,6 +4,7 @@ import {
   Heart,
   Share2,
   Printer,
+  Flag,
   MapPin,
   Mail,
   Check,
@@ -17,6 +18,10 @@ import {
   Send,
   Eye,
 } from 'lucide-react';
+import { useToast } from '../../context/ToastContext';
+
+const API_BASE_URL = 'http://localhost:8000';
+const DUPLICATE_REPORT_MESSAGE = 'Можете да съобщите за нередност с тази обява само веднъж, благодаря.';
 
 interface ContactSidebarProps {
   price: number;
@@ -41,10 +46,21 @@ interface ContactSidebarProps {
   city?: string;
 }
 
+type FavoriteResponseItem = {
+  listing?: {
+    id?: number;
+  };
+};
+
+type ReportResponsePayload = {
+  detail?: string;
+  message?: string;
+  non_field_errors?: string[];
+};
+
 const ContactSidebar: React.FC<ContactSidebarProps> = ({
   price,
   sellerName,
-  sellerEmail,
   phone,
   sellerType,
   sellerCreatedAt,
@@ -58,11 +74,18 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
   title = '',
   city = '',
 }) => {
+  const { showToast } = useToast();
   const [isFavorite, setIsFavorite] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [showPriceHistoryTooltip, setShowPriceHistoryTooltip] = useState(false);
+  const [showReportForm, setShowReportForm] = useState(false);
+  const [reportIncorrectPrice, setReportIncorrectPrice] = useState(false);
+  const [reportOtherIssue, setReportOtherIssue] = useState(false);
+  const [reportMessage, setReportMessage] = useState('');
+  const [reportAcceptedTerms, setReportAcceptedTerms] = useState(false);
+  const [isReporting, setIsReporting] = useState(false);
   const shareMenuRef = useRef<HTMLDivElement | null>(null);
   const shareButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -73,12 +96,13 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
         if (!token || !listingId) return;
 
         const response = await fetch(
-          `http://localhost:8000/api/my-favorites/`,
+          `${API_BASE_URL}/api/my-favorites/`,
           { headers: { 'Authorization': `Bearer ${token}` } }
         );
         if (response.ok) {
           const data = await response.json();
-          const isFav = data.some((fav: any) => fav.listing.id === listingId);
+          const favorites = Array.isArray(data) ? (data as FavoriteResponseItem[]) : [];
+          const isFav = favorites.some((fav) => fav.listing?.id === listingId);
           setIsFavorite(isFav);
         }
       } catch (err) {
@@ -98,8 +122,8 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
       setIsLoading(true);
 
       const endpoint = isFavorite
-        ? `http://localhost:8000/api/listings/${listingId}/unfavorite/`
-        : `http://localhost:8000/api/listings/${listingId}/favorite/`;
+        ? `${API_BASE_URL}/api/listings/${listingId}/unfavorite/`
+        : `${API_BASE_URL}/api/listings/${listingId}/favorite/`;
 
       const response = await fetch(endpoint, {
         method: isFavorite ? 'DELETE' : 'POST',
@@ -119,6 +143,90 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
       alert('Грешка при запазване на обявата');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const resetReportForm = () => {
+    setReportIncorrectPrice(false);
+    setReportOtherIssue(false);
+    setReportMessage('');
+    setReportAcceptedTerms(false);
+  };
+
+  const handleSubmitReport = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const token = localStorage.getItem('authToken');
+
+    if (!token) {
+      showToast('Трябва да сте логнати, за да докладвате обява.', { type: 'error' });
+      return;
+    }
+
+    if (!listingId) {
+      showToast('Неуспешно докладване. Невалидна обява.', { type: 'error' });
+      return;
+    }
+
+    if (!reportIncorrectPrice && !reportOtherIssue) {
+      showToast('Изберете поне една причина за доклада.', { type: 'error' });
+      return;
+    }
+
+    if (reportOtherIssue && !reportMessage.trim()) {
+      showToast('Моля, опишете нередността в съобщението.', { type: 'error' });
+      return;
+    }
+
+    if (!reportAcceptedTerms) {
+      showToast('Трябва да приемете общите условия и политиката за защита на личните данни.', { type: 'error' });
+      return;
+    }
+
+    setIsReporting(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/listings/${listingId}/report/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          incorrect_price: reportIncorrectPrice,
+          other_issue: reportOtherIssue,
+          message: reportMessage.trim(),
+          accepted_terms: reportAcceptedTerms,
+        }),
+      });
+
+      let payload: ReportResponsePayload | null = null;
+      try {
+        const parsed = await response.json();
+        payload = parsed && typeof parsed === 'object' ? (parsed as ReportResponsePayload) : null;
+      } catch {
+        payload = null;
+      }
+
+      if (response.status === 409) {
+        showToast(DUPLICATE_REPORT_MESSAGE, { type: 'error', duration: 4200 });
+        return;
+      }
+
+      if (!response.ok) {
+        const backendMessage =
+          (payload && (payload.detail || payload.message || payload.non_field_errors?.[0])) ||
+          'Грешка при изпращане на доклада.';
+        showToast(String(backendMessage), { type: 'error' });
+        return;
+      }
+
+      showToast((payload && payload.detail) || 'Сигналът е изпратен успешно.', { type: 'success' });
+      resetReportForm();
+      setShowReportForm(false);
+    } catch (error) {
+      console.error('Error creating report:', error);
+      showToast('Грешка при изпращане на доклада.', { type: 'error' });
+    } finally {
+      setIsReporting(false);
     }
   };
 
@@ -869,6 +977,169 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
               return null;
             })}
           </div>
+        </div>
+
+        <div
+          style={{
+            borderTop: '1px solid #eef2f7',
+            padding: '14px 20px 20px',
+            background: '#fff',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setShowReportForm((prev) => !prev)}
+            style={{
+              width: '100%',
+              padding: '11px 12px',
+              borderRadius: 10,
+              border: '1px solid #fecaca',
+              background: showReportForm ? '#fef2f2' : '#fff',
+              color: '#b91c1c',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#fef2f2';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = showReportForm ? '#fef2f2' : '#fff';
+            }}
+          >
+            <Flag size={14} />
+            Докладвай обявата
+          </button>
+
+          {showReportForm && (
+            <form onSubmit={handleSubmitReport} style={{ marginTop: 12, display: 'grid', gap: 10 }}>
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  fontSize: 13,
+                  color: '#374151',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={reportIncorrectPrice}
+                  onChange={(event) => setReportIncorrectPrice(event.target.checked)}
+                />
+                Невярна цена
+              </label>
+
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  fontSize: 13,
+                  color: '#374151',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={reportOtherIssue}
+                  onChange={(event) => {
+                    const isChecked = event.target.checked;
+                    setReportOtherIssue(isChecked);
+                    if (!isChecked) {
+                      setReportMessage('');
+                    }
+                  }}
+                />
+                Друга нередност
+              </label>
+
+              <textarea
+                rows={6}
+                placeholder="Вашето съобщение"
+                disabled={!reportOtherIssue}
+                value={reportMessage}
+                onChange={(event) => setReportMessage(event.target.value)}
+                style={{
+                  width: '100%',
+                  resize: 'vertical',
+                  borderRadius: 10,
+                  border: '1px solid #d1d5db',
+                  padding: '10px 11px',
+                  fontSize: 13,
+                  color: '#111827',
+                  background: reportOtherIssue ? '#fff' : '#f9fafb',
+                  cursor: reportOtherIssue ? 'text' : 'not-allowed',
+                }}
+              />
+
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 8,
+                  fontSize: 12,
+                  lineHeight: 1.45,
+                  color: '#4b5563',
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={reportAcceptedTerms}
+                  onChange={(event) => setReportAcceptedTerms(event.target.checked)}
+                  style={{ marginTop: 2 }}
+                />
+                <span>
+                  Съгласявам се с{' '}
+                  <a
+                    href="https://www.mobile.bg/obshti-uslovia"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: '#b91c1c', fontWeight: 600 }}
+                  >
+                    общите условия
+                  </a>{' '}
+                  и{' '}
+                  <a
+                    href="https://www.mobile.bg/zashtita-na-lichni-danni"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: '#b91c1c', fontWeight: 600 }}
+                  >
+                    политиките за защита на личните данни
+                  </a>
+                </span>
+              </label>
+
+              <button
+                type="submit"
+                disabled={isReporting}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  borderRadius: 10,
+                  border: 'none',
+                  background: isReporting ? '#fca5a5' : '#dc2626',
+                  color: '#fff',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: isReporting ? 'not-allowed' : 'pointer',
+                  transition: 'background 0.2s ease',
+                }}
+              >
+                {isReporting ? 'Изпращане...' : 'Изпрати'}
+              </button>
+            </form>
+          )}
         </div>
       </div>
 
