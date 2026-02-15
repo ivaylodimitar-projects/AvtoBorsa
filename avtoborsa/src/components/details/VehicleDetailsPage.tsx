@@ -59,7 +59,7 @@ interface CarListing {
   updated_at?: string;
   view_count?: number;
   price_history?: PriceHistoryEntry[];
-  listing_type?: 'top' | 'normal' | string | number;
+  listing_type?: 'top' | 'vip' | 'normal' | string | number;
   listing_type_display?: string;
   is_top?: boolean;
   is_top_listing?: boolean;
@@ -125,7 +125,7 @@ interface SimilarListing {
   power?: number | string;
   city?: string;
   created_at?: string;
-  listing_type?: 'top' | 'normal' | string | number;
+  listing_type?: 'top' | 'vip' | 'normal' | string | number;
   listing_type_display?: string;
   image_url?: string;
   images?: CarImage[];
@@ -144,6 +144,19 @@ const isTopListing = (listing: CarListing) => {
 
   const display = (listing.listing_type_display || '').toString().toLowerCase();
   return display.includes('топ');
+};
+
+const isVipListing = (listing: CarListing) => {
+  if (isTopListing(listing)) return false;
+
+  const numericType = Number(listing.listing_type);
+  if (!Number.isNaN(numericType) && numericType === 2) return true;
+
+  const rawType = (listing.listing_type || '').toString().toLowerCase().trim();
+  if (rawType === 'vip') return true;
+
+  const display = (listing.listing_type_display || '').toString().toLowerCase();
+  return display.includes('vip');
 };
 
 const NEW_LISTING_BADGE_MINUTES = 10;
@@ -400,6 +413,16 @@ const VehicleDetailsPage: React.FC = () => {
     const display = (item.listing_type_display || '').toString().toLowerCase();
     return display.includes('топ');
   }, []);
+
+  const isSimilarVipListing = useCallback((item: SimilarListing) => {
+    if (isSimilarTopListing(item)) return false;
+    const rawType = (item.listing_type || '').toString().toLowerCase().trim();
+    if (rawType === 'vip') return true;
+    const numericType = Number(item.listing_type);
+    if (!Number.isNaN(numericType) && numericType === 2) return true;
+    const display = (item.listing_type_display || '').toString().toLowerCase();
+    return display.includes('vip');
+  }, [isSimilarTopListing]);
 
   const isRecentListing = useCallback(
     (createdAt?: string) => {
@@ -681,6 +704,10 @@ const VehicleDetailsPage: React.FC = () => {
       background: '#10b981',
       boxShadow: '0 4px 10px rgba(16, 185, 129, 0.25)',
     },
+    similarBadgeVip: {
+      background: '#0ea5e9',
+      boxShadow: '0 4px 10px rgba(14, 165, 233, 0.25)',
+    },
     similarImage: {
       width: '100%',
       height: '100%',
@@ -843,6 +870,7 @@ const VehicleDetailsPage: React.FC = () => {
             title={title}
             isMobile={isMobile}
             showTopBadge={isTopListing(listing)}
+            showVipBadge={isVipListing(listing)}
             showNewBadge={isNewListing}
           />
 
@@ -954,6 +982,7 @@ const VehicleDetailsPage: React.FC = () => {
                     const imagePath = item.image_url || item.images?.[0]?.image || '';
                     const imageUrl = imagePath ? getImageUrl(imagePath) : '';
                     const isTop = isSimilarTopListing(item);
+                    const isVip = isSimilarVipListing(item);
                     const isNew = isRecentListing(item.created_at);
                     const priceValue = typeof item.price === 'string' ? Number(item.price) : item.price;
                     const priceLabel =
@@ -981,9 +1010,10 @@ const VehicleDetailsPage: React.FC = () => {
                         onClick={() => navigate(`/details/${item.slug}`)}
                       >
                         <div style={styles.similarMedia}>
-                          {(isTop || isNew) && (
+                          {(isTop || isVip || isNew) && (
                             <div style={styles.similarBadgeRow}>
                               {isTop && <span style={styles.similarBadge}>Топ</span>}
+                              {isVip && <span style={{ ...styles.similarBadge, ...styles.similarBadgeVip }}>VIP</span>}
                               {isNew && <span style={{ ...styles.similarBadge, ...styles.similarBadgeNew }}>Нова</span>}
                             </div>
                           )}

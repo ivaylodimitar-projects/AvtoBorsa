@@ -18,7 +18,18 @@ from django.core.cache import cache
 from django.utils.cache import patch_cache_control, patch_vary_headers
 from django.utils import timezone
 from backend.accounts.models import UserProfile
-from .models import CarListing, CarImage, Favorite, CarListingPriceHistory, get_expiry_cutoff, TOP_LISTING_DURATION_DAYS
+from .models import (
+    CarListing,
+    CarImage,
+    Favorite,
+    CarListingPriceHistory,
+    get_expiry_cutoff,
+    get_top_expiry,
+    get_listing_expiry,
+    get_vip_short_expiry,
+    TOP_PLAN_1D,
+    TOP_PLAN_7D,
+)
 from .serializers import (
     CarListingSerializer,
     CarListingLiteSerializer,
@@ -29,7 +40,12 @@ from .serializers import (
 )
 
 
-TOP_LISTING_PRICE_EUR = Decimal("3.00")
+TOP_LISTING_PRICE_1D_EUR = Decimal("2.49")
+TOP_LISTING_PRICE_7D_EUR = Decimal("7.49")
+VIP_LISTING_PRICE_7D_EUR = Decimal("1.99")
+VIP_LISTING_PRICE_LIFETIME_EUR = Decimal("6.99")
+VIP_PLAN_7D = "7d"
+VIP_PLAN_LIFETIME = "lifetime"
 LISTINGS_PUBLIC_CACHE_SECONDS = 30
 LISTINGS_PUBLIC_STALE_SECONDS = 120
 TOP_DEMOTION_MIN_INTERVAL_SECONDS = 60
@@ -60,33 +76,110 @@ class ListingsPagination(PageNumberPagination):
 
 
 def _demote_expired_top_listings():
-    """Ensure expired top listings are demoted to normal."""
+    """Ensure expired promoted listings are demoted to normal."""
     if not cache.add(TOP_DEMOTION_LOCK_KEY, 1, TOP_DEMOTION_MIN_INTERVAL_SECONDS):
         return 0
     return CarListing.demote_expired_top_listings()
 
 
-def _charge_top_listing_fee(user):
+def _normalize_vip_plan(raw_plan):
+    if raw_plan in (None, ""):
+        return VIP_PLAN_7D
+    plan = str(raw_plan).strip().lower()
+    aliases = {
+        "7": VIP_PLAN_7D,
+        "7d": VIP_PLAN_7D,
+        "7days": VIP_PLAN_7D,
+        "7_day": VIP_PLAN_7D,
+        "7-day": VIP_PLAN_7D,
+        "lifetime": VIP_PLAN_LIFETIME,
+        "30d": VIP_PLAN_LIFETIME,
+        "full": VIP_PLAN_LIFETIME,
+    }
+    normalized = aliases.get(plan)
+    if normalized is None:
+        raise ValidationError("Невалиден VIP пакет")
+    return normalized
+
+
+def _normalize_top_plan(raw_plan):
+    if raw_plan in (None, ""):
+        return TOP_PLAN_1D
+    plan = str(raw_plan).strip().lower()
+    aliases = {
+        "1": TOP_PLAN_1D,
+        "1d": TOP_PLAN_1D,
+        "1day": TOP_PLAN_1D,
+        "1-day": TOP_PLAN_1D,
+        "7": TOP_PLAN_7D,
+        "7d": TOP_PLAN_7D,
+        "7days": TOP_PLAN_7D,
+        "7_day": TOP_PLAN_7D,
+        "7-day": TOP_PLAN_7D,
+    }
+    normalized = aliases.get(plan)
+    if normalized is None:
+        raise ValidationError("Невалиден TOP пакет")
+    return normalized
+
+
+def _charge_top_listing_fee(user, top_plan):
     """Charge the top listing fee from the user's wallet."""
+    price = TOP_LISTING_PRICE_7D_EUR if top_plan == TOP_PLAN_7D else TOP_LISTING_PRICE_1D_EUR
     with db_transaction.atomic():
         profile, _ = UserProfile.objects.select_for_update().get_or_create(user=user)
-        if profile.balance < TOP_LISTING_PRICE_EUR:
+        if profile.balance < price:
             raise ValidationError("Недостатъчни средства")
-        profile.balance -= TOP_LISTING_PRICE_EUR
+        profile.balance -= price
         profile.save(update_fields=["balance"])
         return profile
 
 
-def _apply_top_listing_window(listing, now=None):
-    """Set a fresh 14-day top window on the listing."""
+def _charge_vip_listing_fee(user, vip_plan):
+    """Charge the VIP listing fee from the user's wallet."""
+    price = VIP_LISTING_PRICE_LIFETIME_EUR if vip_plan == VIP_PLAN_LIFETIME else VIP_LISTING_PRICE_7D_EUR
+    with db_transaction.atomic():
+        profile, _ = UserProfile.objects.select_for_update().get_or_create(user=user)
+        if profile.balance < price:
+            raise ValidationError("Недостатъчни средства")
+        profile.balance -= price
+        profile.save(update_fields=["balance"])
+        return profile
+
+
+def _clear_vip_listing_window(listing):
+    """Remove VIP status timing fields from the listing."""
+    listing.vip_plan = None
+    listing.vip_paid_at = None
+    listing.vip_expires_at = None
+
+
+def _apply_top_listing_window(listing, top_plan, now=None):
+    """Set a fresh top window on the listing for the selected plan."""
     current = now or timezone.now()
     listing.listing_type = "top"
+    listing.top_plan = top_plan
     listing.top_paid_at = current
-    listing.top_expires_at = current + timedelta(days=TOP_LISTING_DURATION_DAYS)
+    listing.top_expires_at = get_top_expiry(current, top_plan=top_plan)
+    _clear_vip_listing_window(listing)
+
+
+def _apply_vip_listing_window(listing, vip_plan, now=None):
+    """Set a VIP window on the listing based on selected plan."""
+    current = now or timezone.now()
+    listing.listing_type = "vip"
+    listing.vip_plan = vip_plan
+    listing.vip_paid_at = current
+    if vip_plan == VIP_PLAN_LIFETIME:
+        listing.vip_expires_at = get_listing_expiry(listing.created_at, now=current)
+    else:
+        listing.vip_expires_at = get_vip_short_expiry(current)
+    _clear_top_listing_window(listing)
 
 
 def _clear_top_listing_window(listing):
     """Remove top status timing fields from the listing."""
+    listing.top_plan = None
     listing.top_paid_at = None
     listing.top_expires_at = None
 
@@ -786,15 +879,54 @@ class CarListingViewSet(viewsets.ModelViewSet):
         """Create listing and associate with current user"""
         _demote_expired_top_listings()
         listing_type = serializer.validated_data.get("listing_type", "normal")
+        top_plan = (
+            _normalize_top_plan(serializer.validated_data.get("top_plan"))
+            if listing_type == "top"
+            else None
+        )
+        vip_plan = (
+            _normalize_vip_plan(serializer.validated_data.get("vip_plan"))
+            if listing_type == "vip"
+            else None
+        )
+        now = timezone.now()
         with db_transaction.atomic():
             if listing_type == "top":
-                _charge_top_listing_fee(self.request.user)
+                _charge_top_listing_fee(self.request.user, top_plan)
+            elif listing_type == "vip":
+                _charge_vip_listing_fee(self.request.user, vip_plan)
 
-            listing = serializer.save(user=self.request.user)
+            listing = serializer.save(
+                user=self.request.user,
+                top_plan=top_plan if listing_type == "top" else None,
+                vip_plan=vip_plan if listing_type == "vip" else None,
+            )
 
             if listing_type == "top":
-                _apply_top_listing_window(listing)
-                listing.save(update_fields=["listing_type", "top_paid_at", "top_expires_at"])
+                _apply_top_listing_window(listing, top_plan=top_plan, now=now)
+                listing.save(
+                    update_fields=[
+                        "listing_type",
+                        "top_plan",
+                        "top_paid_at",
+                        "top_expires_at",
+                        "vip_plan",
+                        "vip_paid_at",
+                        "vip_expires_at",
+                    ]
+                )
+            elif listing_type == "vip":
+                _apply_vip_listing_window(listing, vip_plan=vip_plan, now=now)
+                listing.save(
+                    update_fields=[
+                        "listing_type",
+                        "top_paid_at",
+                        "top_expires_at",
+                        "vip_plan",
+                        "vip_paid_at",
+                        "vip_expires_at",
+                    ]
+                )
 
     def perform_update(self, serializer):
         """Update listing - only owner can update"""
@@ -807,24 +939,82 @@ class CarListingViewSet(viewsets.ModelViewSet):
 
         with db_transaction.atomic():
             if listing_type == "top":
+                top_plan = _normalize_top_plan(
+                    serializer.validated_data.get("top_plan") or listing.top_plan
+                )
+                serializer.validated_data["top_plan"] = top_plan
                 is_current_top = (
                     listing.listing_type == "top"
+                    and listing.top_plan == top_plan
                     and listing.top_expires_at
                     and listing.top_expires_at > now
                 )
                 if not is_current_top:
-                    _charge_top_listing_fee(self.request.user)
-                    _apply_top_listing_window(listing, now=now)
+                    _charge_top_listing_fee(self.request.user, top_plan)
+                    _apply_top_listing_window(listing, top_plan=top_plan, now=now)
+            elif listing_type == "vip":
+                vip_plan = _normalize_vip_plan(
+                    serializer.validated_data.get("vip_plan") or listing.vip_plan
+                )
+                serializer.validated_data["vip_plan"] = vip_plan
+                is_current_vip = (
+                    listing.listing_type == "vip"
+                    and listing.vip_plan == vip_plan
+                    and listing.vip_expires_at
+                    and listing.vip_expires_at > now
+                )
+                if not is_current_vip:
+                    _charge_vip_listing_fee(self.request.user, vip_plan)
+                    _apply_vip_listing_window(listing, vip_plan=vip_plan, now=now)
 
             updated = serializer.save()
 
             if listing_type == "top":
+                updated.top_plan = listing.top_plan
                 updated.top_paid_at = listing.top_paid_at
                 updated.top_expires_at = listing.top_expires_at
-                updated.save(update_fields=["listing_type", "top_paid_at", "top_expires_at"])
+                _clear_vip_listing_window(updated)
+                updated.save(
+                    update_fields=[
+                        "listing_type",
+                        "top_plan",
+                        "top_paid_at",
+                        "top_expires_at",
+                        "vip_plan",
+                        "vip_paid_at",
+                        "vip_expires_at",
+                    ]
+                )
+            elif listing_type == "vip":
+                updated.vip_plan = listing.vip_plan
+                updated.vip_paid_at = listing.vip_paid_at
+                updated.vip_expires_at = listing.vip_expires_at
+                _clear_top_listing_window(updated)
+                updated.save(
+                    update_fields=[
+                        "listing_type",
+                        "top_plan",
+                        "top_paid_at",
+                        "top_expires_at",
+                        "vip_plan",
+                        "vip_paid_at",
+                        "vip_expires_at",
+                    ]
+                )
             elif listing_type == "normal":
                 _clear_top_listing_window(updated)
-                updated.save(update_fields=["listing_type", "top_paid_at", "top_expires_at"])
+                _clear_vip_listing_window(updated)
+                updated.save(
+                    update_fields=[
+                        "listing_type",
+                        "top_plan",
+                        "top_paid_at",
+                        "top_expires_at",
+                        "vip_plan",
+                        "vip_paid_at",
+                        "vip_expires_at",
+                    ]
+                )
 
     def perform_destroy(self, instance):
         """Delete listing - only owner can delete"""
@@ -931,8 +1121,18 @@ def republish_listing(request, listing_id):
     _demote_expired_top_listings()
     listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
     listing_type = request.data.get('listing_type')
+    top_plan = (
+        _normalize_top_plan(request.data.get("top_plan") or request.data.get("topPlan"))
+        if listing_type == "top"
+        else None
+    )
+    vip_plan = (
+        _normalize_vip_plan(request.data.get("vip_plan") or request.data.get("vipPlan"))
+        if listing_type == "vip"
+        else None
+    )
 
-    if listing_type not in ['top', 'normal']:
+    if listing_type not in ['top', 'vip', 'normal']:
         return Response(
             {"detail": "Невалиден тип на обявата."},
             status=status.HTTP_400_BAD_REQUEST
@@ -940,17 +1140,22 @@ def republish_listing(request, listing_id):
 
     now = timezone.now()
     with db_transaction.atomic():
-        if listing_type == "top":
-            _charge_top_listing_fee(request.user)
-            _apply_top_listing_window(listing, now=now)
-        else:
-            listing.listing_type = "normal"
-            _clear_top_listing_window(listing)
-
         listing.is_draft = False
         listing.is_archived = False
         listing.is_active = True
         listing.created_at = now
+
+        if listing_type == "top":
+            _charge_top_listing_fee(request.user, top_plan)
+            _apply_top_listing_window(listing, top_plan=top_plan, now=now)
+        elif listing_type == "vip":
+            _charge_vip_listing_fee(request.user, vip_plan)
+            _apply_vip_listing_window(listing, vip_plan=vip_plan, now=now)
+        else:
+            listing.listing_type = "normal"
+            _clear_top_listing_window(listing)
+            _clear_vip_listing_window(listing)
+
         listing.save()
 
     serializer = CarListingSerializer(listing, context={'request': request})
@@ -960,12 +1165,22 @@ def republish_listing(request, listing_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def update_listing_type(request, listing_id):
-    """Update listing type (top/normal) for a listing."""
+    """Update listing type (top/vip/normal) for a listing."""
     _demote_expired_top_listings()
     listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
     listing_type = request.data.get('listing_type')
+    top_plan = (
+        _normalize_top_plan(request.data.get("top_plan") or request.data.get("topPlan"))
+        if listing_type == "top"
+        else None
+    )
+    vip_plan = (
+        _normalize_vip_plan(request.data.get("vip_plan") or request.data.get("vipPlan"))
+        if listing_type == "vip"
+        else None
+    )
 
-    if listing_type not in ['top', 'normal']:
+    if listing_type not in ['top', 'vip', 'normal']:
         return Response(
             {"detail": "Невалиден тип на обявата."},
             status=status.HTTP_400_BAD_REQUEST
@@ -976,15 +1191,27 @@ def update_listing_type(request, listing_id):
         if listing_type == "top":
             is_current_top = (
                 listing.listing_type == "top"
+                and listing.top_plan == top_plan
                 and listing.top_expires_at
                 and listing.top_expires_at > now
             )
             if not is_current_top:
-                _charge_top_listing_fee(request.user)
-                _apply_top_listing_window(listing, now=now)
+                _charge_top_listing_fee(request.user, top_plan)
+                _apply_top_listing_window(listing, top_plan=top_plan, now=now)
+        elif listing_type == "vip":
+            is_current_vip = (
+                listing.listing_type == "vip"
+                and listing.vip_plan == vip_plan
+                and listing.vip_expires_at
+                and listing.vip_expires_at > now
+            )
+            if not is_current_vip:
+                _charge_vip_listing_fee(request.user, vip_plan)
+                _apply_vip_listing_window(listing, vip_plan=vip_plan, now=now)
         else:
             listing.listing_type = "normal"
             _clear_top_listing_window(listing)
+            _clear_vip_listing_window(listing)
 
         listing.save()
 

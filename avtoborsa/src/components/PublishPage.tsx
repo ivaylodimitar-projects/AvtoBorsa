@@ -107,7 +107,9 @@ interface PublishFormData {
   email: string;
   pictures: File[];
   features: string[];
-  listingType: "normal" | "top";
+  listingType: "normal" | "top" | "vip";
+  topPlan: "1d" | "7d";
+  vipPlan: "7d" | "lifetime";
   wheelFor: string;
   wheelOfferType: string;
   wheelBrand: string;
@@ -173,6 +175,11 @@ const MAIN_CATEGORY_OPTIONS: Array<{ value: MainCategoryKey; label: string }> =
   APP_MAIN_CATEGORY_OPTIONS as Array<{ value: MainCategoryKey; label: string }>;
 
 const CLASSIFIED_FOR_OPTIONS = MOBILE_CLASSIFIED_FOR_OPTIONS;
+const MIN_IMAGES_REQUIRED_TO_PUBLISH = 3;
+const IMAGE_OPTIONAL_MAIN_CATEGORIES = new Set<MainCategoryKey>(["y", "z"]);
+
+const getMinimumRequiredImageCount = (mainCategory: MainCategoryKey) =>
+  IMAGE_OPTIONAL_MAIN_CATEGORIES.has(mainCategory) ? 0 : MIN_IMAGES_REQUIRED_TO_PUBLISH;
 
 const CONDITION_OPTIONS = [
   { value: "0", label: "Нов" },
@@ -1071,6 +1078,8 @@ const createInitialFormData = (): PublishFormData => ({
   pictures: [],
   features: [],
   listingType: "normal",
+  topPlan: "1d",
+  vipPlan: "7d",
   wheelFor: getTopmenuFromMainCategory("1") || "1",
   wheelOfferType: "",
   wheelBrand: "",
@@ -1145,13 +1154,15 @@ const PublishPage: React.FC = () => {
   const { isAuthenticated, isLoading: authLoading, user, updateBalance } = useAuth();
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: currentYear - 1950 + 1 }, (_, i) => currentYear - i);
-  const TOP_LISTING_PRICE_EUR = 3;
+  const TOP_LISTING_PRICE_1D_EUR = 2.49;
+  const TOP_LISTING_PRICE_7D_EUR = 7.49;
+  const VIP_LISTING_PRICE_7D_EUR = 1.99;
+  const VIP_LISTING_PRICE_LIFETIME_EUR = 6.99;
 
   const [loading, setLoading] = useState(false);
   const [loadingListing, setLoadingListing] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
-  const [showTopConfirm, setShowTopConfirm] = useState(false);
 
   // Check authentication on mount
   useEffect(() => {
@@ -1393,7 +1404,7 @@ const PublishPage: React.FC = () => {
       key: "listingType",
       label: "Тип обява",
       icon: <FiStar size={16} />,
-      description: "Топ или нормална",
+      description: "Нормална, ТОП или VIP",
     },
   ];
 
@@ -1425,6 +1436,8 @@ const PublishPage: React.FC = () => {
       locationRegion: previous.locationRegion,
       city: previous.city,
       listingType: previous.listingType,
+      topPlan: previous.topPlan,
+      vipPlan: previous.vipPlan,
     };
   };
 
@@ -1537,10 +1550,6 @@ const PublishPage: React.FC = () => {
 
   const handleListingTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value as PublishFormData["listingType"];
-    if (value === "top" && formData.listingType !== "top") {
-      setShowTopConfirm(true);
-      return;
-    }
     updateFormField("listingType", value);
   };
 
@@ -1566,7 +1575,7 @@ const PublishPage: React.FC = () => {
       pricing: pricingRequirements,
       images: [],
       features: [],
-      description: [{ key: "description", label: "Описание" }],
+      description: [],
       contact: [
         { key: "phone", label: "Телефон" },
         { key: "email", label: "Имейл" },
@@ -1746,11 +1755,6 @@ const PublishPage: React.FC = () => {
         key: "condition",
         label: "Състояние",
         when: (data) => !["y", "z"].includes(data.mainCategory),
-      },
-      {
-        key: "vin",
-        label: "VIN номер",
-        when: (data) => !["y", "z", "u", "v", "w", "5", "6", "7", "8", "a", "b"].includes(data.mainCategory),
       }
     );
 
@@ -1771,6 +1775,17 @@ const PublishPage: React.FC = () => {
   const getMissingFields = (step: number, data: PublishFormData) => {
     const stepKey = publishSteps[step - 1]?.key;
     if (!stepKey) return [];
+
+    if (stepKey === "images") {
+      const requiredImageCount = getMinimumRequiredImageCount(data.mainCategory);
+      if (requiredImageCount <= 0) return [];
+      const uploadedImageCount = images.length + (existingCoverImage ? 1 : 0);
+      if (uploadedImageCount < requiredImageCount) {
+        return [`Поне ${requiredImageCount} снимки`];
+      }
+      return [];
+    }
+
     const requiredByStep = getRequiredFieldsByStep(data.mainCategory);
     const fields = requiredByStep[stepKey] ?? [];
     return fields
@@ -1791,15 +1806,6 @@ const PublishPage: React.FC = () => {
 
   const formatMissingMessage = (fields: string[]) =>
     fields.length ? `Моля, попълнете: ${fields.join(", ")}` : "";
-
-  const confirmTopListing = () => {
-    setFormData((prev) => ({ ...prev, listingType: "top" }));
-    setShowTopConfirm(false);
-  };
-
-  const cancelTopListing = () => {
-    setShowTopConfirm(false);
-  };
 
   const normalizeStringList = (raw: unknown): string[] => {
     if (Array.isArray(raw)) return raw.filter(Boolean);
@@ -1937,6 +1943,19 @@ const PublishPage: React.FC = () => {
     );
     const normalizedBoatCategoryValue = toStringOrEmpty(data.boat_category ?? data.boatCategory);
     const normalizedAgriCategoryValue = toStringOrEmpty(data.equipment_type ?? data.equipmentType);
+    const normalizedListingTypeRaw = toStringOrEmpty(data.listing_type ?? data.listingType).toLowerCase();
+    const normalizedListingType: PublishFormData["listingType"] =
+      normalizedListingTypeRaw === "top"
+        ? "top"
+        : normalizedListingTypeRaw === "vip"
+          ? "vip"
+          : "normal";
+    const normalizedVipPlan: PublishFormData["vipPlan"] =
+      toStringOrEmpty(data.vip_plan ?? data.vipPlan).toLowerCase() === "lifetime"
+        ? "lifetime"
+        : "7d";
+    const normalizedTopPlan: PublishFormData["topPlan"] =
+      toStringOrEmpty(data.top_plan ?? data.topPlan).toLowerCase() === "7d" ? "7d" : "1d";
 
     const nextFormData: PublishFormData = {
       ...createInitialFormData(),
@@ -1978,7 +1997,9 @@ const PublishPage: React.FC = () => {
           : normalizedMainCategory === "a"
             ? Array.from(new Set([...normalizedFeatures, ...normalizedBoatFeatures]))
           : normalizedFeatures,
-      listingType: data.listing_type === "top" || data.listingType === "top" ? "top" : "normal",
+      listingType: normalizedListingType,
+      topPlan: normalizedTopPlan,
+      vipPlan: normalizedVipPlan,
       wheelFor: normalizedWheelFor,
       wheelOfferType: normalizeWheelOfferTypeValue(
         toStringOrEmpty(data.offer_type ?? data.wheelOfferType),
@@ -2081,9 +2102,13 @@ const PublishPage: React.FC = () => {
       }
     });
 
-    const hasImage = images.length > 0 || !!existingCoverImage;
-    const totalRequired = requiredKeys.size + 1;
-    const totalFilled = filled + (hasImage ? 1 : 0);
+    const requiredImageCount = getMinimumRequiredImageCount(formData.mainCategory);
+    const uploadedImageCount = images.length + (existingCoverImage ? 1 : 0);
+    const hasRequiredImages =
+      requiredImageCount <= 0 || uploadedImageCount >= requiredImageCount;
+    const imageRequirementWeight = requiredImageCount > 0 ? 1 : 0;
+    const totalRequired = requiredKeys.size + imageRequirementWeight;
+    const totalFilled = filled + (hasRequiredImages ? imageRequirementWeight : 0);
     const percentage =
       totalRequired <= 0 ? 0 : Math.round((totalFilled / totalRequired) * 100);
 
@@ -2091,7 +2116,7 @@ const PublishPage: React.FC = () => {
       percentage,
       filledFields: filled,
       totalFields: requiredKeys.size,
-      hasImage,
+      hasRequiredImages,
     };
   };
 
@@ -2139,6 +2164,7 @@ const PublishPage: React.FC = () => {
         ? mapTransmissionToGearboxValue(formData.transmission)
         : "";
   const previewImageCount = images.length + (existingCoverImage ? 1 : 0);
+  const minimumRequiredImageCount = getMinimumRequiredImageCount(formData.mainCategory);
   const hasValidPriceSignal = requiresPrice(formData.mainCategory)
     ? hasPositiveNumber(formData.price)
     : true;
@@ -2229,9 +2255,17 @@ const PublishPage: React.FC = () => {
 
   const submitListing = async () => {
     setErrors({});
-    if (formData.listingType === "top") {
+    if (formData.listingType === "top" || formData.listingType === "vip") {
       const balance = user?.balance;
-      if (typeof balance === "number" && balance < TOP_LISTING_PRICE_EUR) {
+      const requiredAmount =
+        formData.listingType === "top"
+          ? formData.topPlan === "7d"
+            ? TOP_LISTING_PRICE_7D_EUR
+            : TOP_LISTING_PRICE_1D_EUR
+          : formData.vipPlan === "lifetime"
+            ? VIP_LISTING_PRICE_LIFETIME_EUR
+            : VIP_LISTING_PRICE_7D_EUR;
+      if (typeof balance === "number" && balance < requiredAmount) {
         setToast({ message: "Недостатъчни средства", type: "error" });
         return;
       }
@@ -2290,8 +2324,7 @@ const PublishPage: React.FC = () => {
           ? formData.city || "Извън страната"
           : formData.city || "Непосочен";
       const normalizedTitle = buildListingTitle(formData, defaultClassifiedTopmenu);
-      const normalizedDescription =
-        formData.description?.trim() || `${getMainCategoryLabel(formData.mainCategory)} обява`;
+      const normalizedDescription = formData.description?.trim() || "";
       const normalizedEmail = user?.email || formData.email || "";
 
       appendIfValue("main_category", formData.mainCategory);
@@ -2318,10 +2351,20 @@ const PublishPage: React.FC = () => {
       appendIfValue("power", formData.power);
       appendIfValue("displacement", formData.displacement);
       appendIfValue("euro_standard", normalizeCarEuroStandard(formData.euroStandard));
-      appendIfValue("description", normalizedDescription);
+      if (normalizedDescription) {
+        appendIfValue("description", normalizedDescription);
+      } else if (isEditMode) {
+        formDataToSend.append("description", "");
+      }
       appendIfValue("phone", formData.phone);
       appendIfValue("email", normalizedEmail);
       appendIfValue("listing_type", formData.listingType);
+      if (formData.listingType === "top") {
+        appendIfValue("top_plan", formData.topPlan);
+      }
+      if (formData.listingType === "vip") {
+        appendIfValue("vip_plan", formData.vipPlan);
+      }
 
       const normalizedListingFeatures = formData.features
         .map((feature) => feature.trim())
@@ -2538,7 +2581,7 @@ const PublishPage: React.FC = () => {
 
       const savedListing = parsedResponse;
 
-      if (formData.listingType === "top") {
+      if (formData.listingType === "top" || formData.listingType === "vip") {
         try {
           const meToken = localStorage.getItem("authToken");
           if (meToken) {
@@ -3370,6 +3413,14 @@ const PublishPage: React.FC = () => {
                 <FiImage size={18} className="section-icon" />
                 Снимки към обявата
               </h2>
+              {minimumRequiredImageCount > 0 && (
+                <p style={{ margin: "0 0 12px", fontSize: 13, color: "#475569" }}>
+                  Минимум {minimumRequiredImageCount} снимки.
+                  <span style={{ marginLeft: 6, fontWeight: 600 }}>
+                    Текущо: {previewImageCount}
+                  </span>
+                </p>
+              )}
               <AdvancedImageUpload images={images} onImagesChange={setImages} maxImages={15} />
             </div>
           )}
@@ -5004,9 +5055,8 @@ const PublishPage: React.FC = () => {
               </h2>
               <FormFieldWithTooltip
                 label="Описание"
-                required
                 tooltip="Подробно описание на обявата"
-                helperText="Напиши поне 50 символа за по-добра видимост"
+                helperText="Полето е по желание, но помага за по-добра видимост"
                 hint="Включи състояние, особености, сервизна история и важни детайли"
               >
                 <textarea
@@ -5073,7 +5123,7 @@ const PublishPage: React.FC = () => {
                 Тип обява
               </h2>
               <p style={{ color: "#666", marginBottom: 16, fontSize: 14 }}>
-                Избери дали обявата да е нормална или топ за по-голяма видимост.
+                Избери тип на обявата. VIP е визуално откроена, без приоритет в сортирането.
               </p>
               <div className="listing-type-grid">
                 <label
@@ -5110,8 +5160,158 @@ const PublishPage: React.FC = () => {
                   <p className="listing-type-desc">
                     Приоритетна видимост и изкарване по-напред в резултатите.
                   </p>
+                  <p className="listing-type-desc" style={{ marginTop: 8, fontWeight: 700 }}>
+                    Цена:{" "}
+                    {formData.topPlan === "7d"
+                      ? `${TOP_LISTING_PRICE_7D_EUR.toFixed(2)} EUR`
+                      : `${TOP_LISTING_PRICE_1D_EUR.toFixed(2)} EUR`}
+                  </p>
+                </label>
+
+                <label
+                  className={`listing-type-card ${
+                    formData.listingType === "vip" ? "is-selected" : ""
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="listingType"
+                    value="vip"
+                    checked={formData.listingType === "vip"}
+                    onChange={handleListingTypeChange}
+                  />
+                  <h3 className="listing-type-title">VIP обява</h3>
+                  <p className="listing-type-desc">
+                    Визуално открояване с VIP етикет (без приоритет в класирането).
+                  </p>
+                  <p className="listing-type-desc" style={{ marginTop: 8, fontWeight: 700 }}>
+                    Цена:{" "}
+                    {formData.vipPlan === "lifetime"
+                      ? `${VIP_LISTING_PRICE_LIFETIME_EUR.toFixed(2)} EUR`
+                      : `${VIP_LISTING_PRICE_7D_EUR.toFixed(2)} EUR`}
+                  </p>
                 </label>
               </div>
+
+              {formData.listingType === "top" && (
+                <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
+                  <label style={{ fontSize: 13, fontWeight: 700, color: "#334155" }}>
+                    TOP пакет
+                  </label>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <label
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "8px 10px",
+                        borderRadius: 10,
+                        border: "1px solid #e2e8f0",
+                        background: "#fff",
+                        cursor: "pointer",
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="topPlan"
+                        value="1d"
+                        checked={formData.topPlan === "1d"}
+                        onChange={(e) =>
+                          updateFormField("topPlan", e.target.value as PublishFormData["topPlan"])
+                        }
+                      />
+                      1 ден ({TOP_LISTING_PRICE_1D_EUR.toFixed(2)} EUR)
+                    </label>
+                    <label
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "8px 10px",
+                        borderRadius: 10,
+                        border: "1px solid #e2e8f0",
+                        background: "#fff",
+                        cursor: "pointer",
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="topPlan"
+                        value="7d"
+                        checked={formData.topPlan === "7d"}
+                        onChange={(e) =>
+                          updateFormField("topPlan", e.target.value as PublishFormData["topPlan"])
+                        }
+                      />
+                      7 дни ({TOP_LISTING_PRICE_7D_EUR.toFixed(2)} EUR)
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {formData.listingType === "vip" && (
+                <div style={{ marginTop: 14, display: "grid", gap: 8 }}>
+                  <label style={{ fontSize: 13, fontWeight: 700, color: "#334155" }}>
+                    VIP пакет
+                  </label>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <label
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "8px 10px",
+                        borderRadius: 10,
+                        border: "1px solid #e2e8f0",
+                        background: "#fff",
+                        cursor: "pointer",
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="vipPlan"
+                        value="7d"
+                        checked={formData.vipPlan === "7d"}
+                        onChange={(e) =>
+                          updateFormField("vipPlan", e.target.value as PublishFormData["vipPlan"])
+                        }
+                      />
+                      7 дни ({VIP_LISTING_PRICE_7D_EUR.toFixed(2)} EUR)
+                    </label>
+                    <label
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "8px 10px",
+                        borderRadius: 10,
+                        border: "1px solid #e2e8f0",
+                        background: "#fff",
+                        cursor: "pointer",
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="vipPlan"
+                        value="lifetime"
+                        checked={formData.vipPlan === "lifetime"}
+                        onChange={(e) =>
+                          updateFormField("vipPlan", e.target.value as PublishFormData["vipPlan"])
+                        }
+                      />
+                      До изтичане на обявата ({VIP_LISTING_PRICE_LIFETIME_EUR.toFixed(2)} EUR)
+                    </label>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -5191,24 +5391,6 @@ const PublishPage: React.FC = () => {
         </aside>
       </div>
     </div>
-    {showTopConfirm && (
-      <div style={styles.confirmOverlay} onClick={cancelTopListing}>
-        <div style={styles.confirmModal} onClick={(e) => e.stopPropagation()}>
-          <h3 style={styles.confirmTitle}>ТОП обява</h3>
-          <p style={styles.confirmText}>
-            Публикуването на обява като "ТОП" струва 3 EUR.
-          </p>
-          <div style={styles.confirmActions}>
-            <button style={styles.confirmButtonGhost} onClick={cancelTopListing}>
-              Отхвърли
-            </button>
-            <button style={styles.confirmButtonPrimary} onClick={confirmTopListing}>
-              Продължи
-            </button>
-          </div>
-        </div>
-      </div>
-    )}
     </div>
   );
 };

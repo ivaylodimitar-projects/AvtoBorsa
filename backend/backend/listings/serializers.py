@@ -43,6 +43,177 @@ def _normalize_media_path(raw_path):
     return f"{media_url}/{path.lstrip('/')}"
 
 
+def _normalize_choice_alias(value, aliases):
+    if value in (None, ""):
+        return value
+    key = str(value).strip().lower()
+    return aliases.get(key, value)
+
+
+FUEL_ALIASES = {
+    "benzin": "benzin",
+    "petrol": "benzin",
+    "gasoline": "benzin",
+    "бензин": "benzin",
+    "dizel": "dizel",
+    "diesel": "dizel",
+    "дизел": "dizel",
+    "gaz_benzin": "gaz_benzin",
+    "газ/бензин": "gaz_benzin",
+    "газ бензин": "gaz_benzin",
+    "gas/benzin": "gaz_benzin",
+    "gas/benzine": "gaz_benzin",
+    "gasoline+gas": "gaz_benzin",
+    "lpg/petrol": "gaz_benzin",
+    "hibrid": "hibrid",
+    "hybrid": "hibrid",
+    "хибрид": "hibrid",
+    "elektro": "elektro",
+    "electric": "elektro",
+    "ev": "elektro",
+    "електро": "elektro",
+}
+
+GEARBOX_ALIASES = {
+    "ruchna": "ruchna",
+    "manual": "ruchna",
+    "stick": "ruchna",
+    "ръчна": "ruchna",
+    "avtomatik": "avtomatik",
+    "automatic": "avtomatik",
+    "auto": "avtomatik",
+    "автоматик": "avtomatik",
+    "автоматична": "avtomatik",
+}
+
+CONDITION_ALIASES = {
+    "0": "0",
+    "new": "0",
+    "нов": "0",
+    "нова": "0",
+    "1": "1",
+    "used": "1",
+    "second hand": "1",
+    "употребяван": "1",
+    "използван": "1",
+    "2": "2",
+    "damaged": "2",
+    "повреден": "2",
+    "ударен": "2",
+    "3": "3",
+    "parts": "3",
+    "за части": "3",
+}
+
+CATEGORY_ALIASES = {
+    "van": "van",
+    "ван": "van",
+    "jeep": "jeep",
+    "джип": "jeep",
+    "cabriolet": "cabriolet",
+    "кабрио": "cabriolet",
+    "wagon": "wagon",
+    "комби": "wagon",
+    "coupe": "coupe",
+    "купе": "coupe",
+    "minivan": "minivan",
+    "миниван": "minivan",
+    "pickup": "pickup",
+    "пикап": "pickup",
+    "sedan": "sedan",
+    "седан": "sedan",
+    "stretch_limo": "stretch_limo",
+    "стреч лимузина": "stretch_limo",
+    "hatchback": "hatchback",
+    "хечбек": "hatchback",
+}
+
+LISTING_TYPE_ALIASES = {
+    "normal": "normal",
+    "regular": "normal",
+    "standard": "normal",
+    "нормална": "normal",
+    "топ": "top",
+    "top": "top",
+    "vip": "vip",
+}
+
+MAIN_CATEGORY_ALIASES = {
+    "1": "1",
+    "cars": "1",
+    "car": "1",
+    "автомобили и джипове": "1",
+    "w": "w",
+    "wheels": "w",
+    "tires and rims": "w",
+    "гуми и джанти": "w",
+    "u": "u",
+    "parts": "u",
+    "части": "u",
+    "3": "3",
+    "buses": "3",
+    "бусове": "3",
+    "4": "4",
+    "trucks": "4",
+    "камиони": "4",
+    "5": "5",
+    "motorcycles": "5",
+    "мотоциклети": "5",
+    "6": "6",
+    "agri": "6",
+    "agricultural": "6",
+    "селскостопански": "6",
+    "7": "7",
+    "industrial": "7",
+    "индустриални": "7",
+    "8": "8",
+    "forklifts": "8",
+    "кари": "8",
+    "9": "9",
+    "caravans": "9",
+    "каравани": "9",
+    "a": "a",
+    "boats": "a",
+    "яхти и лодки": "a",
+    "b": "b",
+    "trailers": "b",
+    "ремаркета": "b",
+    "v": "v",
+    "accessories": "v",
+    "аксесоари": "v",
+    "y": "y",
+    "buy": "y",
+    "купува": "y",
+    "z": "z",
+    "services": "z",
+    "услуги": "z",
+}
+
+VIP_PLAN_ALIASES = {
+    "7d": "7d",
+    "7": "7d",
+    "7days": "7d",
+    "7-day": "7d",
+    "lifetime": "lifetime",
+    "full": "lifetime",
+    "30d": "lifetime",
+}
+
+TOP_PLAN_ALIASES = {
+    "1d": "1d",
+    "1": "1d",
+    "1day": "1d",
+    "1-day": "1d",
+    "7d": "7d",
+    "7": "7d",
+    "7days": "7d",
+    "7-day": "7d",
+}
+
+MIN_IMAGES_REQUIRED_FOR_PUBLISH = 3
+MAIN_CATEGORIES_WITH_OPTIONAL_IMAGES = {"y", "z"}
+
+
 class CarImageSerializer(serializers.ModelSerializer):
     """Serializer for car images"""
     class Meta:
@@ -71,10 +242,10 @@ class CarListingLiteSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_fuel_display(self, obj):
-        return obj.get_fuel_display()
+        return obj.fuel
 
     def get_listing_type_display(self, obj):
-        return obj.get_listing_type_display()
+        return obj.listing_type
 
     def get_image_url(self, obj):
         first_image = getattr(obj, 'first_image', None)
@@ -204,22 +375,22 @@ class CarListingListSerializer(serializers.ModelSerializer):
         return self._build_image_url(images[0]) if images else None
 
     def get_fuel_display(self, obj):
-        return obj.get_fuel_display()
+        return obj.fuel
 
     def get_main_category_display(self, obj):
-        return obj.get_main_category_display()
+        return obj.main_category
 
     def get_gearbox_display(self, obj):
-        return obj.get_gearbox_display()
+        return obj.gearbox
 
     def get_condition_display(self, obj):
-        return obj.get_condition_display()
+        return obj.condition
 
     def get_category_display(self, obj):
-        return obj.get_category_display()
+        return obj.category
 
     def get_listing_type_display(self, obj):
-        return obj.get_listing_type_display()
+        return obj.listing_type
 
     def get_description_preview(self, obj):
         preview = getattr(obj, 'description_preview', None)
@@ -370,6 +541,7 @@ class CarListingSerializer(serializers.ModelSerializer):
     seller_type = serializers.SerializerMethodField()
     seller_created_at = serializers.SerializerMethodField()
     price_history = serializers.SerializerMethodField()
+    description = serializers.CharField(required=False, allow_blank=True, default="")
 
     images_upload = serializers.ListField(
         child=serializers.ImageField(),
@@ -442,7 +614,8 @@ class CarListingSerializer(serializers.ModelSerializer):
             'year_from', 'month', 'vin', 'price', 'location_country', 'location_region', 'city',
             'fuel', 'fuel_display', 'gearbox', 'gearbox_display', 'mileage', 'color', 'condition', 'condition_display',
             'power', 'displacement', 'euro_standard',
-            'description', 'phone', 'email', 'features', 'listing_type', 'listing_type_display', 'top_expires_at',
+            'description', 'phone', 'email', 'features', 'listing_type', 'listing_type_display',
+            'top_plan', 'vip_plan', 'top_expires_at', 'vip_expires_at',
             'view_count', 'is_draft', 'is_active', 'is_archived', 'created_at', 'updated_at', 'images', 'image_url',
             'is_favorited', 'seller_name', 'seller_type', 'seller_created_at', 'price_history', 'images_upload',
             'wheel_for', 'offer_type',
@@ -461,56 +634,23 @@ class CarListingSerializer(serializers.ModelSerializer):
             'id', 'slug', 'user', 'user_email', 'created_at', 'updated_at', 'images', 'image_url', 'is_favorited',
             'is_draft', 'is_active', 'fuel_display', 'gearbox_display', 'condition_display', 'category_display',
             'listing_type_display', 'seller_name', 'seller_type', 'seller_created_at', 'price_history',
-            'top_expires_at', 'view_count'
+            'top_expires_at', 'vip_expires_at', 'view_count'
         ]
 
     def get_fuel_display(self, obj):
-        fuel_choices = {
-            'benzin': 'Бензин',
-            'dizel': 'Дизел',
-            'gaz_benzin': 'Газ/Бензин',
-            'hibrid': 'Хибрид',
-            'elektro': 'Електро',
-        }
-        return fuel_choices.get(obj.fuel, obj.fuel)
+        return obj.fuel
 
     def get_gearbox_display(self, obj):
-        gearbox_choices = {
-            'ruchna': 'Ръчна',
-            'avtomatik': 'Автоматик',
-        }
-        return gearbox_choices.get(obj.gearbox, obj.gearbox)
+        return obj.gearbox
 
     def get_condition_display(self, obj):
-        condition_choices = {
-            '0': 'Нов',
-            '1': 'Употребяван',
-            '2': 'Повреден/ударен',
-            '3': 'За части',
-        }
-        return condition_choices.get(obj.condition, obj.condition)
+        return obj.condition
 
     def get_category_display(self, obj):
-        category_choices = {
-            'van': 'Ван',
-            'jeep': 'Джип',
-            'cabriolet': 'Кабрио',
-            'wagon': 'Комби',
-            'coupe': 'Купе',
-            'minivan': 'Миниван',
-            'pickup': 'Пикап',
-            'sedan': 'Седан',
-            'stretch_limo': 'Стреч лимузина',
-            'hatchback': 'Хечбек',
-        }
-        return category_choices.get(obj.category, obj.category)
+        return obj.category
 
     def get_listing_type_display(self, obj):
-        listing_type_choices = {
-            'normal': 'Нормална',
-            'top': 'Топ',
-        }
-        return listing_type_choices.get(obj.listing_type, obj.listing_type)
+        return obj.listing_type
 
     def get_image_url(self, obj):
         images = list(obj.images.all())
@@ -568,6 +708,42 @@ class CarListingSerializer(serializers.ModelSerializer):
             for entry in history
         ]
 
+    def validate(self, attrs):
+        main_category = str(
+            attrs.get("main_category", self.instance.main_category if self.instance else "1")
+        )
+
+        is_create = self.instance is None
+        if is_create:
+            target_is_draft = bool(attrs.get("is_draft", False))
+            will_publish = not target_is_draft
+            existing_images_count = 0
+        else:
+            target_is_draft = bool(attrs.get("is_draft", self.instance.is_draft))
+            will_publish = bool(self.instance.is_draft and not target_is_draft)
+            existing_images_count = self.instance.images.count()
+
+        if (
+            will_publish
+            and main_category not in MAIN_CATEGORIES_WITH_OPTIONAL_IMAGES
+        ):
+            incoming_images_count = len(attrs.get("images_upload") or [])
+            total_images = existing_images_count + incoming_images_count
+            if total_images < MIN_IMAGES_REQUIRED_FOR_PUBLISH:
+                raise serializers.ValidationError(
+                    {
+                        "images_upload": (
+                            f"Минимум {MIN_IMAGES_REQUIRED_FOR_PUBLISH} снимки са задължителни "
+                            "за тази категория."
+                        )
+                    }
+                )
+
+        if attrs.get("description") is None:
+            attrs["description"] = ""
+
+        return attrs
+
     def to_internal_value(self, data):
         if hasattr(data, "getlist"):
             always_list_keys = {
@@ -596,6 +772,8 @@ class CarListingSerializer(serializers.ModelSerializer):
             "locationCountry": "location_country",
             "locationRegion": "location_region",
             "listingType": "listing_type",
+            "topPlan": "top_plan",
+            "vipPlan": "vip_plan",
             "euroStandard": "euro_standard",
             "wheelFor": "wheel_for",
             "wheelOfferType": "offer_type",
@@ -663,6 +841,23 @@ class CarListingSerializer(serializers.ModelSerializer):
         ]:
             if mutable_data.get(numeric_key, None) == "":
                 mutable_data[numeric_key] = None
+
+        choice_field_aliases = {
+            "fuel": FUEL_ALIASES,
+            "gearbox": GEARBOX_ALIASES,
+            "condition": CONDITION_ALIASES,
+            "category": CATEGORY_ALIASES,
+            "listing_type": LISTING_TYPE_ALIASES,
+            "main_category": MAIN_CATEGORY_ALIASES,
+            "top_plan": TOP_PLAN_ALIASES,
+            "vip_plan": VIP_PLAN_ALIASES,
+        }
+        for field_name, aliases in choice_field_aliases.items():
+            if field_name in mutable_data:
+                mutable_data[field_name] = _normalize_choice_alias(
+                    mutable_data.get(field_name),
+                    aliases,
+                )
 
         def normalize_list_field(raw_value):
             if raw_value in (None, ""):

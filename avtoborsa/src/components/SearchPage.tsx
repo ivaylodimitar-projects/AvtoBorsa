@@ -39,9 +39,9 @@ type CarListing = {
   price: number;
   mileage: number;
   fuel: string;
-  fuel_display: string;
+  fuel_display?: string;
   gearbox: string;
-  gearbox_display: string;
+  gearbox_display?: string;
   power: number;
   location_country?: string;
   city: string;
@@ -73,7 +73,7 @@ type CarListing = {
     direction?: string;
     changed_at?: string;
   };
-  listing_type?: "top" | "normal" | string | number;
+  listing_type?: "top" | "vip" | "normal" | string | number;
   listing_type_display?: string;
   is_top?: boolean;
   is_top_listing?: boolean;
@@ -130,6 +130,16 @@ const isTopListing = (listing: CarListing) => {
   }
   const display = (listing.listing_type_display || "").toString().toLowerCase();
   return display.includes("топ");
+};
+
+const isVipListing = (listing: CarListing) => {
+  if (isTopListing(listing)) return false;
+  const numericType = Number(listing.listing_type);
+  if (!Number.isNaN(numericType) && numericType === 2) return true;
+  const rawType = (listing.listing_type || "").toString().toLowerCase().trim();
+  if (rawType === "vip") return true;
+  const display = (listing.listing_type_display || "").toString().toLowerCase();
+  return display.includes("vip");
 };
 
 const NEW_LISTING_BADGE_MINUTES = 10;
@@ -573,7 +583,9 @@ const SearchPage: React.FC = () => {
 
   const getListingTechnicalParams = (listing: CarListing) => {
     const params: Array<{ label: string; value: string; icon: React.ComponentType<any> }> = [];
-    const conditionLabel = toText(listing.condition_display) || formatConditionLabel(toText(listing.condition));
+    const conditionLabel = formatConditionLabel(
+      toText(listing.condition_display) || toText(listing.condition)
+    );
     const addParam = (label: string, value: unknown, icon: React.ComponentType<any>) => {
       const normalized = toText(value);
       if (!normalized) return;
@@ -676,9 +688,9 @@ const SearchPage: React.FC = () => {
       default:
         addParam("Година", listing.year_from ? `${listing.year_from} г.` : "", Calendar);
         addNumeric("Пробег", listing.mileage, "км", Gauge);
-        addParam("Гориво", listing.fuel_display || formatFuelLabel(listing.fuel), Fuel);
+        addParam("Гориво", formatFuelLabel(listing.fuel_display || listing.fuel), Fuel);
         addNumeric("Мощност", listing.power, "к.с.", Zap);
-        addParam("Кутия", listing.gearbox_display || formatGearboxLabel(listing.gearbox), Settings);
+        addParam("Кутия", formatGearboxLabel(listing.gearbox_display || listing.gearbox), Settings);
         break;
     }
 
@@ -1231,6 +1243,7 @@ const SearchPage: React.FC = () => {
     },
     itemPhotoOverlay: { position: "absolute" as const, top: 0, right: 0, bottom: 0, left: 0, display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 12, background: "linear-gradient(to top, rgba(15, 23, 42, 0.45), transparent)", zIndex: 1 },
     topBadge: { position: "absolute" as const, top: 10, left: 10, background: "linear-gradient(135deg, #ef4444, #dc2626)", color: "#fff", padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: 0.3, textTransform: "uppercase" as const, boxShadow: "0 4px 10px rgba(220, 38, 38, 0.3)", zIndex: 2 },
+    vipBadge: { position: "absolute" as const, top: 10, left: 10, background: "linear-gradient(135deg, #0ea5e9, #0284c7)", color: "#fff", padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: 0.3, textTransform: "uppercase" as const, boxShadow: "0 4px 10px rgba(2, 132, 199, 0.3)", zIndex: 2 },
     newBadge: { position: "absolute" as const, left: 10, background: "linear-gradient(135deg, #10b981, #059669)", color: "#fff", padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: 0.3, textTransform: "uppercase" as const, boxShadow: "0 4px 10px rgba(5, 150, 105, 0.35)", zIndex: 2 },
     favoriteButton: { background: "rgba(255,255,255,0.95)", border: "none", borderRadius: "50%", width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s", padding: 0, boxShadow: "0 6px 14px rgba(15, 23, 42, 0.18)" },
     photoPlaceholder: { width: "100%", height: "100%", display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center", gap: 6, color: "#94a3b8", fontSize: 13, fontWeight: 600 },
@@ -1518,6 +1531,8 @@ const SearchPage: React.FC = () => {
             <div style={styles.results} className="search-results">
               {results.map((listing, index) => {
                   const isTop = isTopListing(listing);
+                  const isVip = isVipListing(listing);
+                  const hasHighlightBadge = isTop || isVip;
                   const isNewListing = isListingNew(listing.created_at);
                   const isPriorityImage = index < 3;
                   const sellerLabel = listing.seller_name || "Частно лице";
@@ -1596,8 +1611,9 @@ const SearchPage: React.FC = () => {
                       <div style={styles.itemPhoto}>
                         <div style={styles.photoMain}>
                           {isTop && <div style={styles.topBadge}>Топ обява</div>}
+                          {isVip && <div style={styles.vipBadge}>VIP</div>}
                           {isNewListing && (
-                            <div style={{ ...styles.newBadge, top: isTop ? 38 : 10 }}>
+                            <div style={{ ...styles.newBadge, top: hasHighlightBadge ? 38 : 10 }}>
                               Нова
                             </div>
                           )}

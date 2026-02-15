@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { formatConditionLabel, formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 
 type CarListing = {
   id: number;
@@ -10,8 +11,10 @@ type CarListing = {
   year_from: number;
   price: number;
   mileage: number;
-  fuel_display: string;
-  gearbox_display: string;
+  fuel?: string;
+  fuel_display?: string;
+  gearbox?: string;
+  gearbox_display?: string;
   power: number;
   city: string;
   image_url?: string;
@@ -942,9 +945,10 @@ const DealerDetailPage: React.FC = () => {
                   const isTop = isTopListing(listing);
                   const isNew = isListingNew(listing.created_at);
                   const priceLabel = `${listing.price.toLocaleString("bg-BG")} лв`;
-                  const conditionLabel =
+                  const conditionLabel = formatConditionLabel(
                     listing.condition_display ||
-                    (listing.condition ? String(listing.condition) : "");
+                      (listing.condition ? String(listing.condition) : "")
+                  );
                   const subtitleParts = [
                     conditionLabel,
                     listing.year_from ? `${listing.year_from} г.` : "",
@@ -952,8 +956,8 @@ const DealerDetailPage: React.FC = () => {
                   const subtitle = subtitleParts.join(" · ");
                   const descriptionSnippet = getShortDescription(listing.description);
                   const chips = [
-                    listing.fuel_display || "",
-                    listing.gearbox_display || "",
+                    formatFuelLabel(listing.fuel_display || listing.fuel || ""),
+                    formatGearboxLabel(listing.gearbox_display || listing.gearbox || ""),
                     Number.isFinite(listing.power) && listing.power > 0 ? `${listing.power} к.с.` : "",
                     Number.isFinite(listing.mileage) && listing.mileage > 0
                       ? `${listing.mileage.toLocaleString("bg-BG")} км`

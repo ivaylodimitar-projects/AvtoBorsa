@@ -35,10 +35,10 @@ type BonusOption = {
 };
 
 const PRESET_AMOUNTS: PresetAmount[] = [
-  { value: 10, label: "Старт", tag: "Лесно начало" },
-  { value: 25, label: "Популярен", tag: "Най-често" },
-  { value: 50, label: "Стандарт", tag: "Най-добра стойност" },
-  { value: 100, label: "Про", tag: "За активни" },
+  { value: 5, label: "Старт" },
+  { value: 10, label: "Популярен", tag: "Най-популярен" },
+  { value: 50, label: "Стандарт" },
+  { value: 120, label: "Про" },
 ];
 
 const BONUS_OPTIONS: BonusOption[] = [
@@ -243,32 +243,32 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
     overlay: {
       position: "fixed",
       inset: 0,
-      background: "rgba(15, 23, 42, 0.65)",
-      backdropFilter: "blur(4px)",
+      background: "rgba(15, 23, 42, 0.5)",
+      backdropFilter: "blur(2px)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       zIndex: 2000,
-      padding: "24px",
+      padding: "20px",
     },
     modal: {
-      width: "min(720px, 96vw)",
-      background: "#fff",
-      borderRadius: 20,
-      boxShadow: "0 30px 80px rgba(15, 23, 42, 0.35)",
-      overflow: "hidden",
+      width: "min(660px, 96vw)",
+      background: "#ffffff",
+      borderRadius: 18,
+      border: "1px solid #d1fae5",
+      boxShadow: "0 24px 60px rgba(15, 23, 42, 0.22)",
       maxHeight: "92vh",
+      overflow: "hidden",
       display: "flex",
       flexDirection: "column",
       fontFamily: "\"Manrope\", \"Segoe UI\", sans-serif",
     },
     header: {
-      padding: "24px 24px 18px",
-      color: "#fff",
-      backgroundImage:
-        "radial-gradient(circle at top right, rgba(255,255,255,0.35), transparent 45%), linear-gradient(120deg, #0f766e 0%, #14b8a6 55%, #5eead4 100%)",
+      padding: "20px 22px 18px",
+      background: "#ffffff",
+      borderBottom: "1px solid #ecfdf5",
     },
-    headerRow: {
+    headerTop: {
       display: "flex",
       alignItems: "flex-start",
       justifyContent: "space-between",
@@ -277,50 +277,63 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
     headerBadge: {
       display: "inline-flex",
       alignItems: "center",
-      gap: 8,
-      padding: "6px 12px",
+      gap: 6,
       borderRadius: 999,
-      background: "rgba(255,255,255,0.2)",
-      fontSize: 12,
+      border: "1px solid #a7f3d0",
+      background: "#ecfdf5",
+      color: "#065f46",
+      fontSize: 11,
       fontWeight: 700,
+      padding: "4px 10px",
+      letterSpacing: "0.2px",
       textTransform: "uppercase",
-      letterSpacing: "0.4px",
+    },
+    headerBadgeAlt: {
+      display: "inline-flex",
+      alignItems: "center",
+      borderRadius: 999,
+      border: "1px solid #d1d5db",
+      background: "#ffffff",
+      color: "#475569",
+      fontSize: 11,
+      fontWeight: 700,
+      padding: "4px 10px",
+      textTransform: "uppercase",
+      letterSpacing: "0.2px",
     },
     title: {
       margin: "12px 0 8px",
+      color: "#0f172a",
       fontSize: 24,
       fontWeight: 800,
+      letterSpacing: "-0.2px",
     },
     subtitle: {
       margin: 0,
-      fontSize: 14,
-      lineHeight: 1.5,
-      opacity: 0.9,
-      maxWidth: 420,
+      color: "#475569",
+      fontSize: 13,
+      lineHeight: 1.55,
+      maxWidth: 470,
     },
     closeButton: {
-      border: "1px solid #ef4444",
-      background: "#ef4444",
-      color: "#fff",
-      borderRadius: 999,
-      padding: "6px 12px",
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      border: "1px solid #d1d5db",
+      background: "#ffffff",
+      color: "#64748b",
+      cursor: "pointer",
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
-      gap: 8,
-      cursor: "pointer",
-      fontSize: 12,
-      fontWeight: 700,
-      textTransform: "uppercase",
-      letterSpacing: "0.4px",
-      transition: "transform 0.2s ease, background 0.2s ease",
+      flexShrink: 0,
     },
     content: {
-      padding: "22px 24px 24px",
-      background: "#f8fafc",
+      padding: "18px 22px 22px",
+      background: "#ffffff",
       display: "flex",
       flexDirection: "column",
-      gap: 16,
+      gap: 14,
       flex: 1,
       minHeight: 0,
       overflowY: "auto",
@@ -328,10 +341,10 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
     },
     success: {
       background: "#ecfdf5",
-      border: "1px solid #bbf7d0",
-      color: "#0f766e",
-      padding: "10px 12px",
+      border: "1px solid #a7f3d0",
+      color: "#065f46",
       borderRadius: 10,
+      padding: "10px 12px",
       fontSize: 13,
       fontWeight: 600,
     },
@@ -339,80 +352,82 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
       background: "#fef2f2",
       border: "1px solid #fecaca",
       color: "#b91c1c",
-      padding: "10px 12px",
       borderRadius: 10,
+      padding: "10px 12px",
       fontSize: 13,
       fontWeight: 600,
     },
     form: {
       display: "flex",
       flexDirection: "column",
-      gap: 16,
+      gap: 12,
     },
     sectionCard: {
-      background: "#fff",
-      borderRadius: 16,
-      padding: 16,
-      border: "1px solid #e2e8f0",
-      boxShadow: "0 8px 20px rgba(15, 23, 42, 0.06)",
+      background: "#ffffff",
+      borderRadius: 14,
+      border: "1px solid #e5e7eb",
+      padding: 14,
+      boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
     },
     sectionTitle: {
+      color: "#0f172a",
       fontSize: 14,
       fontWeight: 800,
-      color: "#0f172a",
-      display: "flex",
+      display: "inline-flex",
       alignItems: "center",
       gap: 8,
     },
     sectionSubtitle: {
       margin: "6px 0 0",
-      fontSize: 12,
       color: "#64748b",
+      fontSize: 12,
     },
     amountGrid: {
       marginTop: 12,
       display: "grid",
       gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-      gap: 10,
+      gap: 8,
     },
     amountButton: {
-      border: "1px solid #e2e8f0",
-      borderRadius: 12,
+      border: "1px solid #e5e7eb",
+      borderRadius: 11,
       padding: "12px",
-      background: "#fff",
+      background: "#ffffff",
       cursor: "pointer",
       display: "flex",
       flexDirection: "column",
-      gap: 6,
+      gap: 5,
       textAlign: "left",
-      transition: "all 0.2s ease",
+      fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+      transition: "border-color 0.18s ease, background 0.18s ease",
     },
     amountButtonActive: {
       borderColor: "#0f766e",
-      background: "#f0fdfa",
-      boxShadow: "0 0 0 3px rgba(15, 118, 110, 0.18)",
+      background: "#ecfdf5",
+      boxShadow: "0 0 0 2px rgba(15, 118, 110, 0.14)",
     },
     amountValue: {
-      fontSize: 16,
+      fontSize: 18,
       fontWeight: 800,
       color: "#0f172a",
+      lineHeight: 1.1,
     },
     amountLabel: {
-      fontSize: 12,
-      color: "#475569",
-      fontWeight: 600,
+      fontSize: 13,
+      color: "#64748b",
+      fontWeight: 700,
     },
     amountTag: {
       alignSelf: "flex-start",
-      fontSize: 11,
-      fontWeight: 700,
-      color: "#0f766e",
-      background: "rgba(15, 118, 110, 0.12)",
-      padding: "2px 8px",
       borderRadius: 999,
+      background: "#d1fae5",
+      color: "#065f46",
+      fontSize: 10,
+      fontWeight: 700,
+      padding: "2px 8px",
     },
     customInputRow: {
-      marginTop: 14,
+      marginTop: 12,
       display: "flex",
       flexDirection: "column",
       gap: 8,
@@ -426,15 +441,15 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
       display: "flex",
       alignItems: "center",
       gap: 8,
-      border: "1px solid #e2e8f0",
-      borderRadius: 12,
+      borderRadius: 11,
+      border: "1px solid #d1d5db",
+      background: "#ffffff",
       padding: "10px 12px",
-      background: "#fff",
     },
     inputPrefix: {
+      color: "#0f766e",
       fontSize: 14,
       fontWeight: 800,
-      color: "#0f766e",
     },
     input: {
       flex: 1,
@@ -443,45 +458,53 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
       fontSize: 15,
       fontWeight: 600,
       background: "transparent",
+      color: "#0f172a",
     },
     hint: {
       fontSize: 11,
       color: "#64748b",
+      fontWeight: 600,
     },
     bonusGrid: {
       marginTop: 12,
       display: "grid",
-      gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-      gap: 12,
+      gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+      gap: 10,
     },
     bonusCard: {
-      border: "1px solid #e2e8f0",
-      borderRadius: 14,
-      padding: "12px",
-      background: "#fff",
+      border: "1px solid #e5e7eb",
+      borderRadius: 12,
+      padding: "13px",
+      background: "#ffffff",
       display: "flex",
       flexDirection: "column",
       gap: 6,
       textAlign: "left",
       cursor: "pointer",
-      transition: "all 0.2s ease",
-      minHeight: 120,
+      fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+      transition: "border-color 0.18s ease, background 0.18s ease",
+      minHeight: 112,
     },
     bonusCardSelected: {
-      borderColor: "#dc2626",
-      boxShadow: "0 0 0 3px rgba(220, 38, 38, 0.18)",
-      background: "#fef2f2",
+      borderColor: "#0f766e",
+      background: "#ecfdf5",
+      boxShadow: "0 0 0 2px rgba(15, 118, 110, 0.14)",
+    },
+    bonusCardMuted: {
+      opacity: 0.45,
+      background: "#f8fafc",
+      borderColor: "#e2e8f0",
     },
     bonusCardDisabled: {
-      opacity: 0.55,
+      opacity: 0.56,
       cursor: "not-allowed",
       background: "#f8fafc",
     },
     bonusHeaderRow: {
       display: "flex",
-      justifyContent: "space-between",
-      gap: 8,
       alignItems: "center",
+      justifyContent: "space-between",
+      gap: 6,
     },
     bonusTitle: {
       fontSize: 14,
@@ -489,17 +512,18 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
       color: "#0f172a",
     },
     bonusTag: {
-      fontSize: 11,
-      fontWeight: 700,
-      color: "#b91c1c",
-      background: "rgba(239, 68, 68, 0.12)",
-      padding: "2px 8px",
       borderRadius: 999,
+      background: "#d1fae5",
+      color: "#065f46",
+      fontSize: 10,
+      fontWeight: 700,
+      padding: "2px 8px",
     },
     bonusValue: {
-      fontSize: 20,
+      fontSize: 22,
       fontWeight: 800,
-      color: "#dc2626",
+      color: "#0f766e",
+      lineHeight: 1.1,
     },
     bonusDesc: {
       fontSize: 12,
@@ -508,102 +532,120 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
     },
     bonusRequirement: {
       fontSize: 11,
-      color: "#94a3b8",
+      color: "#64748b",
       fontWeight: 600,
     },
     bonusHint: {
       marginTop: 12,
-      fontSize: 12,
-      color: "#b91c1c",
-      background: "rgba(239, 68, 68, 0.08)",
       borderRadius: 10,
-      padding: "8px 10px",
+      border: "1px solid #a7f3d0",
+      background: "#ecfdf5",
+      color: "#065f46",
+      fontSize: 12,
       fontWeight: 600,
+      padding: "8px 10px",
     },
     summaryCard: {
-      background: "linear-gradient(135deg, #0f172a 0%, #0f766e 100%)",
-      borderRadius: 16,
-      padding: 16,
-      color: "#fff",
+      borderRadius: 12,
+      border: "1px solid #d1fae5",
+      background: "#ffffff",
+      padding: 14,
       display: "flex",
       flexDirection: "column",
       gap: 8,
     },
     summaryTitle: {
       fontSize: 13,
-      fontWeight: 700,
-      opacity: 0.85,
+      fontWeight: 800,
+      color: "#065f46",
+      textTransform: "uppercase",
+      letterSpacing: "0.2px",
     },
     summaryRow: {
       display: "flex",
       justifyContent: "space-between",
       fontSize: 13,
-      color: "rgba(255,255,255,0.8)",
+      color: "#0f172a",
     },
-    summaryBonus: {
-      color: "#fecaca",
+    summaryMuted: {
+      color: "#64748b",
+    },
+    summaryValuePositive: {
+      color: "#047857",
+      fontWeight: 700,
     },
     summaryDivider: {
       height: 1,
-      background: "rgba(255,255,255,0.2)",
-      margin: "6px 0",
+      background: "#e5e7eb",
+      margin: "2px 0",
     },
     summaryTotalRow: {
       display: "flex",
       justifyContent: "space-between",
-      fontSize: 16,
+      alignItems: "center",
+      borderRadius: 10,
+      background: "#ecfdf5",
+      border: "1px solid #a7f3d0",
+      padding: "10px 11px",
+      fontSize: 15,
       fontWeight: 800,
+      color: "#065f46",
     },
-    summaryFoot: {
-      marginTop: 6,
+    summaryPayRow: {
       fontSize: 12,
-      color: "rgba(255,255,255,0.8)",
+      color: "#475569",
       display: "flex",
       alignItems: "center",
       gap: 6,
+      marginTop: 2,
     },
     securityRow: {
       display: "flex",
       alignItems: "center",
-      gap: 10,
+      gap: 8,
+      borderRadius: 10,
+      border: "1px solid #a7f3d0",
       background: "#ecfdf5",
-      border: "1px solid #bbf7d0",
-      color: "#0f766e",
-      padding: "10px 12px",
-      borderRadius: 12,
+      color: "#065f46",
       fontSize: 12,
       fontWeight: 600,
+      padding: "10px 11px",
     },
     buttonGroup: {
+      marginTop: 2,
       display: "flex",
-      gap: 12,
-      marginTop: 6,
+      gap: 10,
     },
     cancelButton: {
       flex: 1,
-      padding: "12px 16px",
       borderRadius: 10,
-      border: "1px solid #e2e8f0",
-      background: "#fff",
-      color: "#0f172a",
-      fontSize: 14,
-      fontWeight: 700,
+      border: "1px solid #d1d5db",
+      background: "#ffffff",
+      color: "#334155",
+      fontSize: 15,
+      fontWeight: 800,
+      letterSpacing: "0.1px",
+      padding: "13px 14px",
+      fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
       cursor: "pointer",
     },
     submitButton: {
       flex: 1,
-      padding: "12px 16px",
       borderRadius: 10,
-      border: "none",
-      background: "linear-gradient(120deg, #0f766e 0%, #14b8a6 100%)",
-      color: "#fff",
-      fontSize: 14,
+      border: "1px solid #0f766e",
+      background: "#0f766e",
+      color: "#ffffff",
+      fontSize: 16,
       fontWeight: 800,
+      letterSpacing: "0.2px",
+      padding: "14px 14px",
+      fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
       cursor: "pointer",
-      boxShadow: "0 10px 24px rgba(15, 118, 110, 0.3)",
+      boxShadow: "0 10px 20px rgba(15, 118, 110, 0.22)",
     },
     submitButtonDisabled: {
-      background: "#cbd5f5",
+      borderColor: "#cbd5e1",
+      background: "#cbd5e1",
       boxShadow: "none",
       cursor: "not-allowed",
     },
@@ -613,35 +655,27 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
     <div style={styles.overlay} onClick={onClose}>
       <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div style={styles.header}>
-          <div style={styles.headerRow}>
+          <div style={styles.headerTop}>
             <div>
-              <div style={styles.headerBadge}>
-                <Coins size={14} />
-                Баланс
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={styles.headerBadge}>
+                  <ShieldCheck size={12} />
+                  Stripe Secure
+                </span>
+                <span style={styles.headerBadgeAlt}>Wallet Top-up</span>
               </div>
-              <h2 style={styles.title}>Зареди баланса си</h2>
+              <h2 style={styles.title}>Зареди баланса</h2>
               <p style={styles.subtitle}>
-                Избери сума и бонус пакет. Ще бъдеш пренасочен към защитено
-                плащане със Stripe.
+                Избери сума и бонус пакет. Плащането минава през защитен Stripe checkout.
               </p>
             </div>
             <button
               type="button"
               style={styles.closeButton}
               onClick={onClose}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "scale(1.03)";
-                e.currentTarget.style.background = "#ef4444";
-                e.currentTarget.style.borderColor = "#ef4444";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
-                e.currentTarget.style.background = "#ef4444";
-                e.currentTarget.style.borderColor = "#ef4444";
-              }}
+              aria-label="Затвори"
             >
-              <X size={14} color="#fff" />
-              Затвори
+              <X size={16} />
             </button>
           </div>
         </div>
@@ -699,7 +733,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
                   />
                 </div>
                 <div style={styles.hint}>
-                  Минимум 1€, максимум 999 999.99€
+                  Минимум 1€, максимум 1000€
                 </div>
               </div>
             </div>
@@ -710,13 +744,14 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
                 Бонус пакети
               </div>
               <p style={styles.sectionSubtitle}>
-                Избери промо бонус и виж крайния баланс.
+                Бонусът се прилага автоматично според избрания пакет.
               </p>
               <div style={styles.bonusGrid}>
                 {BONUS_OPTIONS.map((option) => {
                   const isDisabled =
                     option.minAmount > 0 && amountValue < option.minAmount;
                   const isSelected = option.id === selectedBonusId;
+                  const isMuted = !isSelected;
 
                   return (
                     <button
@@ -724,6 +759,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
                       type="button"
                       style={{
                         ...styles.bonusCard,
+                        ...(isMuted ? styles.bonusCardMuted : {}),
                         ...(isSelected ? styles.bonusCardSelected : {}),
                         ...(isDisabled ? styles.bonusCardDisabled : {}),
                       }}
@@ -759,13 +795,13 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
               <div style={styles.summaryTitle}>Резюме</div>
               <div style={styles.summaryRow}>
                 <span>Сума за зареждане</span>
-                <strong>
+                <strong style={styles.summaryMuted}>
                   {amountValue > 0 ? formatCurrency(amountValue) : "—"}
                 </strong>
               </div>
               <div style={styles.summaryRow}>
                 <span>Бонус</span>
-                <strong style={styles.summaryBonus}>
+                <strong style={styles.summaryValuePositive}>
                   {amountValue > 0 ? `+${formatCurrency(bonusAmount)}` : "—"}
                 </strong>
               </div>
@@ -776,7 +812,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
                   {amountValue > 0 ? formatCurrency(totalCredit) : "—"}
                 </strong>
               </div>
-              <div style={styles.summaryFoot}>
+              <div style={styles.summaryPayRow}>
                 <CreditCard size={14} />
                 Общо за плащане:
                 <strong>
@@ -802,19 +838,19 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
               </button>
               <button
                 type="submit"
-                style={{
-                  ...styles.submitButton,
-                  ...(isLoading || success || !isAmountValid
-                    ? styles.submitButtonDisabled
-                    : {}),
-                }}
-                disabled={isLoading || success || !isAmountValid}
-              >
-                {isLoading ? "Пренасочване..." : "Продължи към плащане"}
-              </button>
-            </div>
-          </form>
-        </div>
+              style={{
+                ...styles.submitButton,
+                ...(isLoading || success || !isAmountValid
+                  ? styles.submitButtonDisabled
+                  : {}),
+              }}
+              disabled={isLoading || success || !isAmountValid}
+            >
+              {isLoading ? "Пренасочване..." : "Продължи към Stripe"}
+            </button>
+          </div>
+        </form>
+      </div>
       </div>
     </div>
   );

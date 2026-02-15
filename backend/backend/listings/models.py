@@ -11,7 +11,11 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 LISTING_EXPIRY_DAYS = 30
-TOP_LISTING_DURATION_DAYS = 14
+TOP_PLAN_1D = "1d"
+TOP_PLAN_7D = "7d"
+TOP_LISTING_DURATION_DAYS_1D = 1
+TOP_LISTING_DURATION_DAYS_7D = 7
+VIP_LISTING_DURATION_DAYS = 7
 CAR_IMAGE_THUMBNAIL_SIZE = (280, 194)
 CAR_IMAGE_THUMBNAIL_QUALITY = 82
 
@@ -22,77 +26,103 @@ def get_expiry_cutoff(now=None):
     return current - timedelta(days=LISTING_EXPIRY_DAYS)
 
 
-def get_top_expiry(now=None):
-    """Return the datetime when a top listing should expire."""
+def get_top_expiry(now=None, top_plan=TOP_PLAN_1D):
+    """Return the datetime when a top listing should expire for the selected plan."""
     current = now or timezone.now()
-    return current + timedelta(days=TOP_LISTING_DURATION_DAYS)
+    duration_days = (
+        TOP_LISTING_DURATION_DAYS_1D
+        if str(top_plan) == TOP_PLAN_1D
+        else TOP_LISTING_DURATION_DAYS_7D
+    )
+    return current + timedelta(days=duration_days)
+
+
+def get_listing_expiry(created_at=None, now=None):
+    """Return the datetime when a listing expires."""
+    base = created_at or now or timezone.now()
+    return base + timedelta(days=LISTING_EXPIRY_DAYS)
+
+
+def get_vip_short_expiry(now=None):
+    """Return the datetime when a 7-day VIP window should expire."""
+    current = now or timezone.now()
+    return current + timedelta(days=VIP_LISTING_DURATION_DAYS)
 
 class CarListing(models.Model):
     """Model for car listings/advertisements"""
 
     FUEL_CHOICES = [
-        ('benzin', 'Бензин'),
-        ('dizel', 'Дизел'),
-        ('gaz_benzin', 'Газ/Бензин'),
-        ('hibrid', 'Хибрид'),
-        ('elektro', 'Електро'),
+        ('benzin', 'Ð‘ÐµÐ½Ð·Ð¸Ð½'),
+        ('dizel', 'Ð”Ð¸Ð·ÐµÐ»'),
+        ('gaz_benzin', 'Ð“Ð°Ð·/Ð‘ÐµÐ½Ð·Ð¸Ð½'),
+        ('hibrid', 'Ð¥Ð¸Ð±Ñ€Ð¸Ð´'),
+        ('elektro', 'Ð•Ð»ÐµÐºÑ‚Ñ€Ð¾'),
     ]
 
     GEARBOX_CHOICES = [
-        ('ruchna', 'Ръчна'),
-        ('avtomatik', 'Автоматик'),
+        ('ruchna', 'Ð ÑŠÑ‡Ð½Ð°'),
+        ('avtomatik', 'ÐÐ²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ðº'),
     ]
 
     CONDITION_CHOICES = [
-        ('0', 'Нов'),
-        ('1', 'Употребяван'),
-        ('2', 'Повреден/ударен'),
-        ('3', 'За части'),
+        ('0', 'ÐÐ¾Ð²'),
+        ('1', 'Ð£Ð¿Ð¾Ñ‚Ñ€ÐµÐ±ÑÐ²Ð°Ð½'),
+        ('2', 'ÐŸÐ¾Ð²Ñ€ÐµÐ´ÐµÐ½/ÑƒÐ´Ð°Ñ€ÐµÐ½'),
+        ('3', 'Ð—Ð° Ñ‡Ð°ÑÑ‚Ð¸'),
     ]
 
     CAR_TYPE_CHOICES = [
-        ('van', 'Ван'),
-        ('jeep', 'Джип'),
-        ('cabriolet', 'Кабрио'),
-        ('wagon', 'Комби'),
-        ('coupe', 'Купе'),
-        ('minivan', 'Миниван'),
-        ('pickup', 'Пикап'),
-        ('sedan', 'Седан'),
-        ('stretch_limo', 'Стреч лимузина'),
-        ('hatchback', 'Хечбек'),
+        ('van', 'Ð’Ð°Ð½'),
+        ('jeep', 'Ð”Ð¶Ð¸Ð¿'),
+        ('cabriolet', 'ÐšÐ°Ð±Ñ€Ð¸Ð¾'),
+        ('wagon', 'ÐšÐ¾Ð¼Ð±Ð¸'),
+        ('coupe', 'ÐšÑƒÐ¿Ðµ'),
+        ('minivan', 'ÐœÐ¸Ð½Ð¸Ð²Ð°Ð½'),
+        ('pickup', 'ÐŸÐ¸ÐºÐ°Ð¿'),
+        ('sedan', 'Ð¡ÐµÐ´Ð°Ð½'),
+        ('stretch_limo', 'Ð¡Ñ‚Ñ€ÐµÑ‡ Ð»Ð¸Ð¼ÑƒÐ·Ð¸Ð½Ð°'),
+        ('hatchback', 'Ð¥ÐµÑ‡Ð±ÐµÐº'),
     ]
 
     EURO_STANDARD_CHOICES = [
-        ('1', 'Евро 1'),
-        ('2', 'Евро 2'),
-        ('3', 'Евро 3'),
-        ('4', 'Евро 4'),
-        ('5', 'Евро 5'),
-        ('6', 'Евро 6'),
+        ('1', 'Ð•Ð²Ñ€Ð¾ 1'),
+        ('2', 'Ð•Ð²Ñ€Ð¾ 2'),
+        ('3', 'Ð•Ð²Ñ€Ð¾ 3'),
+        ('4', 'Ð•Ð²Ñ€Ð¾ 4'),
+        ('5', 'Ð•Ð²Ñ€Ð¾ 5'),
+        ('6', 'Ð•Ð²Ñ€Ð¾ 6'),
     ]
 
     LISTING_TYPE_CHOICES = [
         ('normal', 'Нормална'),
         ('top', 'Топ'),
+        ('vip', 'VIP'),
+    ]
+    TOP_PLAN_CHOICES = [
+        (TOP_PLAN_1D, '1 day'),
+        (TOP_PLAN_7D, '7 days'),
+    ]
+    VIP_PLAN_CHOICES = [
+        ('7d', '7 days'),
+        ('lifetime', 'Lifetime'),
     ]
 
     MAIN_CATEGORY_CHOICES = [
-        ('1', 'Автомобили и Джипове'),
-        ('w', 'Гуми и джанти'),
-        ('u', 'Части'),
-        ('3', 'Бусове'),
-        ('4', 'Камиони'),
-        ('5', 'Мотоциклети'),
-        ('6', 'Селскостопански'),
-        ('7', 'Индустриални'),
-        ('8', 'Кари'),
-        ('9', 'Каравани'),
-        ('a', 'Яхти и Лодки'),
-        ('b', 'Ремаркета'),
-        ('v', 'Аксесоари'),
-        ('y', 'Купува'),
-        ('z', 'Услуги'),
+        ('1', 'ÐÐ²Ñ‚Ð¾Ð¼Ð¾Ð±Ð¸Ð»Ð¸ Ð¸ Ð”Ð¶Ð¸Ð¿Ð¾Ð²Ðµ'),
+        ('w', 'Ð“ÑƒÐ¼Ð¸ Ð¸ Ð´Ð¶Ð°Ð½Ñ‚Ð¸'),
+        ('u', 'Ð§Ð°ÑÑ‚Ð¸'),
+        ('3', 'Ð‘ÑƒÑÐ¾Ð²Ðµ'),
+        ('4', 'ÐšÐ°Ð¼Ð¸Ð¾Ð½Ð¸'),
+        ('5', 'ÐœÐ¾Ñ‚Ð¾Ñ†Ð¸ÐºÐ»ÐµÑ‚Ð¸'),
+        ('6', 'Ð¡ÐµÐ»ÑÐºÐ¾ÑÑ‚Ð¾Ð¿Ð°Ð½ÑÐºÐ¸'),
+        ('7', 'Ð˜Ð½Ð´ÑƒÑÑ‚Ñ€Ð¸Ð°Ð»Ð½Ð¸'),
+        ('8', 'ÐšÐ°Ñ€Ð¸'),
+        ('9', 'ÐšÐ°Ñ€Ð°Ð²Ð°Ð½Ð¸'),
+        ('a', 'Ð¯Ñ…Ñ‚Ð¸ Ð¸ Ð›Ð¾Ð´ÐºÐ¸'),
+        ('b', 'Ð ÐµÐ¼Ð°Ñ€ÐºÐµÑ‚Ð°'),
+        ('v', 'ÐÐºÑÐµÑÐ¾Ð°Ñ€Ð¸'),
+        ('y', 'ÐšÑƒÐ¿ÑƒÐ²Ð°'),
+        ('z', 'Ð£ÑÐ»ÑƒÐ³Ð¸'),
     ]
 
     # User and basic info
@@ -138,8 +168,12 @@ class CarListing(models.Model):
     is_active = models.BooleanField(default=True)
     is_archived = models.BooleanField(default=False)
     listing_type = models.CharField(max_length=10, choices=LISTING_TYPE_CHOICES, default='normal')
+    top_plan = models.CharField(max_length=12, choices=TOP_PLAN_CHOICES, null=True, blank=True)
     top_paid_at = models.DateTimeField(null=True, blank=True)
     top_expires_at = models.DateTimeField(null=True, blank=True)
+    vip_plan = models.CharField(max_length=12, choices=VIP_PLAN_CHOICES, null=True, blank=True)
+    vip_paid_at = models.DateTimeField(null=True, blank=True)
+    vip_expires_at = models.DateTimeField(null=True, blank=True)
     view_count = models.PositiveIntegerField(default=0)
 
     # Timestamps
@@ -163,6 +197,7 @@ class CarListing(models.Model):
             models.Index(fields=['category'], name='carlist_category_idx'),
             models.Index(fields=['location_region'], name='carlist_region_idx'),
             models.Index(fields=['listing_type', 'top_expires_at'], name='carlist_top_exp_idx'),
+            models.Index(fields=['listing_type', 'vip_expires_at'], name='carlist_vip_exp_idx'),
         ]
 
     def __str__(self):
@@ -176,40 +211,99 @@ class CarListing(models.Model):
             return f"obiava-{self.id}-{brand_slug}-{model_slug}"
         return None
 
-    def apply_top_status(self, now=None):
-        """Ensure top listings have an expiry and demote expired ones."""
+    def _clear_top_status(self):
+        self.top_plan = None
+        self.top_paid_at = None
+        self.top_expires_at = None
+
+    def _clear_vip_status(self):
+        self.vip_plan = None
+        self.vip_paid_at = None
+        self.vip_expires_at = None
+
+    def apply_listing_type_status(self, now=None):
+        """Ensure promoted listings have expiries and demote expired ones."""
         current = now or timezone.now()
         if self.listing_type == 'top':
             if self.top_expires_at and self.top_expires_at <= current:
                 self.listing_type = 'normal'
-                self.top_paid_at = None
-                self.top_expires_at = None
+                self._clear_top_status()
+                self._clear_vip_status()
                 return
 
+            if self.top_plan not in {TOP_PLAN_1D, TOP_PLAN_7D}:
+                self.top_plan = TOP_PLAN_1D
             if self.top_paid_at is None:
                 self.top_paid_at = current
             if self.top_expires_at is None:
-                self.top_expires_at = get_top_expiry(self.top_paid_at)
-        else:
-            self.top_paid_at = None
-            self.top_expires_at = None
+                self.top_expires_at = get_top_expiry(self.top_paid_at, top_plan=self.top_plan)
+            self._clear_vip_status()
+            return
+
+        if self.listing_type == 'vip':
+            if self.vip_expires_at and self.vip_expires_at <= current:
+                self.listing_type = 'normal'
+                self._clear_top_status()
+                self._clear_vip_status()
+                return
+
+            if self.vip_plan not in {'7d', 'lifetime'}:
+                self.vip_plan = '7d'
+            if self.vip_paid_at is None:
+                self.vip_paid_at = current
+            if self.vip_expires_at is None:
+                if self.vip_plan == 'lifetime':
+                    self.vip_expires_at = get_listing_expiry(self.created_at, now=current)
+                else:
+                    self.vip_expires_at = get_vip_short_expiry(self.vip_paid_at)
+            self._clear_top_status()
+            return
+
+        self._clear_top_status()
+        self._clear_vip_status()
+
+    def apply_top_status(self, now=None):
+        """Backward compatible wrapper for older callers."""
+        self.apply_listing_type_status(now=now)
 
     @classmethod
     def demote_expired_top_listings(cls, now=None):
-        """Bulk demote expired top listings to normal."""
+        """Bulk demote expired promoted listings to normal."""
         current = now or timezone.now()
-        return cls.objects.filter(
+        demoted_top = cls.objects.filter(
             listing_type='top',
             top_expires_at__isnull=False,
             top_expires_at__lte=current,
-        ).update(listing_type='normal', top_paid_at=None, top_expires_at=None)
+        ).update(
+            listing_type='normal',
+            top_plan=None,
+            top_paid_at=None,
+            top_expires_at=None,
+            vip_plan=None,
+            vip_paid_at=None,
+            vip_expires_at=None,
+        )
+        demoted_vip = cls.objects.filter(
+            listing_type='vip',
+            vip_expires_at__isnull=False,
+            vip_expires_at__lte=current,
+        ).update(
+            listing_type='normal',
+            top_plan=None,
+            top_paid_at=None,
+            top_expires_at=None,
+            vip_plan=None,
+            vip_paid_at=None,
+            vip_expires_at=None,
+        )
+        return demoted_top + demoted_vip
 
     def save(self, *args, **kwargs):
         """Override save to auto-generate slug"""
         old_price = None
         if self.pk:
             old_price = CarListing.objects.filter(pk=self.pk).values_list('price', flat=True).first()
-        self.apply_top_status()
+        self.apply_listing_type_status()
         # First save to get an ID if it's a new object
         if not self.pk:
             # Remove force_insert to allow normal insert
@@ -254,7 +348,7 @@ class CarListingPriceHistory(models.Model):
 
 
 class CarsListing(models.Model):
-    """Dedicated details model for main_category='1' (Автомобили и Джипове)."""
+    """Dedicated details model for main_category='1' (ÐÐ²Ñ‚Ð¾Ð¼Ð¾Ð±Ð¸Ð»Ð¸ Ð¸ Ð”Ð¶Ð¸Ð¿Ð¾Ð²Ðµ)."""
     listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='cars_details')
 
     def __str__(self):
@@ -519,3 +613,5 @@ class Favorite(models.Model):
 
     def __str__(self):
         return f"{self.user.email} favorited {self.listing.brand} {self.listing.model}"
+
+

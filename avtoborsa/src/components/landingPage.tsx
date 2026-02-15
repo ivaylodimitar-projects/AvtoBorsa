@@ -7,6 +7,7 @@ import { useSavedSearches } from "../hooks/useSavedSearches";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 import { CAR_BRANDS, CAR_MODELS } from "../constants/carBrandModels";
 import { APP_MAIN_CATEGORY_OPTIONS, getMainCategoryLabel } from "../constants/mobileBgData";
+import { formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 import type { IconType } from "react-icons";
 import {
   FaCarSide,
@@ -36,9 +37,9 @@ type CarListing = {
   price: number;
   mileage: number;
   fuel: string;
-  fuel_display: string;
+  fuel_display?: string;
   gearbox: string;
-  gearbox_display: string;
+  gearbox_display?: string;
   power: number;
   city: string;
   image_url?: string;
@@ -343,14 +344,14 @@ export default function LandingPage() {
       pushValue(`${Math.round(mileage).toLocaleString("bg-BG")} км`);
     }
 
-    pushValue((listing.fuel_display || listing.fuel || "").toString());
+    pushValue(formatFuelLabel((listing.fuel_display || listing.fuel || "").toString()));
 
     const power = Number(listing.power);
     if (Number.isFinite(power) && power > 0) {
       pushValue(`${Math.round(power)} к.с.`);
     }
 
-    pushValue((listing.gearbox_display || "").toString());
+    pushValue(formatGearboxLabel((listing.gearbox_display || listing.gearbox || "").toString()));
 
     return values.slice(0, 4);
   };
@@ -1016,20 +1017,27 @@ export default function LandingPage() {
                           </div>
                         )}
                         {/* Price overlay */}
-                        <div style={{
-                          position: "absolute",
-                          right: 12,
-                          bottom: 12,
-                          background: "#0f766e",
-                          padding: "6px 12px",
-                          borderRadius: 4,
-                          fontWeight: 800,
-                          fontSize: 14,
-                          color: "#fff",
-                          border: "1px solid #e0e0e0",
-                          boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
-                        }}>
-                          {listing.price.toLocaleString("bg-BG")} &euro;
+                        <div
+                          style={{
+                            position: "absolute",
+                            right: 12,
+                            bottom: 12,
+                            padding: "3px 6px",
+                            borderRadius: 14,
+                            background: "linear-gradient(rgb(248, 250, 252) 0%, rgb(241, 245, 249) 100%)",
+                            color: "#000",
+                            fontSize: 14,
+                            fontWeight: 800,
+                            border: "1px solid rgb(224, 224, 224)",
+                            boxShadow: "rgba(0, 0, 0, 0.12) 0px 2px 6px",
+                            zIndex: 2,
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "flex-end",
+                            gap: 4,
+                          }}
+                        >
+                          <span>{listing.price.toLocaleString("bg-BG")} €</span>
                         </div>
                       </div>
 

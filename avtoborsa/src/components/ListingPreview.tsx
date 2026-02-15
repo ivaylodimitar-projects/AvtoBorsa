@@ -17,7 +17,7 @@ interface ListingPreviewProps {
   description: string;
   completionPercentage: number;
   variant?: "full" | "compact";
-  listingType?: "top" | "normal" | string;
+  listingType?: "top" | "vip" | "normal" | string;
   dealershipAbout?: string;
   imageCount?: number;
   priceRequired?: boolean;
@@ -148,6 +148,20 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
       textTransform: "uppercase" as const,
       boxShadow: "0 6px 14px rgba(249, 115, 22, 0.35)",
     },
+    vipBadge: {
+      position: "absolute" as const,
+      top: 12,
+      left: 12,
+      padding: "6px 10px",
+      borderRadius: 999,
+      background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: 0.4,
+      textTransform: "uppercase" as const,
+      boxShadow: "0 6px 14px rgba(2, 132, 199, 0.35)",
+    },
     noImage: {
       color: "#94a3b8",
       display: "flex",
@@ -268,6 +282,7 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
       <div style={styles.content}>
         <div style={styles.imageContainer}>
           {listingType === "top" && <div style={styles.topBadge}>Топ обява</div>}
+          {listingType === "vip" && <div style={styles.vipBadge}>VIP обява</div>}
           {coverImage ? (
             <img src={coverImage} alt="Cover" style={styles.image} />
           ) : (

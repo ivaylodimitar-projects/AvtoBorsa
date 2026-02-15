@@ -15,6 +15,7 @@ interface RezonGalleryProps {
   isMobile: boolean;
   promoLabel?: string;
   showTopBadge?: boolean;
+  showVipBadge?: boolean;
   showNewBadge?: boolean;
 }
 
@@ -40,7 +41,6 @@ const MainCarouselImage = memo<{
       userSelect: 'none',
       WebkitUserSelect: 'none',
       msUserSelect: 'none',
-      WebkitUserDrag: 'none',
     }}
     onDragStart={(e) => e.preventDefault()}
   />
@@ -61,6 +61,7 @@ const FullscreenModal = memo<{
   getImageUrl: (path: string) => string;
   isMobile: boolean;
   showTopBadge?: boolean;
+  showVipBadge?: boolean;
   showNewBadge?: boolean;
 }>(
   ({
@@ -75,6 +76,7 @@ const FullscreenModal = memo<{
     getImageUrl,
     isMobile,
     showTopBadge = false,
+    showVipBadge = false,
     showNewBadge = false,
   }) => {
     const [zoomLevel, setZoomLevel] = useState(1);
@@ -249,6 +251,23 @@ const FullscreenModal = memo<{
                 Топ обява
               </span>
             )}
+            {showVipBadge && (
+              <span
+                style={{
+                  background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+                  color: '#fff',
+                  padding: isMobile ? '5px 9px' : '6px 11px',
+                  borderRadius: 999,
+                  fontSize: isMobile ? 10 : 11,
+                  fontWeight: 700,
+                  letterSpacing: 0.3,
+                  textTransform: 'uppercase',
+                  boxShadow: '0 6px 14px rgba(2, 132, 199, 0.35)',
+                }}
+              >
+                VIP обява
+              </span>
+            )}
             {showNewBadge && (
               <span
                 style={{
@@ -414,7 +433,6 @@ const FullscreenModal = memo<{
                 userSelect: 'none',
                 WebkitUserSelect: 'none',
                 msUserSelect: 'none',
-                WebkitUserDrag: 'none',
               }}
               onDragStart={(e) => e.preventDefault()}
             />
@@ -506,6 +524,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
   isMobile,
   promoLabel,
   showTopBadge = false,
+  showVipBadge = false,
   showNewBadge = false,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -722,6 +741,21 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         boxShadow: '0 6px 14px rgba(220, 38, 38, 0.35)',
         zIndex: 11,
       } as React.CSSProperties,
+      vipBadge: {
+        position: 'absolute' as const,
+        top: isMobile ? 8 : 12,
+        left: isMobile ? 8 : 12,
+        background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
+        color: '#fff',
+        padding: isMobile ? '5px 9px' : '6px 11px',
+        borderRadius: 999,
+        fontSize: isMobile ? 10 : 11,
+        fontWeight: 700,
+        letterSpacing: 0.3,
+        textTransform: 'uppercase' as const,
+        boxShadow: '0 6px 14px rgba(2, 132, 199, 0.35)',
+        zIndex: 11,
+      } as React.CSSProperties,
       newBadge: {
         position: 'absolute' as const,
         top: isMobile ? 8 : 12,
@@ -763,11 +797,23 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
           {showTopBadge && (
             <div style={styles.topBadge}>Топ обява</div>
           )}
+          {showVipBadge && (
+            <div
+              style={{
+                ...styles.vipBadge,
+                top: showTopBadge ? (isMobile ? 40 : 48) : (isMobile ? 8 : 12),
+              }}
+            >
+              VIP обява
+            </div>
+          )}
           {showNewBadge && (
             <div
               style={{
                 ...styles.newBadge,
-                top: showTopBadge ? (isMobile ? 40 : 48) : (isMobile ? 8 : 12),
+                top:
+                  (isMobile ? 8 : 12) +
+                  ((showTopBadge ? 1 : 0) + (showVipBadge ? 1 : 0)) * (isMobile ? 32 : 36),
               }}
             >
               Нова
@@ -780,7 +826,9 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
               alt="Promo"
               style={{
                 ...styles.promoLabel,
-                top: showTopBadge ? (isMobile ? 40 : 48) : (isMobile ? 8 : 12),
+                top:
+                  (isMobile ? 8 : 12) +
+                  ((showTopBadge ? 1 : 0) + (showVipBadge ? 1 : 0)) * (isMobile ? 32 : 36),
                 maxWidth: isMobile ? 60 : 80,
                 height: 'auto',
               }}
@@ -876,6 +924,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         getImageUrl={getImageUrl}
         isMobile={isMobile}
         showTopBadge={showTopBadge}
+        showVipBadge={showVipBadge}
         showNewBadge={showNewBadge}
       />
     </>
