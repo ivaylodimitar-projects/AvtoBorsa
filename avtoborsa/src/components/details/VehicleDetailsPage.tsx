@@ -9,8 +9,7 @@ import SellerCard from './SellerCard';
 import SkeletonLoader from './SkeletonLoader';
 import { extractIdFromSlug } from '../../utils/slugify';
 import { useImageUrl } from '../../hooks/useGalleryLazyLoad';
-import topBadgeImage from '../../assets/top_badge.png';
-import vipBadgeImage from '../../assets/vip_badge.jpg';
+import ListingPromoBadge from '../ListingPromoBadge';
 
 interface CarImage {
   id: number;
@@ -693,45 +692,20 @@ const VehicleDetailsPage: React.FC = () => {
       background: '#e2e8f0',
       isolation: 'isolate',
     },
-    similarBadgeRow: {
+    similarNewBadge: {
       position: 'absolute',
-      top: -8,
-      left: -6,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 6,
-      zIndex: 12,
-    },
-    similarBadge: {
-      padding: '4px 8px',
+      top: 10,
+      left: 10,
+      padding: '4px 9px',
       borderRadius: 999,
       fontSize: 10,
       fontWeight: 700,
       letterSpacing: 0.3,
       textTransform: 'uppercase' as const,
       color: '#fff',
-      background: '#ef4444',
-      boxShadow: '0 4px 10px rgba(239, 68, 68, 0.25)',
-    },
-    similarBadgeNew: {
-      background: '#10b981',
+      background: 'linear-gradient(135deg, #10b981, #059669)',
       boxShadow: '0 4px 10px rgba(16, 185, 129, 0.25)',
-    },
-    similarBadgeVip: {
-      width: 50,
-      height: 50,
-      objectFit: 'contain' as const,
-      transform: 'rotate(-9deg)',
-      filter: 'drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))',
-      pointerEvents: 'none' as const,
-    },
-    similarBadgeTop: {
-      width: 50,
-      height: 50,
-      objectFit: 'contain' as const,
-      transform: 'rotate(-9deg)',
-      filter: 'drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))',
-      pointerEvents: 'none' as const,
+      zIndex: 11,
     },
     similarImage: {
       width: '100%',
@@ -1037,28 +1011,12 @@ const VehicleDetailsPage: React.FC = () => {
                         onClick={() => navigate(`/details/${item.slug}`)}
                       >
                         <div style={styles.similarMedia}>
-                          {(isTop || isVip || isNew) && (
-                            <div style={styles.similarBadgeRow}>
-                              {isTop && (
-                                <img
-                                  src={topBadgeImage}
-                                  alt="Топ обява"
-                                  style={styles.similarBadgeTop}
-                                  loading="lazy"
-                                  decoding="async"
-                                />
-                              )}
-                              {isVip && (
-                                <img
-                                  src={vipBadgeImage}
-                                  alt="VIP обява"
-                                  style={styles.similarBadgeVip}
-                                  loading="lazy"
-                                  decoding="async"
-                                />
-                              )}
-                              {isNew && <span style={{ ...styles.similarBadge, ...styles.similarBadgeNew }}>Нова</span>}
-                            </div>
+                          {isTop && <ListingPromoBadge type="top" />}
+                          {isVip && <ListingPromoBadge type="vip" />}
+                          {isNew && (
+                            <span style={{ ...styles.similarNewBadge, top: 'auto', bottom: 10, left: 10 }}>
+                              Нова
+                            </span>
                           )}
                           {imageUrl ? (
                             <img

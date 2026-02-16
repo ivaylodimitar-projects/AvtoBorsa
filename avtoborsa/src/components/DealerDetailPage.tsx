@@ -3,8 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { MapPin, Fuel, Gauge, Zap, Settings } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { formatConditionLabel, formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
-import topBadgeImage from "../assets/top_badge.png";
-import vipBadgeImage from "../assets/vip_badge.jpg";
+import ListingPromoBadge from "./ListingPromoBadge";
 
 type CarListing = {
   id: number;
@@ -630,30 +629,6 @@ const DealerDetailPage: React.FC = () => {
       fontSize: 14,
       gap: 8,
     },
-    topBadge: {
-      position: "absolute",
-      top: -8,
-      left: -6,
-      width: 64,
-      height: 64,
-      objectFit: "contain",
-      transform: "rotate(-9deg)",
-      filter: "drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))",
-      zIndex: 12,
-      pointerEvents: "none",
-    },
-    vipBadge: {
-      position: "absolute",
-      top: -8,
-      left: -6,
-      width: 64,
-      height: 64,
-      objectFit: "contain",
-      transform: "rotate(-9deg)",
-      filter: "drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))",
-      zIndex: 12,
-      pointerEvents: "none",
-    },
     newBadge: {
       position: "absolute",
       left: 12,
@@ -1111,7 +1086,6 @@ const DealerDetailPage: React.FC = () => {
                 {paginatedListings.map((listing) => {
                   const isTop = isTopListing(listing);
                   const isVip = isVipListing(listing);
-                  const hasHighlightBadge = isTop || isVip;
                   const isNew = isListingNew(listing.created_at);
                   const priceLabel = `${listing.price.toLocaleString("bg-BG")} €`;
                   const conditionLabel = formatConditionLabel(
@@ -1141,25 +1115,13 @@ const DealerDetailPage: React.FC = () => {
                   >
                     <div style={styles.listingMedia}>
                       {isTop && (
-                        <img
-                          src={topBadgeImage}
-                          alt="Топ обява"
-                          style={styles.topBadge}
-                          loading="lazy"
-                          decoding="async"
-                        />
+                        <ListingPromoBadge type="top" />
                       )}
                       {isVip && (
-                        <img
-                          src={vipBadgeImage}
-                          alt="VIP обява"
-                          style={styles.vipBadge}
-                          loading="lazy"
-                          decoding="async"
-                        />
+                        <ListingPromoBadge type="vip" />
                       )}
                       {isNew && (
-                        <div style={{ ...styles.newBadge, top: hasHighlightBadge ? 62 : 12 }}>
+                        <div style={{ ...styles.newBadge, top: "auto", bottom: 12, left: 12 }}>
                           Нова
                         </div>
                       )}

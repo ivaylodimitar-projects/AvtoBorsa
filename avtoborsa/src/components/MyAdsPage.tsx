@@ -42,8 +42,7 @@ import {
   invalidateMyAdsCache,
 } from "../utils/myAdsCache";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
-import topBadgeImage from "../assets/top_badge.png";
-import vipBadgeImage from "../assets/vip_badge.jpg";
+import ListingPromoBadge from "./ListingPromoBadge";
 
 interface CarListing {
   id: number;
@@ -1835,30 +1834,6 @@ const MyAdsPage: React.FC = () => {
     fontSize: 14,
     gap: 8,
   },
-  topBadge: {
-    position: "absolute" as const,
-    top: -8,
-    left: -6,
-    width: 64,
-    height: 64,
-    objectFit: "contain" as const,
-    transform: "rotate(-9deg)",
-    filter: "drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))",
-    pointerEvents: "none" as const,
-    zIndex: 12,
-  },
-  vipBadge: {
-    position: "absolute" as const,
-    top: -8,
-    left: -6,
-    width: 64,
-    height: 64,
-    objectFit: "contain" as const,
-    transform: "rotate(-9deg)",
-    filter: "drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))",
-    pointerEvents: "none" as const,
-    zIndex: 12,
-  },
   newBadge: {
     position: "absolute" as const,
     left: 12,
@@ -2343,8 +2318,6 @@ const MyAdsPage: React.FC = () => {
     (!previewListing.vip_expires_at ||
       (Number.isFinite(new Date(previewListing.vip_expires_at).getTime()) &&
         new Date(previewListing.vip_expires_at).getTime() > currentTimeMs));
-  const isPreviewPromotedActive = isPreviewTopActive || isPreviewVipActive;
-
   if (totalListings === 0) {
     return (
       <div style={styles.page}>
@@ -2601,28 +2574,18 @@ const MyAdsPage: React.FC = () => {
                 <div>
                   <div style={styles.previewMedia}>
                     {isPreviewTopActive && (
-                      <img
-                        src={topBadgeImage}
-                        alt="Топ обява"
-                        style={styles.topBadge}
-                        loading="lazy"
-                        decoding="async"
-                      />
+                      <ListingPromoBadge type="top" />
                     )}
                     {isPreviewVipActive && (
-                      <img
-                        src={vipBadgeImage}
-                        alt="VIP обява"
-                        style={styles.vipBadge}
-                        loading="lazy"
-                        decoding="async"
-                      />
+                      <ListingPromoBadge type="vip" />
                     )}
                     {isPreviewListingNew && (
                       <div
                         style={{
                           ...styles.newBadge,
-                          top: isPreviewPromotedActive ? 62 : 12,
+                          top: "auto",
+                          bottom: 12,
+                          left: 12,
                         }}
                       >
                         Нова
@@ -2930,7 +2893,6 @@ const MyAdsPage: React.FC = () => {
                     (!listing.vip_expires_at ||
                       (Number.isFinite(new Date(listing.vip_expires_at).getTime()) &&
                         new Date(listing.vip_expires_at).getTime() > currentTimeMs));
-                  const isPromotedActive = isTopActive || isVipActive;
                   const topRemainingLabel = isTopActive ? getTopRemainingLabel(listing) : "";
                   const vipRemainingLabel = isVipActive ? getVipRemainingLabel(listing) : "";
                   const nonPromotedLabel =
@@ -2983,28 +2945,18 @@ const MyAdsPage: React.FC = () => {
             >
               <div style={styles.listingMedia}>
                 {isTopActive && (
-                  <img
-                    src={topBadgeImage}
-                    alt="Топ обява"
-                    style={styles.topBadge}
-                    loading="lazy"
-                    decoding="async"
-                  />
+                  <ListingPromoBadge type="top" />
                 )}
                 {isVipActive && (
-                  <img
-                    src={vipBadgeImage}
-                    alt="VIP обява"
-                    style={styles.vipBadge}
-                    loading="lazy"
-                    decoding="async"
-                  />
+                  <ListingPromoBadge type="vip" />
                 )}
                 {isNewListing && (
                   <div
                     style={{
                       ...styles.newBadge,
-                      top: isPromotedActive ? 62 : 12,
+                      top: "auto",
+                      bottom: 12,
+                      left: 12,
                     }}
                   >
                     Нова

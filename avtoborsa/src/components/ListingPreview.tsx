@@ -1,8 +1,7 @@
 ﻿import React from "react";
 import { FiCheckCircle, FiHome, FiImage } from "react-icons/fi";
 import { formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
-import topBadgeImage from "../assets/top_badge.png";
-import vipBadgeImage from "../assets/vip_badge.jpg";
+import ListingPromoBadge from "./ListingPromoBadge";
 
 interface ListingPreviewProps {
   title: string;
@@ -138,30 +137,6 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
       objectFit: "cover" as const,
       borderRadius: 12,
     },
-    topBadge: {
-      position: "absolute" as const,
-      top: -8,
-      left: -6,
-      width: 64,
-      height: 64,
-      objectFit: "contain" as const,
-      transform: "rotate(-9deg)",
-      filter: "drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))",
-      pointerEvents: "none" as const,
-      zIndex: 12,
-    },
-    vipBadge: {
-      position: "absolute" as const,
-      top: -8,
-      left: -6,
-      width: 64,
-      height: 64,
-      objectFit: "contain" as const,
-      transform: "rotate(-9deg)",
-      filter: "drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))",
-      pointerEvents: "none" as const,
-      zIndex: 12,
-    },
     noImage: {
       color: "#94a3b8",
       display: "flex",
@@ -282,22 +257,10 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
       <div style={styles.content}>
         <div style={styles.imageContainer}>
           {listingType === "top" && (
-            <img
-              src={topBadgeImage}
-              alt="Топ обява"
-              style={styles.topBadge}
-              loading="lazy"
-              decoding="async"
-            />
+            <ListingPromoBadge type="top" />
           )}
           {listingType === "vip" && (
-            <img
-              src={vipBadgeImage}
-              alt="VIP обява"
-              style={styles.vipBadge}
-              loading="lazy"
-              decoding="async"
-            />
+            <ListingPromoBadge type="vip" />
           )}
           {coverImage ? (
             <img src={coverImage} alt="Cover" style={styles.image} />

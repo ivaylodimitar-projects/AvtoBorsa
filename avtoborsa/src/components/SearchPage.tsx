@@ -28,8 +28,7 @@ import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 import { formatConditionLabel, formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 import { getMainCategoryFromTopmenu, getMainCategoryLabel } from "../constants/mobileBgData";
 import { useSavedSearches } from "../hooks/useSavedSearches";
-import topBadgeImage from "../assets/top_badge.png";
-import vipBadgeImage from "../assets/vip_badge.jpg";
+import ListingPromoBadge from "./ListingPromoBadge";
 
 type CarListing = {
   id: number;
@@ -1248,8 +1247,6 @@ const SearchPage: React.FC = () => {
       cursor: "pointer",
       transition: "transform 0.25s ease, box-shadow 0.25s ease",
       position: "relative" as const,
-      contentVisibility: "auto",
-      containIntrinsicSize: "340px",
     },
     itemRow: { display: "flex", alignItems: "stretch" },
     itemPhoto: { width: 280, flexShrink: 0, display: "flex", flexDirection: "column" as const, background: "#fff" },
@@ -1264,8 +1261,6 @@ const SearchPage: React.FC = () => {
       display: "block",
     },
     itemPhotoOverlay: { position: "absolute" as const, top: 0, right: 0, bottom: 0, left: 0, display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 12, background: "linear-gradient(to top, rgba(15, 23, 42, 0.45), transparent)", zIndex: 1 },
-    topBadge: { position: "absolute" as const, top: -8, left: -6, width: 64, height: 64, objectFit: "contain" as const, transform: "rotate(-9deg)", filter: "drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))", zIndex: 12, pointerEvents: "none" as const },
-    vipBadge: { position: "absolute" as const, top: -8, left: -6, width: 64, height: 64, objectFit: "contain" as const, transform: "rotate(-9deg)", filter: "drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))", zIndex: 12, pointerEvents: "none" as const },
     newBadge: { position: "absolute" as const, left: 10, background: "linear-gradient(135deg, #10b981, #059669)", color: "#fff", padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: 0.3, textTransform: "uppercase" as const, boxShadow: "0 4px 10px rgba(5, 150, 105, 0.35)", zIndex: 11 },
     favoriteButton: { background: "rgba(255,255,255,0.95)", border: "none", borderRadius: "50%", width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s", padding: 0, boxShadow: "0 6px 14px rgba(15, 23, 42, 0.18)" },
     photoPlaceholder: { width: "100%", height: "100%", display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center", gap: 6, color: "#94a3b8", fontSize: 13, fontWeight: 600 },
@@ -1631,10 +1626,10 @@ const SearchPage: React.FC = () => {
                     <div style={styles.itemRow}>
                       <div style={styles.itemPhoto}>
                         <div style={styles.photoMain}>
-                          {isTop && <img src={topBadgeImage} alt="Топ обява" style={styles.topBadge} loading="lazy" decoding="async" />}
-                          {isVip && <img src={vipBadgeImage} alt="VIP обява" style={styles.vipBadge} loading="lazy" decoding="async" />}
+                          {isTop && <ListingPromoBadge type="top" />}
+                          {isVip && <ListingPromoBadge type="vip" />}
                           {isNewListing && (
-                            <div style={{ ...styles.newBadge, top: isTop || isVip ? 62 : 10 }}>
+                            <div style={{ ...styles.newBadge, top: "auto", bottom: 10, left: 10 }}>
                               Нова
                             </div>
                           )}

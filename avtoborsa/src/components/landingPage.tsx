@@ -5,8 +5,7 @@ import { AdvancedSearch } from "./AdvancedSearch";
 import { useRecentSearches } from "../hooks/useRecentSearches";
 import { useSavedSearches } from "../hooks/useSavedSearches";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
-import topBadgeImage from "../assets/top_badge.png";
-import vipBadgeImage from "../assets/vip_badge.jpg";
+import ListingPromoBadge from "./ListingPromoBadge";
 import {
   readLatestListingsCache,
   writeLatestListingsCache,
@@ -911,23 +910,14 @@ export default function LandingPage() {
         <section id="latest" style={{ ...styles.section, ...styles.latestSection }}>
           <style>{`
             .listing-card-hover {
-              transition: transform 0.25s ease, box-shadow 0.25s ease;
+              transition: transform 0.24s ease, box-shadow 0.24s ease;
+              position: relative;
+              z-index: 3;
             }
             .listing-card-hover:hover {
-              transform: translateY(-4px);
-              box-shadow: 0 12px 32px rgba(15,23,42,0.12) !important;
-            }
-            .listing-top-badge {
-              position: absolute;
-              top: -8px;
-              left: -6px;
-              width: 64px;
-              height: 64px;
-              object-fit: contain;
-              transform: rotate(-9deg);
-              filter: drop-shadow(0 8px 14px rgba(0,0,0,0.35));
-              z-index: 2;
-              pointer-events: none;
+              transform: translateY(-5px);
+              box-shadow: 0 16px 34px rgba(15,23,42,0.14) !important;
+              z-index: 6;
             }
             .listing-new-badge {
               position: absolute;
@@ -942,24 +932,23 @@ export default function LandingPage() {
               letter-spacing: 0.3px;
               text-transform: uppercase;
               box-shadow: 0 4px 10px rgba(5,150,105,0.35);
-              z-index: 2;
+              z-index: 11;
             }
-            .listing-vip-badge {
+            .listing-image-layer {
               position: absolute;
-              top: -8px;
-              left: -6px;
-              width: 64px;
-              height: 64px;
-              object-fit: contain;
-              transform: rotate(-9deg);
-              filter: drop-shadow(0 8px 14px rgba(0,0,0,0.35));
-              z-index: 2;
-              pointer-events: none;
+              inset: 0;
+              overflow: hidden;
+              border-top-left-radius: 16px;
+              border-top-right-radius: 16px;
+              z-index: 1;
             }
             .latest-grid {
               display: grid;
               grid-template-columns: repeat(4, minmax(0, 1fr));
               gap: 18px;
+              padding-top: 14px;
+              margin-top: 2px;
+              overflow: visible;
             }
             .view-more-btn {
               transition: background 0.2s ease, box-shadow 0.2s ease;
@@ -975,11 +964,11 @@ export default function LandingPage() {
               .latest-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
             }
             @media (max-width: 767px) {
-              .latest-grid { grid-template-columns: 1fr !important; gap: 14px !important; }
+              .latest-grid { grid-template-columns: 1fr !important; gap: 14px !important; padding-top: 10px !important; }
             }
           `}</style>
 
-          <div style={styles.latestContainer}>
+          <div style={{ ...styles.latestContainer, overflow: "visible", position: "relative", zIndex: 1 }}>
             <div style={{ ...styles.sectionHeader, ...styles.containerHeader }}>
               <h2 style={styles.h2}>Последни обяви</h2>
               <p style={styles.sectionLead}>
@@ -1017,70 +1006,59 @@ export default function LandingPage() {
                       key={listing.id}
                       className="listing-card-hover"
                       style={{
-                        borderRadius: 10,
-                        overflow: "hidden",
-                        border: "1px solid #eef2f7",
-                        background: "linear-gradient(rgb(248, 250, 252) 0%, rgb(241, 245, 249) 100%)",
-                        boxShadow: "0 2px 8px rgba(15,23,42,0.06)",
+                        borderRadius: 16,
+                        overflow: "visible",
+                        border: "1px solid #e5e7eb",
+                        background: "#ffffff",
+                        boxShadow: "0 8px 24px rgba(15,23,42,0.08)",
                         display: "flex",
                         flexDirection: "column",
+                        position: "relative",
                         cursor: "pointer",
-                        contentVisibility: "auto",
-                        containIntrinsicSize: "300px",
                       }}
                       onClick={() => navigate(`/details/${listing.slug}`)}
                     >
+                      {isTop && (
+                        <ListingPromoBadge type="top" size="xs" />
+                      )}
+                      {isVip && (
+                        <ListingPromoBadge type="vip" size="xs" />
+                      )}
                       {/* Image */}
-                      <div style={{ position: "relative", height: 170, background: "#f0f0f0", overflow: "hidden" }}>
-                        {isTop && (
-                          <img
-                            className="listing-top-badge"
-                            src={topBadgeImage}
-                            alt="Топ обява"
-                            loading="lazy"
-                            decoding="async"
-                          />
-                        )}
-                        {isVip && (
-                          <img
-                            className="listing-vip-badge"
-                            src={vipBadgeImage}
-                            alt="VIP обява"
-                            loading="lazy"
-                            decoding="async"
-                          />
-                        )}
+                      <div style={{ position: "relative", height: 178, background: "#e5e7eb", overflow: "visible", borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
+                        <div className="listing-image-layer">
+                          {listing.image_url ? (
+                            <img
+                              src={listingImageUrl}
+                              alt={`${listing.brand} ${listing.model}`}
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                                objectPosition: "center",
+                                imageRendering: "auto",
+                                display: "block",
+                              }}
+                              loading={isAboveFold ? "eager" : "lazy"}
+                              decoding="async"
+                              fetchPriority={isAboveFold ? "high" : "low"}
+                            />
+                          ) : (
+                            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>
+                              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                                <circle cx="8.5" cy="8.5" r="1.5" />
+                                <polyline points="21 15 16 10 5 21" />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
                         {isNew && (
                           <div
                             className="listing-new-badge"
-                            style={{ top: isTop || isVip ? 62 : 10 }}
+                            style={{ top: "auto", bottom: 10, left: 10 }}
                           >
                             Нова
-                          </div>
-                        )}
-                        {listing.image_url ? (
-                          <img
-                            src={listingImageUrl}
-                            alt={`${listing.brand} ${listing.model}`}
-                            style={{
-                              width: "100%",
-                              height: "100%",
-                              objectFit: "cover",
-                              objectPosition: "center",
-                              imageRendering: "auto",
-                              display: "block",
-                            }}
-                            loading={isAboveFold ? "eager" : "lazy"}
-                            decoding="async"
-                            fetchPriority={isAboveFold ? "high" : "low"}
-                          />
-                        ) : (
-                          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>
-                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ccc" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                              <circle cx="8.5" cy="8.5" r="1.5" />
-                              <polyline points="21 15 16 10 5 21" />
-                            </svg>
                           </div>
                         )}
                         {showPriceChange && (
@@ -1100,6 +1078,7 @@ export default function LandingPage() {
                               display: "inline-flex",
                               alignItems: "center",
                               gap: 6,
+                              zIndex: 9,
                             }}
                             title={isUp ? "Повишена цена" : "Намалена цена"}
                           >
@@ -1123,7 +1102,7 @@ export default function LandingPage() {
                             fontWeight: 800,
                             letterSpacing: 0.2,
                             boxShadow: "0 2px 8px rgba(15, 23, 42, 0.08)",
-                            zIndex: 2,
+                            zIndex: 9,
                             lineHeight: 1,
                           }}
                         >
@@ -1132,12 +1111,12 @@ export default function LandingPage() {
                       </div>
 
                       {/* Body */}
-                      <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
-                        <div style={{ fontWeight: 700, fontSize: 15, color: "#111827", lineHeight: 1.3 }}>
+                      <div style={{ padding: "14px 15px 13px", display: "flex", flexDirection: "column", gap: 9, flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: 16, color: "#111827", lineHeight: 1.3 }}>
                           {listing.brand} {listing.model}
                         </div>
                         {listingMeta.length > 0 && (
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, fontSize: 12, color: "#6b7280" }}>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, fontSize: 12, color: "#64748b" }}>
                             {listingMeta.map((metaValue, metaIndex) => (
                               <React.Fragment key={`${listing.id}-meta-${metaIndex}`}>
                                 {metaIndex > 0 && <span style={{ color: "#d1d5db" }}>|</span>}
@@ -1146,7 +1125,7 @@ export default function LandingPage() {
                             ))}
                           </div>
                         )}
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12, color: "#9ca3af", marginTop: "auto" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 12, color: "#94a3b8", marginTop: "auto" }}>
                           <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />

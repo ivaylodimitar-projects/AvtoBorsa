@@ -3,8 +3,7 @@ import { ChevronLeft, ChevronRight, Monitor, X, ZoomIn, ZoomOut, RotateCcw } fro
 import ThumbnailStrip from './ThumbnailStrip';
 import { useThrottle } from '../../hooks/useThrottle';
 import { useGalleryLazyLoad, useImageUrl } from '../../hooks/useGalleryLazyLoad';
-import topBadgeImage from '../../assets/top_badge.png';
-import vipBadgeImage from '../../assets/vip_badge.jpg';
+import ListingPromoBadge from '../ListingPromoBadge';
 
 interface Image {
   id: number;
@@ -236,53 +235,6 @@ const FullscreenModal = memo<{
           onClick={(e) => e.stopPropagation()}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {showTopBadge && (
-              <img
-                src={topBadgeImage}
-                alt="Топ обява"
-                style={{
-                  width: isMobile ? 30 : 34,
-                  height: isMobile ? 30 : 34,
-                  objectFit: 'contain',
-                  filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.35))',
-                  pointerEvents: 'none',
-                }}
-                loading="lazy"
-                decoding="async"
-              />
-            )}
-            {showVipBadge && (
-              <img
-                src={vipBadgeImage}
-                alt="VIP обява"
-                style={{
-                  width: isMobile ? 30 : 34,
-                  height: isMobile ? 30 : 34,
-                  objectFit: 'contain',
-                  filter: 'drop-shadow(0 4px 10px rgba(2, 132, 199, 0.35))',
-                  pointerEvents: 'none',
-                }}
-                loading="lazy"
-                decoding="async"
-              />
-            )}
-            {showNewBadge && (
-              <span
-                style={{
-                  background: 'linear-gradient(135deg, #10b981, #059669)',
-                  color: '#fff',
-                  padding: isMobile ? '5px 9px' : '6px 11px',
-                  borderRadius: 999,
-                  fontSize: isMobile ? 10 : 11,
-                  fontWeight: 700,
-                  letterSpacing: 0.3,
-                  textTransform: 'uppercase',
-                  boxShadow: '0 6px 14px rgba(5, 150, 105, 0.35)',
-                }}
-              >
-                Нова
-              </span>
-            )}
             <h2 style={{ color: '#fff', margin: 0, fontSize: isMobile ? 14 : 16 }}>
               {title}
             </h2>
@@ -413,27 +365,59 @@ const FullscreenModal = memo<{
               overscrollBehavior: 'contain',
             }}
           >
-            <img
-              ref={imageRef}
-              src={getImageUrl(image.image)}
-              alt={title}
-              draggable={false}
+            <div
               style={{
-                maxWidth: '100%',
-                maxHeight: '100%',
-                objectFit: 'contain',
-                display: 'block',
+                position: 'relative',
+                display: 'inline-block',
+                lineHeight: 0,
                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomLevel})`,
                 transformOrigin: 'center center',
                 transition: isDragging ? 'none' : 'transform 0.05s ease-out',
                 willChange: 'transform',
-                imageRendering: 'auto',
-                userSelect: 'none',
-                WebkitUserSelect: 'none',
-                msUserSelect: 'none',
               }}
-              onDragStart={(e) => e.preventDefault()}
-            />
+            >
+              <img
+                ref={imageRef}
+                src={getImageUrl(image.image)}
+                alt={title}
+                draggable={false}
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  objectFit: 'contain',
+                  display: 'block',
+                  imageRendering: 'auto',
+                  userSelect: 'none',
+                  WebkitUserSelect: 'none',
+                  msUserSelect: 'none',
+                }}
+                onDragStart={(e) => e.preventDefault()}
+              />
+              {showTopBadge && <ListingPromoBadge type="top" zIndex={24} />}
+              {showVipBadge && <ListingPromoBadge type="vip" zIndex={24} />}
+              {showNewBadge && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                    color: '#fff',
+                    padding: isMobile ? '4px 8px' : '5px 10px',
+                    borderRadius: 999,
+                    fontSize: isMobile ? 10 : 11,
+                    fontWeight: 700,
+                    letterSpacing: 0.3,
+                    textTransform: 'uppercase',
+                    boxShadow: '0 6px 14px rgba(5, 150, 105, 0.35)',
+                    top: 'auto',
+                    bottom: isMobile ? 8 : 12,
+                    left: isMobile ? 8 : 12,
+                    zIndex: 25,
+                  }}
+                >
+                  Нова
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Navigation Buttons */}
@@ -728,33 +712,10 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         left: isMobile ? 8 : 12,
         zIndex: 9,
       } as React.CSSProperties,
-      topBadge: {
-        position: 'absolute' as const,
-        top: -8,
-        left: -6,
-        width: isMobile ? 56 : 64,
-        height: isMobile ? 56 : 64,
-        objectFit: 'contain' as const,
-        transform: 'rotate(-9deg)',
-        filter: 'drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))',
-        zIndex: 20,
-        pointerEvents: 'none' as const,
-      } as React.CSSProperties,
-      vipBadge: {
-        position: 'absolute' as const,
-        top: -8,
-        left: -6,
-        width: isMobile ? 56 : 64,
-        height: isMobile ? 56 : 64,
-        objectFit: 'contain' as const,
-        transform: 'rotate(-9deg)',
-        filter: 'drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))',
-        zIndex: 20,
-        pointerEvents: 'none' as const,
-      } as React.CSSProperties,
       newBadge: {
         position: 'absolute' as const,
-        top: isMobile ? 8 : 12,
+        top: 'auto',
+        bottom: isMobile ? 8 : 12,
         left: isMobile ? 8 : 12,
         background: 'linear-gradient(135deg, #10b981, #059669)',
         color: '#fff',
@@ -790,34 +751,14 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
           </div>
 
           {/* Promo Label */}
-          {showTopBadge && (
-            <img
-              src={topBadgeImage}
-              alt="Топ обява"
-              style={styles.topBadge}
-              loading="lazy"
-              decoding="async"
-            />
-          )}
-          {showVipBadge && (
-            <img
-              src={vipBadgeImage}
-              alt="VIP обява"
-              style={{
-                ...styles.vipBadge,
-                top: showTopBadge ? (isMobile ? 36 : 44) : -8,
-              }}
-              loading="lazy"
-              decoding="async"
-            />
-          )}
+          {showTopBadge && <ListingPromoBadge type="top" zIndex={20} />}
+          {showVipBadge && <ListingPromoBadge type="vip" zIndex={20} />}
           {showNewBadge && (
             <div
               style={{
                 ...styles.newBadge,
-                top:
-                  (isMobile ? 8 : 12) +
-                  ((showTopBadge ? 1 : 0) + (showVipBadge ? 1 : 0)) * (isMobile ? 50 : 56),
+                bottom: isMobile ? 8 : 12,
+                left: isMobile ? 8 : 12,
               }}
             >
               Нова
@@ -830,9 +771,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
               alt="Promo"
               style={{
                 ...styles.promoLabel,
-                top:
-                  (isMobile ? 8 : 12) +
-                  ((showTopBadge ? 1 : 0) + (showVipBadge ? 1 : 0)) * (isMobile ? 50 : 56),
+                top: (isMobile ? 8 : 12) + (showTopBadge || showVipBadge ? (isMobile ? 56 : 54) : 0),
                 maxWidth: isMobile ? 60 : 80,
                 height: 'auto',
               }}
@@ -897,7 +836,12 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
 
           {/* Counter */}
           {safeImages.length > 1 && (
-            <div style={styles.counter}>
+            <div
+              style={{
+                ...styles.counter,
+                left: (isMobile ? 8 : 12) + (showNewBadge ? (isMobile ? 58 : 66) : 0),
+              }}
+            >
               {safeIndex + 1} / {safeImages.length}
             </div>
           )}
