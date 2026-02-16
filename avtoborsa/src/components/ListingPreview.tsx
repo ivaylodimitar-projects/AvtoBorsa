@@ -1,6 +1,8 @@
 ﻿import React from "react";
 import { FiCheckCircle, FiHome, FiImage } from "react-icons/fi";
 import { formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
+import topBadgeImage from "../assets/top_badge.png";
+import vipBadgeImage from "../assets/vip_badge.jpg";
 
 interface ListingPreviewProps {
   title: string;
@@ -78,7 +80,7 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
       background: "#fff",
       borderRadius: 16,
       border: "1px solid #e2e8f0",
-      overflow: "hidden",
+      overflow: "visible",
       boxShadow: "0 12px 24px rgba(15, 23, 42, 0.08)",
     },
     header: {
@@ -122,45 +124,43 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
       height: isCompact ? 150 : 220,
       background: "#f1f5f9",
       borderRadius: 12,
-      overflow: "hidden",
+      overflow: "visible",
       marginBottom: 16,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       position: "relative" as const,
+      isolation: "isolate" as const,
     },
     image: {
       width: "100%",
       height: "100%",
       objectFit: "cover" as const,
+      borderRadius: 12,
     },
     topBadge: {
       position: "absolute" as const,
-      top: 12,
-      left: 12,
-      padding: "6px 10px",
-      borderRadius: 999,
-      background: "linear-gradient(135deg, #f50b0b, #d61111)",
-      color: "#fff",
-      fontSize: 11,
-      fontWeight: 700,
-      letterSpacing: 0.4,
-      textTransform: "uppercase" as const,
-      boxShadow: "0 6px 14px rgba(249, 115, 22, 0.35)",
+      top: -8,
+      left: -6,
+      width: 64,
+      height: 64,
+      objectFit: "contain" as const,
+      transform: "rotate(-9deg)",
+      filter: "drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))",
+      pointerEvents: "none" as const,
+      zIndex: 12,
     },
     vipBadge: {
       position: "absolute" as const,
-      top: 12,
-      left: 12,
-      padding: "6px 10px",
-      borderRadius: 999,
-      background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
-      color: "#fff",
-      fontSize: 11,
-      fontWeight: 700,
-      letterSpacing: 0.4,
-      textTransform: "uppercase" as const,
-      boxShadow: "0 6px 14px rgba(2, 132, 199, 0.35)",
+      top: -8,
+      left: -6,
+      width: 64,
+      height: 64,
+      objectFit: "contain" as const,
+      transform: "rotate(-9deg)",
+      filter: "drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))",
+      pointerEvents: "none" as const,
+      zIndex: 12,
     },
     noImage: {
       color: "#94a3b8",
@@ -281,8 +281,24 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
 
       <div style={styles.content}>
         <div style={styles.imageContainer}>
-          {listingType === "top" && <div style={styles.topBadge}>Топ обява</div>}
-          {listingType === "vip" && <div style={styles.vipBadge}>VIP обява</div>}
+          {listingType === "top" && (
+            <img
+              src={topBadgeImage}
+              alt="Топ обява"
+              style={styles.topBadge}
+              loading="lazy"
+              decoding="async"
+            />
+          )}
+          {listingType === "vip" && (
+            <img
+              src={vipBadgeImage}
+              alt="VIP обява"
+              style={styles.vipBadge}
+              loading="lazy"
+              decoding="async"
+            />
+          )}
           {coverImage ? (
             <img src={coverImage} alt="Cover" style={styles.image} />
           ) : (

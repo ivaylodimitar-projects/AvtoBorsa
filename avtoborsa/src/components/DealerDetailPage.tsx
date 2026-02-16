@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { MapPin, Fuel, Gauge, Zap, Settings } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { formatConditionLabel, formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
+import topBadgeImage from "../assets/top_badge.png";
+import vipBadgeImage from "../assets/vip_badge.jpg";
 
 type CarListing = {
   id: number;
@@ -583,7 +585,7 @@ const DealerDetailPage: React.FC = () => {
     listingCard: {
       background: "#fff",
       borderRadius: 6,
-      overflow: "hidden",
+      overflow: "visible",
       border: "1px solid #e0e0e0",
       boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
       transition: "box-shadow 0.2s",
@@ -600,11 +602,17 @@ const DealerDetailPage: React.FC = () => {
       position: "relative",
       height: 220,
       background: "#f0f0f0",
+      overflow: "visible",
+      borderTopLeftRadius: 6,
+      borderTopRightRadius: 6,
+      isolation: "isolate",
     },
     listingImage: {
       width: "100%",
       height: "100%",
       objectFit: "cover",
+      borderTopLeftRadius: 6,
+      borderTopRightRadius: 6,
       display: "block",
     },
     listingMediaOverlay: {
@@ -624,33 +632,27 @@ const DealerDetailPage: React.FC = () => {
     },
     topBadge: {
       position: "absolute",
-      top: 10,
-      left: 10,
-      padding: "4px 10px",
-      borderRadius: 999,
-      background: "linear-gradient(135deg, #ef4444, #dc2626)",
-      color: "#fff",
-      fontSize: 11,
-      fontWeight: 700,
-      letterSpacing: 0.3,
-      textTransform: "uppercase",
-      boxShadow: "0 4px 10px rgba(220, 38, 38, 0.3)",
-      zIndex: 2,
+      top: -8,
+      left: -6,
+      width: 64,
+      height: 64,
+      objectFit: "contain",
+      transform: "rotate(-9deg)",
+      filter: "drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))",
+      zIndex: 12,
+      pointerEvents: "none",
     },
     vipBadge: {
       position: "absolute",
-      top: 10,
-      left: 10,
-      padding: "4px 10px",
-      borderRadius: 999,
-      background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
-      color: "#fff",
-      fontSize: 11,
-      fontWeight: 700,
-      letterSpacing: 0.3,
-      textTransform: "uppercase",
-      boxShadow: "0 4px 10px rgba(2, 132, 199, 0.3)",
-      zIndex: 2,
+      top: -8,
+      left: -6,
+      width: 64,
+      height: 64,
+      objectFit: "contain",
+      transform: "rotate(-9deg)",
+      filter: "drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))",
+      zIndex: 12,
+      pointerEvents: "none",
     },
     newBadge: {
       position: "absolute",
@@ -664,7 +666,7 @@ const DealerDetailPage: React.FC = () => {
       letterSpacing: 0.3,
       textTransform: "uppercase",
       boxShadow: "0 4px 10px rgba(5, 150, 105, 0.35)",
-      zIndex: 2,
+      zIndex: 11,
     },
     listingPricePill: {
       position: "absolute",
@@ -1138,10 +1140,26 @@ const DealerDetailPage: React.FC = () => {
                     onClick={() => navigate(`/details/${listing.slug}`)}
                   >
                     <div style={styles.listingMedia}>
-                      {isTop && <div style={styles.topBadge}>Топ обява</div>}
-                      {isVip && <div style={styles.vipBadge}>VIP обява</div>}
+                      {isTop && (
+                        <img
+                          src={topBadgeImage}
+                          alt="Топ обява"
+                          style={styles.topBadge}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      )}
+                      {isVip && (
+                        <img
+                          src={vipBadgeImage}
+                          alt="VIP обява"
+                          style={styles.vipBadge}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      )}
                       {isNew && (
-                        <div style={{ ...styles.newBadge, top: hasHighlightBadge ? 46 : 12 }}>
+                        <div style={{ ...styles.newBadge, top: hasHighlightBadge ? 62 : 12 }}>
                           Нова
                         </div>
                       )}

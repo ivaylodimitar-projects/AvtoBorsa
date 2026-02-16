@@ -9,6 +9,8 @@ import SellerCard from './SellerCard';
 import SkeletonLoader from './SkeletonLoader';
 import { extractIdFromSlug } from '../../utils/slugify';
 import { useImageUrl } from '../../hooks/useGalleryLazyLoad';
+import topBadgeImage from '../../assets/top_badge.png';
+import vipBadgeImage from '../../assets/vip_badge.jpg';
 
 interface CarImage {
   id: number;
@@ -671,7 +673,7 @@ const VehicleDetailsPage: React.FC = () => {
       display: 'flex',
       flexDirection: 'column',
       borderRadius: 10,
-      overflow: 'hidden',
+      overflow: 'visible',
       background: '#fff',
       border: '1px solid #e5e7eb',
       boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
@@ -685,16 +687,20 @@ const VehicleDetailsPage: React.FC = () => {
       position: 'relative',
       width: '100%',
       height: 140,
-      overflow: 'hidden',
+      overflow: 'visible',
+      borderTopLeftRadius: 10,
+      borderTopRightRadius: 10,
       background: '#e2e8f0',
+      isolation: 'isolate',
     },
     similarBadgeRow: {
       position: 'absolute',
-      top: 8,
-      left: 8,
+      top: -8,
+      left: -6,
       display: 'flex',
+      alignItems: 'center',
       gap: 6,
-      zIndex: 2,
+      zIndex: 12,
     },
     similarBadge: {
       padding: '4px 8px',
@@ -712,13 +718,27 @@ const VehicleDetailsPage: React.FC = () => {
       boxShadow: '0 4px 10px rgba(16, 185, 129, 0.25)',
     },
     similarBadgeVip: {
-      background: '#0ea5e9',
-      boxShadow: '0 4px 10px rgba(14, 165, 233, 0.25)',
+      width: 50,
+      height: 50,
+      objectFit: 'contain' as const,
+      transform: 'rotate(-9deg)',
+      filter: 'drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))',
+      pointerEvents: 'none' as const,
+    },
+    similarBadgeTop: {
+      width: 50,
+      height: 50,
+      objectFit: 'contain' as const,
+      transform: 'rotate(-9deg)',
+      filter: 'drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))',
+      pointerEvents: 'none' as const,
     },
     similarImage: {
       width: '100%',
       height: '100%',
       objectFit: 'cover',
+      borderTopLeftRadius: 10,
+      borderTopRightRadius: 10,
     },
     similarImagePlaceholder: {
       width: '100%',
@@ -1019,8 +1039,24 @@ const VehicleDetailsPage: React.FC = () => {
                         <div style={styles.similarMedia}>
                           {(isTop || isVip || isNew) && (
                             <div style={styles.similarBadgeRow}>
-                              {isTop && <span style={styles.similarBadge}>Топ</span>}
-                              {isVip && <span style={{ ...styles.similarBadge, ...styles.similarBadgeVip }}>VIP</span>}
+                              {isTop && (
+                                <img
+                                  src={topBadgeImage}
+                                  alt="Топ обява"
+                                  style={styles.similarBadgeTop}
+                                  loading="lazy"
+                                  decoding="async"
+                                />
+                              )}
+                              {isVip && (
+                                <img
+                                  src={vipBadgeImage}
+                                  alt="VIP обява"
+                                  style={styles.similarBadgeVip}
+                                  loading="lazy"
+                                  decoding="async"
+                                />
+                              )}
                               {isNew && <span style={{ ...styles.similarBadge, ...styles.similarBadgeNew }}>Нова</span>}
                             </div>
                           )}

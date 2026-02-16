@@ -5,6 +5,8 @@ import { AdvancedSearch } from "./AdvancedSearch";
 import { useRecentSearches } from "../hooks/useRecentSearches";
 import { useSavedSearches } from "../hooks/useSavedSearches";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
+import topBadgeImage from "../assets/top_badge.png";
+import vipBadgeImage from "../assets/vip_badge.jpg";
 import {
   readLatestListingsCache,
   writeLatestListingsCache,
@@ -917,18 +919,15 @@ export default function LandingPage() {
             }
             .listing-top-badge {
               position: absolute;
-              top: 10px;
-              left: 10px;
-              background: linear-gradient(135deg, #ef4444, #dc2626);
-              color: #fff;
-              padding: 4px 10px;
-              border-radius: 999px;
-              font-size: 11px;
-              font-weight: 700;
-              letter-spacing: 0.3px;
-              text-transform: uppercase;
-              box-shadow: 0 4px 10px rgba(220,38,38,0.3);
+              top: -8px;
+              left: -6px;
+              width: 64px;
+              height: 64px;
+              object-fit: contain;
+              transform: rotate(-9deg);
+              filter: drop-shadow(0 8px 14px rgba(0,0,0,0.35));
               z-index: 2;
+              pointer-events: none;
             }
             .listing-new-badge {
               position: absolute;
@@ -947,18 +946,15 @@ export default function LandingPage() {
             }
             .listing-vip-badge {
               position: absolute;
-              top: 10px;
-              left: 10px;
-              background: linear-gradient(135deg, #0ea5e9, #0284c7);
-              color: #fff;
-              padding: 4px 10px;
-              border-radius: 999px;
-              font-size: 11px;
-              font-weight: 700;
-              letter-spacing: 0.3px;
-              text-transform: uppercase;
-              box-shadow: 0 4px 10px rgba(2,132,199,0.3);
+              top: -8px;
+              left: -6px;
+              width: 64px;
+              height: 64px;
+              object-fit: contain;
+              transform: rotate(-9deg);
+              filter: drop-shadow(0 8px 14px rgba(0,0,0,0.35));
               z-index: 2;
+              pointer-events: none;
             }
             .latest-grid {
               display: grid;
@@ -1036,12 +1032,28 @@ export default function LandingPage() {
                     >
                       {/* Image */}
                       <div style={{ position: "relative", height: 170, background: "#f0f0f0", overflow: "hidden" }}>
-                        {isTop && <div className="listing-top-badge">TOP</div>}
-                        {isVip && <div className="listing-vip-badge">VIP</div>}
+                        {isTop && (
+                          <img
+                            className="listing-top-badge"
+                            src={topBadgeImage}
+                            alt="Топ обява"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        )}
+                        {isVip && (
+                          <img
+                            className="listing-vip-badge"
+                            src={vipBadgeImage}
+                            alt="VIP обява"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        )}
                         {isNew && (
                           <div
                             className="listing-new-badge"
-                            style={{ top: isTop || isVip ? 38 : 10 }}
+                            style={{ top: isTop || isVip ? 62 : 10 }}
                           >
                             Нова
                           </div>

@@ -28,6 +28,8 @@ import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 import { formatConditionLabel, formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 import { getMainCategoryFromTopmenu, getMainCategoryLabel } from "../constants/mobileBgData";
 import { useSavedSearches } from "../hooks/useSavedSearches";
+import topBadgeImage from "../assets/top_badge.png";
+import vipBadgeImage from "../assets/vip_badge.jpg";
 
 type CarListing = {
   id: number;
@@ -1238,7 +1240,7 @@ const SearchPage: React.FC = () => {
     item: {
       background: "#fff",
       borderRadius: 6,
-      overflow: "hidden",
+      overflow: "visible",
       border: "1px solid #e0e0e0",
       boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
       display: "flex",
@@ -1251,19 +1253,20 @@ const SearchPage: React.FC = () => {
     },
     itemRow: { display: "flex", alignItems: "stretch" },
     itemPhoto: { width: 280, flexShrink: 0, display: "flex", flexDirection: "column" as const, background: "#fff" },
-    photoMain: { height: 194, position: "relative" as const, overflow: "hidden", background: "linear-gradient(135deg, #e2e8f0 0%, #cbd5f5 100%)" },
+    photoMain: { height: 194, position: "relative" as const, overflow: "visible", borderTopLeftRadius: 6, background: "linear-gradient(135deg, #e2e8f0 0%, #cbd5f5 100%)", isolation: "isolate" as const },
     itemImage: {
       width: "100%",
       height: "100%",
       objectFit: "cover",
       objectPosition: "center",
+      borderTopLeftRadius: 6,
       imageRendering: "auto",
       display: "block",
     },
     itemPhotoOverlay: { position: "absolute" as const, top: 0, right: 0, bottom: 0, left: 0, display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 12, background: "linear-gradient(to top, rgba(15, 23, 42, 0.45), transparent)", zIndex: 1 },
-    topBadge: { position: "absolute" as const, top: 10, left: 10, background: "linear-gradient(135deg, #ef4444, #dc2626)", color: "#fff", padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: 0.3, textTransform: "uppercase" as const, boxShadow: "0 4px 10px rgba(220, 38, 38, 0.3)", zIndex: 2 },
-    vipBadge: { position: "absolute" as const, top: 10, left: 10, background: "linear-gradient(135deg, #0ea5e9, #0284c7)", color: "#fff", padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: 0.3, textTransform: "uppercase" as const, boxShadow: "0 4px 10px rgba(2, 132, 199, 0.3)", zIndex: 2 },
-    newBadge: { position: "absolute" as const, left: 10, background: "linear-gradient(135deg, #10b981, #059669)", color: "#fff", padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: 0.3, textTransform: "uppercase" as const, boxShadow: "0 4px 10px rgba(5, 150, 105, 0.35)", zIndex: 2 },
+    topBadge: { position: "absolute" as const, top: -8, left: -6, width: 64, height: 64, objectFit: "contain" as const, transform: "rotate(-9deg)", filter: "drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))", zIndex: 12, pointerEvents: "none" as const },
+    vipBadge: { position: "absolute" as const, top: -8, left: -6, width: 64, height: 64, objectFit: "contain" as const, transform: "rotate(-9deg)", filter: "drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))", zIndex: 12, pointerEvents: "none" as const },
+    newBadge: { position: "absolute" as const, left: 10, background: "linear-gradient(135deg, #10b981, #059669)", color: "#fff", padding: "4px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: 0.3, textTransform: "uppercase" as const, boxShadow: "0 4px 10px rgba(5, 150, 105, 0.35)", zIndex: 11 },
     favoriteButton: { background: "rgba(255,255,255,0.95)", border: "none", borderRadius: "50%", width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s", padding: 0, boxShadow: "0 6px 14px rgba(15, 23, 42, 0.18)" },
     photoPlaceholder: { width: "100%", height: "100%", display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center", gap: 6, color: "#94a3b8", fontSize: 13, fontWeight: 600 },
     thumbStrip: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, padding: "10px", background: "#fff", borderTop: "1px solid #e2e8f0" },
@@ -1551,7 +1554,6 @@ const SearchPage: React.FC = () => {
               {results.map((listing, index) => {
                   const isTop = isTopListing(listing);
                   const isVip = isVipListing(listing);
-                  const hasHighlightBadge = isTop || isVip;
                   const isNewListing = isListingNew(listing.created_at);
                   const isPriorityImage = index < 3;
                   const sellerLabel = listing.seller_name || "Частно лице";
@@ -1629,10 +1631,10 @@ const SearchPage: React.FC = () => {
                     <div style={styles.itemRow}>
                       <div style={styles.itemPhoto}>
                         <div style={styles.photoMain}>
-                          {isTop && <div style={styles.topBadge}>Топ обява</div>}
-                          {isVip && <div style={styles.vipBadge}>{"VIP \u043e\u0431\u044f\u0432\u0430"}</div>}
+                          {isTop && <img src={topBadgeImage} alt="Топ обява" style={styles.topBadge} loading="lazy" decoding="async" />}
+                          {isVip && <img src={vipBadgeImage} alt="VIP обява" style={styles.vipBadge} loading="lazy" decoding="async" />}
                           {isNewListing && (
-                            <div style={{ ...styles.newBadge, top: hasHighlightBadge ? 38 : 10 }}>
+                            <div style={{ ...styles.newBadge, top: isTop || isVip ? 62 : 10 }}>
                               Нова
                             </div>
                           )}

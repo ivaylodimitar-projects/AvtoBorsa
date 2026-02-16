@@ -3,6 +3,8 @@ import { ChevronLeft, ChevronRight, Monitor, X, ZoomIn, ZoomOut, RotateCcw } fro
 import ThumbnailStrip from './ThumbnailStrip';
 import { useThrottle } from '../../hooks/useThrottle';
 import { useGalleryLazyLoad, useImageUrl } from '../../hooks/useGalleryLazyLoad';
+import topBadgeImage from '../../assets/top_badge.png';
+import vipBadgeImage from '../../assets/vip_badge.jpg';
 
 interface Image {
   id: number;
@@ -235,38 +237,34 @@ const FullscreenModal = memo<{
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {showTopBadge && (
-              <span
+              <img
+                src={topBadgeImage}
+                alt="Топ обява"
                 style={{
-                  background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-                  color: '#fff',
-                  padding: isMobile ? '5px 9px' : '6px 11px',
-                  borderRadius: 999,
-                  fontSize: isMobile ? 10 : 11,
-                  fontWeight: 700,
-                  letterSpacing: 0.3,
-                  textTransform: 'uppercase',
-                  boxShadow: '0 6px 14px rgba(220, 38, 38, 0.35)',
+                  width: isMobile ? 30 : 34,
+                  height: isMobile ? 30 : 34,
+                  objectFit: 'contain',
+                  filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.35))',
+                  pointerEvents: 'none',
                 }}
-              >
-                Топ обява
-              </span>
+                loading="lazy"
+                decoding="async"
+              />
             )}
             {showVipBadge && (
-              <span
+              <img
+                src={vipBadgeImage}
+                alt="VIP обява"
                 style={{
-                  background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
-                  color: '#fff',
-                  padding: isMobile ? '5px 9px' : '6px 11px',
-                  borderRadius: 999,
-                  fontSize: isMobile ? 10 : 11,
-                  fontWeight: 700,
-                  letterSpacing: 0.3,
-                  textTransform: 'uppercase',
-                  boxShadow: '0 6px 14px rgba(2, 132, 199, 0.35)',
+                  width: isMobile ? 30 : 34,
+                  height: isMobile ? 30 : 34,
+                  objectFit: 'contain',
+                  filter: 'drop-shadow(0 4px 10px rgba(2, 132, 199, 0.35))',
+                  pointerEvents: 'none',
                 }}
-              >
-                VIP обява
-              </span>
+                loading="lazy"
+                decoding="async"
+              />
             )}
             {showNewBadge && (
               <span
@@ -630,7 +628,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         width: '100%',
         background: '#fff',
         borderRadius: 8,
-        overflow: 'hidden',
+        overflow: 'visible',
         boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
         border: '1px solid #e0e0e0',
       } as React.CSSProperties,
@@ -641,7 +639,9 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         paddingBottom: isMobile ? '100%' : undefined,
         background: '#f0f0f0',
         minHeight: isMobile ? 300 : 500,
-        overflow: 'hidden',
+        overflow: 'visible',
+        borderRadius: 8,
+        isolation: 'isolate' as const,
         backfaceVisibility: 'hidden' as const,
         transform: 'translateZ(0)',
         userSelect: 'none',
@@ -657,6 +657,8 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        overflow: 'hidden',
+        borderRadius: 8,
         willChange: 'transform',
         backfaceVisibility: 'hidden' as const,
         transform: 'translateZ(0)',
@@ -728,33 +730,27 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
       } as React.CSSProperties,
       topBadge: {
         position: 'absolute' as const,
-        top: isMobile ? 8 : 12,
-        left: isMobile ? 8 : 12,
-        background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-        color: '#fff',
-        padding: isMobile ? '5px 9px' : '6px 11px',
-        borderRadius: 999,
-        fontSize: isMobile ? 10 : 11,
-        fontWeight: 700,
-        letterSpacing: 0.3,
-        textTransform: 'uppercase' as const,
-        boxShadow: '0 6px 14px rgba(220, 38, 38, 0.35)',
-        zIndex: 11,
+        top: -8,
+        left: -6,
+        width: isMobile ? 56 : 64,
+        height: isMobile ? 56 : 64,
+        objectFit: 'contain' as const,
+        transform: 'rotate(-9deg)',
+        filter: 'drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))',
+        zIndex: 20,
+        pointerEvents: 'none' as const,
       } as React.CSSProperties,
       vipBadge: {
         position: 'absolute' as const,
-        top: isMobile ? 8 : 12,
-        left: isMobile ? 8 : 12,
-        background: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
-        color: '#fff',
-        padding: isMobile ? '5px 9px' : '6px 11px',
-        borderRadius: 999,
-        fontSize: isMobile ? 10 : 11,
-        fontWeight: 700,
-        letterSpacing: 0.3,
-        textTransform: 'uppercase' as const,
-        boxShadow: '0 6px 14px rgba(2, 132, 199, 0.35)',
-        zIndex: 11,
+        top: -8,
+        left: -6,
+        width: isMobile ? 56 : 64,
+        height: isMobile ? 56 : 64,
+        objectFit: 'contain' as const,
+        transform: 'rotate(-9deg)',
+        filter: 'drop-shadow(0 8px 14px rgba(0, 0, 0, 0.35))',
+        zIndex: 20,
+        pointerEvents: 'none' as const,
       } as React.CSSProperties,
       newBadge: {
         position: 'absolute' as const,
@@ -769,7 +765,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         letterSpacing: 0.3,
         textTransform: 'uppercase' as const,
         boxShadow: '0 6px 14px rgba(5, 150, 105, 0.35)',
-        zIndex: 11,
+        zIndex: 19,
       } as React.CSSProperties,
     }),
     [isMobile]
@@ -795,17 +791,25 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
 
           {/* Promo Label */}
           {showTopBadge && (
-            <div style={styles.topBadge}>Топ обява</div>
+            <img
+              src={topBadgeImage}
+              alt="Топ обява"
+              style={styles.topBadge}
+              loading="lazy"
+              decoding="async"
+            />
           )}
           {showVipBadge && (
-            <div
+            <img
+              src={vipBadgeImage}
+              alt="VIP обява"
               style={{
                 ...styles.vipBadge,
-                top: showTopBadge ? (isMobile ? 40 : 48) : (isMobile ? 8 : 12),
+                top: showTopBadge ? (isMobile ? 36 : 44) : -8,
               }}
-            >
-              VIP обява
-            </div>
+              loading="lazy"
+              decoding="async"
+            />
           )}
           {showNewBadge && (
             <div
@@ -813,7 +817,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
                 ...styles.newBadge,
                 top:
                   (isMobile ? 8 : 12) +
-                  ((showTopBadge ? 1 : 0) + (showVipBadge ? 1 : 0)) * (isMobile ? 32 : 36),
+                  ((showTopBadge ? 1 : 0) + (showVipBadge ? 1 : 0)) * (isMobile ? 50 : 56),
               }}
             >
               Нова
@@ -828,7 +832,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
                 ...styles.promoLabel,
                 top:
                   (isMobile ? 8 : 12) +
-                  ((showTopBadge ? 1 : 0) + (showVipBadge ? 1 : 0)) * (isMobile ? 32 : 36),
+                  ((showTopBadge ? 1 : 0) + (showVipBadge ? 1 : 0)) * (isMobile ? 50 : 56),
                 maxWidth: isMobile ? 60 : 80,
                 height: 'auto',
               }}
