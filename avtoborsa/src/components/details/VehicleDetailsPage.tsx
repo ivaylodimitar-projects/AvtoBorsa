@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Clock, ImageOff, MapPin } from 'lucide-react';
 import RezonGallery from './RezonGallery';
@@ -229,6 +229,10 @@ const VehicleDetailsPage: React.FC = () => {
   const getImageUrl = useImageUrl();
   const similarScrollRef = useRef<HTMLDivElement | null>(null);
 
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [slug]);
+
   // Extract ID from slug
   useEffect(() => {
     if (slug) {
@@ -264,7 +268,10 @@ const VehicleDetailsPage: React.FC = () => {
 
         const response = await fetch(
           `http://localhost:8000/api/listings/${id}/`,
-          { headers }
+          {
+            headers,
+            credentials: 'include',
+          }
         );
         if (!response.ok) {
           if (response.status === 404 || response.status === 410) {

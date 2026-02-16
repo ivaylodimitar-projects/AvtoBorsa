@@ -1,8 +1,13 @@
+import logging
 from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.mail import EmailMultiAlternatives
 from django.db import transaction as db_transaction
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+from django.utils.timezone import localtime
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -19,6 +24,74 @@ from backend.payments.services.stripe_service import (
 )
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
+
+
+def _invoice_number_for_transaction(tx: PaymentTransaction) -> str:
+    issued_at = localtime(tx.credited_at or tx.updated_at or tx.created_at)
+    return f"AB-{issued_at:%Y%m%d}-{tx.id}"
+
+
+def _build_invoice_email_context(tx: PaymentTransaction) -> dict[str, str]:
+    user = tx.user
+    issued_at = localtime(tx.credited_at or tx.updated_at or tx.created_at)
+    customer_name = (
+        user.get_full_name().strip()
+        or getattr(user, "username", "").strip()
+        or user.email
+        or "Customer"
+    )
+    return {
+        "brand_name": "AvtoBorsa",
+        "invoice_number": _invoice_number_for_transaction(tx),
+        "issued_at": issued_at.strftime("%Y-%m-%d %H:%M"),
+        "invoice_year": f"{issued_at:%Y}",
+        "customer_name": customer_name,
+        "customer_email": user.email or "-",
+        "transaction_id": str(tx.id),
+        "stripe_session_id": tx.stripe_session_id or "-",
+        "payment_method": "Card via Stripe Checkout",
+        "amount": f"{tx.amount:.2f}",
+        "currency": tx.currency,
+        "support_email": settings.DEFAULT_FROM_EMAIL,
+    }
+
+
+def send_invoice_email(tx: PaymentTransaction) -> None:
+    if not tx.user.email:
+        return
+
+    context = _build_invoice_email_context(tx)
+    subject = f"Your AvtoBorsa invoice {context['invoice_number']}"
+    html_message = render_to_string("payments/invoice_email.html", context)
+    text_message = strip_tags(html_message)
+
+    message = EmailMultiAlternatives(
+        subject=subject,
+        body=text_message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[tx.user.email],
+    )
+    message.attach_alternative(html_message, "text/html")
+    message.send(fail_silently=False)
+
+
+def _send_invoice_email_after_commit(transaction_id: int) -> None:
+    tx = (
+        PaymentTransaction.objects.select_related("user")
+        .filter(pk=transaction_id)
+        .first()
+    )
+    if tx is None:
+        return
+
+    try:
+        send_invoice_email(tx)
+    except Exception:
+        logger.exception(
+            "Failed to send invoice email for transaction %s",
+            transaction_id,
+        )
 
 
 def _normalize_session_data(session_data: object) -> dict:
@@ -103,6 +176,9 @@ def _credit_balance_if_needed(tx: PaymentTransaction) -> PaymentTransaction:
                 "metadata",
                 "updated_at",
             ]
+        )
+        db_transaction.on_commit(
+            lambda transaction_id=locked_tx.pk: _send_invoice_email_after_commit(transaction_id)
         )
         return locked_tx
 
@@ -379,3 +455,5 @@ def stripe_webhook_view(request):
         return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
     return Response({"received": True}, status=status.HTTP_200_OK)
+
+

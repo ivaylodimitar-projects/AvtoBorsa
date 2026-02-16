@@ -1897,7 +1897,7 @@ const PublishPage: React.FC = () => {
 
   const getValidAccessToken = async (): Promise<string | null> => {
     const ACCESS_TOKEN_KEY = "authToken";
-    const REFRESH_TOKEN_KEY = "refreshToken";
+    const LEGACY_REFRESH_TOKEN_KEY = "refreshToken";
     const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
     if (!accessToken) return null;
 
@@ -1909,45 +1909,18 @@ const PublishPage: React.FC = () => {
       });
 
       if (probeResponse.ok) {
-        return accessToken;
+        return localStorage.getItem(ACCESS_TOKEN_KEY) || accessToken;
       }
 
       if (probeResponse.status !== 401 && probeResponse.status !== 403) {
         return accessToken;
       }
 
-      const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-      if (!refreshToken) {
-        localStorage.removeItem(ACCESS_TOKEN_KEY);
-        return null;
-      }
-
-      const refreshResponse = await fetch("http://localhost:8000/api/auth/token/refresh/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ refresh: refreshToken }),
-      });
-
-      if (!refreshResponse.ok) {
-        localStorage.removeItem(ACCESS_TOKEN_KEY);
-        localStorage.removeItem(REFRESH_TOKEN_KEY);
-        return null;
-      }
-
-      const refreshData = await refreshResponse.json();
-      const nextAccessToken = typeof refreshData?.access === "string" ? refreshData.access : "";
-      if (!nextAccessToken) {
-        localStorage.removeItem(ACCESS_TOKEN_KEY);
-        localStorage.removeItem(REFRESH_TOKEN_KEY);
-        return null;
-      }
-
-      localStorage.setItem(ACCESS_TOKEN_KEY, nextAccessToken);
-      return nextAccessToken;
+      localStorage.removeItem(ACCESS_TOKEN_KEY);
+      localStorage.removeItem(LEGACY_REFRESH_TOKEN_KEY);
+      return null;
     } catch {
-      return accessToken;
+      return localStorage.getItem(ACCESS_TOKEN_KEY) || accessToken;
     }
   };
 

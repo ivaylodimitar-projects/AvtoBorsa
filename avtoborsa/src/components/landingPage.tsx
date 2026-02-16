@@ -1101,7 +1101,7 @@ export default function LandingPage() {
                             position: "absolute",
                             right: 0,
                             bottom: 0,
-                            padding: "8px 12px 7px 14px",
+                            padding: "4px 6px 3px 7px",
                             borderTop: "1px solid #e2e8f0",
                             borderLeft: "1px solid #e2e8f0",
                             borderTopLeftRadius: 12,

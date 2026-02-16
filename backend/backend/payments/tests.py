@@ -88,7 +88,8 @@ class PaymentsApiTests(APITestCase):
         self.assertTrue(tx.credited)
         self.assertEqual(profile.balance, Decimal("50.00"))
 
-    def test_webhook_completion_is_idempotent(self):
+    @patch("backend.payments.views._send_invoice_email_after_commit")
+    def test_webhook_completion_is_idempotent(self, mock_send_invoice_email):
         PaymentTransaction.objects.create(
             user=self.user,
             amount=Decimal("30.00"),
@@ -133,3 +134,4 @@ class PaymentsApiTests(APITestCase):
         self.assertEqual(tx.status, PaymentTransaction.Status.SUCCEEDED)
         self.assertTrue(tx.credited)
         self.assertEqual(profile.balance, Decimal("30.00"))
+        self.assertEqual(mock_send_invoice_email.call_count, 1)

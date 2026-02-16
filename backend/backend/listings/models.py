@@ -52,45 +52,45 @@ class CarListing(models.Model):
     """Model for car listings/advertisements"""
 
     FUEL_CHOICES = [
-        ('benzin', 'Ð‘ÐµÐ½Ð·Ð¸Ð½'),
-        ('dizel', 'Ð”Ð¸Ð·ÐµÐ»'),
-        ('gaz_benzin', 'Ð“Ð°Ð·/Ð‘ÐµÐ½Ð·Ð¸Ð½'),
-        ('hibrid', 'Ð¥Ð¸Ð±Ñ€Ð¸Ð´'),
-        ('elektro', 'Ð•Ð»ÐµÐºÑ‚Ñ€Ð¾'),
+        ('benzin', 'Бензин'),
+        ('dizel', 'Дизел'),
+        ('gaz_benzin', 'Газ/Бензин'),
+        ('hibrid', 'Хибрид'),
+        ('elektro', 'Електро'),
     ]
 
     GEARBOX_CHOICES = [
-        ('ruchna', 'Ð ÑŠÑ‡Ð½Ð°'),
-        ('avtomatik', 'ÐÐ²Ñ‚Ð¾Ð¼Ð°Ñ‚Ð¸Ðº'),
+        ('ruchna', 'Ръчна'),
+        ('avtomatik', 'Автоматик'),
     ]
 
     CONDITION_CHOICES = [
-        ('0', 'ÐÐ¾Ð²'),
-        ('1', 'Ð£Ð¿Ð¾Ñ‚Ñ€ÐµÐ±ÑÐ²Ð°Ð½'),
-        ('2', 'ÐŸÐ¾Ð²Ñ€ÐµÐ´ÐµÐ½/ÑƒÐ´Ð°Ñ€ÐµÐ½'),
-        ('3', 'Ð—Ð° Ñ‡Ð°ÑÑ‚Ð¸'),
+        ('0', 'Нов'),
+        ('1', 'Употребяван'),
+        ('2', 'Повреден/ударен'),
+        ('3', 'За части'),
     ]
 
     CAR_TYPE_CHOICES = [
-        ('van', 'Ð’Ð°Ð½'),
-        ('jeep', 'Ð”Ð¶Ð¸Ð¿'),
-        ('cabriolet', 'ÐšÐ°Ð±Ñ€Ð¸Ð¾'),
-        ('wagon', 'ÐšÐ¾Ð¼Ð±Ð¸'),
-        ('coupe', 'ÐšÑƒÐ¿Ðµ'),
-        ('minivan', 'ÐœÐ¸Ð½Ð¸Ð²Ð°Ð½'),
-        ('pickup', 'ÐŸÐ¸ÐºÐ°Ð¿'),
-        ('sedan', 'Ð¡ÐµÐ´Ð°Ð½'),
-        ('stretch_limo', 'Ð¡Ñ‚Ñ€ÐµÑ‡ Ð»Ð¸Ð¼ÑƒÐ·Ð¸Ð½Ð°'),
-        ('hatchback', 'Ð¥ÐµÑ‡Ð±ÐµÐº'),
+        ('van', 'Ван'),
+        ('jeep', 'Джип'),
+        ('cabriolet', 'Кабрио'),
+        ('wagon', 'Комби'),
+        ('coupe', 'Купе'),
+        ('minivan', 'Миниван'),
+        ('pickup', 'Пикап'),
+        ('sedan', 'Седан'),
+        ('stretch_limo', 'Стреч лимузина'),
+        ('hatchback', 'Хечбек'),
     ]
 
     EURO_STANDARD_CHOICES = [
-        ('1', 'Ð•Ð²Ñ€Ð¾ 1'),
-        ('2', 'Ð•Ð²Ñ€Ð¾ 2'),
-        ('3', 'Ð•Ð²Ñ€Ð¾ 3'),
-        ('4', 'Ð•Ð²Ñ€Ð¾ 4'),
-        ('5', 'Ð•Ð²Ñ€Ð¾ 5'),
-        ('6', 'Ð•Ð²Ñ€Ð¾ 6'),
+        ('1', 'Евро 1'),
+        ('2', 'Евро 2'),
+        ('3', 'Евро 3'),
+        ('4', 'Евро 4'),
+        ('5', 'Евро 5'),
+        ('6', 'Евро 6'),
     ]
 
     LISTING_TYPE_CHOICES = [
@@ -108,21 +108,21 @@ class CarListing(models.Model):
     ]
 
     MAIN_CATEGORY_CHOICES = [
-        ('1', 'ÐÐ²Ñ‚Ð¾Ð¼Ð¾Ð±Ð¸Ð»Ð¸ Ð¸ Ð”Ð¶Ð¸Ð¿Ð¾Ð²Ðµ'),
-        ('w', 'Ð“ÑƒÐ¼Ð¸ Ð¸ Ð´Ð¶Ð°Ð½Ñ‚Ð¸'),
-        ('u', 'Ð§Ð°ÑÑ‚Ð¸'),
-        ('3', 'Ð‘ÑƒÑÐ¾Ð²Ðµ'),
-        ('4', 'ÐšÐ°Ð¼Ð¸Ð¾Ð½Ð¸'),
-        ('5', 'ÐœÐ¾Ñ‚Ð¾Ñ†Ð¸ÐºÐ»ÐµÑ‚Ð¸'),
-        ('6', 'Ð¡ÐµÐ»ÑÐºÐ¾ÑÑ‚Ð¾Ð¿Ð°Ð½ÑÐºÐ¸'),
-        ('7', 'Ð˜Ð½Ð´ÑƒÑÑ‚Ñ€Ð¸Ð°Ð»Ð½Ð¸'),
-        ('8', 'ÐšÐ°Ñ€Ð¸'),
-        ('9', 'ÐšÐ°Ñ€Ð°Ð²Ð°Ð½Ð¸'),
-        ('a', 'Ð¯Ñ…Ñ‚Ð¸ Ð¸ Ð›Ð¾Ð´ÐºÐ¸'),
-        ('b', 'Ð ÐµÐ¼Ð°Ñ€ÐºÐµÑ‚Ð°'),
-        ('v', 'ÐÐºÑÐµÑÐ¾Ð°Ñ€Ð¸'),
-        ('y', 'ÐšÑƒÐ¿ÑƒÐ²Ð°'),
-        ('z', 'Ð£ÑÐ»ÑƒÐ³Ð¸'),
+        ('1', 'Автомобили и Джипове'),
+        ('w', 'Гуми и джанти'),
+        ('u', 'Части'),
+        ('3', 'Бусове'),
+        ('4', 'Камиони'),
+        ('5', 'Мотоциклети'),
+        ('6', 'Селскостопански'),
+        ('7', 'Индустриални'),
+        ('8', 'Кари'),
+        ('9', 'Каравани'),
+        ('a', 'Яхти и Лодки'),
+        ('b', 'Ремаркета'),
+        ('v', 'Аксесоари'),
+        ('y', 'Купува'),
+        ('z', 'Услуги'),
     ]
 
     # User and basic info
@@ -348,7 +348,7 @@ class CarListingPriceHistory(models.Model):
 
 
 class CarsListing(models.Model):
-    """Dedicated details model for main_category='1' (ÐÐ²Ñ‚Ð¾Ð¼Ð¾Ð±Ð¸Ð»Ð¸ Ð¸ Ð”Ð¶Ð¸Ð¿Ð¾Ð²Ðµ)."""
+    """Dedicated details model for main_category='1' (Автомобили и Джипове)."""
     listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='cars_details')
 
     def __str__(self):
@@ -597,6 +597,38 @@ class CarImage(models.Model):
         base_name, _ = os.path.splitext(image_name)
         self.thumbnail.save(f'{base_name}_sm.webp', thumbnail_content, save=False)
         super().save(update_fields=['thumbnail'])
+
+
+class ListingView(models.Model):
+    """Track unique listing views per authenticated user."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='listing_views')
+    listing = models.ForeignKey(CarListing, on_delete=models.CASCADE, related_name='viewer_entries')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'listing')
+        ordering = ['-created_at']
+        verbose_name = 'Listing View'
+        verbose_name_plural = 'Listing Views'
+
+    def __str__(self):
+        return f"{self.user.email} viewed {self.listing_id}"
+
+
+class ListingAnonymousView(models.Model):
+    """Track unique listing views per anonymous browser session."""
+    listing = models.ForeignKey(CarListing, on_delete=models.CASCADE, related_name='anonymous_viewer_entries')
+    session_key = models.CharField(max_length=64, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('listing', 'session_key')
+        ordering = ['-created_at']
+        verbose_name = 'Listing Anonymous View'
+        verbose_name_plural = 'Listing Anonymous Views'
+
+    def __str__(self):
+        return f"anonymous({self.session_key}) viewed {self.listing_id}"
 
 
 class Favorite(models.Model):

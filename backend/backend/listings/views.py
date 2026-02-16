@@ -10,7 +10,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import PageNumberPagination
 from django.shortcuts import get_object_or_404
-from django.db import transaction as db_transaction
+from django.db import transaction as db_transaction, IntegrityError
 from django.db.models import Q, OuterRef, Subquery, Case, When, Value, IntegerField, F
 from django.db.models import Prefetch
 from django.db.models.functions import Substr, Coalesce
@@ -21,6 +21,8 @@ from backend.accounts.models import UserProfile
 from .models import (
     CarListing,
     CarImage,
+    ListingView,
+    ListingAnonymousView,
     Favorite,
     CarListingPriceHistory,
     get_expiry_cutoff,
@@ -866,8 +868,44 @@ class CarListingViewSet(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
-        CarListing.objects.filter(pk=instance.pk).update(view_count=F('view_count') + 1)
-        instance.refresh_from_db(fields=['view_count'])
+        should_increment = True
+
+        if request.user.is_authenticated:
+            if request.user == instance.user:
+                # Do not count owner self-views.
+                should_increment = False
+            else:
+                try:
+                    _, created = ListingView.objects.get_or_create(
+                        user=request.user,
+                        listing=instance,
+                    )
+                except IntegrityError:
+                    created = False
+                should_increment = created
+        else:
+            session_key = request.session.session_key
+            if not session_key:
+                request.session['_listing_view_tracking'] = True
+                request.session.save()
+                session_key = request.session.session_key
+
+            if not session_key:
+                should_increment = False
+            else:
+                try:
+                    _, created = ListingAnonymousView.objects.get_or_create(
+                        session_key=session_key,
+                        listing=instance,
+                    )
+                except IntegrityError:
+                    created = False
+                should_increment = created
+
+        if should_increment:
+            CarListing.objects.filter(pk=instance.pk).update(view_count=F('view_count') + 1)
+            instance.refresh_from_db(fields=['view_count'])
+
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 

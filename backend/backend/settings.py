@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
 
     "backend.accounts",
@@ -81,7 +82,7 @@ ROOT_URLCONF = 'backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / "backend" / "email_templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -172,8 +173,17 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': False,
+    'BLACKLIST_AFTER_ROTATION': True,
 }
+
+# Refresh token cookie settings (used by custom auth refresh endpoint)
+JWT_REFRESH_COOKIE_NAME = os.getenv("JWT_REFRESH_COOKIE_NAME", "refreshToken")
+JWT_REFRESH_COOKIE_PATH = os.getenv("JWT_REFRESH_COOKIE_PATH", "/api/auth/")
+JWT_REFRESH_COOKIE_SAMESITE = os.getenv("JWT_REFRESH_COOKIE_SAMESITE", "Lax")
+JWT_REFRESH_COOKIE_SECURE = os.getenv(
+    "JWT_REFRESH_COOKIE_SECURE",
+    "0" if DEBUG else "1",
+).lower() in ("1", "true", "yes")
 
 # Cache configuration
 CACHES = {

@@ -11,6 +11,7 @@ from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.contrib.auth.tokens import default_token_generator
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework.parsers import MultiPartParser, FormParser
 from backend.listings.models import get_expiry_cutoff
 from .serializers import (
@@ -18,6 +19,29 @@ from .serializers import (
     UserBalanceSerializer, DealerListSerializer, DealerDetailSerializer
 )
 from .models import PrivateUser, BusinessUser, UserProfile
+
+
+def _refresh_cookie_max_age_seconds() -> int:
+    return int(settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds())
+
+
+def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
+    response.set_cookie(
+        key=settings.JWT_REFRESH_COOKIE_NAME,
+        value=refresh_token,
+        max_age=_refresh_cookie_max_age_seconds(),
+        httponly=True,
+        secure=settings.JWT_REFRESH_COOKIE_SECURE,
+        samesite=settings.JWT_REFRESH_COOKIE_SAMESITE,
+        path=settings.JWT_REFRESH_COOKIE_PATH,
+    )
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=settings.JWT_REFRESH_COOKIE_NAME,
+        path=settings.JWT_REFRESH_COOKIE_PATH,
+    )
 
 
 def send_verification_email(user: User) -> None:
@@ -129,24 +153,72 @@ def login(request):
 
     user_data['balance'] = balance
 
-    return Response({
+    response = Response({
         'access': str(refresh.access_token),
-        'refresh': str(refresh),
         'user': {
             **user_data,
             'userType': user_type
         }
     }, status=status.HTTP_200_OK)
+    _set_refresh_cookie(response, str(refresh))
+    return response
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def token_refresh(request):
+    """Refresh access token using HttpOnly refresh-token cookie."""
+    refresh_token = request.COOKIES.get(settings.JWT_REFRESH_COOKIE_NAME)
+    if not refresh_token:
+        # Temporary fallback for older clients still sending refresh in body.
+        refresh_token = request.data.get('refresh')
+
+    if not refresh_token:
+        response = Response(
+            {'error': 'Refresh token is missing.'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+        _clear_refresh_cookie(response)
+        return response
+
+    serializer = TokenRefreshSerializer(data={'refresh': refresh_token})
+    try:
+        serializer.is_valid(raise_exception=True)
+    except Exception:
+        response = Response(
+            {'error': 'Refresh token is invalid or expired.'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+        _clear_refresh_cookie(response)
+        return response
+
+    payload = serializer.validated_data
+    next_access = payload.get('access')
+    next_refresh = payload.get('refresh')
+
+    response = Response({'access': next_access}, status=status.HTTP_200_OK)
+    if next_refresh:
+        _set_refresh_cookie(response, next_refresh)
+    return response
 
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def logout(request):
     """API endpoint for user logout"""
-    return Response(
+    refresh_token = request.COOKIES.get(settings.JWT_REFRESH_COOKIE_NAME)
+    if refresh_token:
+        try:
+            RefreshToken(refresh_token).blacklist()
+        except Exception:
+            pass
+
+    response = Response(
         {'message': 'Logout successful'},
         status=status.HTTP_200_OK
     )
+    _clear_refresh_cookie(response)
+    return response
 
 
 @api_view(['GET'])

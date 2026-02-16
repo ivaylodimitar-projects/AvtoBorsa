@@ -18,7 +18,7 @@ interface AuthContextType {
   authTransition: "login" | "logout" | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  setUserFromToken: (userData: User, accessToken: string, refreshToken?: string) => void;
+  setUserFromToken: (userData: User, accessToken: string) => void;
   isAuthenticated: boolean;
   updateBalance: (newBalance: number) => void;
 }
@@ -30,7 +30,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const [authTransition, setAuthTransition] = useState<"login" | "logout" | null>(null);
   const ACCESS_TOKEN_KEY = "authToken";
-  const REFRESH_TOKEN_KEY = "refreshToken";
+  const LEGACY_REFRESH_TOKEN_KEY = "refreshToken";
   const AUTH_TRANSITION_MIN_MS = 550;
 
   const applyMinimumTransitionDuration = async (startedAt: number) => {
@@ -46,7 +46,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const checkAuth = async () => {
       try {
         const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
-        const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
         if (accessToken) {
           const response = await fetch("http://localhost:8000/api/auth/me/", {
             headers: {
@@ -58,31 +57,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUser(userData);
             return;
           }
-          if ((response.status === 401 || response.status === 403) && refreshToken) {
-            const refreshRes = await fetch("http://localhost:8000/api/auth/token/refresh/", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ refresh: refreshToken }),
-            });
-            if (refreshRes.ok) {
-              const refreshData = await refreshRes.json();
-              if (refreshData?.access) {
-                localStorage.setItem(ACCESS_TOKEN_KEY, refreshData.access);
-                const meRes = await fetch("http://localhost:8000/api/auth/me/", {
-                  headers: { Authorization: `Bearer ${refreshData.access}` },
-                });
-                if (meRes.ok) {
-                  const userData = await meRes.json();
-                  setUser(userData);
-                  return;
-                }
-              }
-            }
+          if (response.status === 401 || response.status === 403) {
             localStorage.removeItem(ACCESS_TOKEN_KEY);
-            localStorage.removeItem(REFRESH_TOKEN_KEY);
-          } else if (response.status === 401 || response.status === 403) {
-            localStorage.removeItem(ACCESS_TOKEN_KEY);
-            localStorage.removeItem(REFRESH_TOKEN_KEY);
+            localStorage.removeItem(LEGACY_REFRESH_TOKEN_KEY);
           } else {
             // Keep token on transient errors
             console.warn("Auth check failed with status:", response.status);
@@ -106,6 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const response = await fetch("http://localhost:8000/api/auth/login/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, password }),
       });
 
@@ -119,11 +97,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const data = await response.json();
-      if (!data?.access || !data?.refresh || !data?.user) {
+      if (!data?.access || !data?.user) {
         throw new Error("Непълен отговор от сървъра при вход");
       }
       localStorage.setItem(ACCESS_TOKEN_KEY, data.access);
-      localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh);
+      localStorage.removeItem(LEGACY_REFRESH_TOKEN_KEY);
       setUser(data.user);
 
       try {
@@ -143,11 +121,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const setUserFromToken = (userData: User, accessToken: string, refreshToken?: string) => {
+  const setUserFromToken = (userData: User, accessToken: string) => {
     localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-    if (refreshToken) {
-      localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-    }
+    localStorage.removeItem(LEGACY_REFRESH_TOKEN_KEY);
     setUser(userData);
   };
 
@@ -166,6 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (token) {
         await fetch("http://localhost:8000/api/auth/logout/", {
           method: "POST",
+          credentials: "include",
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -175,7 +152,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error("Logout error:", error);
     } finally {
       localStorage.removeItem(ACCESS_TOKEN_KEY);
-      localStorage.removeItem(REFRESH_TOKEN_KEY);
+      localStorage.removeItem(LEGACY_REFRESH_TOKEN_KEY);
       setUser(null);
       await applyMinimumTransitionDuration(transitionStartedAt);
       setAuthTransition(null);

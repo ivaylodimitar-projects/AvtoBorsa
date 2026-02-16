@@ -5,6 +5,9 @@ import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
+import { installAuthFetchInterceptor } from './utils/authFetchInterceptor'
+
+installAuthFetchInterceptor()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
