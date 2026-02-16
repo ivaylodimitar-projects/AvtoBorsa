@@ -2,6 +2,7 @@ import React from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
+  FiBell,
   FiBriefcase,
   FiHome,
   FiLogOut,
@@ -11,14 +12,26 @@ import {
 } from "react-icons/fi";
 import ProfileMenu from "./ProfileMenu";
 import SavedSearchesMenu from "./SavedSearchesMenu";
+import {
+  USER_NOTIFICATIONS_UPDATED_EVENT,
+  getUserNotifications,
+  getUserNotificationsStorageKey,
+  markNotificationRead,
+  type AppNotification,
+} from "../utils/notifications";
 
 const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout, isAuthenticated } = useAuth();
+  const { logout, isAuthenticated, user } = useAuth();
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [showLogoutModal, setShowLogoutModal] = React.useState(false);
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
+  const [showNotificationsMenu, setShowNotificationsMenu] = React.useState(false);
+  const [showAllNotifications, setShowAllNotifications] = React.useState(false);
+  const [notifications, setNotifications] = React.useState<AppNotification[]>([]);
+  const notificationsRef = React.useRef<HTMLDivElement | null>(null);
+  const NOTIFICATIONS_PREVIEW_LIMIT = 5;
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -33,6 +46,111 @@ const Navbar: React.FC = () => {
     window.addEventListener("keydown", handleEsc);
     return () => window.removeEventListener("keydown", handleEsc);
   }, [showLogoutModal, isLoggingOut]);
+
+  React.useEffect(() => {
+    if (!user?.id) {
+      setNotifications([]);
+      return;
+    }
+
+    const storageKey = getUserNotificationsStorageKey(user.id);
+    const refreshNotifications = () => {
+      setNotifications(getUserNotifications(user.id));
+    };
+
+    refreshNotifications();
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key && event.key !== storageKey) return;
+      refreshNotifications();
+    };
+
+    const handleNotificationsUpdated = (event: Event) => {
+      const { detail } = event as CustomEvent<{ userId?: number }>;
+      if (detail?.userId && detail.userId !== user.id) return;
+      refreshNotifications();
+    };
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener(USER_NOTIFICATIONS_UPDATED_EVENT, handleNotificationsUpdated);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(USER_NOTIFICATIONS_UPDATED_EVENT, handleNotificationsUpdated);
+    };
+  }, [user?.id]);
+
+  React.useEffect(() => {
+    if (!showNotificationsMenu) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        notificationsRef.current &&
+        !notificationsRef.current.contains(event.target as Node)
+      ) {
+        setShowNotificationsMenu(false);
+      }
+    };
+
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowNotificationsMenu(false);
+      }
+    };
+
+    window.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("keydown", handleEsc);
+
+    return () => {
+      window.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("keydown", handleEsc);
+    };
+  }, [showNotificationsMenu]);
+
+  const unreadNotificationsCount = notifications.filter((item) => !item.isRead).length;
+  const hasUnreadNotifications = unreadNotificationsCount > 0;
+  const hasNotifications = notifications.length > 0;
+  const hasMoreNotifications = notifications.length > NOTIFICATIONS_PREVIEW_LIMIT;
+  const visibleNotifications = showAllNotifications
+    ? notifications
+    : notifications.slice(0, NOTIFICATIONS_PREVIEW_LIMIT);
+
+  const formatNotificationDate = (value: string) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return date.toLocaleString("bg-BG", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const formatNotificationAmount = (amount: number, currency: string) => {
+    try {
+      return new Intl.NumberFormat("bg-BG", {
+        style: "currency",
+        currency,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(amount);
+    } catch {
+      return `${amount.toFixed(2)} ${currency}`;
+    }
+  };
+
+  const handleNotificationsToggle = () => {
+    const nextOpen = !showNotificationsMenu;
+    setShowNotificationsMenu(nextOpen);
+    if (nextOpen) {
+      setShowAllNotifications(false);
+    }
+  };
+
+  const handleMarkAsRead = (notificationId: string) => {
+    if (!user?.id) return;
+    markNotificationRead(user.id, notificationId);
+  };
 
   const handleLogoutConfirm = async () => {
     setIsLoggingOut(true);
@@ -110,6 +228,93 @@ const Navbar: React.FC = () => {
           <div className="nav-group nav-right">
             {isAuthenticated ? (
               <>
+                <div className="notifications-wrap" ref={notificationsRef}>
+                  <button
+                    className={`btn-ghost btn-notifications ${showNotificationsMenu ? "open" : ""}`}
+                    onClick={handleNotificationsToggle}
+                    aria-label="Известия"
+                    aria-haspopup="menu"
+                    aria-expanded={showNotificationsMenu}
+                    title="Известия"
+                  >
+                    <FiBell size={21} className="notifications-bell-icon" />
+                    {hasUnreadNotifications && (
+                      <span className="notification-dot" aria-hidden="true" />
+                    )}
+                  </button>
+
+                  {showNotificationsMenu && (
+                    <div className="notifications-menu" role="menu" aria-label="Списък с известия">
+                      <div className="notifications-title">
+                        Твоите известия
+                        {hasNotifications ? ` (${notifications.length})` : ""}
+                      </div>
+                      {!hasNotifications ? (
+                        <div className="notifications-empty">Тук ще виждаш известия за активността ти в сайта.</div>
+                      ) : (
+                        <>
+                          <div className="notifications-list">
+                            {visibleNotifications.map((notification) => (
+                              <div
+                                key={notification.id}
+                                className={`notification-item ${notification.isRead ? "read" : "unread"}`}
+                                role="menuitem"
+                              >
+                                <div className="notification-item-top">
+                                  <span className="notification-item-type">
+                                    {notification.type === "deposit" ? "Депозит" : "Известие"}
+                                  </span>
+                                  <span className="notification-item-time">
+                                    {formatNotificationDate(notification.createdAt)}
+                                  </span>
+                                </div>
+                                <div className="notification-item-main">
+                                  <span className="notification-item-amount">
+                                    +{formatNotificationAmount(notification.amount, notification.currency)}
+                                  </span>
+                                  <span className="notification-item-text">
+                                    Добавени средства в баланса.
+                                  </span>
+                                </div>
+                                <div className="notification-item-actions">
+                                  {notification.isRead ? (
+                                    <span className="notification-read-label">Прочетено</span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className="notification-read-btn"
+                                      onClick={() => handleMarkAsRead(notification.id)}
+                                    >
+                                      Прочетено
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          {hasMoreNotifications && !showAllNotifications && (
+                            <button
+                              type="button"
+                              className="notifications-footer-link"
+                              onClick={() => setShowAllNotifications(true)}
+                            >
+                              Виж всички известия
+                            </button>
+                          )}
+                          {hasMoreNotifications && showAllNotifications && (
+                            <button
+                              type="button"
+                              className="notifications-footer-link"
+                              onClick={() => setShowAllNotifications(false)}
+                            >
+                              Покажи само 5
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <ProfileMenu />
                 <button className="btn-ghost btn-logout" onClick={() => setShowLogoutModal(true)}>
                   <FiLogOut size={16} />
@@ -323,6 +528,188 @@ const css = `
   align-items: center;
 }
 
+.notifications-wrap {
+  position: relative;
+}
+
+.btn-notifications {
+  width: 50px;
+  min-width: 50px;
+  padding: 0;
+  justify-content: center;
+  position: relative;
+  color: #0f766e;
+  border-color: #99f6e4;
+  background: #ecfdf5;
+}
+
+.notifications-bell-icon {
+  display: block;
+}
+
+.btn-notifications.open {
+  background: #ecfdf5;
+  border-color: #99f6e4;
+  color: #0f766e;
+}
+
+.notification-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ef4444;
+  border: 2px solid #fff;
+}
+
+.notifications-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 280px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.14);
+  padding: 12px;
+  z-index: 1100;
+}
+
+.notifications-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 8px;
+}
+
+.notifications-empty {
+  border-radius: 10px;
+  border: 1px dashed #cbd5e1;
+  background: #f8fafc;
+  padding: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #475569;
+}
+
+.notifications-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.notification-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.notification-item.unread {
+  border-color: #99f6e4;
+  background: #f0fdfa;
+}
+
+.notification-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.notification-item-type {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  color: #0f766e;
+}
+
+.notification-item-time {
+  font-size: 11px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.notification-item-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.notification-item-amount {
+  color: #047857;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.notification-item-text {
+  color: #334155;
+  font-size: 12px;
+  text-align: right;
+}
+
+.notification-item-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.notification-read-btn {
+  border: 1px solid #bae6fd;
+  background: #f0f9ff;
+  color: #0c4a6e;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.notification-read-btn:hover {
+  background: #e0f2fe;
+  border-color: #7dd3fc;
+}
+
+.notification-read-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.notifications-footer-link {
+  margin-top: 8px;
+  width: 100%;
+  border: 1px solid #99f6e4;
+  background: #ecfdf5;
+  color: #0f766e;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.notifications-footer-link:hover {
+  background: #d1fae5;
+}
+
+.notifications-footer {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 11px;
+  color: #64748b;
+}
+
 .nav-link {
   display: inline-flex;
   align-items: center;
@@ -465,6 +852,34 @@ const css = `
     margin-left: 0;
   }
 
+  .notifications-wrap {
+    width: 100%;
+  }
+
+  .btn-notifications {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .notifications-menu {
+    position: static;
+    width: 100%;
+    margin-top: 8px;
+  }
+
+  .notification-item-main {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .notification-item-text {
+    text-align: left;
+  }
+
+  .notification-item-actions {
+    justify-content: flex-start;
+  }
+
   .nav a,
   .nav button {
     width: 100%;
@@ -472,3 +887,5 @@ const css = `
   }
 }
 `;
+
+

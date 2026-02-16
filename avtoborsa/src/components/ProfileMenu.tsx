@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import TopUpModal from "./TopUpModal";
 import { useToast } from "../context/ToastContext";
+import { addDepositNotification } from "../utils/notifications";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 const STRIPE_SESSION_STORAGE_KEY = "stripe_checkout_session_id";
@@ -79,6 +80,7 @@ const ProfileMenu: React.FC = () => {
         }
 
         let paymentStatus: string | null = null;
+        let paymentAmount: number | null = null;
         let nextBalance: number | null = null;
 
         if (sessionId) {
@@ -91,6 +93,19 @@ const ProfileMenu: React.FC = () => {
           if (statusResponse.ok) {
             const statusData = await statusResponse.json();
             paymentStatus = typeof statusData.status === "string" ? statusData.status : null;
+            const amountCandidate =
+              typeof statusData.amount === "number"
+                ? statusData.amount
+                : typeof statusData.credited_amount === "number"
+                  ? statusData.credited_amount
+                  : null;
+            if (
+              typeof amountCandidate === "number" &&
+              Number.isFinite(amountCandidate) &&
+              amountCandidate > 0
+            ) {
+              paymentAmount = amountCandidate;
+            }
             if (typeof statusData.balance === "number") {
               nextBalance = statusData.balance;
             }
@@ -126,11 +141,16 @@ const ProfileMenu: React.FC = () => {
 
           if (previousBalance !== null && nextBalance > previousBalance) {
             const delta = nextBalance - previousBalance;
+            addDepositNotification(user.id, delta);
             showToast(
               `Балансът е обновен: €${nextBalance.toFixed(2)} (+€${delta.toFixed(2)}).`,
               { type: "success" }
             );
             return;
+          }
+
+          if (paymentAmount !== null) {
+            addDepositNotification(user.id, paymentAmount);
           }
 
           showToast(`Балансът е обновен: €${nextBalance.toFixed(2)}.`, { type: "success" });
