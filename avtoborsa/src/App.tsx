@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, useLocation } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import LandingPage from './components/landingPage'
 import PublishPage from './components/PublishPage'
@@ -16,10 +16,13 @@ import MyAdsPage from './components/MyAdsPage'
 import VehicleDetailsPage from './components/details/VehicleDetailsPage'
 import SearchPage from './components/SearchPage'
 import Footer from './components/footer'
+import AdminPage from './components/AdminPage'
 import { useAuth } from './context/AuthContext'
 
 function App() {
+  const location = useLocation()
   const { authTransition } = useAuth()
+  const isAdminRoute = location.pathname === '/admin' || location.pathname.startsWith('/admin/')
   const showAuthTransitionScreen = authTransition !== null
   const transitionTitle =
     authTransition === 'logout' ? 'Излизане от профила...' : 'Влизане в профила...'
@@ -30,7 +33,7 @@ function App() {
 
   return (
     <>
-      <Navbar />
+      {!isAdminRoute && <Navbar />}
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/search" element={<SearchPage />} />
@@ -47,8 +50,9 @@ function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/my-ads" element={<MyAdsPage />} />
         <Route path="/details/:slug" element={<VehicleDetailsPage />} />
+        <Route path="/admin" element={<AdminPage />} />
       </Routes>
-      <Footer />
+      {!isAdminRoute && <Footer />}
       {showAuthTransitionScreen && (
         <div
           style={{

@@ -10,6 +10,10 @@ interface User {
   last_name?: string;
   profile_image_url?: string | null;
   created_at?: string;
+  is_staff?: boolean;
+  is_superuser?: boolean;
+  is_admin?: boolean;
+  isAdmin?: boolean;
 }
 
 interface AuthContextType {

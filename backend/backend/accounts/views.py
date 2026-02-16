@@ -134,6 +134,9 @@ def login(request):
         'first_name': user.first_name,
         'last_name': user.last_name,
         'created_at': user.date_joined,
+        'is_staff': user.is_staff,
+        'is_superuser': user.is_superuser,
+        'is_admin': bool(user.is_staff or user.is_superuser),
     }
 
     if hasattr(user, 'business_profile'):
@@ -255,6 +258,9 @@ def get_current_user(request):
         'email': user.email,
         'userType': user_type,
         'balance': balance,
+        'is_staff': user.is_staff,
+        'is_superuser': user.is_superuser,
+        'is_admin': bool(user.is_staff or user.is_superuser),
         **user_data
     }, status=status.HTTP_200_OK)
 
