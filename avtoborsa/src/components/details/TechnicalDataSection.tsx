@@ -151,10 +151,38 @@ const WHEEL_OFFER_TYPE_LABELS: Record<string, string> = {
   '3': 'Гуми с джанти',
 };
 
+const DB_COLOR_TO_BG_LABEL: Record<string, string> = {
+  white: 'Бял',
+  black: 'Черен',
+  gray: 'Сив',
+  grey: 'Сив',
+  silver: 'Сребърен',
+  blue: 'Син',
+  red: 'Червен',
+  green: 'Зелен',
+  yellow: 'Жълт',
+  orange: 'Оранжев',
+  brown: 'Кафяв',
+  beige: 'Бежов',
+  gold: 'Златист',
+  golden: 'Златист',
+  violet: 'Виолетов',
+  purple: 'Виолетов',
+  burgundy: 'Бордо',
+  maroon: 'Бордо',
+};
+
 const toText = (value: unknown) => {
   if (value === null || value === undefined) return '';
   return String(value).trim();
 };
+
+const normalizeColorKey = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[_-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 const toPositiveNumber = (value: unknown) => {
   const numeric = Number(value);
@@ -194,6 +222,12 @@ const formatEuro = (euro?: string) => {
   return EURO_LABELS[normalized] || normalized;
 };
 
+const formatColor = (color?: string) => {
+  const normalized = toText(color);
+  if (!normalized) return '';
+  return DB_COLOR_TO_BG_LABEL[normalizeColorKey(normalized)] || normalized;
+};
+
 const formatTopmenuCategory = (value?: string) => {
   const normalized = toText(value);
   if (!normalized) return '';
@@ -227,7 +261,7 @@ const TechnicalDataSection: React.FC<TechnicalDataSectionProps> = ({
   gearbox,
   category,
   mileage,
-  color,
+  color: rawColor,
   vin,
   condition,
   euroStandard,
@@ -384,6 +418,7 @@ const TechnicalDataSection: React.FC<TechnicalDataSectionProps> = ({
     }
   };
 
+  const color = formatColor(rawColor);
   const normalizedMainCategory = toText(mainCategory);
 
   switch (normalizedMainCategory) {

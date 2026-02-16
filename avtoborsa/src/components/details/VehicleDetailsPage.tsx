@@ -536,6 +536,7 @@ const VehicleDetailsPage: React.FC = () => {
       display: 'grid',
       gridTemplateColumns: isMobile ? '1fr' : window.innerWidth < 1024 ? '1fr' : '660px 340px',
       justifyContent: isMobile || window.innerWidth < 1024 ? 'stretch' : 'center',
+      alignItems: 'start',
       gap: isMobile ? 12 : 24,
       width: '100%',
       boxSizing: 'border-box',

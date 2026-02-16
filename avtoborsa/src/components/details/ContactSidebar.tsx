@@ -463,7 +463,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
   }
 
   return (
-    <div style={{ position: 'sticky', top: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ position: 'sticky', top: "6rem", alignSelf: 'start', display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Main Contact Box */}
       <div
           style={{
