@@ -34,6 +34,10 @@ def _refresh_cookie_max_age_seconds() -> int:
     return int(settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds())
 
 
+def _normalize_email(value: str) -> str:
+    return str(value).strip().lower()
+
+
 def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
     response.set_cookie(
         key=settings.JWT_REFRESH_COOKIE_NAME,
@@ -644,28 +648,36 @@ def register_private_user(request):
 @permission_classes([AllowAny])
 def login(request):
     """API endpoint for user login"""
-    email = request.data.get('email')
+    identifier = request.data.get('email')
     password = request.data.get('password')
+    normalized_email = _normalize_email(identifier)
 
-    if not email or not password:
+    if not normalized_email or not password:
         return Response(
             {'error': 'Email and password are required'},
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # Try to authenticate with email
-    try:
-        user_obj = User.objects.get(email=email)
-    except User.DoesNotExist:
-        user_obj = None
+    # Primary login: email (case-insensitive). Fallback: username.
+    candidate_users = list(User.objects.filter(email__iexact=normalized_email).order_by('id'))
+    if not candidate_users:
+        candidate_users = list(
+            User.objects.filter(username__iexact=str(identifier).strip()).order_by('id')
+        )
 
-    if user_obj and user_obj.check_password(password) and not user_obj.is_active:
-        return Response(
+    user = None
+    for user_obj in candidate_users:
+        if not user_obj.check_password(password):
+            continue
+        if not user_obj.is_active:
+            return Response(
             {'error': 'Акаунтът не е потвърден. Проверете пощата си.'},
             status=status.HTTP_403_FORBIDDEN
         )
 
-    user = authenticate(username=user_obj.username, password=password) if user_obj else None
+        user = authenticate(username=user_obj.username, password=password)
+        if user is not None:
+            break
 
     if user is None:
         return Response(

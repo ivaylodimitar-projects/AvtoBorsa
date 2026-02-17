@@ -57,7 +57,7 @@ const PrivateProfilePage: React.FC = () => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            email: formData.email,
+            email: formData.email.trim().toLowerCase(),
             password: formData.password,
             confirm_password: formData.confirmPassword,
           }),

@@ -119,7 +119,7 @@ const BusinessProfilePage: React.FC = () => {
           city: formData.city,
           address: formData.address,
           phone: formData.phone,
-          email: formData.email,
+          email: formData.email.trim().toLowerCase(),
           username: formData.username,
           password: formData.password,
           confirm_password: formData.confirmPassword,

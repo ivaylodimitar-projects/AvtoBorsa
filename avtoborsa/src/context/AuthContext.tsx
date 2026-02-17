@@ -82,13 +82,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     const transitionStartedAt = Date.now();
     setAuthTransition("login");
+    const normalizedEmail = email.trim().toLowerCase();
 
     try {
       const response = await fetch("http://localhost:8000/api/auth/login/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: normalizedEmail, password }),
       });
 
       if (!response.ok) {
