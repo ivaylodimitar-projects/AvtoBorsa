@@ -1,19 +1,40 @@
 export const USER_NOTIFICATIONS_STORAGE_KEY_PREFIX =
-  "avtoborsa:user-notifications:v1:";
+  "karbg:user-notifications:v1:";
 export const USER_NOTIFICATIONS_UPDATED_EVENT =
-  "avtoborsa:user-notifications-updated";
+  "karbg:user-notifications-updated";
 
-const MAX_NOTIFICATIONS = 50;
+const MAX_NOTIFICATIONS = 20;
 
-export type AppNotificationType = "deposit";
+export type AppNotificationType = "deposit" | "dealer_listing";
 
-export interface AppNotification {
+interface BaseNotification {
   id: string;
   type: AppNotificationType;
-  amount: number;
-  currency: string;
   createdAt: string;
   isRead: boolean;
+}
+
+export interface DepositNotification extends BaseNotification {
+  type: "deposit";
+  amount: number;
+  currency: string;
+}
+
+export interface DealerListingNotification extends BaseNotification {
+  type: "dealer_listing";
+  dealerId: number;
+  dealerName: string;
+  listingsAdded: number;
+  totalListings: number;
+}
+
+export type AppNotification = DepositNotification | DealerListingNotification;
+
+interface DealerListingNotificationInput {
+  dealerId: number;
+  dealerName: string;
+  listingsAdded: number;
+  totalListings: number;
 }
 
 const toStorageKey = (userId: number) =>
@@ -21,36 +42,92 @@ const toStorageKey = (userId: number) =>
 
 const normalizeAmount = (value: number) => Math.round(value * 100) / 100;
 
+const normalizeCount = (value: number) => {
+  if (!Number.isFinite(value) || value < 0) return 0;
+  return Math.floor(value);
+};
+
+const normalizeText = (value: unknown) => {
+  if (typeof value !== "string") return "";
+  return value.trim();
+};
+
 const toValidNotification = (value: unknown): AppNotification | null => {
   if (!value || typeof value !== "object") {
     return null;
   }
 
   const record = value as Record<string, unknown>;
-  if (record.type !== "deposit") {
-    return null;
-  }
   if (typeof record.id !== "string" || !record.id.trim()) {
-    return null;
-  }
-  if (typeof record.amount !== "number" || !Number.isFinite(record.amount)) {
-    return null;
-  }
-  if (typeof record.currency !== "string" || !record.currency.trim()) {
     return null;
   }
   if (typeof record.createdAt !== "string" || !record.createdAt.trim()) {
     return null;
   }
 
-  return {
-    id: record.id,
-    type: "deposit",
-    amount: normalizeAmount(record.amount),
-    currency: record.currency,
-    createdAt: record.createdAt,
-    isRead: Boolean(record.isRead),
-  };
+  if (record.type === "deposit") {
+    if (typeof record.amount !== "number" || !Number.isFinite(record.amount)) {
+      return null;
+    }
+    const currency = normalizeText(record.currency);
+    if (!currency) {
+      return null;
+    }
+
+    return {
+      id: record.id,
+      type: "deposit",
+      amount: normalizeAmount(record.amount),
+      currency,
+      createdAt: record.createdAt,
+      isRead: Boolean(record.isRead),
+    };
+  }
+
+  if (record.type === "dealer_listing") {
+    if (typeof record.dealerId !== "number" || !Number.isFinite(record.dealerId)) {
+      return null;
+    }
+    const dealerId = Math.floor(record.dealerId);
+    if (dealerId <= 0) {
+      return null;
+    }
+    const dealerName = normalizeText(record.dealerName);
+    if (!dealerName) {
+      return null;
+    }
+    if (
+      typeof record.listingsAdded !== "number" ||
+      !Number.isFinite(record.listingsAdded)
+    ) {
+      return null;
+    }
+    if (
+      typeof record.totalListings !== "number" ||
+      !Number.isFinite(record.totalListings)
+    ) {
+      return null;
+    }
+
+    const listingsAdded = normalizeCount(record.listingsAdded);
+    const totalListings = normalizeCount(record.totalListings);
+    if (listingsAdded <= 0 || totalListings < listingsAdded) {
+      return null;
+    }
+
+    return {
+      id: record.id,
+      type: "dealer_listing",
+      dealerId,
+      dealerName,
+      listingsAdded,
+      totalListings,
+      createdAt: record.createdAt,
+      isRead: Boolean(record.isRead),
+    };
+  }
+
+  return null;
 };
 
 const emitNotificationsUpdated = (userId: number) => {
@@ -102,7 +179,7 @@ export const addDepositNotification = (
   if (!userId) return null;
   if (!Number.isFinite(amount) || amount <= 0) return null;
 
-  const notification: AppNotification = {
+  const notification: DepositNotification = {
     id: `deposit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     type: "deposit",
     amount: normalizeAmount(amount),
@@ -112,7 +189,49 @@ export const addDepositNotification = (
   };
 
   const current = getUserNotifications(userId);
-  persistUserNotifications(userId, [notification, ...current].slice(0, MAX_NOTIFICATIONS));
+  persistUserNotifications(
+    userId,
+    [notification, ...current].slice(0, MAX_NOTIFICATIONS)
+  );
+  return notification;
+};
+
+export const addDealerListingNotification = (
+  userId: number | null | undefined,
+  input: DealerListingNotificationInput
+): AppNotification | null => {
+  if (!userId) return null;
+
+  const dealerId = Number.isFinite(input.dealerId) ? Math.floor(input.dealerId) : 0;
+  const dealerName = normalizeText(input.dealerName);
+  const listingsAdded = normalizeCount(input.listingsAdded);
+  const totalListings = normalizeCount(input.totalListings);
+
+  if (dealerId <= 0 || !dealerName || listingsAdded <= 0 || totalListings < listingsAdded) {
+    return null;
+  }
+
+  const notificationId = `dealer-listing-${dealerId}-${totalListings}`;
+  const current = getUserNotifications(userId);
+  if (current.some((item) => item.id === notificationId)) {
+    return null;
+  }
+
+  const notification: DealerListingNotification = {
+    id: notificationId,
+    type: "dealer_listing",
+    dealerId,
+    dealerName,
+    listingsAdded,
+    totalListings,
+    createdAt: new Date().toISOString(),
+    isRead: false,
+  };
+
+  persistUserNotifications(
+    userId,
+    [notification, ...current].slice(0, MAX_NOTIFICATIONS)
+  );
   return notification;
 };
 
@@ -139,7 +258,9 @@ export const markNotificationRead = (
     item.id === notificationId ? { ...item, isRead: true } : item
   );
 
-  const hasChanges = next.some((item, index) => item.isRead !== current[index]?.isRead);
+  const hasChanges = next.some(
+    (item, index) => item.isRead !== current[index]?.isRead
+  );
   if (!hasChanges) return;
 
   persistUserNotifications(userId, next);

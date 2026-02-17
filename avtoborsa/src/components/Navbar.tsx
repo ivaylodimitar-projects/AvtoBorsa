@@ -2,8 +2,12 @@ import React from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
+  FiCheck,
   FiBell,
   FiBriefcase,
+  FiChevronDown,
+  FiChevronUp,
+  FiExternalLink,
   FiHome,
   FiLogOut,
   FiMenu,
@@ -16,9 +20,76 @@ import {
   USER_NOTIFICATIONS_UPDATED_EVENT,
   getUserNotifications,
   getUserNotificationsStorageKey,
+  markAllNotificationsRead,
   markNotificationRead,
   type AppNotification,
+  type DealerListingNotification,
 } from "../utils/notifications";
+import {
+  USER_FOLLOWED_DEALERS_UPDATED_EVENT,
+  getUserFollowedDealers,
+  getUserFollowedDealersStorageKey,
+  syncFollowedDealersWithLatestListings,
+  unfollowDealer,
+  type DealerListingSnapshot,
+  type FollowedDealer,
+} from "../utils/dealerSubscriptions";
+
+const DEALER_LISTINGS_POLL_INTERVAL_MS = 20_000;
+const DEALER_NOTIFICATIONS_STACK_WINDOW_MS = 60 * 60 * 1000;
+
+type NotificationRenderItem =
+  | {
+      kind: "single";
+      notification: AppNotification;
+    }
+  | {
+      kind: "group";
+      groupKey: string;
+      dealerId: number;
+      dealerName: string;
+      notifications: DealerListingNotification[];
+    };
+
+const toDealerListingSnapshots = (value: unknown): DealerListingSnapshot[] => {
+  if (!Array.isArray(value)) return [];
+
+  const snapshots: DealerListingSnapshot[] = [];
+
+  value.forEach((item) => {
+    if (!item || typeof item !== "object") return;
+
+    const record = item as Record<string, unknown>;
+    const idValue = record.id;
+    const dealerNameValue = record.dealer_name;
+    const listingCountValue = record.listing_count;
+
+    if (
+      typeof idValue !== "number" ||
+      !Number.isFinite(idValue) ||
+      idValue <= 0 ||
+      typeof dealerNameValue !== "string" ||
+      !dealerNameValue.trim() ||
+      typeof listingCountValue !== "number" ||
+      !Number.isFinite(listingCountValue)
+    ) {
+      return;
+    }
+
+    snapshots.push({
+      id: Math.floor(idValue),
+      dealer_name: dealerNameValue.trim(),
+      city: typeof record.city === "string" ? record.city : "",
+      profile_image_url:
+        typeof record.profile_image_url === "string"
+          ? record.profile_image_url
+          : null,
+      listing_count: Math.max(0, Math.floor(listingCountValue)),
+    });
+  });
+
+  return snapshots;
+};
 
 const Navbar: React.FC = () => {
   const navigate = useNavigate();
@@ -29,7 +100,15 @@ const Navbar: React.FC = () => {
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [showNotificationsMenu, setShowNotificationsMenu] = React.useState(false);
   const [showAllNotifications, setShowAllNotifications] = React.useState(false);
+  const [notificationsTab, setNotificationsTab] = React.useState<
+    "notifications" | "subscriptions"
+  >("notifications");
   const [notifications, setNotifications] = React.useState<AppNotification[]>([]);
+  const [followedDealers, setFollowedDealers] = React.useState<FollowedDealer[]>([]);
+  const [notificationsNowMs, setNotificationsNowMs] = React.useState(0);
+  const [expandedNotificationGroups, setExpandedNotificationGroups] = React.useState<
+    Record<string, boolean>
+  >({});
   const notificationsRef = React.useRef<HTMLDivElement | null>(null);
   const NOTIFICATIONS_PREVIEW_LIMIT = 5;
 
@@ -81,6 +160,89 @@ const Navbar: React.FC = () => {
   }, [user?.id]);
 
   React.useEffect(() => {
+    if (!user?.id) {
+      setFollowedDealers([]);
+      return;
+    }
+
+    const storageKey = getUserFollowedDealersStorageKey(user.id);
+    const refreshFollowedDealers = () => {
+      setFollowedDealers(getUserFollowedDealers(user.id));
+    };
+
+    refreshFollowedDealers();
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key && event.key !== storageKey) return;
+      refreshFollowedDealers();
+    };
+
+    const handleFollowedDealersUpdated = (event: Event) => {
+      const { detail } = event as CustomEvent<{ userId?: number }>;
+      if (detail?.userId && detail.userId !== user.id) return;
+      refreshFollowedDealers();
+    };
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener(
+      USER_FOLLOWED_DEALERS_UPDATED_EVENT,
+      handleFollowedDealersUpdated
+    );
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(
+        USER_FOLLOWED_DEALERS_UPDATED_EVENT,
+        handleFollowedDealersUpdated
+      );
+    };
+  }, [user?.id]);
+
+  React.useEffect(() => {
+    if (!user?.id || followedDealers.length === 0) return;
+
+    let isCancelled = false;
+    const syncNewDealerListings = async () => {
+      try {
+        const response = await fetch("http://localhost:8000/api/auth/dealers/", {
+          cache: "no-store",
+        });
+        if (!response.ok) return;
+        const payload: unknown = await response.json();
+        if (isCancelled) return;
+        const snapshots = toDealerListingSnapshots(payload);
+        syncFollowedDealersWithLatestListings(user.id, snapshots);
+      } catch {
+        // silent polling fail
+      }
+    };
+
+    void syncNewDealerListings();
+
+    const handleWindowFocus = () => {
+      void syncNewDealerListings();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void syncNewDealerListings();
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void syncNewDealerListings();
+    }, DEALER_LISTINGS_POLL_INTERVAL_MS);
+    window.addEventListener("focus", handleWindowFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleWindowFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [followedDealers, user?.id]);
+
+  React.useEffect(() => {
     if (!showNotificationsMenu) return;
 
     const handleClickOutside = (event: MouseEvent) => {
@@ -107,13 +269,61 @@ const Navbar: React.FC = () => {
     };
   }, [showNotificationsMenu]);
 
+  React.useEffect(() => {
+    setNotificationsNowMs(Date.now());
+  }, [notifications]);
+
   const unreadNotificationsCount = notifications.filter((item) => !item.isRead).length;
   const hasUnreadNotifications = unreadNotificationsCount > 0;
   const hasNotifications = notifications.length > 0;
+  const hasFollowedDealers = followedDealers.length > 0;
   const hasMoreNotifications = notifications.length > NOTIFICATIONS_PREVIEW_LIMIT;
-  const visibleNotifications = showAllNotifications
+  const notificationsForDisplay = showAllNotifications
     ? notifications
     : notifications.slice(0, NOTIFICATIONS_PREVIEW_LIMIT);
+  const notificationRenderItems = React.useMemo<NotificationRenderItem[]>(() => {
+    const nowMs = notificationsNowMs;
+    const items: NotificationRenderItem[] = [];
+    const groupIndexByDealerId = new Map<number, number>();
+
+    notificationsForDisplay.forEach((notification) => {
+      if (notification.type !== "dealer_listing") {
+        items.push({ kind: "single", notification });
+        return;
+      }
+
+      const createdAtMs = Date.parse(notification.createdAt);
+      const withinStackWindow =
+        Number.isFinite(createdAtMs) &&
+        nowMs - createdAtMs >= 0 &&
+        nowMs - createdAtMs <= DEALER_NOTIFICATIONS_STACK_WINDOW_MS;
+
+      if (!withinStackWindow) {
+        items.push({ kind: "single", notification });
+        return;
+      }
+
+      const existingGroupIndex = groupIndexByDealerId.get(notification.dealerId);
+      if (existingGroupIndex === undefined) {
+        const groupKey = `dealer-stack-${notification.dealerId}`;
+        groupIndexByDealerId.set(notification.dealerId, items.length);
+        items.push({
+          kind: "group",
+          groupKey,
+          dealerId: notification.dealerId,
+          dealerName: notification.dealerName,
+          notifications: [notification],
+        });
+        return;
+      }
+
+      const existingGroup = items[existingGroupIndex];
+      if (existingGroup?.kind !== "group") return;
+      existingGroup.notifications.push(notification);
+    });
+
+    return items;
+  }, [notificationsForDisplay, notificationsNowMs]);
 
   const formatNotificationDate = (value: string) => {
     const date = new Date(value);
@@ -139,17 +349,70 @@ const Navbar: React.FC = () => {
     }
   };
 
+  const formatListingsAdded = (value: number) =>
+    `${value} ${value === 1 ? "нова обява" : "нови обяви"}`;
+
+  const formatTotalListings = (value: number) =>
+    `${value} ${value === 1 ? "обява" : "обяви"}`;
+
   const handleNotificationsToggle = () => {
     const nextOpen = !showNotificationsMenu;
     setShowNotificationsMenu(nextOpen);
     if (nextOpen) {
       setShowAllNotifications(false);
+      setNotificationsTab("notifications");
+      setExpandedNotificationGroups({});
+      setNotificationsNowMs(Date.now());
     }
   };
 
   const handleMarkAsRead = (notificationId: string) => {
     if (!user?.id) return;
     markNotificationRead(user.id, notificationId);
+  };
+
+  const handleMarkAllAsRead = () => {
+    if (!user?.id) return;
+    markAllNotificationsRead(user.id);
+  };
+
+  const handleToggleNotificationGroup = (groupKey: string) => {
+    setExpandedNotificationGroups((prev) => ({
+      ...prev,
+      [groupKey]: !prev[groupKey],
+    }));
+  };
+
+  const handleMarkNotificationGroupRead = (
+    notificationsInGroup: DealerListingNotification[]
+  ) => {
+    if (!user?.id) return;
+    notificationsInGroup.forEach((notification) => {
+      if (!notification.isRead) {
+        markNotificationRead(user.id, notification.id);
+      }
+    });
+  };
+
+  const handleOpenDealerFromNotification = (notification: AppNotification) => {
+    if (notification.type !== "dealer_listing") return;
+    if (user?.id && !notification.isRead) {
+      markNotificationRead(user.id, notification.id);
+    }
+    setShowNotificationsMenu(false);
+    setMobileOpen(false);
+    navigate(`/dealers/${notification.dealerId}`);
+  };
+
+  const handleOpenFollowedDealer = (dealerId: number) => {
+    setShowNotificationsMenu(false);
+    setMobileOpen(false);
+    navigate(`/dealers/${dealerId}`);
+  };
+
+  const handleUnfollowDealer = (dealerId: number) => {
+    if (!user?.id) return;
+    unfollowDealer(user.id, dealerId);
   };
 
   const handleLogoutConfirm = async () => {
@@ -245,72 +508,253 @@ const Navbar: React.FC = () => {
 
                   {showNotificationsMenu && (
                     <div className="notifications-menu" role="menu" aria-label="Списък с известия">
-                      <div className="notifications-title">
-                        Твоите известия
-                        {hasNotifications ? ` (${notifications.length})` : ""}
+                      <div className="notifications-title">Център за известия</div>
+                      <div className="notifications-tabs" role="tablist" aria-label="Раздели за известия">
+                        <button
+                          type="button"
+                          className={`notifications-tab ${notificationsTab === "notifications" ? "active" : ""}`}
+                          onClick={() => setNotificationsTab("notifications")}
+                        >
+                          Известия ({notifications.length})
+                        </button>
+                        <button
+                          type="button"
+                          className={`notifications-tab ${notificationsTab === "subscriptions" ? "active" : ""}`}
+                          onClick={() => setNotificationsTab("subscriptions")}
+                        >
+                          Абонирани ({followedDealers.length})
+                        </button>
                       </div>
-                      {!hasNotifications ? (
-                        <div className="notifications-empty">Тук ще виждаш известия за активността ти в сайта.</div>
-                      ) : (
-                        <>
-                          <div className="notifications-list">
-                            {visibleNotifications.map((notification) => (
-                              <div
-                                key={notification.id}
-                                className={`notification-item ${notification.isRead ? "read" : "unread"}`}
-                                role="menuitem"
+
+                      {notificationsTab === "notifications" ? (
+                        !hasNotifications ? (
+                          <div className="notifications-empty">Тук ще виждаш известия за активността ти в сайта.</div>
+                        ) : (
+                          <>
+                            {hasUnreadNotifications && (
+                              <button
+                                type="button"
+                                className="notifications-mark-all-btn"
+                                onClick={handleMarkAllAsRead}
                               >
-                                <div className="notification-item-top">
-                                  <span className="notification-item-type">
-                                    {notification.type === "deposit" ? "Депозит" : "Известие"}
-                                  </span>
-                                  <span className="notification-item-time">
-                                    {formatNotificationDate(notification.createdAt)}
-                                  </span>
-                                </div>
-                                <div className="notification-item-main">
-                                  <span className="notification-item-amount">
-                                    +{formatNotificationAmount(notification.amount, notification.currency)}
-                                  </span>
-                                  <span className="notification-item-text">
-                                    Добавени средства в баланса.
-                                  </span>
-                                </div>
-                                <div className="notification-item-actions">
-                                  {notification.isRead ? (
-                                    <span className="notification-read-label">Прочетено</span>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      className="notification-read-btn"
-                                      onClick={() => handleMarkAsRead(notification.id)}
+                                Прочети всички
+                              </button>
+                            )}
+                            <div className="notifications-list">
+                              {notificationRenderItems.map((item) => {
+                                if (item.kind === "group") {
+                                  const isExpanded = Boolean(expandedNotificationGroups[item.groupKey]);
+                                  const unreadCount = item.notifications.filter(
+                                    (notification) => !notification.isRead
+                                  ).length;
+                                  const totalListingsAdded = item.notifications.reduce(
+                                    (sum, notification) => sum + notification.listingsAdded,
+                                    0
+                                  );
+                                  const latestNotification = item.notifications[0];
+                                  const firstNotification = item.notifications[item.notifications.length - 1];
+
+                                  return (
+                                    <div
+                                      key={item.groupKey}
+                                      className={`notification-item ${unreadCount > 0 ? "unread" : "read"}`}
+                                      role="menuitem"
                                     >
-                                      Прочетено
-                                    </button>
-                                  )}
+                                      <div className="notification-item-top">
+                                        <span className="notification-item-type">Дилър (1 ч.)</span>
+                                        <span className="notification-item-time">
+                                          {formatNotificationDate(latestNotification.createdAt)}
+                                        </span>
+                                      </div>
+                                      <div className="notification-item-main">
+                                        <span className="notification-item-amount">
+                                          +{formatListingsAdded(totalListingsAdded)}
+                                        </span>
+                                        <span className="notification-item-text">
+                                          {item.dealerName}: {item.notifications.length} събития за последния 1 час.
+                                        </span>
+                                      </div>
+                                      <div className="notification-item-actions">
+                                        <button
+                                          type="button"
+                                          className="notification-link-btn"
+                                          onClick={() => handleOpenDealerFromNotification(latestNotification)}
+                                          aria-label="Отвори профил"
+                                          title="Отвори профил"
+                                        >
+                                          <FiExternalLink size={13} />
+                                        </button>
+                                        {unreadCount > 0 ? (
+                                          <button
+                                            type="button"
+                                            className="notification-read-btn"
+                                            onClick={() => handleMarkNotificationGroupRead(item.notifications)}
+                                            aria-label="Маркирай групата като прочетена"
+                                            title={`Маркирай като прочетени (${unreadCount})`}
+                                          >
+                                            <FiCheck size={13} />
+                                          </button>
+                                        ) : (
+                                          <span className="notification-read-label" title="Прочетено">
+                                            <FiCheck size={12} />
+                                          </span>
+                                        )}
+                                        <button
+                                          type="button"
+                                          className="notification-expand-btn"
+                                          onClick={() => handleToggleNotificationGroup(item.groupKey)}
+                                          aria-label={isExpanded ? "Скрий детайли" : "Разгъни детайли"}
+                                          title={isExpanded ? "Скрий детайли" : "Разгъни детайли"}
+                                        >
+                                          {isExpanded ? <FiChevronUp size={13} /> : <FiChevronDown size={13} />}
+                                        </button>
+                                      </div>
+                                      {isExpanded && (
+                                        <div className="notification-group-details">
+                                          {item.notifications.map((notification) => (
+                                            <div key={notification.id} className="notification-group-row">
+                                              <span>
+                                                {formatNotificationDate(notification.createdAt)} · +
+                                                {formatListingsAdded(notification.listingsAdded)}
+                                              </span>
+                                              <button
+                                                type="button"
+                                                className="notification-group-open-btn"
+                                                onClick={() =>
+                                                  handleOpenDealerFromNotification(notification)
+                                                }
+                                              >
+                                                Отвори
+                                              </button>
+                                            </div>
+                                          ))}
+                                          <div className="notification-group-summary">
+                                            Общо: {item.dealerName} има {formatTotalListings(firstNotification.totalListings)}.
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                }
+
+                                const notification = item.notification;
+                                return (
+                                  <div
+                                    key={notification.id}
+                                    className={`notification-item ${notification.isRead ? "read" : "unread"}`}
+                                    role="menuitem"
+                                  >
+                                    <div className="notification-item-top">
+                                      <span className="notification-item-type">
+                                        {notification.type === "deposit" ? "Депозит" : "Дилър"}
+                                      </span>
+                                      <span className="notification-item-time">
+                                        {formatNotificationDate(notification.createdAt)}
+                                      </span>
+                                    </div>
+                                    <div className="notification-item-main">
+                                      <span className="notification-item-amount">
+                                        {notification.type === "deposit"
+                                          ? `+${formatNotificationAmount(
+                                              notification.amount,
+                                              notification.currency
+                                            )}`
+                                          : `+${formatListingsAdded(notification.listingsAdded)}`}
+                                      </span>
+                                      <span className="notification-item-text">
+                                        {notification.type === "deposit"
+                                          ? "Добавени средства в баланса."
+                                          : `${notification.dealerName} публикува ${formatListingsAdded(
+                                              notification.listingsAdded
+                                            )} (${formatTotalListings(notification.totalListings)}).`}
+                                      </span>
+                                    </div>
+                                    <div className="notification-item-actions">
+                                      {notification.type === "dealer_listing" && (
+                                        <button
+                                          type="button"
+                                          className="notification-link-btn"
+                                          onClick={() => handleOpenDealerFromNotification(notification)}
+                                          aria-label="Отвори профил"
+                                          title="Отвори профил"
+                                        >
+                                          <FiExternalLink size={13} />
+                                        </button>
+                                      )}
+                                      {notification.isRead ? (
+                                        <span className="notification-read-label" title="Прочетено">
+                                          <FiCheck size={12} />
+                                        </span>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          className="notification-read-btn"
+                                          onClick={() => handleMarkAsRead(notification.id)}
+                                          aria-label="Маркирай като прочетено"
+                                          title="Маркирай като прочетено"
+                                        >
+                                          <FiCheck size={13} />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            {hasMoreNotifications && !showAllNotifications && (
+                              <button
+                                type="button"
+                                className="notifications-footer-link"
+                                onClick={() => setShowAllNotifications(true)}
+                              >
+                                Виж всички известия
+                              </button>
+                            )}
+                            {hasMoreNotifications && showAllNotifications && (
+                              <button
+                                type="button"
+                                className="notifications-footer-link"
+                                onClick={() => setShowAllNotifications(false)}
+                              >
+                                Покажи само 5
+                              </button>
+                            )}
+                          </>
+                        )
+                      ) : !hasFollowedDealers ? (
+                        <div className="notifications-empty">
+                          Нямаш абонирани дилъри. Отвори страницата с дилъри и натисни камбанката.
+                        </div>
+                      ) : (
+                        <div className="subscriptions-list">
+                          {followedDealers.map((dealer) => (
+                            <div key={dealer.dealerId} className="subscription-item">
+                              <div className="subscription-main">
+                                <div className="subscription-name">{dealer.dealerName}</div>
+                                <div className="subscription-meta">
+                                  {dealer.dealerCity ? `${dealer.dealerCity} · ` : ""}
+                                  {formatTotalListings(dealer.lastKnownListingCount)}
                                 </div>
                               </div>
-                            ))}
-                          </div>
-                          {hasMoreNotifications && !showAllNotifications && (
-                            <button
-                              type="button"
-                              className="notifications-footer-link"
-                              onClick={() => setShowAllNotifications(true)}
-                            >
-                              Виж всички известия
-                            </button>
-                          )}
-                          {hasMoreNotifications && showAllNotifications && (
-                            <button
-                              type="button"
-                              className="notifications-footer-link"
-                              onClick={() => setShowAllNotifications(false)}
-                            >
-                              Покажи само 5
-                            </button>
-                          )}
-                        </>
+                              <div className="subscription-actions">
+                                <button
+                                  type="button"
+                                  className="subscription-open-btn"
+                                  onClick={() => handleOpenFollowedDealer(dealer.dealerId)}
+                                >
+                                  Профил
+                                </button>
+                                <button
+                                  type="button"
+                                  className="subscription-remove-btn"
+                                  onClick={() => handleUnfollowDealer(dealer.dealerId)}
+                                >
+                                  Премахни
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
                   )}
@@ -568,7 +1012,7 @@ const css = `
   position: absolute;
   top: calc(100% + 10px);
   right: 0;
-  width: 280px;
+  width: 340px;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
   background: #fff;
@@ -582,6 +1026,36 @@ const css = `
   font-weight: 800;
   color: #0f172a;
   margin-bottom: 8px;
+}
+
+.notifications-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.notifications-tab {
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.notifications-tab:hover {
+  border-color: #94a3b8;
+  background: #f1f5f9;
+}
+
+.notifications-tab.active {
+  border-color: #99f6e4;
+  background: #ecfdf5;
+  color: #0f766e;
 }
 
 .notifications-empty {
@@ -662,17 +1136,59 @@ const css = `
 .notification-item-actions {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+}
+
+.notification-link-btn {
+  border: 1px solid #bbf7d0;
+  background: #ecfdf5;
+  color: #0f766e;
+  border-radius: 999px;
+  width: 30px;
+  height: 26px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.notification-link-btn:hover {
+  background: #d1fae5;
+  border-color: #86efac;
+}
+
+.notification-expand-btn {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 999px;
+  width: 30px;
+  height: 26px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.notification-expand-btn:hover {
+  background: #f1f5f9;
 }
 
 .notification-read-btn {
   border: 1px solid #bae6fd;
   background: #f0f9ff;
   color: #0c4a6e;
-  font-size: 11px;
-  font-weight: 700;
   border-radius: 999px;
-  padding: 3px 10px;
+  width: 30px;
+  height: 26px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
 }
 
 .notification-read-btn:hover {
@@ -681,9 +1197,63 @@ const css = `
 }
 
 .notification-read-label {
+  color: #6b7280;
+  width: 30px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d1d5db;
+  background: #f3f4f6;
+  border-radius: 999px;
+}
+
+.notification-link-btn svg,
+.notification-expand-btn svg,
+.notification-read-btn svg,
+.notification-read-label svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.4;
+}
+
+.notification-group-details {
+  border-top: 1px dashed #cbd5e1;
+  padding-top: 8px;
+  margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.notification-group-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.notification-group-open-btn {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #334155;
+  border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
+  padding: 2px 10px;
+  cursor: pointer;
+}
+
+.notification-group-open-btn:hover {
+  background: #f8fafc;
+}
+
+.notification-group-summary {
+  font-size: 11px;
   color: #64748b;
+  margin-top: 2px;
 }
 
 .notifications-footer-link {
@@ -703,11 +1273,101 @@ const css = `
   background: #d1fae5;
 }
 
+.notifications-mark-all-btn {
+  width: 100%;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e3a8a;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.notifications-mark-all-btn:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
 .notifications-footer {
   margin-top: 8px;
   text-align: center;
   font-size: 11px;
   color: #64748b;
+}
+
+.subscriptions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.subscription-item {
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  padding: 10px;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.subscription-main {
+  min-width: 0;
+}
+
+.subscription-name {
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.subscription-meta {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 3px;
+}
+
+.subscription-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.subscription-open-btn,
+.subscription-remove-btn {
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.subscription-open-btn {
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.subscription-open-btn:hover {
+  background: #dbeafe;
+}
+
+.subscription-remove-btn {
+  border: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #b91c1c;
+}
+
+.subscription-remove-btn:hover {
+  background: #ffe4e6;
 }
 
 .nav-link {
@@ -867,6 +1527,10 @@ const css = `
     margin-top: 8px;
   }
 
+  .notifications-tabs {
+    grid-template-columns: 1fr;
+  }
+
   .notification-item-main {
     flex-direction: column;
     align-items: flex-start;
@@ -878,6 +1542,16 @@ const css = `
 
   .notification-item-actions {
     justify-content: flex-start;
+  }
+
+  .notification-group-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .subscription-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .nav a,

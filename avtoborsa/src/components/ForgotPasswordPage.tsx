@@ -41,7 +41,7 @@ const ForgotPasswordPage: React.FC = () => {
       <div style={styles.container}>
         <div style={styles.card}>
           <div style={styles.header}>
-            <div style={styles.badge}>AvtoBorsa</div>
+            <div style={styles.badge}>Kar.bg</div>
             <h1 style={styles.title}>Забравена парола</h1>
             <p style={styles.subtitle}>Ще ти изпратим линк за смяна на парола.</p>
           </div>

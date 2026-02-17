@@ -42,7 +42,7 @@ def _build_invoice_email_context(tx: PaymentTransaction) -> dict[str, str]:
         or "Customer"
     )
     return {
-        "brand_name": "AvtoBorsa",
+        "brand_name": "Kar.bg",
         "invoice_number": _invoice_number_for_transaction(tx),
         "issued_at": issued_at.strftime("%Y-%m-%d %H:%M"),
         "invoice_year": f"{issued_at:%Y}",
@@ -62,7 +62,7 @@ def send_invoice_email(tx: PaymentTransaction) -> None:
         return
 
     context = _build_invoice_email_context(tx)
-    subject = f"Your AvtoBorsa invoice {context['invoice_number']}"
+    subject = f"Your Kar.bg invoice {context['invoice_number']}"
     html_message = render_to_string("payments/invoice_email.html", context)
     text_message = strip_tags(html_message)
 

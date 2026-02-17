@@ -1,5 +1,14 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { FiBell } from "react-icons/fi";
+import { useAuth } from "../context/AuthContext";
+import {
+  USER_FOLLOWED_DEALERS_UPDATED_EVENT,
+  followDealer,
+  getUserFollowedDealers,
+  getUserFollowedDealersStorageKey,
+  unfollowDealer,
+} from "../utils/dealerSubscriptions";
 
 type Dealer = {
   id: number;
@@ -25,15 +34,19 @@ const globalCss = `
 
 const DealersPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [dealers, setDealers] = useState<Dealer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchCity, setSearchCity] = useState("Всички");
   const [hoveredCard, setHoveredCard] = useState<number | null>(null);
+  const [followedDealerIds, setFollowedDealerIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const fetchDealers = async () => {
       try {
-        const res = await fetch("http://localhost:8000/api/auth/dealers/");
+        const res = await fetch("http://localhost:8000/api/auth/dealers/", {
+          cache: "no-store",
+        });
         if (res.ok) {
           const data = await res.json();
           setDealers(data);
@@ -46,6 +59,46 @@ const DealersPage: React.FC = () => {
     };
     fetchDealers();
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setFollowedDealerIds(new Set());
+      return;
+    }
+
+    const storageKey = getUserFollowedDealersStorageKey(user.id);
+    const refreshFollowedDealers = () => {
+      const subscriptions = getUserFollowedDealers(user.id);
+      setFollowedDealerIds(new Set(subscriptions.map((item) => item.dealerId)));
+    };
+
+    refreshFollowedDealers();
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key && event.key !== storageKey) return;
+      refreshFollowedDealers();
+    };
+
+    const handleFollowedDealersUpdated = (event: Event) => {
+      const { detail } = event as CustomEvent<{ userId?: number }>;
+      if (detail?.userId && detail.userId !== user.id) return;
+      refreshFollowedDealers();
+    };
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener(
+      USER_FOLLOWED_DEALERS_UPDATED_EVENT,
+      handleFollowedDealersUpdated
+    );
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(
+        USER_FOLLOWED_DEALERS_UPDATED_EVENT,
+        handleFollowedDealersUpdated
+      );
+    };
+  }, [user?.id]);
 
   const cities = useMemo(
     () => ["Всички", ...Array.from(new Set(dealers.map((d) => d.city)))],
@@ -102,6 +155,30 @@ const DealersPage: React.FC = () => {
       return { background: "linear-gradient(135deg, #94a3b8, #64748b)", color: "#fff" };
     }
     return { background: "linear-gradient(135deg, #b45309, #92400e)", color: "#fff" };
+  };
+
+  const isDealerFollowed = (dealerId: number) => followedDealerIds.has(dealerId);
+
+  const handleToggleDealerFollow = (event: React.MouseEvent, dealer: Dealer) => {
+    event.stopPropagation();
+
+    if (!user?.id) {
+      navigate("/auth");
+      return;
+    }
+
+    if (isDealerFollowed(dealer.id)) {
+      unfollowDealer(user.id, dealer.id);
+      return;
+    }
+
+    followDealer(user.id, {
+      id: dealer.id,
+      dealer_name: dealer.dealer_name,
+      city: dealer.city,
+      profile_image_url: dealer.profile_image_url,
+      listing_count: dealer.listing_count,
+    });
   };
 
   const styles: Record<string, React.CSSProperties> = {
@@ -287,8 +364,14 @@ const DealersPage: React.FC = () => {
       fontWeight: 800,
       letterSpacing: 0.3,
     },
-    podiumButton: {
+    podiumActions: {
       marginTop: "auto",
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      flexWrap: "wrap",
+    },
+    podiumButton: {
       padding: "10px 12px",
       borderRadius: 6,
       border: "none",
@@ -297,6 +380,29 @@ const DealersPage: React.FC = () => {
       fontWeight: 600,
       fontSize: 13,
       cursor: "pointer",
+      flex: 1,
+      minWidth: 102,
+    },
+    followButton: {
+      padding: "10px 12px",
+      borderRadius: 6,
+      border: "1px solid #99f6e4",
+      background: "#ecfdf5",
+      color: "#0f766e",
+      fontWeight: 700,
+      fontSize: 12,
+      cursor: "pointer",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      minWidth: 112,
+      whiteSpace: "nowrap",
+    },
+    followButtonActive: {
+      border: "1px solid #0f766e",
+      background: "#0f766e",
+      color: "#fff",
     },
     rankList: {
       display: "flex",
@@ -385,6 +491,12 @@ const DealersPage: React.FC = () => {
       cursor: "pointer",
       whiteSpace: "nowrap",
     },
+    rankActions: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      justifySelf: "end",
+    },
     empty: {
       textAlign: "center",
       padding: 50,
@@ -437,7 +549,7 @@ const DealersPage: React.FC = () => {
           .podium-grid { grid-template-columns: 1fr; }
           .rank-row { grid-template-columns: 40px 48px 1fr; }
           .rank-stats { text-align: left !important; min-width: 0 !important; }
-          .rank-action { justify-self: start !important; }
+          .rank-actions { justify-self: start !important; }
         }
       `}</style>
 
@@ -520,7 +632,7 @@ const DealersPage: React.FC = () => {
                           <div style={styles.podiumMeta}>
                             <span>{dealer.city}</span>
                             <span style={{ color: "#d1d5db" }}>|</span>
-                            <span>в АвтоБорса {getRelativeTime(dealer.created_at)}</span>
+                            <span>в Kar.bg {getRelativeTime(dealer.created_at)}</span>
                           </div>
                         </div>
                       </div>
@@ -528,15 +640,34 @@ const DealersPage: React.FC = () => {
                         {getDescription(dealer.description, 180)}
                       </div>
                       <div style={styles.podiumScore}>{dealer.listing_count} обяви</div>
-                      <button
-                        style={styles.podiumButton}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/dealers/${dealer.id}`);
-                        }}
-                      >
-                        Виж профил
-                      </button>
+                      <div style={styles.podiumActions}>
+                        <button
+                          type="button"
+                          style={{
+                            ...styles.followButton,
+                            ...(isDealerFollowed(dealer.id) ? styles.followButtonActive : {}),
+                          }}
+                          onClick={(event) => handleToggleDealerFollow(event, dealer)}
+                          aria-label={
+                            isDealerFollowed(dealer.id)
+                              ? `Спри следването на ${dealer.dealer_name}`
+                              : `Следвай ${dealer.dealer_name}`
+                          }
+                          title={isDealerFollowed(dealer.id) ? "Спри следването" : "Следвай дилъра"}
+                        >
+                          <FiBell size={14} />
+                          {isDealerFollowed(dealer.id) ? "Следваш" : "Следвай"}
+                        </button>
+                        <button
+                          style={styles.podiumButton}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/dealers/${dealer.id}`);
+                          }}
+                        >
+                          Виж профил
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -595,18 +726,37 @@ const DealersPage: React.FC = () => {
                       </div>
                       <div style={styles.rankStats} className="rank-stats">
                         <div style={styles.rankScore}>{dealer.listing_count} обяви</div>
-                        <div>в АвтоБорса {getRelativeTime(dealer.created_at)}</div>
+                        <div>в Kar.bg {getRelativeTime(dealer.created_at)}</div>
                       </div>
-                      <button
-                        className="rank-action"
-                        style={styles.rankButton}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/dealers/${dealer.id}`);
-                        }}
-                      >
-                        Профил
-                      </button>
+                      <div style={styles.rankActions} className="rank-actions">
+                        <button
+                          type="button"
+                          style={{
+                            ...styles.followButton,
+                            ...(isDealerFollowed(dealer.id) ? styles.followButtonActive : {}),
+                          }}
+                          onClick={(event) => handleToggleDealerFollow(event, dealer)}
+                          aria-label={
+                            isDealerFollowed(dealer.id)
+                              ? `Спри следването на ${dealer.dealer_name}`
+                              : `Следвай ${dealer.dealer_name}`
+                          }
+                          title={isDealerFollowed(dealer.id) ? "Спри следването" : "Следвай дилъра"}
+                        >
+                          <FiBell size={14} />
+                          {isDealerFollowed(dealer.id) ? "Следваш" : "Следвай"}
+                        </button>
+                        <button
+                          className="rank-action"
+                          style={styles.rankButton}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/dealers/${dealer.id}`);
+                          }}
+                        >
+                          Профил
+                        </button>
+                      </div>
                     </div>
                   );
                 })}

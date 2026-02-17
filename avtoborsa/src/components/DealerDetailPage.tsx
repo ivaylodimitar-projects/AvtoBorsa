@@ -1,8 +1,16 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { MapPin, Fuel, Gauge, Zap, Settings } from "lucide-react";
+import { FiBell } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
 import { formatConditionLabel, formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
+import {
+  USER_FOLLOWED_DEALERS_UPDATED_EVENT,
+  followDealer,
+  getUserFollowedDealers,
+  getUserFollowedDealersStorageKey,
+  unfollowDealer,
+} from "../utils/dealerSubscriptions";
 import ListingPromoBadge from "./ListingPromoBadge";
 
 type CarListing = {
@@ -109,13 +117,16 @@ const DealerDetailPage: React.FC = () => {
   const [listingModelFilter, setListingModelFilter] = useState<string>("all");
   const [listingSort, setListingSort] = useState<"default" | "latest">("default");
   const [currentPage, setCurrentPage] = useState(1);
+  const [isFollowingDealer, setIsFollowingDealer] = useState(false);
 
   const isOwner = user?.userType === "business" && dealer && user.email === dealer.email;
 
   useEffect(() => {
     const fetchDealer = async () => {
       try {
-        const res = await fetch(`http://localhost:8000/api/auth/dealers/${id}/`);
+        const res = await fetch(`http://localhost:8000/api/auth/dealers/${id}/`, {
+          cache: "no-store",
+        });
         if (res.ok) {
           const data = await res.json();
           setDealer(data);
@@ -139,6 +150,68 @@ const DealerDetailPage: React.FC = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [dealer?.id, listingBrandFilter, listingModelFilter, listingSort]);
+
+  useEffect(() => {
+    if (!user?.id || !dealer?.id) {
+      setIsFollowingDealer(false);
+      return;
+    }
+
+    const storageKey = getUserFollowedDealersStorageKey(user.id);
+    const refreshFollowingState = () => {
+      const subscriptions = getUserFollowedDealers(user.id);
+      setIsFollowingDealer(subscriptions.some((item) => item.dealerId === dealer.id));
+    };
+
+    refreshFollowingState();
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key && event.key !== storageKey) return;
+      refreshFollowingState();
+    };
+
+    const handleFollowedDealersUpdated = (event: Event) => {
+      const { detail } = event as CustomEvent<{ userId?: number }>;
+      if (detail?.userId && detail.userId !== user.id) return;
+      refreshFollowingState();
+    };
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener(
+      USER_FOLLOWED_DEALERS_UPDATED_EVENT,
+      handleFollowedDealersUpdated
+    );
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(
+        USER_FOLLOWED_DEALERS_UPDATED_EVENT,
+        handleFollowedDealersUpdated
+      );
+    };
+  }, [dealer?.id, user?.id]);
+
+  const handleToggleDealerFollow = () => {
+    if (!dealer) return;
+
+    if (!user?.id) {
+      navigate("/auth");
+      return;
+    }
+
+    if (isFollowingDealer) {
+      unfollowDealer(user.id, dealer.id);
+      return;
+    }
+
+    followDealer(user.id, {
+      id: dealer.id,
+      dealer_name: dealer.dealer_name,
+      city: dealer.city,
+      profile_image_url: dealer.profile_image_url,
+      listing_count: dealer.listing_count,
+    });
+  };
 
   const handleSaveAbout = async () => {
     setSavingAbout(true);
@@ -441,6 +514,35 @@ const DealerDetailPage: React.FC = () => {
     heroMetaItemOrange: {
       color: "#f97316",
       fontWeight: 600,
+    },
+    heroActions: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      marginLeft: "auto",
+      flexWrap: "wrap",
+      justifyContent: "flex-end",
+    },
+    followBtn: {
+      height: 44,
+      padding: "0 16px",
+      borderRadius: 6,
+      border: "1px solid #99f6e4",
+      background: "#ecfdf5",
+      color: "#0f766e",
+      fontSize: 14,
+      fontWeight: 700,
+      cursor: "pointer",
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 8,
+      transition: "all 0.2s",
+      whiteSpace: "nowrap",
+    },
+    followBtnActive: {
+      border: "1px solid #0f766e",
+      background: "#0f766e",
+      color: "#fff",
     },
     backBtn: {
       padding: "12px 20px",
@@ -932,6 +1034,8 @@ const DealerDetailPage: React.FC = () => {
           .dealer-hero { padding: 35px 16px 30px !important; }
           .dealer-hero h1 { font-size: 22px !important; }
           .dealer-hero-meta { justify-content: center; }
+          .dealer-hero-actions { width: 100%; justify-content: center !important; margin-left: 0 !important; }
+          .dealer-follow-btn { width: 100%; justify-content: center !important; }
           .dealer-content { padding: 20px 12px 40px !important; }
           .dealer-listings-grid { grid-template-columns: 1fr !important; }
           .dealer-contacts-grid { grid-template-columns: 1fr !important; }
@@ -983,23 +1087,43 @@ const DealerDetailPage: React.FC = () => {
               </span>
             </div>
           </div>
-          <button
-            style={styles.backBtn}
-            className="dealer-back-btn"
-            onClick={() => navigate("/dealers")}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLElement).style.background = "#115e59";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLElement).style.background = "#0f766e";
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="19" y1="12" x2="5" y2="12" />
-              <polyline points="12 19 5 12 12 5" />
-            </svg>
-            Всички дилъри
-          </button>
+          <div style={styles.heroActions} className="dealer-hero-actions">
+            <button
+              type="button"
+              style={{
+                ...styles.followBtn,
+                ...(isFollowingDealer ? styles.followBtnActive : {}),
+              }}
+              className="dealer-follow-btn"
+              onClick={handleToggleDealerFollow}
+              title={isFollowingDealer ? "Спри следването" : "Следвай дилъра"}
+              aria-label={
+                isFollowingDealer
+                  ? `Спри следването на ${dealer.dealer_name}`
+                  : `Следвай ${dealer.dealer_name}`
+              }
+            >
+              <FiBell size={16} />
+              {isFollowingDealer ? "Следваш" : "Следвай"}
+            </button>
+            <button
+              style={styles.backBtn}
+              className="dealer-back-btn"
+              onClick={() => navigate("/dealers")}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.background = "#115e59";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.background = "#0f766e";
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12" />
+                <polyline points="12 19 5 12 12 5" />
+              </svg>
+              Всички дилъри
+            </button>
+          </div>
         </div>
       </div>
 
