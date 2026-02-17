@@ -33,22 +33,8 @@ const ListingFormStepper: React.FC<ListingFormStepperProps> = ({
   useEffect(() => {
     const container = stepsContainerRef.current;
     if (!container) return;
-    const activeStep = container.querySelector<HTMLButtonElement>(
-      `[data-step-id="${currentStep}"]`
-    );
-    if (!activeStep) return;
-
-    if (container.scrollWidth <= container.clientWidth) return;
-    const targetLeft =
-      activeStep.offsetLeft -
-      container.clientWidth / 2 +
-      activeStep.offsetWidth / 2;
-    const maxLeft = container.scrollWidth - container.clientWidth;
-    container.scrollTo({
-      left: Math.max(0, Math.min(targetLeft, maxLeft)),
-      behavior: "smooth",
-    });
-  }, [currentStep]);
+    container.scrollLeft = 0;
+  }, [currentStep, steps.length]);
 
   const styles: Record<string, React.CSSProperties> = {
     container: {
