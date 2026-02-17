@@ -7,6 +7,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.core.files.base import ContentFile
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -597,6 +599,31 @@ class CarImage(models.Model):
         base_name, _ = os.path.splitext(image_name)
         self.thumbnail.save(f'{base_name}_sm.webp', thumbnail_content, save=False)
         super().save(update_fields=['thumbnail'])
+
+
+def _delete_file_field_safely(file_field):
+    name = getattr(file_field, 'name', '') or ''
+    if not name:
+        return
+    try:
+        storage = file_field.storage
+        if storage.exists(name):
+            storage.delete(name)
+            return
+    except Exception:
+        pass
+
+    try:
+        file_field.delete(save=False)
+    except Exception:
+        pass
+
+
+@receiver(post_delete, sender=CarImage)
+def cleanup_car_image_files(sender, instance, **kwargs):
+    """Ensure image files are removed from storage when CarImage rows are deleted."""
+    _delete_file_field_safely(instance.thumbnail)
+    _delete_file_field_safely(instance.image)
 
 
 class ListingView(models.Model):

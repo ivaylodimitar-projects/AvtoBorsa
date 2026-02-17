@@ -632,7 +632,7 @@ class CarListingSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'id', 'slug', 'user', 'user_email', 'created_at', 'updated_at', 'images', 'image_url', 'is_favorited',
-            'is_draft', 'is_active', 'fuel_display', 'gearbox_display', 'condition_display', 'category_display',
+            'is_active', 'fuel_display', 'gearbox_display', 'condition_display', 'category_display',
             'listing_type_display', 'seller_name', 'seller_type', 'seller_created_at', 'price_history',
             'top_expires_at', 'vip_expires_at', 'view_count'
         ]

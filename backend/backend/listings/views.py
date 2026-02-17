@@ -261,12 +261,20 @@ class CarListingViewSet(viewsets.ModelViewSet):
         """Get listings based on user and filters"""
         _demote_expired_top_listings()
         cutoff = get_expiry_cutoff()
-        queryset = CarListing.objects.filter(
+        public_visibility_filter = Q(
             is_active=True,
             is_draft=False,
             is_archived=False,
-            created_at__gte=cutoff
+            created_at__gte=cutoff,
         )
+        can_access_own_private_listings = (
+            self.action in {"retrieve", "update", "partial_update", "destroy"}
+            and self.request.user.is_authenticated
+        )
+        if can_access_own_private_listings:
+            queryset = CarListing.objects.filter(public_visibility_filter | Q(user=self.request.user))
+        else:
+            queryset = CarListing.objects.filter(public_visibility_filter)
         queryset = queryset.annotate(
             top_rank=Case(
                 When(listing_type='top', then=Value(0)),
@@ -978,6 +986,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
         if listing.user != self.request.user:
             raise PermissionError("You can only edit your own listings")
         listing_type = serializer.validated_data.get("listing_type")
+        was_draft = bool(listing.is_draft)
         now = timezone.now()
 
         with db_transaction.atomic():
@@ -1011,6 +1020,14 @@ class CarListingViewSet(viewsets.ModelViewSet):
                     _apply_vip_listing_window(listing, vip_plan=vip_plan, now=now)
 
             updated = serializer.save()
+            published_from_draft = was_draft and not updated.is_draft
+            draft_state_update_fields = []
+            if published_from_draft:
+                # When a draft is published via edit, make it active and refresh its lifetime window.
+                updated.is_active = True
+                updated.is_archived = False
+                updated.created_at = now
+                draft_state_update_fields = ["is_active", "is_archived", "created_at"]
 
             if listing_type == "top":
                 updated.top_plan = listing.top_plan
@@ -1026,6 +1043,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
                         "vip_plan",
                         "vip_paid_at",
                         "vip_expires_at",
+                        *draft_state_update_fields,
                     ]
                 )
             elif listing_type == "vip":
@@ -1042,6 +1060,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
                         "vip_plan",
                         "vip_paid_at",
                         "vip_expires_at",
+                        *draft_state_update_fields,
                     ]
                 )
             elif listing_type == "normal":
@@ -1056,8 +1075,11 @@ class CarListingViewSet(viewsets.ModelViewSet):
                         "vip_plan",
                         "vip_paid_at",
                         "vip_expires_at",
+                        *draft_state_update_fields,
                     ]
                 )
+            elif draft_state_update_fields:
+                updated.save(update_fields=draft_state_update_fields)
         _invalidate_latest_listings_cache()
 
     def perform_destroy(self, instance):
@@ -1276,13 +1298,14 @@ def upload_listing_images(request, listing_id):
     listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
 
     images = request.FILES.getlist('images')
+    existing_count = listing.images.count()
+    assign_cover_to_first_upload = existing_count == 0
     for index, image in enumerate(images):
-        # First image is cover by default
-        is_cover = index == 0 and len(images) > 0
+        is_cover = assign_cover_to_first_upload and index == 0
         CarImage.objects.create(
             listing=listing,
             image=image,
-            order=index,
+            order=existing_count + index,
             is_cover=is_cover
         )
     _invalidate_latest_listings_cache()
@@ -1300,32 +1323,68 @@ def update_listing_images(request, listing_id):
     listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
 
     images_data = request.data.get('images', [])
+    if not isinstance(images_data, list):
+        return Response(
+            {'error': 'Invalid images payload.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
-    # Update each image with new order and cover status
-    for image_data in images_data:
+    updated_image_ids = []
+    for index, image_data in enumerate(images_data):
+        if not isinstance(image_data, dict):
+            return Response(
+                {'error': 'Each image item must be an object.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         image_id = image_data.get('id')
-        order = image_data.get('order')
-        is_cover = image_data.get('is_cover', False)
+        if image_id is None:
+            return Response(
+                {'error': 'Image id is required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        try:
+            image_id = int(image_id)
+        except (TypeError, ValueError):
+            return Response(
+                {'error': f'Invalid image id: {image_id}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        order = image_data.get('order', index)
+        try:
+            order = int(order)
+        except (TypeError, ValueError):
+            order = index
+        is_cover = image_data.get('is_cover', False) in {True, 'true', '1', 1}
 
         try:
             image = CarImage.objects.get(id=image_id, listing=listing)
             image.order = order
             image.is_cover = is_cover
-            image.save()
+            image.save(update_fields=['order', 'is_cover'])
+            updated_image_ids.append(image_id)
         except CarImage.DoesNotExist:
             return Response(
                 {'error': f'Image {image_id} not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
 
-    # Ensure only one image is marked as cover
-    CarImage.objects.filter(listing=listing).exclude(
-        id__in=[img.get('id') for img in images_data if img.get('is_cover')]
-    ).update(is_cover=False)
+    prune_missing = request.data.get('prune_missing', False) in {True, 'true', '1', 1}
+    if prune_missing:
+        listing.images.exclude(id__in=updated_image_ids).delete()
+
+    images_qs = listing.images.all()
+    selected_cover = images_qs.filter(is_cover=True).order_by('order', 'id').first()
+    if selected_cover is None:
+        selected_cover = images_qs.order_by('order', 'id').first()
+    if selected_cover is not None:
+        images_qs.exclude(id=selected_cover.id).update(is_cover=False)
+        if not selected_cover.is_cover:
+            images_qs.filter(id=selected_cover.id).update(is_cover=True)
     _invalidate_latest_listings_cache()
 
     serializer = CarImageSerializer(
-        listing.images.all(),
+        listing.images.order_by('order', 'id'),
         many=True
     )
 

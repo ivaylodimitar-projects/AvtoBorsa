@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Kar.bg Copart Importer",
+  "description": "Adds a button on copart.ca listings to import them as drafts in Kar.bg.",
+  "version": "1.0.0",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://www.copart.ca/*",
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Kar.bg Import",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.copart.ca/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

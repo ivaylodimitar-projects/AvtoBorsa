@@ -1,4 +1,6 @@
 import io
+import hashlib
+import secrets
 from PIL import Image as PILImage
 from django.db import models
 from django.contrib.auth.models import User
@@ -6,6 +8,7 @@ from django.core.validators import EmailValidator
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 class UserProfile(models.Model):
     """Model for user balance and profile information"""
@@ -20,6 +23,41 @@ class UserProfile(models.Model):
     class Meta:
         verbose_name = "User Profile"
         verbose_name_plural = "User Profiles"
+
+
+class UserImportApiKey(models.Model):
+    """API key used by external tools (e.g. Chrome extension) to import listings."""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='import_api_key')
+    key_prefix = models.CharField(max_length=16, blank=True)
+    key_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Import API key for {self.user.email}"
+
+    @staticmethod
+    def hash_key(raw_key: str) -> str:
+        value = str(raw_key or "").strip()
+        return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+    @classmethod
+    def generate_raw_key(cls) -> str:
+        return f"karbg_{secrets.token_urlsafe(32)}"
+
+    def set_raw_key(self, raw_key: str) -> None:
+        value = str(raw_key or "").strip()
+        self.key_hash = self.hash_key(value)
+        self.key_prefix = value[:12]
+
+    def mark_used(self) -> None:
+        self.last_used_at = timezone.now()
+        self.save(update_fields=['last_used_at', 'updated_at'])
+
+    class Meta:
+        verbose_name = "User Import API Key"
+        verbose_name_plural = "User Import API Keys"
 
 
 # Signal to create UserProfile when a new User is created

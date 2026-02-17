@@ -629,6 +629,40 @@ def admin_user_update(request, user_id):
     return Response(_serialize_user(target), status=status.HTTP_200_OK)
 
 
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def admin_user_delete(request, user_id):
+    target = get_object_or_404(User, pk=user_id)
+
+    if not request.user.is_superuser:
+        return Response(
+            {"error": "Only superusers can delete users."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    if target.id == request.user.id:
+        return Response(
+            {"error": "You cannot delete your own account from the admin panel."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if target.is_superuser:
+        superusers_count = User.objects.filter(is_superuser=True).count()
+        if superusers_count <= 1:
+            return Response(
+                {"error": "At least one superuser account must remain."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    deleted_id = target.id
+    deleted_email = target.email
+    target.delete()
+    return Response(
+        {"message": "User deleted.", "id": deleted_id, "email": deleted_email},
+        status=status.HTTP_200_OK,
+    )
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsAdminUser])
 def admin_transactions(request):

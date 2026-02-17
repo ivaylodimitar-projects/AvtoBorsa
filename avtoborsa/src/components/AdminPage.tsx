@@ -3,13 +3,11 @@ import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(
-  /\/+$/,
-  ""
-);
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/+$/, "");
 const ACCESS_TOKEN_KEY = "authToken";
 
 type TabKey = "dashboard" | "listings" | "users" | "transactions" | "reports";
+type Tone = "default" | "success" | "warning" | "danger" | "info";
 
 interface Pagination {
   page: number;
@@ -92,13 +90,32 @@ interface AdminReport {
   created_at: string;
 }
 
-const tabs: Array<{ key: TabKey; label: string }> = [
-  { key: "dashboard", label: "Dashboard" },
-  { key: "listings", label: "Listings" },
-  { key: "users", label: "Users" },
-  { key: "transactions", label: "Transactions" },
-  { key: "reports", label: "Reports" },
+const tabs: Array<{ key: TabKey; label: string; hint: string }> = [
+  { key: "dashboard", label: "Dashboard", hint: "metrics" },
+  { key: "listings", label: "Listings", hint: "ads" },
+  { key: "users", label: "Users", hint: "accounts" },
+  { key: "transactions", label: "Transactions", hint: "payments" },
+  { key: "reports", label: "Reports", hint: "issues" },
 ];
+
+const color = {
+  bg: "#edf2f7",
+  panel: "#ffffff",
+  border: "#d7e0ea",
+  borderStrong: "#bdc9d7",
+  text: "#0f172a",
+  muted: "#475569",
+  accent: "#0d6dbb",
+  accentSoft: "#eaf4ff",
+  danger: "#b42318",
+  dangerSoft: "#ffe4e6",
+  success: "#047857",
+  successSoft: "#dcfce7",
+  warn: "#92400e",
+  warnSoft: "#fef3c7",
+  info: "#1d4ed8",
+  infoSoft: "#dbeafe",
+};
 
 const parseJson = async (response: Response): Promise<unknown> => {
   const text = await response.text();
@@ -115,21 +132,34 @@ const request = async <T,>(path: string, init: RequestInit = {}): Promise<T> => 
   const token = localStorage.getItem(ACCESS_TOKEN_KEY);
   if (token) headers.set("Authorization", `Bearer ${token}`);
   if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers, credentials: "include" });
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers,
+    credentials: "include",
+  });
+
   const payload = await parseJson(response);
   if (!response.ok) {
-    const value = payload as Record<string, unknown>;
+    const data = payload as Record<string, unknown>;
     throw new Error(
-      (typeof value.error === "string" && value.error) ||
-        (typeof value.detail === "string" && value.detail) ||
+      (typeof data.error === "string" && data.error) ||
+        (typeof data.detail === "string" && data.detail) ||
         `Request failed (${response.status})`
     );
   }
+
   return payload as T;
 };
 
 const fmtMoney = (value: number) =>
   new Intl.NumberFormat("bg-BG", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+
+const fmtDateTime = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("bg-BG");
+};
 
 const pageLabel = (pagination: Pagination | null | undefined) => {
   if (!pagination || pagination.total === 0) return "0 results";
@@ -138,9 +168,136 @@ const pageLabel = (pagination: Pagination | null | undefined) => {
   return `${start}-${end} of ${pagination.total}`;
 };
 
+const panelStyle: React.CSSProperties = {
+  background: color.panel,
+  border: `1px solid ${color.border}`,
+  borderRadius: 12,
+  padding: 14,
+};
+
+const tableWrap: React.CSSProperties = {
+  overflowX: "auto",
+  border: `1px solid ${color.border}`,
+  borderRadius: 10,
+};
+
+const thStyle: React.CSSProperties = {
+  textAlign: "left",
+  fontSize: 12,
+  color: color.muted,
+  background: "#f8fafc",
+  borderBottom: `1px solid ${color.border}`,
+  padding: "10px 12px",
+  whiteSpace: "nowrap",
+};
+
+const tdStyle: React.CSSProperties = {
+  borderBottom: `1px solid ${color.border}`,
+  padding: "10px 12px",
+  verticalAlign: "top",
+  fontSize: 14,
+  color: color.text,
+};
+
+const inputStyle: React.CSSProperties = {
+  height: 36,
+  borderRadius: 8,
+  border: `1px solid ${color.borderStrong}`,
+  padding: "0 12px",
+  minWidth: 260,
+};
+
+const buttonStyle = (variant: "primary" | "neutral" | "danger" = "neutral"): React.CSSProperties => {
+  if (variant === "primary") {
+    return {
+      height: 34,
+      padding: "0 12px",
+      borderRadius: 8,
+      border: `1px solid ${color.accent}`,
+      background: color.accent,
+      color: "#fff",
+      cursor: "pointer",
+      fontSize: 13,
+    };
+  }
+
+  if (variant === "danger") {
+    return {
+      height: 34,
+      padding: "0 12px",
+      borderRadius: 8,
+      border: "1px solid #f2b8bf",
+      background: "#fff",
+      color: color.danger,
+      cursor: "pointer",
+      fontSize: 13,
+    };
+  }
+
+  return {
+    height: 34,
+    padding: "0 12px",
+    borderRadius: 8,
+    border: `1px solid ${color.borderStrong}`,
+    background: "#fff",
+    color: color.text,
+    cursor: "pointer",
+    fontSize: 13,
+  };
+};
+
+const badgeStyle = (tone: Tone): React.CSSProperties => {
+  const tones: Record<Tone, { bg: string; text: string }> = {
+    default: { bg: "#e2e8f0", text: "#334155" },
+    success: { bg: color.successSoft, text: color.success },
+    warning: { bg: color.warnSoft, text: color.warn },
+    danger: { bg: color.dangerSoft, text: color.danger },
+    info: { bg: color.infoSoft, text: color.info },
+  };
+
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    height: 22,
+    borderRadius: 999,
+    padding: "0 9px",
+    fontSize: 12,
+    fontWeight: 600,
+    background: tones[tone].bg,
+    color: tones[tone].text,
+  };
+};
+
+const resolveListingStatus = (item: AdminListing): { label: string; tone: Tone } => {
+  if (item.is_draft) return { label: "Draft", tone: "warning" };
+  if (item.is_archived) return { label: "Archived", tone: "default" };
+  if (item.is_expired) return { label: "Expired", tone: "danger" };
+  return { label: "Active", tone: "success" };
+};
+
+const userName = (item: AdminUser) => {
+  const fullName = `${item.first_name || ""} ${item.last_name || ""}`.trim();
+  return fullName || item.username || item.email;
+};
+
+const roleBadge = (item: AdminUser): { label: string; tone: Tone } => {
+  if (item.is_superuser) return { label: "Superuser", tone: "info" };
+  if (item.is_staff) return { label: "Admin", tone: "success" };
+  return { label: "User", tone: "default" };
+};
+
+const txTone = (status: string): Tone => {
+  const value = String(status || "").toLowerCase();
+  if (value === "succeeded") return "success";
+  if (value === "pending") return "warning";
+  if (value === "failed" || value === "cancelled") return "danger";
+  return "default";
+};
+
 const AdminPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, isLoading, login, logout } = useAuth();
+
   const [tab, setTab] = useState<TabKey>("dashboard");
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -160,6 +317,7 @@ const AdminPage: React.FC = () => {
   const [userQ, setUserQ] = useState("");
   const [txQ, setTxQ] = useState("");
   const [reportQ, setReportQ] = useState("");
+
   const [listingPage, setListingPage] = useState(1);
   const [userPage, setUserPage] = useState(1);
   const [txPage, setTxPage] = useState(1);
@@ -168,6 +326,8 @@ const AdminPage: React.FC = () => {
   const isAdmin = Boolean(
     user?.is_admin || user?.is_staff || user?.is_superuser || (user as { isAdmin?: boolean } | null)?.isAdmin
   );
+  const isSuperuser = Boolean(user?.is_superuser);
+  const currentUserId = user?.id || null;
 
   const loadOverview = useCallback(async () => {
     if (!isAdmin) return;
@@ -258,21 +418,30 @@ const AdminPage: React.FC = () => {
     [overview]
   );
 
-  const rowStyle: React.CSSProperties = { borderBottom: "1px solid #d9e2ec" };
-  const tableWrap: React.CSSProperties = { overflowX: "auto", border: "1px solid #d9e2ec", borderRadius: 10 };
+  const runBusyAction = useCallback(async (id: number, action: () => Promise<void>, fallbackError: string) => {
+    setBusyId(id);
+    setError("");
+    try {
+      await action();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : fallbackError);
+    } finally {
+      setBusyId(null);
+    }
+  }, []);
 
   if (isLoading) return <div style={{ padding: 24 }}>Loading session...</div>;
 
   if (!user) {
     return (
-      <section style={{ maxWidth: 420, margin: "40px auto", padding: 20, border: "1px solid #d9e2ec", borderRadius: 12, background: "#fff" }}>
+      <section style={{ maxWidth: 430, margin: "40px auto", padding: 20, border: `1px solid ${color.border}`, borderRadius: 12, background: "#fff" }}>
         <h1 style={{ marginTop: 0 }}>Admin Login</h1>
-        <p>Use staff/superuser account.</p>
+        <p style={{ color: color.muted }}>Use staff/superuser account.</p>
         <form onSubmit={handleLogin} style={{ display: "grid", gap: 10 }}>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" required />
-          <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" required />
-          {loginError && <div style={{ color: "#b91c1c", fontSize: 13 }}>{loginError}</div>}
-          <button disabled={loginBusy} type="submit">{loginBusy ? "Signing..." : "Login /admin"}</button>
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" required style={inputStyle} />
+          <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" required style={inputStyle} />
+          {loginError && <div style={{ color: color.danger, fontSize: 13 }}>{loginError}</div>}
+          <button disabled={loginBusy} type="submit" style={buttonStyle("primary")}>{loginBusy ? "Signing..." : "Login /admin"}</button>
         </form>
       </section>
     );
@@ -280,57 +449,68 @@ const AdminPage: React.FC = () => {
 
   if (!isAdmin) {
     return (
-      <section style={{ maxWidth: 520, margin: "40px auto", padding: 20, border: "1px solid #d9e2ec", borderRadius: 12, background: "#fff" }}>
+      <section style={{ maxWidth: 520, margin: "40px auto", padding: 20, border: `1px solid ${color.border}`, borderRadius: 12, background: "#fff" }}>
         <h1 style={{ marginTop: 0 }}>Admin role required</h1>
-        <p>Your account is authenticated but has no admin rights.</p>
+        <p style={{ color: color.muted }}>Your account is authenticated but has no admin rights.</p>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => navigate("/")}>Back</button>
-          <button onClick={() => void logout()}>Logout</button>
+          <button onClick={() => navigate("/")} style={buttonStyle("neutral")}>Back</button>
+          <button onClick={() => void logout()} style={buttonStyle("danger")}>Logout</button>
         </div>
       </section>
     );
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "linear-gradient(145deg,#eef5fb,#f8fafc)", padding: 16, fontFamily: "\"Space Grotesk\", \"Manrope\", sans-serif" }}>
-      <div style={{ maxWidth: 1400, margin: "0 auto", display: "grid", gap: 14 }}>
-        <header style={{ background: "#fff", border: "1px solid #d9e2ec", borderRadius: 12, padding: 16, display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+    <div style={{ minHeight: "100vh", background: `linear-gradient(180deg, ${color.bg}, #e4edf6)`, padding: 16, fontFamily: "\"Space Grotesk\", \"Manrope\", sans-serif", color: color.text }}>
+      <div style={{ maxWidth: 1420, margin: "0 auto", display: "grid", gap: 14 }}>
+        <header style={{ ...panelStyle, display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
           <div>
-            <strong>AvtoBorsa Admin</strong>
-            <h2 style={{ margin: "8px 0 4px" }}>Control Panel</h2>
-            <span style={{ color: "#4b5563", fontSize: 13 }}>Manage listings, users, purchases and reports.</span>
+            <div style={{ fontSize: 12, color: color.muted }}>AVTOBORSA</div>
+            <h2 style={{ margin: "6px 0", fontSize: 24 }}>Admin Control Panel</h2>
+            <div style={{ fontSize: 13, color: color.muted }}>Manage listings, users, purchases and reports.</div>
+            <div style={{ fontSize: 12, color: color.muted, marginTop: 4 }}>Signed in as {user.email}</div>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => void loadByTab()}>Refresh</button>
-            <button onClick={() => void logout()}>Logout</button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button onClick={() => void loadByTab()} style={buttonStyle("neutral")}>Refresh tab</button>
+            <button onClick={() => void loadOverview()} style={buttonStyle("neutral")}>Refresh totals</button>
+            <button onClick={() => void logout()} style={buttonStyle("danger")}>Logout</button>
           </div>
         </header>
 
-        <nav style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {tabs.map((item) => (
-            <button
-              key={item.key}
-              onClick={() => setTab(item.key)}
-              style={{
-                background: tab === item.key ? "#0f766e" : "#fff",
-                color: tab === item.key ? "#fff" : "#1f2937",
-                border: "1px solid #cbd5e1",
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
+        <nav style={{ ...panelStyle, display: "flex", gap: 8, flexWrap: "wrap", padding: 8 }}>
+          {tabs.map((item) => {
+            const active = tab === item.key;
+            return (
+              <button
+                key={item.key}
+                onClick={() => setTab(item.key)}
+                style={{
+                  minWidth: 145,
+                  textAlign: "left",
+                  borderRadius: 10,
+                  padding: "8px 10px",
+                  border: `1px solid ${active ? color.accent : color.borderStrong}`,
+                  background: active ? color.accentSoft : "#fff",
+                  color: active ? color.accent : color.text,
+                  cursor: "pointer",
+                }}
+              >
+                <div style={{ fontWeight: 700, fontSize: 13 }}>{item.label}</div>
+                <div style={{ fontSize: 11, color: color.muted }}>{item.hint}</div>
+              </button>
+            );
+          })}
         </nav>
 
-        {error && <div style={{ color: "#b91c1c", fontSize: 13 }}>{error}</div>}
+        {error && <div style={{ border: "1px solid #f4c2c7", background: "#fff1f2", color: color.danger, borderRadius: 10, padding: "10px 12px", fontSize: 13 }}>{error}</div>}
 
         {tab === "dashboard" && (
-          <section style={{ background: "#fff", border: "1px solid #d9e2ec", borderRadius: 12, padding: 14 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px,1fr))", gap: 10 }}>
+          <section style={panelStyle}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px,1fr))", gap: 10 }}>
               {cards.map(([label, value]) => (
-                <article key={String(label)} style={{ border: "1px solid #d9e2ec", borderRadius: 10, padding: 10 }}>
-                  <div style={{ fontSize: 12, color: "#64748b" }}>{label}</div>
-                  <strong style={{ fontSize: 20 }}>{String(value)}</strong>
+                <article key={String(label)} style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                  <div style={{ fontSize: 12, color: color.muted }}>{label}</div>
+                  <strong style={{ fontSize: 22 }}>{String(value)}</strong>
                 </article>
               ))}
             </div>
@@ -338,65 +518,282 @@ const AdminPage: React.FC = () => {
         )}
 
         {tab === "listings" && (
-          <section style={{ background: "#fff", border: "1px solid #d9e2ec", borderRadius: 12, padding: 14 }}>
+          <section style={panelStyle}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8, flexWrap: "wrap" }}>
+              <h3 style={{ margin: 0 }}>Listings</h3>
+              <span style={{ fontSize: 13, color: color.muted }}>{pageLabel(listings?.pagination)}</span>
+            </div>
             <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-              <input value={listingQ} onChange={(e) => setListingQ(e.target.value)} placeholder="Search listings" />
-              <button onClick={() => { setListingPage(1); void loadListings(); }}>Search</button>
+              <input value={listingQ} onChange={(e) => setListingQ(e.target.value)} placeholder="Search listings" style={inputStyle} />
+              <button onClick={() => { setListingPage(1); void loadListings(); }} style={buttonStyle("primary")}>Search</button>
             </div>
             <div style={tableWrap}>
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1100 }}>
-                <thead><tr><th>ID</th><th>Listing</th><th>Seller</th><th>Price</th><th>Status</th><th>Views</th><th>Actions</th></tr></thead>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1120 }}>
+                <thead><tr><th style={thStyle}>ID</th><th style={thStyle}>Listing</th><th style={thStyle}>Seller</th><th style={thStyle}>Price</th><th style={thStyle}>Status</th><th style={thStyle}>Views</th><th style={thStyle}>Actions</th></tr></thead>
                 <tbody>
-                  {(listings?.results || []).map((item) => (
-                    <tr key={item.id} style={rowStyle}>
-                      <td>{item.id}</td>
-                      <td>{item.brand} {item.model}<div style={{ fontSize: 12, color: "#64748b" }}>{item.title || "No title"} | {item.city}</div></td>
-                      <td>{item.seller_name}<div style={{ fontSize: 12, color: "#64748b" }}>{item.user_email}</div></td>
-                      <td>{fmtMoney(item.price)}</td>
-                      <td>{item.is_draft ? "draft" : item.is_archived ? "archived" : item.is_expired ? "expired" : "active"} ({item.listing_type})</td>
-                      <td>{item.view_count}</td>
-                      <td style={{ display: "grid", gap: 6 }}>
-                        <button disabled={busyId === item.id} onClick={async () => { setBusyId(item.id); try { await request(`/api/admin/listings/${item.id}/`, { method: "PATCH", body: JSON.stringify({ is_archived: !item.is_archived, is_active: item.is_archived }) }); await loadListings(); await loadOverview(); } catch (err) { setError(err instanceof Error ? err.message : "Update failed"); } finally { setBusyId(null); } }}>{item.is_archived ? "Unarchive" : "Archive"}</button>
-                        <button disabled={busyId === item.id} onClick={async () => { setBusyId(item.id); try { await request(`/api/admin/listings/${item.id}/`, { method: "PATCH", body: JSON.stringify({ listing_type: "normal" }) }); await loadListings(); await loadOverview(); } catch (err) { setError(err instanceof Error ? err.message : "Update failed"); } finally { setBusyId(null); } }}>Normal</button>
-                        <button disabled={busyId === item.id} onClick={async () => { if (!window.confirm("Delete listing?")) return; setBusyId(item.id); try { await request(`/api/admin/listings/${item.id}/delete/`, { method: "DELETE" }); await loadListings(); await loadOverview(); } catch (err) { setError(err instanceof Error ? err.message : "Delete failed"); } finally { setBusyId(null); } }}>Delete</button>
-                      </td>
-                    </tr>
-                  ))}
+                  {(listings?.results || []).map((item) => {
+                    const status = resolveListingStatus(item);
+                    return (
+                      <tr key={item.id}>
+                        <td style={tdStyle}>#{item.id}</td>
+                        <td style={tdStyle}>{item.brand} {item.model}<div style={{ fontSize: 12, color: color.muted }}>{item.title || "No title"} | {item.city}</div></td>
+                        <td style={tdStyle}>{item.seller_name}<div style={{ fontSize: 12, color: color.muted }}>{item.user_email}</div></td>
+                        <td style={tdStyle}>{fmtMoney(item.price)}</td>
+                        <td style={tdStyle}><div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}><span style={badgeStyle(status.tone)}>{status.label}</span><span style={badgeStyle("default")}>{item.listing_type}</span></div></td>
+                        <td style={tdStyle}>{item.view_count}</td>
+                        <td style={tdStyle}>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <button
+                              disabled={busyId === item.id}
+                              onClick={async () => {
+                                await runBusyAction(item.id, async () => {
+                                  await request(`/api/admin/listings/${item.id}/`, { method: "PATCH", body: JSON.stringify({ is_archived: !item.is_archived, is_active: item.is_archived }) });
+                                  await Promise.all([loadListings(), loadOverview()]);
+                                }, "Update failed");
+                              }}
+                              style={buttonStyle("neutral")}
+                            >
+                              {item.is_archived ? "Unarchive" : "Archive"}
+                            </button>
+                            <button
+                              disabled={busyId === item.id}
+                              onClick={async () => {
+                                await runBusyAction(item.id, async () => {
+                                  await request(`/api/admin/listings/${item.id}/`, { method: "PATCH", body: JSON.stringify({ listing_type: "normal" }) });
+                                  await Promise.all([loadListings(), loadOverview()]);
+                                }, "Update failed");
+                              }}
+                              style={buttonStyle("neutral")}
+                            >
+                              Normal
+                            </button>
+                            <button
+                              disabled={busyId === item.id}
+                              onClick={async () => {
+                                if (!window.confirm("Delete listing?")) return;
+                                await runBusyAction(item.id, async () => {
+                                  await request(`/api/admin/listings/${item.id}/delete/`, { method: "DELETE" });
+                                  await Promise.all([loadListings(), loadOverview()]);
+                                }, "Delete failed");
+                              }}
+                              style={buttonStyle("danger")}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
             <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 13, color: "#64748b" }}>{pageLabel(listings?.pagination)}</span>
+              <span style={{ fontSize: 13, color: color.muted }}>{pageLabel(listings?.pagination)}</span>
               <div style={{ display: "flex", gap: 8 }}>
-                <button disabled={!listings || listings.pagination.page <= 1} onClick={() => setListingPage((value) => Math.max(1, value - 1))}>Prev</button>
-                <button disabled={!listings || listings.pagination.page >= listings.pagination.total_pages} onClick={() => setListingPage((value) => value + 1)}>Next</button>
+                <button disabled={!listings || listings.pagination.page <= 1} onClick={() => setListingPage((v) => Math.max(1, v - 1))} style={buttonStyle("neutral")}>Prev</button>
+                <button disabled={!listings || listings.pagination.page >= listings.pagination.total_pages} onClick={() => setListingPage((v) => v + 1)} style={buttonStyle("neutral")}>Next</button>
               </div>
             </div>
           </section>
         )}
 
         {tab === "users" && (
-          <section style={{ background: "#fff", border: "1px solid #d9e2ec", borderRadius: 12, padding: 14 }}>
+          <section style={panelStyle}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8, flexWrap: "wrap" }}>
+              <h3 style={{ margin: 0 }}>Users</h3>
+              <span style={{ fontSize: 12, color: color.muted }}>
+                {isSuperuser ? "Superuser: full rights" : "Admin: limited rights"}
+              </span>
+            </div>
             <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-              <input value={userQ} onChange={(e) => setUserQ(e.target.value)} placeholder="Search users" />
-              <button onClick={() => { setUserPage(1); void loadUsers(); }}>Search</button>
+              <input value={userQ} onChange={(e) => setUserQ(e.target.value)} placeholder="Search users" style={inputStyle} />
+              <button onClick={() => { setUserPage(1); void loadUsers(); }} style={buttonStyle("primary")}>Search</button>
             </div>
             <div style={tableWrap}>
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1000 }}>
-                <thead><tr><th>User</th><th>Type</th><th>Balance</th><th>Listings</th><th>Views</th><th>Role</th><th>Actions</th></tr></thead>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1120 }}>
+                <thead><tr><th style={thStyle}>User</th><th style={thStyle}>Type</th><th style={thStyle}>Balance</th><th style={thStyle}>Listings</th><th style={thStyle}>Views</th><th style={thStyle}>Role</th><th style={thStyle}>Actions</th></tr></thead>
                 <tbody>
-                  {(users?.results || []).map((item) => (
-                    <tr key={item.id} style={rowStyle}>
-                      <td>{item.first_name || item.last_name ? `${item.first_name} ${item.last_name}`.trim() : item.username}<div style={{ fontSize: 12, color: "#64748b" }}>{item.email}</div></td>
-                      <td>{item.user_type}</td>
-                      <td>{fmtMoney(item.balance)}</td>
-                      <td>{item.listing_count}</td>
-                      <td>{item.total_views}</td>
-                      <td>{item.is_superuser ? "superuser" : item.is_staff ? "admin" : "user"} | {item.is_active ? "active" : "inactive"}</td>
-                      <td style={{ display: "grid", gap: 6 }}>
-                        <button disabled={busyId === item.id} onClick={async () => { setBusyId(item.id); try { await request(`/api/admin/users/${item.id}/`, { method: "PATCH", body: JSON.stringify({ is_active: !item.is_active }) }); await loadUsers(); await loadOverview(); } catch (err) { setError(err instanceof Error ? err.message : "Update failed"); } finally { setBusyId(null); } }}>{item.is_active ? "Deactivate" : "Activate"}</button>
-                        <button disabled={busyId === item.id} onClick={async () => { setBusyId(item.id); try { await request(`/api/admin/users/${item.id}/`, { method: "PATCH", body: JSON.stringify({ is_staff: !item.is_staff }) }); await loadUsers(); await loadOverview(); } catch (err) { setError(err instanceof Error ? err.message : "Update failed"); } finally { setBusyId(null); } }}>{item.is_staff ? "Remove admin" : "Make admin"}</button>
-                        <button disabled={busyId === item.id} onClick={async () => { const value = window.prompt("New balance:", item.balance.toFixed(2)); if (value === null) return; setBusyId(item.id); try { await request(`/api/admin/users/${item.id}/`, { method: "PATCH", body: JSON.stringify({ balance: value }) }); await loadUsers(); await loadOverview(); } catch (err) { setError(err instanceof Error ? err.message : "Update failed"); } finally { setBusyId(null); } }}>Set balance</button>
+                  {(users?.results || []).map((item) => {
+                    const role = roleBadge(item);
+                    const self = item.id === currentUserId;
+                    const canDelete = isSuperuser && !self;
+                    return (
+                      <tr key={item.id}>
+                        <td style={tdStyle}>{userName(item)}<div style={{ fontSize: 12, color: color.muted }}>{item.email}</div><div style={{ fontSize: 12, color: color.muted }}>ID: {item.id}</div></td>
+                        <td style={tdStyle}>{item.user_type}</td>
+                        <td style={tdStyle}>{fmtMoney(item.balance)}</td>
+                        <td style={tdStyle}>{item.listing_count}</td>
+                        <td style={tdStyle}>{item.total_views}</td>
+                        <td style={tdStyle}>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <span style={badgeStyle(role.tone)}>{role.label}</span>
+                            <span style={badgeStyle(item.is_active ? "success" : "danger")}>{item.is_active ? "Active" : "Inactive"}</span>
+                            {self && <span style={badgeStyle("info")}>Current user</span>}
+                          </div>
+                        </td>
+                        <td style={tdStyle}>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <button
+                              disabled={busyId === item.id}
+                              onClick={async () => {
+                                await runBusyAction(item.id, async () => {
+                                  await request(`/api/admin/users/${item.id}/`, { method: "PATCH", body: JSON.stringify({ is_active: !item.is_active }) });
+                                  await Promise.all([loadUsers(), loadOverview()]);
+                                }, "Update failed");
+                              }}
+                              style={buttonStyle("neutral")}
+                            >
+                              {item.is_active ? "Deactivate" : "Activate"}
+                            </button>
+                            <button
+                              disabled={busyId === item.id || !isSuperuser}
+                              onClick={async () => {
+                                await runBusyAction(item.id, async () => {
+                                  await request(`/api/admin/users/${item.id}/`, { method: "PATCH", body: JSON.stringify({ is_staff: !item.is_staff }) });
+                                  await Promise.all([loadUsers(), loadOverview()]);
+                                }, "Update failed");
+                              }}
+                              title={isSuperuser ? "Toggle admin role" : "Only superusers can change admin role"}
+                              style={buttonStyle("neutral")}
+                            >
+                              {item.is_staff ? "Remove admin" : "Make admin"}
+                            </button>
+                            <button
+                              disabled={busyId === item.id}
+                              onClick={async () => {
+                                const value = window.prompt("New balance:", item.balance.toFixed(2));
+                                if (value === null) return;
+                                await runBusyAction(item.id, async () => {
+                                  await request(`/api/admin/users/${item.id}/`, { method: "PATCH", body: JSON.stringify({ balance: value }) });
+                                  await Promise.all([loadUsers(), loadOverview()]);
+                                }, "Update failed");
+                              }}
+                              style={buttonStyle("neutral")}
+                            >
+                              Set balance
+                            </button>
+                            <button
+                              disabled={busyId === item.id || !canDelete}
+                              onClick={async () => {
+                                if (!isSuperuser) {
+                                  setError("Only superusers can delete users.");
+                                  return;
+                                }
+                                if (self) {
+                                  setError("You cannot delete your own account from the admin panel.");
+                                  return;
+                                }
+                                if (!window.confirm(`Delete user ${userName(item)} (${item.email})?`)) return;
+                                if (!window.confirm("This action is permanent and will remove related records. Continue?")) return;
+                                await runBusyAction(item.id, async () => {
+                                  await request(`/api/admin/users/${item.id}/delete/`, { method: "DELETE" });
+                                  await Promise.all([loadUsers(), loadOverview()]);
+                                }, "Delete failed");
+                              }}
+                              title={canDelete ? "Delete user" : "Only superusers can delete other users"}
+                              style={buttonStyle("danger")}
+                            >
+                              Delete user
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, color: color.muted }}>{pageLabel(users?.pagination)}</span>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button disabled={!users || users.pagination.page <= 1} onClick={() => setUserPage((v) => Math.max(1, v - 1))} style={buttonStyle("neutral")}>Prev</button>
+                <button disabled={!users || users.pagination.page >= users.pagination.total_pages} onClick={() => setUserPage((v) => v + 1)} style={buttonStyle("neutral")}>Next</button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {tab === "transactions" && (
+          <section style={panelStyle}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8, flexWrap: "wrap" }}>
+              <h3 style={{ margin: 0 }}>Transactions</h3>
+              <span style={{ fontSize: 13, color: color.muted }}>{pageLabel(transactions?.pagination)}</span>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+              <input value={txQ} onChange={(e) => setTxQ(e.target.value)} placeholder="Search transactions" style={inputStyle} />
+              <button onClick={() => { setTxPage(1); void loadTransactions(); }} style={buttonStyle("primary")}>Search</button>
+            </div>
+            <div style={tableWrap}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 960 }}>
+                <thead><tr><th style={thStyle}>ID</th><th style={thStyle}>User</th><th style={thStyle}>Amount</th><th style={thStyle}>Status</th><th style={thStyle}>Credited</th><th style={thStyle}>Created</th><th style={thStyle}>Session</th></tr></thead>
+                <tbody>
+                  {(transactions?.results || []).map((item) => (
+                    <tr key={item.id}>
+                      <td style={tdStyle}>#{item.id}</td>
+                      <td style={tdStyle}>{item.user_email}</td>
+                      <td style={tdStyle}>{fmtMoney(item.amount)} {item.currency}</td>
+                      <td style={tdStyle}><span style={badgeStyle(txTone(item.status))}>{item.status}</span></td>
+                      <td style={tdStyle}><span style={badgeStyle(item.credited ? "success" : "warning")}>{item.credited ? "Yes" : "No"}</span></td>
+                      <td style={tdStyle}>{fmtDateTime(item.created_at)}</td>
+                      <td style={tdStyle}>{item.stripe_session_id || "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, color: color.muted }}>{pageLabel(transactions?.pagination)}</span>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button disabled={!transactions || transactions.pagination.page <= 1} onClick={() => setTxPage((v) => Math.max(1, v - 1))} style={buttonStyle("neutral")}>Prev</button>
+                <button disabled={!transactions || transactions.pagination.page >= transactions.pagination.total_pages} onClick={() => setTxPage((v) => v + 1)} style={buttonStyle("neutral")}>Next</button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {tab === "reports" && (
+          <section style={panelStyle}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8, flexWrap: "wrap" }}>
+              <h3 style={{ margin: 0 }}>Reports</h3>
+              <span style={{ fontSize: 13, color: color.muted }}>{pageLabel(reports?.pagination)}</span>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+              <input value={reportQ} onChange={(e) => setReportQ(e.target.value)} placeholder="Search reports" style={inputStyle} />
+              <button onClick={() => { setReportPage(1); void loadReports(); }} style={buttonStyle("primary")}>Search</button>
+            </div>
+            <div style={tableWrap}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 980 }}>
+                <thead><tr><th style={thStyle}>ID</th><th style={thStyle}>Listing</th><th style={thStyle}>User</th><th style={thStyle}>Flags</th><th style={thStyle}>Message</th><th style={thStyle}>Created</th><th style={thStyle}>Action</th></tr></thead>
+                <tbody>
+                  {(reports?.results || []).map((item) => (
+                    <tr key={item.id}>
+                      <td style={tdStyle}>#{item.id}</td>
+                      <td style={tdStyle}>{item.listing_brand} {item.listing_model} #{item.listing_id}</td>
+                      <td style={tdStyle}>{item.user_email}</td>
+                      <td style={tdStyle}>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {item.incorrect_price && <span style={badgeStyle("warning")}>Incorrect price</span>}
+                          {item.other_issue && <span style={badgeStyle("danger")}>Other issue</span>}
+                          {!item.incorrect_price && !item.other_issue && <span style={badgeStyle("default")}>No flags</span>}
+                        </div>
+                      </td>
+                      <td style={tdStyle}>{item.message || "-"}</td>
+                      <td style={tdStyle}>{fmtDateTime(item.created_at)}</td>
+                      <td style={tdStyle}>
+                        <button
+                          disabled={busyId === item.id}
+                          onClick={async () => {
+                            if (!window.confirm("Delete report?")) return;
+                            await runBusyAction(item.id, async () => {
+                              await request(`/api/admin/reports/${item.id}/delete/`, { method: "DELETE" });
+                              await Promise.all([loadReports(), loadOverview()]);
+                            }, "Delete failed");
+                          }}
+                          style={buttonStyle("danger")}
+                        >
+                          Delete
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -404,67 +801,10 @@ const AdminPage: React.FC = () => {
               </table>
             </div>
             <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 13, color: "#64748b" }}>{pageLabel(users?.pagination)}</span>
+              <span style={{ fontSize: 13, color: color.muted }}>{pageLabel(reports?.pagination)}</span>
               <div style={{ display: "flex", gap: 8 }}>
-                <button disabled={!users || users.pagination.page <= 1} onClick={() => setUserPage((value) => Math.max(1, value - 1))}>Prev</button>
-                <button disabled={!users || users.pagination.page >= users.pagination.total_pages} onClick={() => setUserPage((value) => value + 1)}>Next</button>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {tab === "transactions" && (
-          <section style={{ background: "#fff", border: "1px solid #d9e2ec", borderRadius: 12, padding: 14 }}>
-            <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-              <input value={txQ} onChange={(e) => setTxQ(e.target.value)} placeholder="Search transactions" />
-              <button onClick={() => { setTxPage(1); void loadTransactions(); }}>Search</button>
-            </div>
-            <div style={tableWrap}>
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
-                <thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Status</th><th>Credited</th><th>Created</th><th>Session</th></tr></thead>
-                <tbody>
-                  {(transactions?.results || []).map((item) => (
-                    <tr key={item.id} style={rowStyle}>
-                      <td>{item.id}</td><td>{item.user_email}</td><td>{fmtMoney(item.amount)} {item.currency}</td><td>{item.status}</td><td>{item.credited ? "yes" : "no"}</td><td>{new Date(item.created_at).toLocaleString()}</td><td>{item.stripe_session_id || "-"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 13, color: "#64748b" }}>{pageLabel(transactions?.pagination)}</span>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button disabled={!transactions || transactions.pagination.page <= 1} onClick={() => setTxPage((value) => Math.max(1, value - 1))}>Prev</button>
-                <button disabled={!transactions || transactions.pagination.page >= transactions.pagination.total_pages} onClick={() => setTxPage((value) => value + 1)}>Next</button>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {tab === "reports" && (
-          <section style={{ background: "#fff", border: "1px solid #d9e2ec", borderRadius: 12, padding: 14 }}>
-            <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-              <input value={reportQ} onChange={(e) => setReportQ(e.target.value)} placeholder="Search reports" />
-              <button onClick={() => { setReportPage(1); void loadReports(); }}>Search</button>
-            </div>
-            <div style={tableWrap}>
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 950 }}>
-                <thead><tr><th>ID</th><th>Listing</th><th>User</th><th>Flags</th><th>Message</th><th>Created</th><th>Action</th></tr></thead>
-                <tbody>
-                  {(reports?.results || []).map((item) => (
-                    <tr key={item.id} style={rowStyle}>
-                      <td>{item.id}</td><td>{item.listing_brand} {item.listing_model} #{item.listing_id}</td><td>{item.user_email}</td><td>{item.incorrect_price ? "price " : ""}{item.other_issue ? "other" : ""}</td><td>{item.message || "-"}</td><td>{new Date(item.created_at).toLocaleString()}</td>
-                      <td><button disabled={busyId === item.id} onClick={async () => { if (!window.confirm("Delete report?")) return; setBusyId(item.id); try { await request(`/api/admin/reports/${item.id}/delete/`, { method: "DELETE" }); await loadReports(); await loadOverview(); } catch (err) { setError(err instanceof Error ? err.message : "Delete failed"); } finally { setBusyId(null); } }}>Delete</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 13, color: "#64748b" }}>{pageLabel(reports?.pagination)}</span>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button disabled={!reports || reports.pagination.page <= 1} onClick={() => setReportPage((value) => Math.max(1, value - 1))}>Prev</button>
-                <button disabled={!reports || reports.pagination.page >= reports.pagination.total_pages} onClick={() => setReportPage((value) => value + 1)}>Next</button>
+                <button disabled={!reports || reports.pagination.page <= 1} onClick={() => setReportPage((v) => Math.max(1, v - 1))} style={buttonStyle("neutral")}>Prev</button>
+                <button disabled={!reports || reports.pagination.page >= reports.pagination.total_pages} onClick={() => setReportPage((v) => v + 1)} style={buttonStyle("neutral")}>Next</button>
               </div>
             </div>
           </section>

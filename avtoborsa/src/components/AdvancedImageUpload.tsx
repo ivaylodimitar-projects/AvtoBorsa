@@ -7,9 +7,18 @@ interface ImageItem {
   isCover: boolean;
 }
 
+interface ExistingImageItem {
+  id?: number;
+  image: string;
+  thumbnail?: string | null;
+  isCover?: boolean;
+}
+
 interface AdvancedImageUploadProps {
   images: ImageItem[];
   onImagesChange: (images: ImageItem[]) => void;
+  existingImages?: ExistingImageItem[];
+  onExistingImagesChange?: (images: ExistingImageItem[]) => void;
   maxImages?: number;
 }
 
@@ -55,13 +64,37 @@ const normalizeCoverSelection = (items: ImageItem[]): ImageItem[] => {
   return normalized;
 };
 
+const normalizeExistingCoverSelection = (
+  items: ExistingImageItem[]
+): ExistingImageItem[] => {
+  let hasCover = false;
+  const normalized = items.map((item) => {
+    const isCover = Boolean(item.isCover);
+    if (isCover && !hasCover) {
+      hasCover = true;
+      return { ...item, isCover: true };
+    }
+    if (!isCover) return { ...item, isCover: false };
+    return { ...item, isCover: false };
+  });
+
+  if (!hasCover && normalized.length > 0) {
+    normalized[0] = { ...normalized[0], isCover: true };
+  }
+
+  return normalized;
+};
+
 const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
   images,
   onImagesChange,
+  existingImages = [],
+  onExistingImagesChange,
   maxImages = 15,
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [existingDragOverIndex, setExistingDragOverIndex] = useState<number | null>(null);
   const [isAddingImages, setIsAddingImages] = useState(false);
   const [uploadFeedback, setUploadFeedback] = useState<UploadFeedback | null>(null);
   const previousPreviewsRef = useRef<string[]>([]);
@@ -88,6 +121,13 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
   }, []);
 
   const supportsContentHashing = Boolean(globalThis.crypto?.subtle);
+  const totalImageCount = images.length + existingImages.length;
+  const canEditExistingImages = typeof onExistingImagesChange === "function";
+
+  const updateExistingImages = (nextImages: ExistingImageItem[]) => {
+    if (!onExistingImagesChange) return;
+    onExistingImagesChange(normalizeExistingCoverSelection(nextImages));
+  };
 
   const getFileHash = async (file: File): Promise<string> => {
     const cached = fileHashCacheRef.current.get(file);
@@ -128,7 +168,7 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
   const addImages = async (files: File[]) => {
     if (files.length === 0 || isAddingImages) return;
 
-    const slotsLeft = Math.max(maxImages - images.length, 0);
+    const slotsLeft = Math.max(maxImages - totalImageCount, 0);
     if (slotsLeft === 0) {
       setUploadFeedback({
         message: `Достигнат е лимитът от ${maxImages} снимки.`,
@@ -200,7 +240,10 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
       }
 
       if (acceptedImages.length > 0) {
-        const shouldAssignCover = images.length === 0 && !images.some((img) => img.isCover);
+        const shouldAssignCover =
+          images.length === 0 &&
+          existingImages.length === 0 &&
+          !images.some((img) => img.isCover);
         if (shouldAssignCover) {
           acceptedImages[0].isCover = true;
         }
@@ -263,6 +306,29 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
     const [movedImage] = newImages.splice(fromIndex, 1);
     newImages.splice(toIndex, 0, movedImage);
     onImagesChange(normalizeCoverSelection(newImages));
+  };
+
+  const setExistingCoverImage = (index: number) => {
+    if (isAddingImages || !canEditExistingImages) return;
+    const nextImages = existingImages.map((item, itemIndex) => ({
+      ...item,
+      isCover: itemIndex === index,
+    }));
+    updateExistingImages(nextImages);
+  };
+
+  const removeExistingImage = (index: number) => {
+    if (isAddingImages || !canEditExistingImages) return;
+    const nextImages = existingImages.filter((_, itemIndex) => itemIndex !== index);
+    updateExistingImages(nextImages);
+  };
+
+  const moveExistingImage = (fromIndex: number, toIndex: number) => {
+    if (isAddingImages || !canEditExistingImages) return;
+    const nextImages = [...existingImages];
+    const [movedImage] = nextImages.splice(fromIndex, 1);
+    nextImages.splice(toIndex, 0, movedImage);
+    updateExistingImages(nextImages);
   };
 
   const styles: Record<string, React.CSSProperties> = {
@@ -372,6 +438,9 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
       objectFit: "cover" as const,
       display: "block",
     },
+    imageMuted: {
+      opacity: 0.9,
+    },
     coverBadge: {
       position: "absolute" as const,
       top: 8,
@@ -413,6 +482,18 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
       transition: "background 0.2s ease",
       opacity: isAddingImages ? 0.75 : 1,
     },
+    existingBadge: {
+      position: "absolute" as const,
+      top: 8,
+      right: 8,
+      background: "rgba(15, 23, 42, 0.8)",
+      color: "#e2e8f0",
+      padding: "4px 8px",
+      borderRadius: 999,
+      fontSize: 10,
+      fontWeight: 700,
+      letterSpacing: 0.2,
+    },
     emptyState: {
       textAlign: "center" as const,
       padding: "32px 20px",
@@ -427,17 +508,25 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
       marginBottom: 6,
       color: "#0f172a",
     },
+    groupTitle: {
+      margin: "12px 0 10px",
+      fontSize: 12,
+      fontWeight: 700,
+      color: "#334155",
+      textTransform: "uppercase" as const,
+      letterSpacing: 0.4,
+    },
   };
 
   return (
     <div style={styles.container}>
       <div style={styles.header}>
         <div style={styles.counter}>
-          {images.length}/{maxImages}
+          {totalImageCount}/{maxImages}
         </div>
       </div>
 
-      {images.length < maxImages && (
+      {totalImageCount < maxImages && (
         <div
           style={styles.uploadZone}
           onDragEnter={handleDrag}
@@ -489,7 +578,100 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
         </div>
       )}
 
+      {existingImages.length > 0 && (
+        <>
+          <div style={styles.groupTitle}>Текущи снимки</div>
+          <div style={styles.gallery}>
+            {existingImages.map((item, index) => {
+              const previewUrl = item.thumbnail || item.image;
+              if (!previewUrl) return null;
+              return (
+                <div
+                  key={`${item.id ?? item.image}-${index}`}
+                  style={{
+                    ...styles.imageCard,
+                    ...(item.isCover ? styles.imageCardCover : {}),
+                    ...(existingDragOverIndex === index
+                      ? { boxShadow: "0 0 0 2px #93c5fd" }
+                      : {}),
+                    cursor: canEditExistingImages ? "grab" : "default",
+                  }}
+                  draggable={canEditExistingImages && !isAddingImages}
+                  onDragStart={(e) => {
+                    if (!canEditExistingImages || isAddingImages) return;
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain", `existing:${index}`);
+                  }}
+                  onDragOver={(e) => {
+                    if (!canEditExistingImages || isAddingImages) return;
+                    e.preventDefault();
+                    setExistingDragOverIndex(index);
+                  }}
+                  onDragLeave={() => setExistingDragOverIndex(null)}
+                  onDrop={(e) => {
+                    if (!canEditExistingImages || isAddingImages) return;
+                    e.preventDefault();
+                    const raw = e.dataTransfer.getData("text/plain");
+                    const [kind, value] = String(raw || "").split(":");
+                    const fromIndex = Number(value);
+                    if (kind !== "existing" || Number.isNaN(fromIndex)) {
+                      setExistingDragOverIndex(null);
+                      return;
+                    }
+                    if (fromIndex !== index) {
+                      moveExistingImage(fromIndex, index);
+                    }
+                    setExistingDragOverIndex(null);
+                  }}
+                >
+                  {item.isCover && (
+                    <div style={styles.coverBadge}>
+                      <Star size={12} />
+                      Корица
+                    </div>
+                  )}
+                  <div style={styles.existingBadge}>Налична</div>
+                  <img
+                    src={previewUrl}
+                    alt={`Existing ${index + 1}`}
+                    style={{ ...styles.image, ...styles.imageMuted }}
+                  />
+                  {canEditExistingImages && (
+                    <div style={styles.imageActions}>
+                      {!item.isCover && (
+                        <button
+                          type="button"
+                          style={styles.actionButton}
+                          onClick={() => setExistingCoverImage(index)}
+                          title="Задай като корица"
+                          disabled={isAddingImages}
+                        >
+                          <Star size={12} />
+                          Корица
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        style={styles.actionButton}
+                        onClick={() => removeExistingImage(index)}
+                        title="Премахни снимка"
+                        disabled={isAddingImages}
+                      >
+                        <Trash2 size={12} />
+                        Премахни
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
       {images.length > 0 ? (
+        <>
+          <div style={styles.groupTitle}>Ново добавени</div>
         <div style={styles.gallery}>
           {images.map((item, index) => (
             <div
@@ -557,14 +739,15 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
             </div>
           ))}
         </div>
-      ) : (
+        </>
+      ) : existingImages.length === 0 ? (
         <div style={styles.emptyState}>
           <div style={styles.emptyTitle}>Няма качени снимки</div>
           <p style={{ fontSize: 12 }}>
             Качи поне една снимка за по-добра видимост
           </p>
         </div>
-      )}
+      ) : null}
     </div>
   );
 };

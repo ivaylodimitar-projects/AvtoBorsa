@@ -1,10 +1,14 @@
 ﻿import React, { useEffect, useState } from "react";
+import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
+  Copy,
+  KeyRound,
   Lock,
+  RefreshCw,
   ShieldCheck,
   Trash2,
   Wallet,
@@ -24,7 +28,15 @@ type PaymentTransaction = {
   created_at: string;
 };
 
-type TabKey = "profile" | "password" | "transactions" | "delete";
+type ImportApiKeyStatus = {
+  has_key: boolean;
+  key_prefix?: string | null;
+  masked_key?: string | null;
+  created_at?: string | null;
+  last_used_at?: string | null;
+};
+
+type TabKey = "profile" | "password" | "transactions" | "api" | "delete";
 
 const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -51,6 +63,13 @@ const SettingsPage: React.FC = () => {
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const [importApiKeyStatus, setImportApiKeyStatus] = useState<ImportApiKeyStatus | null>(null);
+  const [importApiKeyLoading, setImportApiKeyLoading] = useState(false);
+  const [importApiKeyError, setImportApiKeyError] = useState<string | null>(null);
+  const [importApiKeyActionLoading, setImportApiKeyActionLoading] = useState(false);
+  const [importApiKeyActionStatus, setImportApiKeyActionStatus] = useState<string | null>(null);
+  const [generatedApiKey, setGeneratedApiKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -95,6 +114,115 @@ const SettingsPage: React.FC = () => {
     const totalPages = Math.max(1, Math.ceil(transactions.length / TRANSACTIONS_PER_PAGE));
     setTransactionsPage((prev) => Math.min(prev, totalPages));
   }, [transactions.length]);
+
+  const fetchImportApiKeyStatus = useCallback(async () => {
+    const token = localStorage.getItem("authToken");
+    if (!token) return;
+
+    setImportApiKeyLoading(true);
+    setImportApiKeyError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/import-api-key/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setImportApiKeyError(data?.error || "Неуспешно зареждане на API ключ.");
+        return;
+      }
+      setImportApiKeyStatus({
+        has_key: Boolean(data?.has_key),
+        key_prefix: typeof data?.key_prefix === "string" ? data.key_prefix : null,
+        masked_key: typeof data?.masked_key === "string" ? data.masked_key : null,
+        created_at: typeof data?.created_at === "string" ? data.created_at : null,
+        last_used_at: typeof data?.last_used_at === "string" ? data.last_used_at : null,
+      });
+    } catch {
+      setImportApiKeyError("Неуспешно зареждане на API ключ.");
+    } finally {
+      setImportApiKeyLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    fetchImportApiKeyStatus();
+  }, [user, fetchImportApiKeyStatus]);
+
+  const handleGenerateImportApiKey = async () => {
+    setImportApiKeyError(null);
+    setImportApiKeyActionStatus(null);
+    setGeneratedApiKey(null);
+
+    const token = localStorage.getItem("authToken");
+    if (!token) return;
+
+    setImportApiKeyActionLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/import-api-key/generate/`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setImportApiKeyError(data?.error || "Грешка при генериране на API ключ.");
+        return;
+      }
+
+      const keyValue = typeof data?.api_key === "string" ? data.api_key : "";
+      setGeneratedApiKey(keyValue || null);
+      setImportApiKeyStatus({
+        has_key: true,
+        key_prefix: typeof data?.key_prefix === "string" ? data.key_prefix : null,
+        masked_key: typeof data?.key_prefix === "string" ? `${data.key_prefix}...` : null,
+        created_at: typeof data?.created_at === "string" ? data.created_at : null,
+        last_used_at: typeof data?.last_used_at === "string" ? data.last_used_at : null,
+      });
+      setImportApiKeyActionStatus("Нов API ключ е генериран. Копирай го и го постави в Chrome extension-а.");
+    } catch {
+      setImportApiKeyError("Грешка при генериране на API ключ.");
+    } finally {
+      setImportApiKeyActionLoading(false);
+    }
+  };
+
+  const handleCopyApiKey = async () => {
+    if (!generatedApiKey) return;
+    try {
+      await navigator.clipboard.writeText(generatedApiKey);
+      setImportApiKeyActionStatus("API ключът е копиран в clipboard.");
+    } catch {
+      setImportApiKeyError("Неуспешно копиране на API ключа.");
+    }
+  };
+
+  const handleRevokeImportApiKey = async () => {
+    setImportApiKeyError(null);
+    setImportApiKeyActionStatus(null);
+
+    const token = localStorage.getItem("authToken");
+    if (!token) return;
+
+    setImportApiKeyActionLoading(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/import-api-key/revoke/`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setImportApiKeyError(data?.error || "Грешка при изтриване на API ключ.");
+        return;
+      }
+      setImportApiKeyStatus({ has_key: false });
+      setGeneratedApiKey(null);
+      setImportApiKeyActionStatus("API ключът е изтрит.");
+    } catch {
+      setImportApiKeyError("Грешка при изтриване на API ключ.");
+    } finally {
+      setImportApiKeyActionLoading(false);
+    }
+  };
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -270,6 +398,7 @@ const SettingsPage: React.FC = () => {
     profile: "Профил",
     password: "Парола",
     transactions: "Транзакции",
+    api: "API ключ",
     delete: "Изтриване",
   };
 
@@ -277,6 +406,7 @@ const SettingsPage: React.FC = () => {
     profile: "Управлявай личните си данни за контакт.",
     password: "Обнови достъпа си и защити профила си.",
     transactions: "Прегледай история на добавените средства.",
+    api: "Създай API ключ за импортиране на обяви от Copart.",
     delete: "Контролирай изтриването на профила си.",
   };
 
@@ -291,6 +421,19 @@ const SettingsPage: React.FC = () => {
     return `${datePart} • ${timePart}`;
   };
 
+  const formatMetaDateTime = (rawValue?: string | null) => {
+    if (!rawValue) return "Няма";
+    const dateValue = new Date(rawValue);
+    if (Number.isNaN(dateValue.getTime())) return "Няма";
+    return dateValue.toLocaleString("bg-BG", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   const globalCss = `
     @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
     * { box-sizing: border-box; }
@@ -300,11 +443,34 @@ const SettingsPage: React.FC = () => {
       background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 30%, #f8fafc 100%);
       color: #0f172a;
     }
-    .settings-tab { transition: all 0.2s ease; }
+    .settings-tab {
+      transition: all 0.2s ease;
+      border: 1px solid #dbe4ef !important;
+      outline: none;
+    }
     .settings-tab:hover {
       border-color: #14b8a6 !important;
       color: #0f766e !important;
       transform: translateY(-1px);
+    }
+    .settings-tab:focus,
+    .settings-tab:active,
+    .settings-tab:focus-visible {
+      border-style: solid !important;
+      border-width: 1px !important;
+      outline: none;
+    }
+    .settings-tab:focus-visible {
+      border-color: #14b8a6 !important;
+      box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.15);
+    }
+    .settings-tab[aria-selected="true"] {
+      border-color: #0b5f58 !important;
+      color: #ffffff !important;
+    }
+    .settings-tab[aria-selected="true"]:hover {
+      border-color: #0b5f58 !important;
+      color: #ffffff !important;
     }
     .settings-input {
       transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
@@ -402,6 +568,8 @@ const SettingsPage: React.FC = () => {
       padding: "12px 14px",
       borderRadius: 12,
       border: "1px solid #dbe4ef",
+      borderStyle: "solid",
+      borderWidth: 1,
       background: "#f8fafc",
       fontSize: 13,
       fontWeight: 700,
@@ -411,10 +579,12 @@ const SettingsPage: React.FC = () => {
       alignItems: "center",
       gap: 8,
       justifyContent: "center",
+      outline: "none",
+      appearance: "none",
     },
     tabActive: {
       background: "linear-gradient(145deg, #0f766e 0%, #0d9488 100%)",
-      borderColor: "#0f766e",
+      border: "1px solid #0b5f58",
       color: "#fff",
       boxShadow: "0 10px 18px rgba(15,118,110,0.22)",
       transform: "translateY(-1px)",
@@ -518,6 +688,54 @@ const SettingsPage: React.FC = () => {
       display: "inline-flex",
       alignItems: "center",
       gap: 8,
+    },
+    codeBox: {
+      width: "100%",
+      padding: "11px 12px",
+      borderRadius: 12,
+      border: "1px solid #dbeafe",
+      background: "#f8fafc",
+      fontFamily: "\"JetBrains Mono\", \"Fira Code\", monospace",
+      fontSize: 12,
+      color: "#0f172a",
+      overflowX: "auto",
+      wordBreak: "break-all",
+    },
+    metaGrid: {
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+      gap: 10,
+      marginTop: 12,
+    },
+    metaItem: {
+      border: "1px solid #dbeafe",
+      borderRadius: 12,
+      background: "#f8fafc",
+      padding: "10px 12px",
+    },
+    metaItemLabel: {
+      fontSize: 11,
+      fontWeight: 800,
+      color: "#64748b",
+      textTransform: "uppercase",
+      letterSpacing: "0.3px",
+    },
+    metaItemValue: {
+      marginTop: 4,
+      fontSize: 13,
+      fontWeight: 700,
+      color: "#0f172a",
+      wordBreak: "break-word",
+    },
+    noteBox: {
+      border: "1px dashed #99f6e4",
+      background: "#f0fdfa",
+      color: "#0f766e",
+      borderRadius: 12,
+      padding: "10px 12px",
+      fontSize: 13,
+      lineHeight: 1.5,
+      marginTop: 12,
     },
     transactionList: { marginTop: 16, display: "flex", flexDirection: "column", gap: 12 },
     transactionRow: {
@@ -667,8 +885,11 @@ const SettingsPage: React.FC = () => {
               {user.username || user.email}
             </div>
           </div>
-          <div style={styles.tabs}>
+          <div style={styles.tabs} role="tablist" aria-label="Настройки табове">
             <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "profile"}
               className="settings-tab"
               style={{ ...styles.tab, ...(activeTab === "profile" ? styles.tabActive : {}) }}
               onClick={() => setActiveTab("profile")}
@@ -677,6 +898,9 @@ const SettingsPage: React.FC = () => {
               Профил
             </button>
             <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "password"}
               className="settings-tab"
               style={{ ...styles.tab, ...(activeTab === "password" ? styles.tabActive : {}) }}
               onClick={() => setActiveTab("password")}
@@ -685,6 +909,9 @@ const SettingsPage: React.FC = () => {
               Парола
             </button>
             <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "transactions"}
               className="settings-tab"
               style={{ ...styles.tab, ...(activeTab === "transactions" ? styles.tabActive : {}) }}
               onClick={() => setActiveTab("transactions")}
@@ -693,6 +920,20 @@ const SettingsPage: React.FC = () => {
               Транзакции
             </button>
             <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "api"}
+              className="settings-tab"
+              style={{ ...styles.tab, ...(activeTab === "api" ? styles.tabActive : {}) }}
+              onClick={() => setActiveTab("api")}
+            >
+              <KeyRound size={16} />
+              API ключ
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "delete"}
               className="settings-tab"
               style={{ ...styles.tab, ...(activeTab === "delete" ? styles.tabActive : {}) }}
               onClick={() => setActiveTab("delete")}
@@ -910,6 +1151,111 @@ const SettingsPage: React.FC = () => {
                     </div>
                   </div>
                 )}
+              </>
+            )}
+          </div>
+        )}
+
+        {activeTab === "api" && (
+          <div style={styles.section}>
+            <div style={styles.sectionHeader}>
+              <div>
+                <h2 style={styles.sectionTitle}>API ключ за Chrome Extension</h2>
+                <div style={styles.sectionDescription}>
+                  Използвай този ключ в extension-а, за да добавяш Copart обяви като чернови в Kar.bg.
+                </div>
+              </div>
+              <div style={styles.sectionBadge}>
+                <KeyRound size={13} />
+                {tabTitles.api}
+              </div>
+            </div>
+
+            {importApiKeyLoading ? (
+              <div style={styles.empty}>Зареждане...</div>
+            ) : (
+              <>
+                {importApiKeyError && <div style={styles.error}>{importApiKeyError}</div>}
+                {importApiKeyActionStatus && (
+                  <div style={styles.success}>
+                    <CheckCircle2 size={15} />
+                    {importApiKeyActionStatus}
+                  </div>
+                )}
+
+                <div style={styles.metaGrid}>
+                  <div style={styles.metaItem}>
+                    <div style={styles.metaItemLabel}>Статус</div>
+                    <div style={styles.metaItemValue}>
+                      {importApiKeyStatus?.has_key ? "Има активен ключ" : "Няма активен ключ"}
+                    </div>
+                  </div>
+                  <div style={styles.metaItem}>
+                    <div style={styles.metaItemLabel}>Префикс</div>
+                    <div style={styles.metaItemValue}>{importApiKeyStatus?.key_prefix || "Няма"}</div>
+                  </div>
+                  <div style={styles.metaItem}>
+                    <div style={styles.metaItemLabel}>Създаден</div>
+                    <div style={styles.metaItemValue}>{formatMetaDateTime(importApiKeyStatus?.created_at)}</div>
+                  </div>
+                  <div style={styles.metaItem}>
+                    <div style={styles.metaItemLabel}>Последно ползван</div>
+                    <div style={styles.metaItemValue}>{formatMetaDateTime(importApiKeyStatus?.last_used_at)}</div>
+                  </div>
+                </div>
+
+                {generatedApiKey && (
+                  <div style={{ marginTop: 14 }}>
+                    <div style={styles.label}>Нов API ключ (показва се само след генериране)</div>
+                    <div style={styles.codeBox}>{generatedApiKey}</div>
+                    <button
+                      type="button"
+                      className="settings-ghost-btn"
+                      style={{ ...styles.buttonGhost, marginTop: 10, display: "inline-flex", alignItems: "center", gap: 7 }}
+                      onClick={handleCopyApiKey}
+                    >
+                      <Copy size={14} />
+                      Копирай ключа
+                    </button>
+                  </div>
+                )}
+
+                <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 10 }}>
+                  <button
+                    type="button"
+                    className="settings-primary-btn"
+                    style={styles.button}
+                    onClick={handleGenerateImportApiKey}
+                    disabled={importApiKeyActionLoading}
+                  >
+                    <RefreshCw size={15} />
+                    {importApiKeyStatus?.has_key ? "Регенерирай API ключ" : "Генерирай API ключ"}
+                  </button>
+                  <button
+                    type="button"
+                    className="settings-ghost-btn"
+                    style={styles.buttonGhost}
+                    onClick={fetchImportApiKeyStatus}
+                    disabled={importApiKeyActionLoading}
+                  >
+                    Обнови
+                  </button>
+                  {importApiKeyStatus?.has_key && (
+                    <button
+                      type="button"
+                      className="settings-ghost-btn"
+                      style={{ ...styles.buttonGhost, borderColor: "#fecaca", color: "#b91c1c", background: "#fef2f2" }}
+                      onClick={handleRevokeImportApiKey}
+                      disabled={importApiKeyActionLoading}
+                    >
+                      Изтрий ключа
+                    </button>
+                  )}
+                </div>
+
+                <div style={styles.noteBox}>
+                  Използвай този API ключ в extension-а за endpoint: <strong>{API_BASE_URL}/api/auth/import/copart/</strong>
+                </div>
               </>
             )}
           </div>

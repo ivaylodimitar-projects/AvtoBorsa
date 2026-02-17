@@ -179,6 +179,7 @@ const MAIN_CATEGORY_OPTIONS: Array<{ value: MainCategoryKey; label: string }> =
 const CLASSIFIED_FOR_OPTIONS = MOBILE_CLASSIFIED_FOR_OPTIONS;
 const MIN_IMAGES_REQUIRED_TO_PUBLISH = 3;
 const IMAGE_OPTIONAL_MAIN_CATEGORIES = new Set<MainCategoryKey>(["y", "z"]);
+const EDIT_REDIRECT_LOADING_DELAY_MS = 650;
 
 const getMinimumRequiredImageCount = (mainCategory: MainCategoryKey) =>
   IMAGE_OPTIONAL_MAIN_CATEGORIES.has(mainCategory) ? 0 : MIN_IMAGES_REQUIRED_TO_PUBLISH;
@@ -886,6 +887,382 @@ const mapTransmissionToGearboxValue = (transmission: string): string => {
   return "ruchna";
 };
 
+const normalizeLookupText = (value: string): string =>
+  (value || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("bg-BG")
+    .replace(/[^a-z0-9а-я]+/gi, "");
+
+const IMPORT_BRAND_ALIAS_MAP: Record<string, string> = {
+  vw: "Volkswagen",
+  vwaudi: "Volkswagen",
+  mercedesbenz: "Mercedes-Benz",
+  mercedes: "Mercedes-Benz",
+  landrover: "Land Rover",
+  alfaromeo: "Alfa Romeo",
+  astonmartin: "Aston Martin",
+  rollsroyce: "Rolls-Royce",
+  chev: "Chevrolet",
+  chevy: "Chevrolet",
+  infinity: "Infiniti",
+};
+
+const dedupeNonEmpty = (values: string[]): string[] => {
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const candidate = value.trim();
+    if (!candidate) continue;
+    if (seen.has(candidate)) continue;
+    seen.add(candidate);
+    result.push(candidate);
+  }
+  return result;
+};
+
+const stripLeadingYearFromTitle = (value: string): string =>
+  value.replace(/^\s*(19|20)\d{2}\s+/, "").trim();
+
+const escapeRegexLiteral = (value: string): string =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const stripLeadingBrandFromText = (value: string, brand: string): string => {
+  const text = value.trim();
+  const brandParts = brand
+    .trim()
+    .split(/\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (!text || !brandParts.length) return text;
+
+  const brandPattern = brandParts.map((part) => escapeRegexLiteral(part)).join("[\\s\\-_/]*");
+  const leadingBrandRegex = new RegExp(`^${brandPattern}\\b`, "i");
+  const strippedByRegex = text
+    .replace(leadingBrandRegex, "")
+    .replace(/^[\s\-_:|,/]+/, "")
+    .trim();
+  if (strippedByRegex && strippedByRegex !== text) {
+    return strippedByRegex;
+  }
+
+  const normalizedText = normalizeLookupText(text);
+  const normalizedBrand = normalizeLookupText(brandParts.join(" "));
+  if (!normalizedText || !normalizedBrand) return text;
+
+  if (!normalizedText.startsWith(normalizedBrand)) {
+    return text;
+  }
+
+  const brandWordCount = brandParts.length;
+  const textParts = text.split(/\s+/).filter(Boolean);
+  if (textParts.length <= brandWordCount) {
+    return "";
+  }
+
+  return textParts.slice(brandWordCount).join(" ").trim();
+};
+
+const extractOriginalCopartTitleFromDescription = (description: string): string => {
+  const match = description.match(/Original Copart title:\s*([^\n\r]+)/i);
+  if (!match?.[1]) return "";
+  return match[1].trim();
+};
+
+const findBestCatalogOption = (
+  rawValue: string,
+  options: string[],
+  extraSources: string[] = []
+): string => {
+  if (!options.length) return "";
+
+  const value = rawValue.trim();
+  const loweredValue = value.toLocaleLowerCase("bg-BG");
+  const optionPairs = options
+    .map((option) => ({ option, normalized: normalizeLookupText(option) }))
+    .filter((entry) => entry.normalized);
+
+  if (value) {
+    const exact = options.find((option) => option === value);
+    if (exact) return exact;
+
+    const caseInsensitive = options.find(
+      (option) => option.toLocaleLowerCase("bg-BG") === loweredValue
+    );
+    if (caseInsensitive) return caseInsensitive;
+  }
+
+  const tryMatchByNormalized = (candidate: string): string => {
+    const normalizedCandidate = normalizeLookupText(candidate);
+    if (!normalizedCandidate) return "";
+
+    const normalizedExact = optionPairs.find(
+      (entry) => entry.normalized === normalizedCandidate
+    );
+    if (normalizedExact) return normalizedExact.option;
+
+    const containsMatch = optionPairs
+      .filter(
+        (entry) =>
+          entry.normalized.length >= 2 &&
+          normalizedCandidate.includes(entry.normalized)
+      )
+      .sort((a, b) => b.normalized.length - a.normalized.length)[0];
+    if (containsMatch) return containsMatch.option;
+
+    const reverseContainsMatch = optionPairs
+      .filter(
+        (entry) =>
+          entry.normalized.length >= 2 &&
+          entry.normalized.includes(normalizedCandidate)
+      )
+      .sort((a, b) => a.normalized.length - b.normalized.length)[0];
+    if (reverseContainsMatch) return reverseContainsMatch.option;
+
+    return "";
+  };
+
+  if (value) {
+    const matchFromValue = tryMatchByNormalized(value);
+    if (matchFromValue) return matchFromValue;
+  }
+
+  for (const source of extraSources) {
+    const sourceMatch = tryMatchByNormalized(source);
+    if (sourceMatch) return sourceMatch;
+  }
+
+  return "";
+};
+
+const mapCatalogBrandModel = (
+  mainCategory: MainCategoryKey,
+  rawBrand: string,
+  rawModel: string,
+  rawTitle: string
+): { brand: string; model: string } => {
+  const initialBrand = rawBrand.trim();
+  const aliasBrand =
+    IMPORT_BRAND_ALIAS_MAP[normalizeLookupText(initialBrand)] || initialBrand;
+  const baseBrand = aliasBrand;
+  const baseModel = rawModel.trim();
+  const title = rawTitle.trim();
+  const titleWithoutYear = stripLeadingYearFromTitle(title);
+
+  const brandOptions = getBrandOptionsByMainCategory(mainCategory);
+  if (!brandOptions.length) {
+    return { brand: baseBrand, model: baseModel };
+  }
+
+  const titleTokens = titleWithoutYear.split(/\s+/).filter(Boolean);
+  const brandHints = dedupeNonEmpty([
+    titleWithoutYear,
+    titleTokens.slice(0, 2).join(" "),
+    titleTokens.slice(0, 1).join(" "),
+  ]);
+  const mappedBrand = findBestCatalogOption(baseBrand, brandOptions, brandHints);
+  const finalBrand = mappedBrand || baseBrand;
+  if (!finalBrand) {
+    return { brand: baseBrand, model: baseModel };
+  }
+
+  const modelOptions = getModelOptionsByMainCategory(mainCategory, finalBrand);
+  if (!modelOptions.length) {
+    return { brand: finalBrand, model: baseModel };
+  }
+
+  const strippedModel = stripLeadingBrandFromText(baseModel, finalBrand);
+  const strippedTitle = stripLeadingBrandFromText(titleWithoutYear, finalBrand);
+  const modelHints = dedupeNonEmpty([
+    strippedModel,
+    strippedTitle,
+    titleWithoutYear,
+    title,
+  ]);
+  const mappedModel = findBestCatalogOption(
+    modelHints[0] || baseModel,
+    modelOptions,
+    modelHints.slice(1)
+  );
+  return {
+    brand: finalBrand,
+    model: mappedModel || baseModel,
+  };
+};
+
+const normalizeImportedCarCategoryValue = (value: string): string => {
+  const normalizedValue = value.trim();
+  if (!normalizedValue) return "";
+  if (CAR_CATEGORY_OPTIONS.some((option) => option.value === normalizedValue)) {
+    return normalizedValue;
+  }
+
+  const normalized = normalizeLookupText(normalizedValue);
+  if (!normalized) return "";
+  if (normalized.includes("pickup") || normalized.includes("truck")) return "pickup";
+  if (
+    normalized.includes("suv") ||
+    normalized.includes("jeep") ||
+    normalized.includes("sportutility") ||
+    normalized.includes("crossover")
+  ) {
+    return "jeep";
+  }
+  if (normalized.includes("hatch")) return "hatchback";
+  if (normalized.includes("wagon") || normalized.includes("estate")) return "wagon";
+  if (normalized.includes("coupe")) return "coupe";
+  if (
+    normalized.includes("cabrio") ||
+    normalized.includes("convertible") ||
+    normalized.includes("roadster")
+  ) {
+    return "cabriolet";
+  }
+  if (normalized.includes("minivan") || normalized.includes("mpv")) return "minivan";
+  if (normalized.includes("stretch") || normalized.includes("limo")) return "stretch_limo";
+  if (normalized.includes("van")) return "van";
+  if (normalized.includes("sedan") || normalized.includes("saloon")) return "sedan";
+  return "";
+};
+
+const normalizeImportedFuelValue = (value: string): string => {
+  const normalizedValue = value.trim();
+  if (!normalizedValue) return "";
+  if (CAR_FUEL_OPTIONS.some((option) => option.value === normalizedValue)) {
+    return normalizedValue;
+  }
+
+  const normalized = normalizeLookupText(normalizedValue);
+  if (!normalized) return "";
+  if (normalized.includes("electric") || normalized.includes("ev")) return "elektro";
+  if (normalized.includes("hybrid") || normalized.includes("phev")) return "hibrid";
+  if (normalized.includes("diesel") || normalized.includes("dizel")) return "dizel";
+  if (
+    normalized.includes("lpg") ||
+    normalized.includes("cng") ||
+    normalized.includes("gaz") ||
+    normalized.includes("gasbenzin")
+  ) {
+    return "gaz_benzin";
+  }
+  if (
+    normalized.includes("gasoline") ||
+    normalized.includes("flexfuel") ||
+    normalized.includes("petrol") ||
+    normalized.includes("benzin") ||
+    normalized === "gas"
+  ) {
+    return "benzin";
+  }
+  return "";
+};
+
+const normalizeImportedGearboxValue = (value: string): string => {
+  const normalizedValue = value.trim();
+  if (!normalizedValue) return "";
+  if (CAR_GEARBOX_OPTIONS.some((option) => option.value === normalizedValue)) {
+    return normalizedValue;
+  }
+
+  const normalized = normalizeLookupText(normalizedValue);
+  if (!normalized) return "";
+  if (
+    normalized.includes("automatic") ||
+    normalized.includes("avtomat") ||
+    normalized.includes("cvt") ||
+    normalized.includes("dct")
+  ) {
+    return "avtomatik";
+  }
+  if (normalized.includes("manual") || normalized.includes("ruchna") || normalized.includes("stick")) {
+    return "ruchna";
+  }
+  return "";
+};
+
+const normalizeImportedConditionValue = (value: string): string => {
+  const normalizedValue = value.trim();
+  if (!normalizedValue) return "2";
+  if (["0", "1", "2", "3"].includes(normalizedValue)) return normalizedValue;
+
+  const normalized = normalizeLookupText(normalizedValue);
+  if (!normalized) return "2";
+  if (normalized.includes("new")) return "0";
+  if (
+    normalized.includes("forparts") ||
+    normalized.includes("partsonly") ||
+    normalized.includes("scrap")
+  ) {
+    return "3";
+  }
+  if (
+    normalized.includes("used") ||
+    normalized.includes("normalwear") ||
+    normalized.includes("cleantitle")
+  ) {
+    return "1";
+  }
+  return "2";
+};
+
+const IMPORT_COLOR_ALIAS_MAP: Record<string, string> = {
+  white: "Бял",
+  black: "Черен",
+  grey: "Сив",
+  gray: "Сив",
+  silver: "Сребърен",
+  blue: "Син",
+  red: "Червен",
+  green: "Зелен",
+  yellow: "Жълт",
+  orange: "Оранжев",
+  brown: "Кафяв",
+  beige: "Бежов",
+  tan: "Бежов",
+  gold: "Златист",
+  purple: "Виолетов",
+  violet: "Виолетов",
+  burgundy: "Бордо",
+  maroon: "Бордо",
+};
+
+const normalizeImportedColorValue = (value: string): string => {
+  const normalizedValue = value.trim();
+  if (!normalizedValue) return "";
+  const exact = COLOR_OPTIONS.find((option) => option === normalizedValue);
+  if (exact) return exact;
+
+  const normalized = normalizeLookupText(normalizedValue);
+  if (!normalized) return "";
+  const mapped = IMPORT_COLOR_ALIAS_MAP[normalized];
+  if (mapped) return mapped;
+
+  const fallback = Object.entries(IMPORT_COLOR_ALIAS_MAP).find(([token]) =>
+    normalized.includes(token)
+  );
+  return fallback?.[1] || "";
+};
+
+const IMPORT_LOCATION_VALUE_BY_NORMALIZED = BULGARIA_REGIONS.reduce<Record<string, string>>(
+  (acc, region) => {
+    acc[normalizeLookupText(region.value)] = region.value;
+    acc[normalizeLookupText(region.label)] = region.value;
+    return acc;
+  },
+  {}
+);
+
+const normalizeImportedLocationCountryValue = (value: string): string => {
+  const normalizedValue = value.trim();
+  if (!normalizedValue) return "";
+  const normalized = normalizeLookupText(normalizedValue);
+  if (!normalized) return "";
+
+  const match = IMPORT_LOCATION_VALUE_BY_NORMALIZED[normalized];
+  if (match) return match;
+  return "Извън страната";
+};
+
 const getClassifiedForLabel = (topmenu: string): string => {
   const normalized = topmenu.trim();
   if (!normalized) return "";
@@ -1149,6 +1526,132 @@ interface ImageItem {
   isCover: boolean;
 }
 
+interface ExistingImageItem {
+  id?: number;
+  image: string;
+  thumbnail?: string | null;
+  isCover: boolean;
+}
+
+const normalizeExistingImageUrl = (value: unknown): string => String(value ?? "").trim();
+
+const normalizeExistingImageId = (value: unknown): number | undefined => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+};
+
+const normalizeExistingImagesFromPayload = (
+  rawImages: unknown,
+  fallbackCoverUrl = ""
+): ExistingImageItem[] => {
+  const sourceItems = Array.isArray(rawImages) ? rawImages : [];
+
+  const parsedItems = sourceItems
+    .map((item) => {
+      if (typeof item === "string") {
+        const url = normalizeExistingImageUrl(item);
+        if (!url) return null;
+        return {
+          image: url,
+          thumbnail: null,
+          isCover: false,
+          id: undefined,
+        } as ExistingImageItem;
+      }
+
+      if (!item || typeof item !== "object") return null;
+      const record = item as Record<string, unknown>;
+      const image = normalizeExistingImageUrl(
+        record.image ?? record.url ?? record.src ?? record.preview
+      );
+      const thumbnail = normalizeExistingImageUrl(record.thumbnail ?? record.thumb);
+      const rawIsCover = record.is_cover ?? record.isCover;
+      const isCover =
+        rawIsCover === true ||
+        rawIsCover === "true" ||
+        rawIsCover === 1 ||
+        rawIsCover === "1";
+
+      const resolvedImage = image || thumbnail;
+      if (!resolvedImage) return null;
+
+      return {
+        id: normalizeExistingImageId(record.id),
+        image: resolvedImage,
+        thumbnail: thumbnail || null,
+        isCover,
+      } as ExistingImageItem;
+    })
+    .filter((item): item is ExistingImageItem => Boolean(item));
+
+  const normalizedFallbackCover = normalizeExistingImageUrl(fallbackCoverUrl);
+  if (
+    normalizedFallbackCover &&
+    !parsedItems.some((item) => item.image === normalizedFallbackCover)
+  ) {
+    parsedItems.unshift({
+      image: normalizedFallbackCover,
+      thumbnail: null,
+      isCover: true,
+      id: undefined,
+    });
+  }
+
+  const uniqueItems: ExistingImageItem[] = [];
+  const seenUrls = new Set<string>();
+  for (const item of parsedItems) {
+    if (seenUrls.has(item.image)) continue;
+    seenUrls.add(item.image);
+    uniqueItems.push(item);
+  }
+
+  if (uniqueItems.length === 0) return [];
+
+  let coverIndex = uniqueItems.findIndex((item) => item.isCover);
+  if (coverIndex < 0 && normalizedFallbackCover) {
+    coverIndex = uniqueItems.findIndex((item) => item.image === normalizedFallbackCover);
+  }
+  if (coverIndex < 0) coverIndex = 0;
+
+  return uniqueItems.map((item, index) => ({
+    ...item,
+    isCover: index === coverIndex,
+  }));
+};
+
+const normalizeExistingCoverSelection = (
+  items: ExistingImageItem[]
+): ExistingImageItem[] => {
+  let hasCover = false;
+  const normalized = items.map((item) => {
+    if (item.isCover && !hasCover) {
+      hasCover = true;
+      return { ...item, isCover: true };
+    }
+    return { ...item, isCover: false };
+  });
+
+  if (!hasCover && normalized.length > 0) {
+    normalized[0] = { ...normalized[0], isCover: true };
+  }
+
+  return normalized;
+};
+
+const serializeExistingImagesSnapshot = (items: ExistingImageItem[]) =>
+  JSON.stringify(
+    items.map((item, index) => ({
+      id: typeof item.id === "number" ? item.id : null,
+      image: String(item.image || ""),
+      isCover: Boolean(item.isCover),
+      index,
+    }))
+  );
+
 const buildImageFingerprint = (file: File) =>
   [file.name.trim().toLowerCase(), file.size, file.lastModified, file.type].join("::");
 
@@ -1362,7 +1865,10 @@ const PublishPage: React.FC = () => {
   }, [user?.email]);
 
   const initialFormSnapshotRef = useRef<string | null>(null);
+  const initialExistingImagesSnapshotRef = useRef<string | null>(null);
+  const initialExistingImageIdsRef = useRef<number[]>([]);
   const [images, setImages] = useState<ImageItem[]>([]);
+  const [existingListingImages, setExistingListingImages] = useState<ExistingImageItem[]>([]);
   const handleImagesChange = (nextImages: ImageItem[]) => {
     const { uniqueImages, removedCount } = dedupeImageItems(nextImages);
     if (removedCount > 0) {
@@ -1372,7 +1878,27 @@ const PublishPage: React.FC = () => {
         type: "error",
       });
     }
+    if (uniqueImages.some((item) => item.isCover)) {
+      setExistingListingImages((prev) => prev.map((item) => ({ ...item, isCover: false })));
+      setExistingCoverImage(null);
+    }
     setImages(uniqueImages);
+  };
+  const handleExistingImagesChange = (nextImages: ExistingImageItem[]) => {
+    const normalized = normalizeExistingCoverSelection(nextImages);
+    setExistingListingImages(normalized);
+    const nextCoverImage =
+      normalized.find((item) => item.isCover)?.image || normalized[0]?.image || null;
+    setExistingCoverImage(nextCoverImage);
+    if (normalized.some((item) => item.isCover)) {
+      setImages((prev) => prev.map((item) => ({ ...item, isCover: false })));
+    } else {
+      setImages((prev) => {
+        if (prev.length === 0) return prev;
+        if (prev.some((item) => item.isCover)) return prev;
+        return prev.map((item, index) => ({ ...item, isCover: index === 0 }));
+      });
+    }
   };
   const [currentStep, setCurrentStep] = useState(1);
   const formRef = useRef<HTMLFormElement>(null);
@@ -1827,7 +2353,7 @@ const PublishPage: React.FC = () => {
     if (stepKey === "images") {
       const requiredImageCount = getMinimumRequiredImageCount(data.mainCategory);
       if (requiredImageCount <= 0) return [];
-      const uploadedImageCount = images.length + (existingCoverImage ? 1 : 0);
+      const uploadedImageCount = images.length + existingListingImages.length;
       if (uploadedImageCount < requiredImageCount) {
         return [`Поне ${requiredImageCount} снимки`];
       }
@@ -1945,6 +2471,15 @@ const PublishPage: React.FC = () => {
     const rawBrand = toStringOrEmpty(data.brand);
     const rawModel = toStringOrEmpty(data.model);
     const rawTitle = toStringOrEmpty(data.title);
+    const rawDescription = toStringOrEmpty(data.description);
+    const rawSourceTitle = extractOriginalCopartTitleFromDescription(rawDescription);
+    const titleForBrandModelLookup = rawSourceTitle || rawTitle;
+    const usesCatalogBrandModel =
+      requiresBrandAndModel(normalizedMainCategory) &&
+      !CATEGORY_AS_BRAND_MAIN_CATEGORIES.has(normalizedMainCategory);
+    const mappedBrandModel = usesCatalogBrandModel
+      ? mapCatalogBrandModel(normalizedMainCategory, rawBrand, rawModel, titleForBrandModelLookup)
+      : { brand: rawBrand.trim(), model: rawModel.trim() };
     const normalizedFeatures = normalizeCarFeatures(data.features);
     const normalizedBoatFeatures = normalizeCarFeatures(data.boat_features ?? data.boatFeatures);
     const normalizedTrailerFeatures = normalizeCarFeatures(
@@ -1977,11 +2512,41 @@ const PublishPage: React.FC = () => {
         : "7d";
     const normalizedTopPlan: PublishFormData["topPlan"] =
       toStringOrEmpty(data.top_plan ?? data.topPlan).toLowerCase() === "7d" ? "7d" : "1d";
+    const normalizedCategoryValue =
+      normalizedMainCategory === "1"
+        ? normalizeImportedCarCategoryValue(
+            toStringOrEmpty(data.category ?? data.body_style ?? data.bodyStyle ?? data.vehicle_type)
+          )
+        : toStringOrEmpty(data.category);
+    const normalizedFuelValue =
+      normalizedMainCategory === "1"
+        ? normalizeImportedFuelValue(toStringOrEmpty(data.fuel))
+        : toStringOrEmpty(data.fuel);
+    const normalizedGearboxValue =
+      normalizedMainCategory === "1"
+        ? normalizeImportedGearboxValue(toStringOrEmpty(data.gearbox ?? data.transmission))
+        : toStringOrEmpty(data.gearbox);
+    const normalizedColorValue = normalizeImportedColorValue(toStringOrEmpty(data.color));
+    const normalizedConditionValue = normalizeImportedConditionValue(
+      toStringOrEmpty(data.condition || "2")
+    );
+    const normalizedLocationCountryValue = normalizeImportedLocationCountryValue(
+      toStringOrEmpty(data.location_country ?? data.locationCountry ?? data.country)
+    );
+    const hasResolvedBrandModel =
+      Boolean((mappedBrandModel.brand || rawBrand).trim()) &&
+      Boolean((mappedBrandModel.model || rawModel).trim());
+    const isCopartImportedListing =
+      /Imported automatically from Copart\./i.test(rawDescription) ||
+      normalizedFeatures.includes("copart-import");
 
     const nextFormData: PublishFormData = {
       ...createInitialFormData(),
       mainCategory: normalizedMainCategory,
-      category: toStringOrEmpty(data.category),
+      category:
+        normalizedMainCategory === "1"
+          ? normalizedCategoryValue || toStringOrEmpty(data.category)
+          : normalizedCategoryValue,
       title: rawTitle,
       brand:
         normalizedMainCategory === "b"
@@ -1990,24 +2555,28 @@ const PublishPage: React.FC = () => {
             ? normalizedBoatCategoryValue || rawBrand
           : normalizedMainCategory === "6"
             ? normalizedAgriCategoryValue || rawBrand
-          : rawBrand,
-      model: rawModel,
+          : usesCatalogBrandModel
+            ? mappedBrandModel.brand || rawBrand
+            : rawBrand,
+      model: usesCatalogBrandModel ? mappedBrandModel.model || rawModel : rawModel,
       yearFrom: toStringOrEmpty(data.year_from ?? data.yearFrom),
       month: toStringOrEmpty(data.month),
       vin: toStringOrEmpty(data.vin),
-      locationCountry: toStringOrEmpty(data.location_country ?? data.locationCountry),
+      locationCountry:
+        normalizedLocationCountryValue ||
+        toStringOrEmpty(data.location_country ?? data.locationCountry),
       locationRegion: toStringOrEmpty(data.location_region ?? data.locationRegion),
       price: toStringOrEmpty(data.price),
       city: toStringOrEmpty(data.city),
-      fuel: toStringOrEmpty(data.fuel),
-      gearbox: toStringOrEmpty(data.gearbox),
+      fuel: normalizedFuelValue || toStringOrEmpty(data.fuel),
+      gearbox: normalizedGearboxValue || toStringOrEmpty(data.gearbox),
       mileage: toStringOrEmpty(data.mileage),
-      color: toStringOrEmpty(data.color),
-      condition: toStringOrEmpty(data.condition || "0"),
+      color: normalizedColorValue || toStringOrEmpty(data.color),
+      condition: normalizedConditionValue,
       power: toStringOrEmpty(data.power),
       displacement: toStringOrEmpty(data.displacement),
       euroStandard: normalizeCarEuroStandard(toStringOrEmpty(data.euro_standard ?? data.euroStandard)),
-      description: toStringOrEmpty(data.description),
+      description: rawDescription,
       phone: toStringOrEmpty(data.phone),
       email: user?.email || toStringOrEmpty(data.email),
       pictures: [],
@@ -2093,13 +2662,37 @@ const PublishPage: React.FC = () => {
       buyServiceCategory: toStringOrEmpty(data.buy_service_category ?? data.buyServiceCategory),
     };
     const baseGeneratedTitle = buildListingTitle({ ...nextFormData, title: "" }, defaultClassifiedTopmenu);
-    nextFormData.title = normalizeTitleSuffix(rawTitle, baseGeneratedTitle);
+    const shouldClearShortTitleForCopartImport =
+      isCopartImportedListing &&
+      normalizedMainCategory === "1" &&
+      usesCatalogBrandModel &&
+      hasResolvedBrandModel;
+    nextFormData.title = shouldClearShortTitleForCopartImport
+      ? ""
+      : normalizeTitleSuffix(rawTitle, baseGeneratedTitle);
 
     setFormData(nextFormData);
     initialFormSnapshotRef.current = normalizeFormSnapshot(nextFormData);
 
     setImages([]);
-    setExistingCoverImage(data.image_url || data.coverImage || null);
+    const normalizedExistingImages = normalizeExistingCoverSelection(
+      normalizeExistingImagesFromPayload(
+        data.images,
+        toStringOrEmpty(data.image_url ?? data.coverImage)
+      )
+    );
+    setExistingListingImages(normalizedExistingImages);
+    initialExistingImagesSnapshotRef.current =
+      serializeExistingImagesSnapshot(normalizedExistingImages);
+    initialExistingImageIdsRef.current = normalizedExistingImages
+      .map((item) => (typeof item.id === "number" ? item.id : null))
+      .filter((item): item is number => item !== null);
+    const coverImage =
+      normalizedExistingImages.find((image) => image.isCover)?.image ||
+      normalizedExistingImages[0]?.image ||
+      toStringOrEmpty(data.image_url ?? data.coverImage) ||
+      null;
+    setExistingCoverImage(coverImage);
     setCurrentStep(1);
     setErrors({});
   };
@@ -2124,7 +2717,7 @@ const PublishPage: React.FC = () => {
     });
 
     const requiredImageCount = getMinimumRequiredImageCount(formData.mainCategory);
-    const uploadedImageCount = images.length + (existingCoverImage ? 1 : 0);
+    const uploadedImageCount = images.length + existingListingImages.length;
     const hasRequiredImages =
       requiredImageCount <= 0 || uploadedImageCount >= requiredImageCount;
     const imageRequirementWeight = requiredImageCount > 0 ? 1 : 0;
@@ -2144,10 +2737,19 @@ const PublishPage: React.FC = () => {
   const completionStats = calculateCompletionStats();
   const completionPercentage = completionStats.percentage;
   const currentFormSnapshot = normalizeFormSnapshot(formData);
+  const currentExistingImagesSnapshot = serializeExistingImagesSnapshot(existingListingImages);
+  const hasExistingImagesChanges =
+    isEditMode &&
+    initialExistingImagesSnapshotRef.current !== null &&
+    currentExistingImagesSnapshot !== initialExistingImagesSnapshotRef.current;
   const isDirty =
     isEditMode &&
     !!initialFormSnapshotRef.current &&
-    (currentFormSnapshot !== initialFormSnapshotRef.current || images.length > 0);
+    (
+      currentFormSnapshot !== initialFormSnapshotRef.current ||
+      images.length > 0 ||
+      hasExistingImagesChanges
+    );
   const priceSummary = {
     price: requiresPrice(formData.mainCategory)
       ? formData.price
@@ -2163,7 +2765,11 @@ const PublishPage: React.FC = () => {
           : "не е избран",
   };
   const coverPreview =
-    images.find((img) => img.isCover)?.preview || existingCoverImage || undefined;
+    images.find((img) => img.isCover)?.preview ||
+    existingListingImages.find((image) => image.isCover)?.image ||
+    existingCoverImage ||
+    existingListingImages[0]?.image ||
+    undefined;
   const previewTitle = buildListingTitle(formData, defaultClassifiedTopmenu);
   const previewYear =
     formData.mainCategory === "u" ? formData.partYearFrom : formData.yearFrom;
@@ -2184,7 +2790,7 @@ const PublishPage: React.FC = () => {
       : isHeavyMainCategory(formData.mainCategory)
         ? mapTransmissionToGearboxValue(formData.transmission)
         : "";
-  const previewImageCount = images.length + (existingCoverImage ? 1 : 0);
+  const previewImageCount = images.length + existingListingImages.length;
   const minimumRequiredImageCount = getMinimumRequiredImageCount(formData.mainCategory);
   const hasValidPriceSignal = requiresPrice(formData.mainCategory)
     ? hasPositiveNumber(formData.price)
@@ -2198,8 +2804,11 @@ const PublishPage: React.FC = () => {
     if (!editIdParam) {
       setIsEditMode(false);
       setEditingListingId(null);
+      setExistingListingImages([]);
       setExistingCoverImage(null);
       initialFormSnapshotRef.current = null;
+      initialExistingImagesSnapshotRef.current = null;
+      initialExistingImageIdsRef.current = [];
       return;
     }
 
@@ -2212,14 +2821,21 @@ const PublishPage: React.FC = () => {
       setErrors({ submit: "Невалиден идентификатор на обявата." });
       setIsEditMode(false);
       setEditingListingId(null);
+      setExistingListingImages([]);
       setExistingCoverImage(null);
       initialFormSnapshotRef.current = null;
+      initialExistingImagesSnapshotRef.current = null;
+      initialExistingImageIdsRef.current = [];
       return;
     }
 
     setIsEditMode(true);
     setEditingListingId(editId);
+    setExistingListingImages([]);
+    setExistingCoverImage(null);
     initialFormSnapshotRef.current = null;
+    initialExistingImagesSnapshotRef.current = null;
+    initialExistingImageIdsRef.current = [];
     const stateListing = (location.state as { listing?: any } | null)?.listing;
     const fallbackListing =
       stateListing && String(stateListing.id) === String(editId) ? stateListing : null;
@@ -2273,6 +2889,117 @@ const PublishPage: React.FC = () => {
 
     fetchListing();
   }, [searchParams, authLoading, isAuthenticated, navigate, location.state]);
+
+  const syncEditedListingImages = async (listingId: number, token: string) => {
+    const listingResponse = await fetch(`http://localhost:8000/api/listings/${listingId}/`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    });
+    const listingRaw = await listingResponse.text();
+    let listingData: any = null;
+    if (listingRaw) {
+      try {
+        listingData = JSON.parse(listingRaw);
+      } catch {
+        listingData = null;
+      }
+    }
+    if (!listingResponse.ok || !listingData) {
+      const responseError =
+        listingData?.error || listingData?.detail || "Неуспешно синхронизиране на снимките.";
+      throw new Error(String(responseError));
+    }
+
+    const normalizedServerImages = normalizeExistingCoverSelection(
+      normalizeExistingImagesFromPayload(
+        listingData.images,
+        toStringOrEmpty(listingData.image_url ?? listingData.coverImage)
+      )
+    ).filter((item): item is ExistingImageItem & { id: number } => typeof item.id === "number");
+
+    const canReconcileExistingImages =
+      initialExistingImageIdsRef.current.length > 0 ||
+      existingListingImages.some((item) => typeof item.id === "number");
+    if (!canReconcileExistingImages) {
+      return;
+    }
+
+    const initialExistingIds = new Set<number>(
+      initialExistingImageIdsRef.current.length > 0
+        ? initialExistingImageIdsRef.current
+        : normalizedServerImages.map((item) => item.id)
+    );
+
+    const keptExistingIds = existingListingImages
+      .map((item) => (typeof item.id === "number" ? item.id : null))
+      .filter(
+        (id): id is number =>
+          id !== null && normalizedServerImages.some((serverItem) => serverItem.id === id)
+      );
+
+    const newServerImages = normalizedServerImages.filter((item) => !initialExistingIds.has(item.id));
+    const mappedNewImageIds = newServerImages
+      .slice(0, images.length)
+      .map((item) => item.id);
+
+    const orderedImageIds = [...keptExistingIds, ...mappedNewImageIds].filter(
+      (id, index, self) => self.indexOf(id) === index
+    );
+
+    const existingCoverId = existingListingImages.find(
+      (item) =>
+        item.isCover &&
+        typeof item.id === "number" &&
+        orderedImageIds.includes(item.id)
+    )?.id;
+    let newCoverId: number | undefined;
+    if (!existingCoverId) {
+      const newCoverIndex = images.findIndex((item) => item.isCover);
+      if (newCoverIndex >= 0) {
+        newCoverId = mappedNewImageIds[newCoverIndex];
+      }
+    }
+    const coverId = existingCoverId ?? newCoverId ?? orderedImageIds[0] ?? null;
+
+    const updatePayload = {
+      images: orderedImageIds.map((id, index) => ({
+        id,
+        order: index,
+        is_cover: coverId !== null && id === coverId,
+      })),
+      prune_missing: true,
+    };
+
+    const updateResponse = await fetch(
+      `http://localhost:8000/api/listings/${listingId}/update-images/`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatePayload),
+      }
+    );
+
+    const updateRaw = await updateResponse.text();
+    let updateData: any = null;
+    if (updateRaw) {
+      try {
+        updateData = JSON.parse(updateRaw);
+      } catch {
+        updateData = null;
+      }
+    }
+    if (!updateResponse.ok) {
+      const responseError =
+        updateData?.error || updateData?.detail || "Неуспешно записване на снимките.";
+      throw new Error(String(responseError));
+    }
+  };
 
   const submitListing = async () => {
     setErrors({});
@@ -2381,6 +3108,7 @@ const PublishPage: React.FC = () => {
       appendIfValue("phone", formData.phone);
       appendIfValue("email", normalizedEmail);
       appendIfValue("listing_type", formData.listingType);
+      formDataToSend.append("is_draft", "false");
       if (formData.listingType === "top") {
         appendIfValue("top_plan", formData.topPlan);
       }
@@ -2622,24 +3350,16 @@ const PublishPage: React.FC = () => {
         }
       }
 
-      if (isEditMode && editingListingId && images.length > 0) {
-        const imagesData = new FormData();
-        images.forEach((img) => {
-          imagesData.append("images", img.file);
-        });
-        await fetch(`http://localhost:8000/api/listings/${editingListingId}/upload-images/`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-          body: imagesData,
-        });
+      if (isEditMode && editingListingId) {
+        await syncEditedListingImages(editingListingId, token);
       }
 
       invalidateMyAdsCache(user?.id);
       invalidateLatestListingsCache();
       setRedirectingAfterPublish(true);
+      if (isEditMode) {
+        await new Promise((resolve) => setTimeout(resolve, EDIT_REDIRECT_LOADING_DELAY_MS));
+      }
       navigate("/my-ads", {
         replace: true,
         state: {
@@ -3569,6 +4289,8 @@ const PublishPage: React.FC = () => {
               <AdvancedImageUpload
                 images={images}
                 onImagesChange={handleImagesChange}
+                existingImages={existingListingImages}
+                onExistingImagesChange={handleExistingImagesChange}
                 maxImages={15}
               />
             </div>

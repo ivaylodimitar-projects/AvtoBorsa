@@ -1,3 +1,9 @@
+import re
+import urllib.error
+import urllib.parse
+import urllib.request
+from decimal import Decimal, InvalidOperation
+
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -7,6 +13,9 @@ from django.contrib.auth.models import User
 from django.conf import settings
 from django.core.mail import send_mail
 from django.core.cache import cache
+from django.core.files.base import ContentFile
+from django.db import IntegrityError
+from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.contrib.auth.tokens import default_token_generator
@@ -18,7 +27,7 @@ from .serializers import (
     PrivateUserSerializer, BusinessUserSerializer, UserProfileSerializer,
     UserBalanceSerializer, DealerListSerializer, DealerDetailSerializer
 )
-from .models import PrivateUser, BusinessUser, UserProfile
+from .models import PrivateUser, BusinessUser, UserProfile, UserImportApiKey
 
 
 def _refresh_cookie_max_age_seconds() -> int:
@@ -63,6 +72,546 @@ def send_verification_email(user: User) -> None:
         [user.email],
         fail_silently=False,
     )
+
+
+def _extract_import_api_key(request) -> str:
+    auth_header = str(request.headers.get('Authorization') or '').strip()
+    if auth_header.lower().startswith('apikey '):
+        return auth_header[7:].strip()
+
+    fallback = request.headers.get('X-Karbg-Api-Key') or request.headers.get('X-Api-Key')
+    return str(fallback or '').strip()
+
+
+def _safe_int(value, default=0):
+    if value is None:
+        return default
+    text = str(value).strip()
+    if not text:
+        return default
+    digits = re.sub(r'[^0-9-]', '', text)
+    if not digits or digits in {'-', '--'}:
+        return default
+    try:
+        return int(digits)
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_decimal(value, default=Decimal('0')):
+    if value is None:
+        return default
+    text = str(value).replace(' ', '').replace(',', '').strip()
+    if not text:
+        return default
+    cleaned = re.sub(r'[^0-9.\-]', '', text)
+    if not cleaned:
+        return default
+    try:
+        parsed = Decimal(cleaned)
+    except (InvalidOperation, TypeError, ValueError):
+        return default
+    return parsed if parsed >= 0 else default
+
+
+def _safe_str(value, max_length=255):
+    text = str(value or '').strip()
+    if not text:
+        return ''
+    return text[:max_length]
+
+
+def _normalize_copart_category(value):
+    key = str(value or '').strip().lower()
+    if not key:
+        return 'sedan'
+
+    normalized = re.sub(r'[^a-z0-9]+', ' ', key).strip()
+
+    if any(token in normalized for token in ('pickup', 'pick up', 'truck')):
+        return 'pickup'
+    if any(token in normalized for token in ('suv', 'sport utility', 'jeep', 'crossover')):
+        return 'jeep'
+    if any(token in normalized for token in ('hatchback', 'hatch')):
+        return 'hatchback'
+    if any(token in normalized for token in ('wagon', 'estate')):
+        return 'wagon'
+    if any(token in normalized for token in ('coupe', 'kup')):
+        return 'coupe'
+    if any(token in normalized for token in ('cabriolet', 'convertible', 'roadster', 'cabrio')):
+        return 'cabriolet'
+    if any(token in normalized for token in ('minivan', 'mini van', 'mpv')):
+        return 'minivan'
+    if any(token in normalized for token in ('stretch', 'limo', 'limousine')):
+        return 'stretch_limo'
+    if 'van' in normalized:
+        return 'van'
+    if any(token in normalized for token in ('sedan', 'saloon')):
+        return 'sedan'
+    return 'sedan'
+
+
+def _normalize_copart_fuel(value):
+    key = str(value or '').strip().lower()
+    if not key:
+        return 'benzin'
+
+    normalized = re.sub(r'[^a-z0-9]+', ' ', key).strip()
+    if any(token in normalized for token in ('electric', 'ev', 'bev')):
+        return 'elektro'
+    if any(token in normalized for token in ('plug in', 'phev', 'hybrid', 'hibrid')):
+        return 'hibrid'
+    if any(token in normalized for token in ('diesel', 'dizel')):
+        return 'dizel'
+    if any(token in normalized for token in ('lpg', 'cng', 'газ', 'gas benzin', 'gasoline lpg', 'газ бензин')):
+        return 'gaz_benzin'
+    if any(token in normalized for token in ('gasoline', 'gas', 'petrol', 'benzin')):
+        return 'benzin'
+    return 'benzin'
+
+
+def _normalize_copart_gearbox(value):
+    key = str(value or '').strip().lower()
+    if not key:
+        return 'avtomatik'
+
+    normalized = re.sub(r'[^a-z0-9]+', ' ', key).strip()
+    if any(token in normalized for token in ('manual', 'stick', 'mt', 'ruchna')):
+        return 'ruchna'
+    if any(token in normalized for token in ('automatic', 'auto', 'cvt', 'dct', 'semi', 'avtomatik')):
+        return 'avtomatik'
+    return 'avtomatik'
+
+
+def _normalize_copart_condition(value):
+    key = str(value or '').strip().lower()
+    if not key:
+        return '2'
+
+    if key in {'0', '1', '2', '3'}:
+        return key
+
+    normalized = re.sub(r'[^a-z0-9]+', ' ', key).strip()
+    if any(token in normalized for token in ('new', 'unused', 'brand new')):
+        return '0'
+    if any(
+        token in normalized
+        for token in (
+            'for parts',
+            'parts only',
+            'donor',
+            'scrap',
+            'junk',
+        )
+    ):
+        return '3'
+    if any(
+        token in normalized
+        for token in (
+            'used',
+            'normal wear',
+            'clean title',
+            'minor dent',
+            'minor scratch',
+        )
+    ):
+        return '1'
+    if any(
+        token in normalized
+        for token in (
+            'damag',
+            'salvage',
+            'collision',
+            'flood',
+            'burn',
+            'fire',
+            'hail',
+            'water',
+            'stripped',
+            'biohazard',
+            'vandal',
+        )
+    ):
+        return '2'
+    return '2'
+
+
+def _parse_copart_displacement_cc(*values):
+    for value in values:
+        text = str(value or '').strip()
+        if not text:
+            continue
+
+        cc_match = re.search(r'(\d{3,5})\s*(?:cc|cm3|cm\^?3|куб\.?\s*см)', text, flags=re.IGNORECASE)
+        if cc_match:
+            parsed = _safe_int(cc_match.group(1), default=0)
+            if parsed > 0:
+                return parsed
+
+        liter_match = re.search(r'(\d(?:\.\d)?)\s*(?:l|liter|litre|литра?)\b', text, flags=re.IGNORECASE)
+        if liter_match:
+            try:
+                liters = Decimal(liter_match.group(1))
+            except (InvalidOperation, ValueError):
+                liters = None
+            if liters and liters > 0:
+                cc_value = int((liters * Decimal('1000')).to_integral_value())
+                if cc_value > 0:
+                    return cc_value
+
+    return 0
+
+
+def _parse_copart_power_hp(*values):
+    for value in values:
+        text = str(value or '').strip()
+        if not text:
+            continue
+        hp_match = re.search(r'(\d{2,4})\s*(?:hp|bhp|ps|к\.?\s*с\.?)\b', text, flags=re.IGNORECASE)
+        if hp_match:
+            parsed = _safe_int(hp_match.group(1), default=0)
+            if parsed > 0:
+                return parsed
+    return 0
+
+
+COPART_ALLOWED_IMAGE_HOST_TOKENS = (
+    'copart.',
+    '.copart',
+    'copartimages',
+)
+IMPORT_MAX_IMAGES = 12
+IMPORT_MAX_IMAGE_BYTES = 12 * 1024 * 1024
+IMAGE_CONTENT_TYPE_EXTENSIONS = {
+    'image/jpeg': 'jpg',
+    'image/jpg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/gif': 'gif',
+    'image/bmp': 'bmp',
+    'image/avif': 'avif',
+}
+ALLOWED_IMAGE_EXTENSIONS = set(IMAGE_CONTENT_TYPE_EXTENSIONS.values())
+
+
+def _to_string_list(raw_value):
+    if raw_value is None:
+        return []
+    if isinstance(raw_value, (list, tuple, set)):
+        return [str(item).strip() for item in raw_value if str(item).strip()]
+    value = str(raw_value).strip()
+    if not value:
+        return []
+    if value.startswith('[') and value.endswith(']'):
+        value = value[1:-1]
+    separators = ['\n', ',']
+    parts = [value]
+    for separator in separators:
+        next_parts = []
+        for part in parts:
+            if separator in part:
+                next_parts.extend(part.split(separator))
+            else:
+                next_parts.append(part)
+        parts = next_parts
+    return [part.strip().strip('"').strip("'") for part in parts if part.strip()]
+
+
+def _normalize_remote_image_url(raw_url, base_url=''):
+    candidate = str(raw_url or '').strip()
+    if not candidate or candidate.lower().startswith('data:'):
+        return ''
+
+    resolved = urllib.parse.urljoin(base_url, candidate) if base_url else candidate
+    parsed = urllib.parse.urlparse(resolved)
+    if parsed.scheme not in {'http', 'https'}:
+        return ''
+    if not parsed.netloc:
+        return ''
+
+    normalized_host = parsed.netloc.lower()
+    if not any(token in normalized_host for token in COPART_ALLOWED_IMAGE_HOST_TOKENS):
+        return ''
+
+    return parsed.geturl()
+
+
+def _extract_import_image_urls(payload):
+    base_url = _safe_str(payload.get('source_url') or payload.get('url'), 1000)
+    raw_urls = (
+        payload.get('image_urls')
+        or payload.get('imageUrls')
+        or payload.get('images')
+        or []
+    )
+    items = _to_string_list(raw_urls)
+    unique_urls = []
+    seen = set()
+    for item in items:
+        normalized = _normalize_remote_image_url(item, base_url=base_url)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        unique_urls.append(normalized)
+    return unique_urls
+
+
+def _detect_image_extension(url, content_type=''):
+    normalized_content_type = str(content_type or '').split(';')[0].strip().lower()
+    if normalized_content_type in IMAGE_CONTENT_TYPE_EXTENSIONS:
+        return IMAGE_CONTENT_TYPE_EXTENSIONS[normalized_content_type]
+
+    path = urllib.parse.urlparse(url).path
+    suffix = path.rsplit('.', 1)[-1].lower() if '.' in path else ''
+    if suffix in ALLOWED_IMAGE_EXTENSIONS:
+        return suffix
+    return 'jpg'
+
+
+def _download_remote_image_bytes(url, referer=''):
+    request_headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) KarBgCopartImporter/1.0',
+    }
+    if referer:
+        request_headers['Referer'] = referer
+
+    request = urllib.request.Request(
+        url,
+        headers=request_headers,
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=18) as response:
+            content_type = response.headers.get('Content-Type', '')
+            if content_type and not str(content_type).lower().startswith('image/'):
+                return None, None
+
+            data = response.read(IMPORT_MAX_IMAGE_BYTES + 1)
+            if not data or len(data) > IMPORT_MAX_IMAGE_BYTES:
+                return None, None
+            return data, content_type
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError, OSError):
+        return None, None
+
+
+def _attach_copart_images_to_listing(listing, payload):
+    from backend.listings.models import CarImage
+
+    image_urls = _extract_import_image_urls(payload)
+    source_url = _safe_str(payload.get('source_url') or payload.get('url'), 1000)
+    uploaded_count = 0
+    for image_url in image_urls[:IMPORT_MAX_IMAGES]:
+        image_bytes, content_type = _download_remote_image_bytes(image_url, referer=source_url)
+        if not image_bytes:
+            continue
+
+        extension = _detect_image_extension(image_url, content_type=content_type)
+        file_name = f"copart_{listing.id}_{uploaded_count + 1}.{extension}"
+        content_file = ContentFile(image_bytes, name=file_name)
+
+        try:
+            CarImage.objects.create(
+                listing=listing,
+                image=content_file,
+                order=uploaded_count,
+                is_cover=(uploaded_count == 0),
+            )
+            uploaded_count += 1
+        except Exception:
+            continue
+
+    return uploaded_count
+
+
+def _build_copart_draft_payload(payload, user):
+    source_url = _safe_str(payload.get('source_url') or payload.get('url'), 1000)
+    lot_number = _safe_str(payload.get('lot_number') or payload.get('lotNumber'), 60)
+    source_title = _safe_str(
+        payload.get('source_title') or payload.get('copart_title') or payload.get('title'),
+        200,
+    )
+    brand = _safe_str(payload.get('brand'), 100)
+    model = _safe_str(payload.get('model'), 100)
+    year_from = _safe_int(payload.get('year_from') or payload.get('year'), default=timezone.now().year)
+    year_from = year_from if 1900 <= year_from <= 2100 else timezone.now().year
+    price = _safe_decimal(
+        payload.get('price')
+        or payload.get('current_bid')
+        or payload.get('currentBid')
+        or payload.get('buy_now')
+        or payload.get('buyNow'),
+        default=Decimal('0'),
+    )
+    mileage = _safe_int(payload.get('mileage') or payload.get('odometer'), default=0)
+    mileage = mileage if mileage >= 0 else 0
+    vin = _safe_str(payload.get('vin'), 17)
+
+    engine_text = _safe_str(
+        payload.get('engine') or payload.get('engine_spec') or payload.get('engineSpec'),
+        160,
+    )
+    cylinders = _safe_str(payload.get('cylinders'), 40)
+    drive = _safe_str(payload.get('drive') or payload.get('driveline') or payload.get('drive_line'), 80)
+    primary_damage = _safe_str(
+        payload.get('primary_damage') or payload.get('primaryDamage'),
+        120,
+    )
+    secondary_damage = _safe_str(
+        payload.get('secondary_damage') or payload.get('secondaryDamage'),
+        120,
+    )
+    title_type = _safe_str(payload.get('title_type') or payload.get('titleType'), 120)
+    vehicle_type = _safe_str(payload.get('vehicle_type') or payload.get('vehicleType'), 120)
+    keys_info = _safe_str(payload.get('keys'), 60)
+    run_and_drives = _safe_str(payload.get('run_and_drives') or payload.get('runAndDrives'), 80)
+    odometer_text = _safe_str(payload.get('odometer_text') or payload.get('odometerText'), 80)
+    odometer_status = _safe_str(payload.get('odometer_status') or payload.get('odometerStatus'), 80)
+    seller = _safe_str(payload.get('seller') or payload.get('seller_name'), 160)
+    sale_date = _safe_str(payload.get('sale_date') or payload.get('saleDate'), 120)
+    sale_name = _safe_str(payload.get('sale_name') or payload.get('saleName'), 160)
+    lot_status = _safe_str(payload.get('lot_status') or payload.get('lotStatus'), 120)
+    highlights = _safe_str(payload.get('highlights'), 220)
+
+    power = _safe_int(payload.get('power') or payload.get('horsepower'), default=0)
+    if power <= 0:
+        power = _parse_copart_power_hp(payload.get('horsepower'), engine_text, source_title)
+
+    displacement = _parse_copart_displacement_cc(
+        payload.get('displacement'),
+        payload.get('displacement_cc'),
+        payload.get('displacementCc'),
+        engine_text,
+        source_title,
+    )
+    if displacement <= 0:
+        displacement = _safe_int(payload.get('displacement') or payload.get('displacement_cc'), default=0)
+
+    est_retail_value = _safe_decimal(
+        payload.get('est_retail_value')
+        or payload.get('estRetailValue')
+        or payload.get('retail_value'),
+        default=Decimal('0'),
+    )
+    repair_cost = _safe_decimal(
+        payload.get('repair_cost')
+        or payload.get('repairCost')
+        or payload.get('estimated_repair_cost'),
+        default=Decimal('0'),
+    )
+
+    if not brand or not model:
+        title_parts = [part for part in re.split(r'\s+', source_title) if part]
+        if title_parts and len(title_parts[0]) == 4 and title_parts[0].isdigit():
+            guessed_year = _safe_int(title_parts[0], default=year_from)
+            if 1900 <= guessed_year <= 2100:
+                year_from = guessed_year
+            title_parts = title_parts[1:]
+        if not brand and title_parts:
+            brand = title_parts[0][:100]
+            title_parts = title_parts[1:]
+        if not model and title_parts:
+            model = title_parts[0][:100]
+
+    if not brand:
+        brand = 'Unknown'
+    if not model:
+        model = 'Model'
+
+    title = _safe_str(payload.get('clean_title') or payload.get('listing_title'), 200)
+    if not title:
+        title = f"{year_from} {brand} {model}".strip()
+    title = title[:200] if title else "Imported from Copart"
+
+    business_phone = getattr(getattr(user, 'business_profile', None), 'phone', '')
+    phone = _safe_str(payload.get('phone') or business_phone, 20) or '0000000000'
+    email = _safe_str(user.email, 254) or f"user{user.id}@kar.bg"
+
+    country = _safe_str(payload.get('location_country') or payload.get('locationCountry'), 100)
+    if not country:
+        raw_country = _safe_str(payload.get('country') or 'Canada', 100)
+        lowered_raw_country = raw_country.lower()
+        if raw_country and lowered_raw_country not in {'bulgaria', 'българия'}:
+            country = 'Извън страната'
+        else:
+            country = raw_country
+    if not country:
+        country = 'Извън страната'
+
+    region = _safe_str(payload.get('region') or payload.get('province') or payload.get('state'), 100)
+    city = _safe_str(payload.get('city'), 100) or 'Unknown'
+
+    if city == 'Unknown' and region:
+        city = region
+
+    def append_if_value(label, raw_value, max_length=180):
+        text = _safe_str(raw_value, max_length)
+        if text:
+            description_lines.append(f"{label}: {text}")
+
+    description_lines = [
+        "Imported automatically from Copart.",
+    ]
+    if source_url:
+        description_lines.append(f"Source URL: {source_url}")
+    if source_title and source_title.lower() != title.lower():
+        description_lines.append(f"Original Copart title: {source_title}")
+    append_if_value("Lot number", lot_number, max_length=80)
+    append_if_value("VIN", vin, max_length=17)
+    append_if_value("Odometer", odometer_text)
+    append_if_value("Odometer status", odometer_status)
+    append_if_value("Primary damage", primary_damage)
+    append_if_value("Secondary damage", secondary_damage)
+    append_if_value("Title type", title_type)
+    append_if_value("Vehicle type", vehicle_type)
+    append_if_value("Drive line", drive)
+    append_if_value("Engine", engine_text)
+    append_if_value("Cylinders", cylinders, max_length=40)
+    append_if_value("Keys", keys_info, max_length=60)
+    append_if_value("Run and drives", run_and_drives, max_length=80)
+    append_if_value("Lot status", lot_status, max_length=120)
+    append_if_value("Seller", seller, max_length=160)
+    append_if_value("Sale date", sale_date, max_length=120)
+    append_if_value("Sale name", sale_name, max_length=160)
+    append_if_value("Highlights", highlights, max_length=220)
+    if est_retail_value > 0:
+        description_lines.append(f"Estimated retail value: {est_retail_value}")
+    if repair_cost > 0:
+        description_lines.append(f"Estimated repair cost: {repair_cost}")
+
+    return {
+        'main_category': '1',
+        'category': _normalize_copart_category(
+            payload.get('category')
+            or payload.get('body_style')
+            or payload.get('bodyStyle')
+            or vehicle_type
+        ),
+        'title': title,
+        'brand': brand,
+        'model': model,
+        'year_from': year_from,
+        'vin': vin,
+        'price': price,
+        'location_country': country,
+        'location_region': region,
+        'city': city,
+        'fuel': _normalize_copart_fuel(payload.get('fuel') or payload.get('engine_type') or engine_text),
+        'gearbox': _normalize_copart_gearbox(payload.get('gearbox') or payload.get('transmission')),
+        'mileage': mileage,
+        'color': _safe_str(payload.get('color') or payload.get('exterior_color'), 50),
+        'condition': _normalize_copart_condition(
+            payload.get('condition') or primary_damage or secondary_damage or title_type
+        ),
+        'power': power if power > 0 else None,
+        'displacement': displacement if displacement > 0 else None,
+        'description': "\n".join(description_lines),
+        'phone': phone,
+        'email': email,
+        'features': ['copart-import'],
+        'is_draft': True,
+        'is_active': True,
+        'is_archived': False,
+        'listing_type': 'normal',
+    }
 
 
 @api_view(['POST'])
@@ -454,6 +1003,121 @@ def delete_account(request):
 
     request.user.delete()
     return Response({'message': 'Акаунтът е изтрит.'}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_import_api_key_status(request):
+    """Get metadata for the current user's import API key."""
+    api_key = UserImportApiKey.objects.filter(user=request.user).first()
+    if not api_key:
+        return Response({'has_key': False}, status=status.HTTP_200_OK)
+
+    masked_suffix = '...' if api_key.key_prefix else ''
+    return Response(
+        {
+            'has_key': True,
+            'key_prefix': api_key.key_prefix,
+            'masked_key': f"{api_key.key_prefix}{masked_suffix}" if api_key.key_prefix else None,
+            'created_at': api_key.created_at,
+            'last_used_at': api_key.last_used_at,
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def generate_import_api_key(request):
+    """Generate or rotate import API key for the current user."""
+    max_attempts = 8
+    for _ in range(max_attempts):
+        raw_key = UserImportApiKey.generate_raw_key()
+        try:
+            api_key, _ = UserImportApiKey.objects.get_or_create(
+                user=request.user,
+                defaults={
+                    'key_hash': UserImportApiKey.hash_key(raw_key),
+                    'key_prefix': raw_key[:12],
+                },
+            )
+            api_key.set_raw_key(raw_key)
+            api_key.last_used_at = None
+            api_key.save()
+            return Response(
+                {
+                    'api_key': raw_key,
+                    'key_prefix': api_key.key_prefix,
+                    'created_at': api_key.created_at,
+                    'last_used_at': api_key.last_used_at,
+                },
+                status=status.HTTP_200_OK,
+            )
+        except IntegrityError:
+            continue
+
+    return Response(
+        {'error': 'Could not generate API key. Please try again.'},
+        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    )
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def revoke_import_api_key(request):
+    """Delete the current user's import API key."""
+    deleted_count, _ = UserImportApiKey.objects.filter(user=request.user).delete()
+    return Response({'deleted': bool(deleted_count)}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def import_copart_listing(request):
+    """Import Copart listing into draft ad by using an API key."""
+    raw_key = _extract_import_api_key(request)
+    if not raw_key:
+        return Response(
+            {'error': 'API key is missing.'},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    api_key = UserImportApiKey.objects.select_related('user').filter(
+        key_hash=UserImportApiKey.hash_key(raw_key)
+    ).first()
+    if not api_key or not api_key.user.is_active:
+        return Response(
+            {'error': 'API key is invalid.'},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    from backend.listings.models import CarListing
+
+    draft_payload = _build_copart_draft_payload(request.data, api_key.user)
+    try:
+        listing = CarListing.objects.create(
+            user=api_key.user,
+            **draft_payload,
+        )
+    except Exception as exc:
+        return Response(
+            {'error': 'Could not import listing.', 'details': str(exc)},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    uploaded_images = _attach_copart_images_to_listing(listing, request.data)
+    api_key.mark_used()
+
+    return Response(
+        {
+            'id': listing.id,
+            'slug': listing.slug,
+            'title': listing.title,
+            'is_draft': listing.is_draft,
+            'images_uploaded': uploaded_images,
+            'message': 'Listing imported as draft.',
+        },
+        status=status.HTTP_201_CREATED,
+    )
 
 
 @api_view(['POST'])

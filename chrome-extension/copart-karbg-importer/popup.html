@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="bg">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kar.bg Copart Importer</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Segoe UI", Tahoma, sans-serif;
+      }
+
+      body {
+        margin: 0;
+        width: 360px;
+        background: #f8fafc;
+        color: #0f172a;
+      }
+
+      .wrap {
+        padding: 14px;
+      }
+
+      .title {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 800;
+      }
+
+      .desc {
+        margin: 6px 0 0;
+        color: #475569;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .field {
+        margin-top: 12px;
+      }
+
+      .label {
+        font-size: 11px;
+        font-weight: 800;
+        color: #475569;
+        margin-bottom: 6px;
+        display: block;
+      }
+
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        padding: 9px 10px;
+        font-size: 12px;
+        outline: none;
+        background: #ffffff;
+      }
+
+      input:focus {
+        border-color: #0f766e;
+        box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
+      }
+
+      .actions {
+        margin-top: 12px;
+        display: flex;
+        gap: 8px;
+      }
+
+      button {
+        flex: 1;
+        border: none;
+        background: #0f766e;
+        color: #ffffff;
+        border-radius: 10px;
+        padding: 9px 10px;
+        font-weight: 700;
+        font-size: 12px;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: #0c615a;
+      }
+
+      .status {
+        margin-top: 10px;
+        min-height: 18px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .status.error {
+        color: #b91c1c;
+      }
+
+      .status.success {
+        color: #0f766e;
+      }
+
+      .hint {
+        margin-top: 10px;
+        border: 1px dashed #99f6e4;
+        border-radius: 10px;
+        padding: 8px 10px;
+        font-size: 11px;
+        color: #0f766e;
+        background: #f0fdfa;
+        line-height: 1.45;
+      }
+
+      code {
+        font-family: Consolas, "Courier New", monospace;
+        font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1 class="title">Kar.bg Copart Importer</h1>
+      <p class="desc">Задай backend URL и API ключ (генериран от Kar.bg → Settings → API ключ).</p>
+
+      <div class="field">
+        <label class="label" for="backendUrl">Backend URL</label>
+        <input id="backendUrl" type="text" placeholder="http://localhost:8000" />
+      </div>
+
+      <div class="field">
+        <label class="label" for="apiKey">API ключ</label>
+        <input id="apiKey" type="password" placeholder="karbg_..." />
+      </div>
+
+      <div class="actions">
+        <button id="saveBtn" type="button">Запази</button>
+      </div>
+
+      <div id="status" class="status" role="status" aria-live="polite"></div>
+
+      <div class="hint">
+        Изпращане към endpoint: <code>/api/auth/import/copart/</code>
+      </div>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
