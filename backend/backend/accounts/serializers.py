@@ -4,6 +4,10 @@ from backend.listings.models import get_expiry_cutoff
 from .models import PrivateUser, BusinessUser, UserProfile
 
 
+def _normalize_email(value: str) -> str:
+    return str(value).strip().lower()
+
+
 class PrivateUserSerializer(serializers.ModelSerializer):
     """Serializer for private user registration"""
     email = serializers.EmailField()
@@ -19,10 +23,17 @@ class PrivateUserSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"confirm_password": "Паролите не съвпадат"})
         return data
 
+    def validate_email(self, value):
+        email = _normalize_email(value)
+        if User.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError("User with this email already exists.")
+        return email
+
     def create(self, validated_data):
         email = validated_data['email']
-        password = validated_data['password']
-        
+        password = validated_data.pop('password')
+        validated_data.pop('confirm_password', None)
+
         # Create Django User
         user = User.objects.create_user(
             username=email,
@@ -62,12 +73,18 @@ class BusinessUserSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"username": "Потребителското име трябва да е поне 3 символа"})
         return data
 
+    def validate_email(self, value):
+        email = _normalize_email(value)
+        if User.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError("User with this email already exists.")
+        return email
+
     def create(self, validated_data):
         email = validated_data['email']
-        username = validated_data['username']
+        username = str(validated_data['username']).strip()
         password = validated_data.pop('password')
-        validated_data.pop('confirm_password')
-        
+        validated_data.pop('confirm_password', None)
+
         # Create Django User
         user = User.objects.create_user(
             username=username,
