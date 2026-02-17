@@ -4,10 +4,12 @@ import vipBadgeImage from "../assets/vip_badge.jpg";
 
 type ListingPromoBadgeType = "top" | "vip";
 type ListingPromoBadgeSize = "default" | "sm" | "xs";
+type ListingPromoBadgeShadowVariant = "default" | "similar";
 
 type ListingPromoBadgeProps = {
   type: ListingPromoBadgeType;
   size?: ListingPromoBadgeSize;
+  shadowVariant?: ListingPromoBadgeShadowVariant;
   zIndex?: number;
 };
 
@@ -51,6 +53,7 @@ const BASE_SHADOW_STYLE: CSSProperties = {
 export default function ListingPromoBadge({
   type,
   size = "default",
+  shadowVariant = "default",
   zIndex = 30,
 }: ListingPromoBadgeProps) {
   const isVip = type === "vip";
@@ -109,8 +112,20 @@ export default function ListingPromoBadge({
       }
     : {
         ...BASE_SHADOW_STYLE,
-        width: isExtraSmall ? 25 : isSmall ? 40 : 44,
-        height: isExtraSmall ? 6 : isSmall ? 10 : 11,
+        width: isExtraSmall
+          ? shadowVariant === "similar"
+            ? 29
+            : 25
+          : isSmall
+            ? 40
+            : 44,
+        height: isExtraSmall
+          ? shadowVariant === "similar"
+            ? 7
+            : 6
+          : isSmall
+            ? 10
+            : 11,
       };
 
   return (

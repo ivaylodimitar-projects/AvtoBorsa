@@ -65,6 +65,11 @@ interface CarListing {
   is_top?: boolean;
   is_top_listing?: boolean;
   is_top_ad?: boolean;
+  is_vip?: boolean;
+  is_vip_listing?: boolean;
+  is_vip_ad?: boolean;
+  vip_plan?: string | null;
+  vip_expires_at?: string | null;
   wheel_for?: string;
   offer_type?: string;
   tire_brand?: string;
@@ -128,11 +133,32 @@ interface SimilarListing {
   created_at?: string;
   listing_type?: 'top' | 'vip' | 'normal' | string | number;
   listing_type_display?: string;
+  is_top?: boolean;
+  is_top_listing?: boolean;
+  is_top_ad?: boolean;
+  is_vip?: boolean;
+  is_vip_listing?: boolean;
+  is_vip_ad?: boolean;
+  vip_plan?: string | null;
+  vip_expires_at?: string | null;
   image_url?: string;
   images?: CarImage[];
 }
 
-const isTopListing = (listing: CarListing) => {
+type ListingWithPromoStatus = {
+  listing_type?: 'top' | 'vip' | 'normal' | string | number;
+  listing_type_display?: string;
+  is_top?: boolean;
+  is_top_listing?: boolean;
+  is_top_ad?: boolean;
+  is_vip?: boolean;
+  is_vip_listing?: boolean;
+  is_vip_ad?: boolean;
+  vip_plan?: string | null;
+  vip_expires_at?: string | null;
+};
+
+const isTopListing = (listing: ListingWithPromoStatus) => {
   if (listing.is_top || listing.is_top_listing || listing.is_top_ad) return true;
 
   const numericType = Number(listing.listing_type);
@@ -144,25 +170,38 @@ const isTopListing = (listing: CarListing) => {
   }
 
   const display = (listing.listing_type_display || '').toString().toLowerCase();
-  return display.includes('топ');
+  return display.includes('top') || display.includes('\u0442\u043e\u043f');
 };
 
-const isVipListing = (listing: CarListing) => {
+const isVipListing = (listing: ListingWithPromoStatus) => {
   if (isTopListing(listing)) return false;
+  if (listing.is_vip || listing.is_vip_listing || listing.is_vip_ad) return true;
 
   const numericType = Number(listing.listing_type);
   if (!Number.isNaN(numericType) && numericType === 2) return true;
 
   const rawType = (listing.listing_type || '').toString().toLowerCase().trim();
-  if (rawType === 'vip') return true;
+  if (rawType === 'vip' || rawType.includes('vip')) return true;
 
   const display = (listing.listing_type_display || '').toString().toLowerCase();
-  return display.includes('vip');
+  if (display.includes('vip')) return true;
+
+  const vipPlan = (listing.vip_plan || '').toString().toLowerCase().trim();
+  if (vipPlan && !['none', 'normal', 'null', 'undefined'].includes(vipPlan)) return true;
+
+  if (listing.vip_expires_at) {
+    const vipExpiresAtMs = Date.parse(listing.vip_expires_at);
+    if (!Number.isNaN(vipExpiresAtMs) && vipExpiresAtMs > Date.now()) return true;
+  }
+
+  return false;
 };
 
 const NEW_LISTING_BADGE_MINUTES = 10;
 const NEW_LISTING_BADGE_WINDOW_MS = NEW_LISTING_BADGE_MINUTES * 60 * 1000;
 const NEW_LISTING_BADGE_REFRESH_MS = 30_000;
+const SIMILAR_PROMO_HEADROOM_TOP = 16;
+const SIMILAR_FIRST_CARD_OFFSET = 20;
 const RECENTLY_VIEWED_STORAGE_KEY = "recently_viewed_listings";
 const MAX_RECENTLY_VIEWED = 12;
 
@@ -412,25 +451,12 @@ const VehicleDetailsPage: React.FC = () => {
   }, []);
 
   const isSimilarTopListing = useCallback((item: SimilarListing) => {
-    const rawType = (item.listing_type || '').toString().toLowerCase().trim();
-    if (['top', 'top_ad', 'top_listing', 'topad', 'toplisting'].includes(rawType)) {
-      return true;
-    }
-    const numericType = Number(item.listing_type);
-    if (!Number.isNaN(numericType) && numericType === 1) return true;
-    const display = (item.listing_type_display || '').toString().toLowerCase();
-    return display.includes('топ');
+    return isTopListing(item);
   }, []);
 
   const isSimilarVipListing = useCallback((item: SimilarListing) => {
-    if (isSimilarTopListing(item)) return false;
-    const rawType = (item.listing_type || '').toString().toLowerCase().trim();
-    if (rawType === 'vip') return true;
-    const numericType = Number(item.listing_type);
-    if (!Number.isNaN(numericType) && numericType === 2) return true;
-    const display = (item.listing_type_display || '').toString().toLowerCase();
-    return display.includes('vip');
-  }, [isSimilarTopListing]);
+    return isVipListing(item);
+  }, []);
 
   const isRecentListing = useCallback(
     (createdAt?: string) => {
@@ -651,7 +677,7 @@ const VehicleDetailsPage: React.FC = () => {
     },
     similarNavOverlay: {
       position: 'absolute',
-      top: 70,
+      top: 110 + SIMILAR_PROMO_HEADROOM_TOP,
       left: 8,
       right: 8,
       display: 'flex',
@@ -662,10 +688,12 @@ const VehicleDetailsPage: React.FC = () => {
     },
     similarScroller: {
       display: 'flex',
-      gap: 12,
+      gap: 20,
       overflowX: 'auto',
-      paddingBottom: 6,
+      paddingTop: SIMILAR_PROMO_HEADROOM_TOP,
+      paddingBottom: 16,
       scrollSnapType: 'x mandatory',
+      scrollPaddingLeft: SIMILAR_FIRST_CARD_OFFSET,
       WebkitOverflowScrolling: 'touch',
       overscrollBehaviorX: 'contain' as const,
     },
@@ -683,6 +711,7 @@ const VehicleDetailsPage: React.FC = () => {
       scrollSnapAlign: 'start',
       position: 'relative',
     },
+    
     similarMedia: {
       position: 'relative',
       width: '100%',
@@ -980,7 +1009,7 @@ const VehicleDetailsPage: React.FC = () => {
                   </button>
                 </div>
                 <div style={styles.similarScroller} ref={similarScrollRef} className="similar-scroll">
-                  {similarListings.map((item) => {
+                  {similarListings.map((item, index) => {
                     const imagePath = item.image_url || item.images?.[0]?.image || '';
                     const imageUrl = imagePath ? getImageUrl(imagePath) : '';
                     const isTop = isSimilarTopListing(item);
@@ -1007,13 +1036,16 @@ const VehicleDetailsPage: React.FC = () => {
                     return (
                       <div
                         key={item.id}
-                        style={styles.similarCard}
+                        style={{
+                          ...styles.similarCard,
+                          ...(index === 0 ? { marginLeft: SIMILAR_FIRST_CARD_OFFSET } : {}),
+                        }}
                         className="similar-card"
                         onClick={() => navigate(`/details/${item.slug}`)}
                       >
                         <div style={styles.similarMedia}>
-                          {isTop && <ListingPromoBadge type="top" />}
-                          {isVip && <ListingPromoBadge type="vip" />}
+                          {isTop && <ListingPromoBadge type="top" size="xs" shadowVariant="similar" />}
+                          {isVip && <ListingPromoBadge type="vip" size="xs" shadowVariant="similar" />}
                           {isNew && (
                             <span style={{ ...styles.similarNewBadge, top: 'auto', bottom: 10, left: 10 }}>
                               Нова
