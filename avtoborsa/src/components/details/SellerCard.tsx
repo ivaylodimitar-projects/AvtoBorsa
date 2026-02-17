@@ -1,5 +1,5 @@
 ﻿import React, { useState } from 'react';
-import { Star, Phone, Eye, EyeOff, MapPin } from 'lucide-react';
+import { Phone, MapPin } from 'lucide-react';
 
 interface SellerCardProps {
   sellerName: string;
@@ -7,8 +7,6 @@ interface SellerCardProps {
   phone: string;
   city?: string;
   showAvatar?: boolean;
-  // rating?: number;
-  reviewCount?: number;
 }
 
 const SellerCard: React.FC<SellerCardProps> = ({
@@ -17,8 +15,6 @@ const SellerCard: React.FC<SellerCardProps> = ({
   phone,
   city,
   showAvatar = true,
-  // rating = 4.5,
-  reviewCount = 0,
 }) => {
   const [isPhoneRevealed, setIsPhoneRevealed] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -31,10 +27,26 @@ const SellerCard: React.FC<SellerCardProps> = ({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const maskPhone = (phoneNumber: string): string => {
-    const cleaned = phoneNumber.replace(/\D/g, '');
-    if (cleaned.length < 6) return phoneNumber;
-    return cleaned.slice(0, 3) + '***' + cleaned.slice(-2);
+  const maskPhoneNumber = (phoneNumber: string): string => {
+    const digitsOnly = phoneNumber.replace(/\D/g, '');
+    if (!digitsOnly) return phoneNumber;
+
+    if (digitsOnly.startsWith('359') && digitsOnly.length >= 7) {
+      const localNumber = digitsOnly.slice(3);
+      if (localNumber.length < 4) {
+        return `+359 ${localNumber}`;
+      }
+      const localPrefix = localNumber.slice(0, 2);
+      const localSuffix = localNumber.slice(-2);
+      const maskedMiddle = 'x'.repeat(Math.max(localNumber.length - 4, 3));
+      return `+359 ${localPrefix} ${maskedMiddle} ${localSuffix}`;
+    }
+
+    if (digitsOnly.length < 6) return phoneNumber;
+    const prefix = digitsOnly.slice(0, 3);
+    const suffix = digitsOnly.slice(-2);
+    const maskedMiddle = 'x'.repeat(Math.max(digitsOnly.length - 5, 3));
+    return `${prefix} ${maskedMiddle} ${suffix}`;
   };
 
   const styles: Record<string, React.CSSProperties> = {
@@ -170,16 +182,21 @@ const SellerCard: React.FC<SellerCardProps> = ({
       textOverflow: 'ellipsis',
       whiteSpace: 'nowrap',
     },
-    revealButton: {
-      background: 'none',
+    revealPhoneButton: {
+      background: 'transparent',
       border: 'none',
       cursor: 'pointer',
       color: '#0f766e',
       padding: 0,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      flexShrink: 0,
+      fontSize: isMobile ? 13 : 14,
+      fontWeight: 700,
+      fontFamily: 'inherit',
+      textDecoration: 'underline',
+      textUnderlineOffset: 2,
+    },
+    phoneLink: {
+      color: '#1a1a1a',
+      textDecoration: 'none',
     },
     callButton: {
       width: '100%',
@@ -233,20 +250,22 @@ const SellerCard: React.FC<SellerCardProps> = ({
           <div style={styles.phoneContent}>
             <div style={styles.phoneLabel}>Телефон</div>
             <div style={styles.phoneNumber}>
-              {isPhoneRevealed ? phone : maskPhone(phone)}
+              {isPhoneRevealed ? (
+                <a href={`tel:${phone}`} style={styles.phoneLink}>
+                  {phone}
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  style={styles.revealPhoneButton}
+                  onClick={() => setIsPhoneRevealed(true)}
+                  title="Покажи телефона"
+                >
+                  {maskPhoneNumber(phone)}
+                </button>
+              )}
             </div>
           </div>
-          <button
-            style={styles.revealButton}
-            onClick={() => setIsPhoneRevealed(!isPhoneRevealed)}
-            title={isPhoneRevealed ? 'Скрий номера' : 'Покажи номера'}
-          >
-            {isPhoneRevealed ? (
-              <EyeOff size={18} />
-            ) : (
-              <Eye size={18} />
-            )}
-          </button>
         </div>
 
         <button

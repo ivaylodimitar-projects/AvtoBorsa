@@ -87,6 +87,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
   const [reportMessage, setReportMessage] = useState('');
   const [reportAcceptedTerms, setReportAcceptedTerms] = useState(false);
   const [isReporting, setIsReporting] = useState(false);
+  const [isPhoneRevealed, setIsPhoneRevealed] = useState(false);
   const shareMenuRef = useRef<HTMLDivElement | null>(null);
   const shareButtonRef = useRef<HTMLButtonElement | null>(null);
 
@@ -321,6 +322,28 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
   const updatedTimeLabel = formatClockTime(updatedAt);
   const sellerSinceLabel = sellerType === 'business' ? formatAccountDate(sellerCreatedAt) : '';
   const viewCountValue = Number.isFinite(viewCount ?? Number.NaN) ? Number(viewCount) : null;
+
+  const maskPhoneNumber = (phoneNumber: string): string => {
+    const digitsOnly = phoneNumber.replace(/\D/g, '');
+    if (!digitsOnly) return phoneNumber;
+
+    if (digitsOnly.startsWith('359') && digitsOnly.length >= 7) {
+      const localNumber = digitsOnly.slice(3);
+      if (localNumber.length < 4) {
+        return `+359 ${localNumber}`;
+      }
+      const localPrefix = localNumber.slice(0, 2);
+      const localSuffix = localNumber.slice(-2);
+      const maskedMiddle = 'x'.repeat(Math.max(localNumber.length - 4, 3));
+      return `+359 ${localPrefix} ${maskedMiddle} ${localSuffix}`;
+    }
+
+    if (digitsOnly.length < 6) return phoneNumber;
+    const prefix = digitsOnly.slice(0, 3);
+    const suffix = digitsOnly.slice(-2);
+    const maskedMiddle = 'x'.repeat(Math.max(digitsOnly.length - 5, 3));
+    return `${prefix} ${maskedMiddle} ${suffix}`;
+  };
 
   const shareUrl = window.location.href;
   const shareText = `${title || 'Обява'}${city ? ` · ${city}` : ''}`;
@@ -706,23 +729,44 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
               <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 2 }}>
                 Телефон за връзка
               </div>
-              <a
-                href={`tel:${phone}`}
-                style={{
-                  fontSize: 18,
-                  fontWeight: 800,
-                  color: 'rgb(51, 51, 51)',
-                  letterSpacing: '0.4px',
-                  textDecoration: 'none',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                }}
-              >
-                {phone}
-              </a>
+              {isPhoneRevealed ? (
+                <a
+                  href={`tel:${phone}`}
+                  style={{
+                    fontSize: 18,
+                    fontWeight: 800,
+                    color: 'rgb(51, 51, 51)',
+                    letterSpacing: '0.4px',
+                    textDecoration: 'none',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  {phone}
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsPhoneRevealed(true)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    padding: 0,
+                    margin: 0,
+                    fontSize: 18,
+                    fontWeight: 800,
+                    color: 'rgb(51, 51, 51)',
+                    textDecoration: 'underline',
+                    textUnderlineOffset: 2,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {maskPhoneNumber(phone)}
+                </button>
+              )}
               <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, marginTop: 2 }}>
-                Натисни за директно обаждане
+                {isPhoneRevealed ? 'Натисни за директно обаждане' : 'Номерът е скрит. Натисни за показване'}
               </div>
             </div>
           </div>
