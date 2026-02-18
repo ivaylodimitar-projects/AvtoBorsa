@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { CAR_FEATURES } from "../constants/carFeatures";
 import { AdvancedSearch } from "./AdvancedSearch";
 import { useRecentSearches } from "../hooks/useRecentSearches";
-import { useSavedSearches } from "../hooks/useSavedSearches";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 import ListingPromoBadge from "./ListingPromoBadge";
 import {
@@ -13,24 +12,6 @@ import {
 import { CAR_BRANDS, CAR_MODELS } from "../constants/carBrandModels";
 import { APP_MAIN_CATEGORY_OPTIONS, getMainCategoryLabel } from "../constants/mobileBgData";
 import { formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
-import type { IconType } from "react-icons";
-import {
-  FaCarSide,
-  FaCircleNotch,
-  FaToolbox,
-  FaShuttleVan,
-  FaTruck,
-  FaMotorcycle,
-  FaTractor,
-  FaIndustry,
-  FaWarehouse,
-  FaCaravan,
-  FaShip,
-  FaTrailer,
-  FaPuzzlePiece,
-  FaShoppingCart,
-  FaWrench,
-} from "react-icons/fa";
 
 type CarListing = {
   id: number;
@@ -129,22 +110,173 @@ const GEARBOX: Gearbox[] = ["Ръчна", "Автоматик"];
 const MODELS: Record<string, string[]> = CAR_MODELS;
 
 const CATEGORIES = APP_MAIN_CATEGORY_OPTIONS;
-const CATEGORY_ICONS: Record<string, IconType> = {
-  "1": FaCarSide,
-  w: FaCircleNotch,
-  u: FaToolbox,
-  "3": FaShuttleVan,
-  "4": FaTruck,
-  "5": FaMotorcycle,
-  "6": FaTractor,
-  "7": FaIndustry,
-  "8": FaWarehouse,
-  "9": FaCaravan,
-  a: FaShip,
-  b: FaTrailer,
-  v: FaPuzzlePiece,
-  y: FaShoppingCart,
-  z: FaWrench,
+
+type CategoryIconProps = { size?: number; strokeWidth?: number };
+type CategoryIconComponent = (props: CategoryIconProps) => React.JSX.Element;
+
+function CategoryIconBase({
+  size = 13,
+  strokeWidth = 1.9,
+  children,
+}: CategoryIconProps & { children: React.ReactNode }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
+  );
+}
+
+const CategoryCarIcon: CategoryIconComponent = (props) => (
+  <CategoryIconBase {...props}>
+    <path d="M3 13l2-5h14l2 5" />
+    <path d="M4 13h16v5H4z" />
+    <circle cx="7.5" cy="18" r="1.5" />
+    <circle cx="16.5" cy="18" r="1.5" />
+  </CategoryIconBase>
+);
+
+const CategoryWheelIcon: CategoryIconComponent = (props) => (
+  <CategoryIconBase {...props}>
+    <circle cx="12" cy="12" r="8" />
+    <circle cx="12" cy="12" r="2.5" />
+    <path d="M12 4v5M20 12h-5M12 20v-5M4 12h5" />
+  </CategoryIconBase>
+);
+
+const CategoryPartsIcon: CategoryIconComponent = (props) => (
+  <CategoryIconBase {...props}>
+    <path d="M14.5 4.5l1.8 1.8-2.2 2.2a2.3 2.3 0 0 1-3.2 3.2l-5.4 5.4-2.3-2.3 5.4-5.4a2.3 2.3 0 0 1 3.2-3.2z" />
+    <path d="M16.5 7.5l3.5 3.5" />
+  </CategoryIconBase>
+);
+
+const CategoryVanIcon: CategoryIconComponent = (props) => (
+  <CategoryIconBase {...props}>
+    <path d="M3 9h12l4 4v5H3z" />
+    <path d="M15 9v4h4" />
+    <circle cx="7.5" cy="18" r="1.5" />
+    <circle cx="16.5" cy="18" r="1.5" />
+  </CategoryIconBase>
+);
+
+const CategoryTruckIcon: CategoryIconComponent = (props) => (
+  <CategoryIconBase {...props}>
+    <path d="M3 8h10v10H3z" />
+    <path d="M13 11h4l3 3v4h-7z" />
+    <circle cx="7" cy="18" r="1.5" />
+    <circle cx="17" cy="18" r="1.5" />
+  </CategoryIconBase>
+);
+
+const CategoryMotoIcon: CategoryIconComponent = (props) => (
+  <CategoryIconBase {...props}>
+    <circle cx="6.5" cy="17.5" r="2" />
+    <circle cx="17.5" cy="17.5" r="2" />
+    <path d="M8 17.5h4.5l3-4.5h-4l-2-3H7" />
+    <path d="M15.5 13H19" />
+  </CategoryIconBase>
+);
+
+const CategoryTractorIcon: CategoryIconComponent = (props) => (
+  <CategoryIconBase {...props}>
+    <circle cx="8" cy="17" r="3" />
+    <circle cx="18" cy="18" r="2" />
+    <path d="M5 14h8l2 2h3" />
+    <path d="M10 8h4v6" />
+  </CategoryIconBase>
+);
+
+const CategoryIndustryIcon: CategoryIconComponent = (props) => (
+  <CategoryIconBase {...props}>
+    <path d="M3 20V9l6 3V9l5 3V6l7 4v10z" />
+    <path d="M3 20h18" />
+  </CategoryIconBase>
+);
+
+const CategoryForkliftIcon: CategoryIconComponent = (props) => (
+  <CategoryIconBase {...props}>
+    <circle cx="8" cy="18" r="2" />
+    <circle cx="16.5" cy="18" r="1.5" />
+    <path d="M5 18V9h6l2 3v6" />
+    <path d="M19 9v9M19 18h2" />
+  </CategoryIconBase>
+);
+
+const CategoryCaravanIcon: CategoryIconComponent = (props) => (
+  <CategoryIconBase {...props}>
+    <rect x="3" y="8" width="16" height="8" rx="2" />
+    <circle cx="8" cy="18" r="1.5" />
+    <circle cx="15" cy="18" r="1.5" />
+    <path d="M19 12h2" />
+  </CategoryIconBase>
+);
+
+const CategoryBoatIcon: CategoryIconComponent = (props) => (
+  <CategoryIconBase {...props}>
+    <path d="M12 4v9" />
+    <path d="M12 4l4 3h-4" />
+    <path d="M3 15l4 3h10l4-3H3z" />
+  </CategoryIconBase>
+);
+
+const CategoryTrailerIcon: CategoryIconComponent = (props) => (
+  <CategoryIconBase {...props}>
+    <path d="M4 10h10v5H4z" />
+    <path d="M14 12h5" />
+    <circle cx="7" cy="17.5" r="1.5" />
+    <circle cx="17.5" cy="17.5" r="1.5" />
+  </CategoryIconBase>
+);
+
+const CategoryAccessoryIcon: CategoryIconComponent = (props) => (
+  <CategoryIconBase {...props}>
+    <path d="M10.5 4l1.5 2.5L15 8l-2.5 1.5L11 12l-1.5-2.5L7 8l2.5-1.5z" />
+    <path d="M4 14l2 .8.8 2 .8-2 2-.8-2-.8-.8-2-.8 2z" />
+    <path d="M15.5 14.5l1 .4.4 1 .4-1 1-.4-1-.4-.4-1-.4 1z" />
+  </CategoryIconBase>
+);
+
+const CategoryBuyIcon: CategoryIconComponent = (props) => (
+  <CategoryIconBase {...props}>
+    <path d="M4 6h2l1.3 8h9.8l1.4-6H7.1" />
+    <circle cx="10" cy="18" r="1.5" />
+    <circle cx="17" cy="18" r="1.5" />
+  </CategoryIconBase>
+);
+
+const CategoryServiceIcon: CategoryIconComponent = (props) => (
+  <CategoryIconBase {...props}>
+    <path d="M14.5 4.5l5 5-2 2-5-5z" />
+    <path d="M11 8l5 5-8 8H3v-5z" />
+  </CategoryIconBase>
+);
+
+const CATEGORY_ICONS: Record<string, CategoryIconComponent> = {
+  "1": CategoryCarIcon,
+  w: CategoryWheelIcon,
+  u: CategoryPartsIcon,
+  "3": CategoryVanIcon,
+  "4": CategoryTruckIcon,
+  "5": CategoryMotoIcon,
+  "6": CategoryTractorIcon,
+  "7": CategoryIndustryIcon,
+  "8": CategoryForkliftIcon,
+  "9": CategoryCaravanIcon,
+  a: CategoryBoatIcon,
+  b: CategoryTrailerIcon,
+  v: CategoryAccessoryIcon,
+  y: CategoryBuyIcon,
+  z: CategoryServiceIcon,
 };
 
 function clampNumber(n: number, min: number, max: number) {
@@ -172,7 +304,6 @@ const selectBase: React.CSSProperties = {
 export default function LandingPage() {
   const navigate = useNavigate();
   const { searches } = useRecentSearches();
-  const { savedSearches } = useSavedSearches();
   const getImageUrl = useImageUrl();
   const initialLatestListingsRef = useRef<CarListing[] | null>(
     readLatestListingsCache<CarListing>()
@@ -287,6 +418,31 @@ export default function LandingPage() {
   const [hasPhotosOnly, setHasPhotosOnly] = useState(false);
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
   const [showFeaturesDropdown, setShowFeaturesDropdown] = useState(false);
+  const mainCategorySliderRef = useRef<HTMLDivElement | null>(null);
+
+  const scrollMainCategories = (direction: "left" | "right") => {
+    const slider = mainCategorySliderRef.current;
+    if (!slider) return;
+    const scrollAmount = Math.max(220, Math.floor(slider.clientWidth * 0.75));
+    slider.scrollBy({
+      left: direction === "left" ? -scrollAmount : scrollAmount,
+      behavior: "smooth",
+    });
+  };
+
+  useEffect(() => {
+    const slider = mainCategorySliderRef.current;
+    if (!slider) return;
+    const activeButton = slider.querySelector<HTMLButtonElement>(
+      `button[data-category-value="${category}"]`
+    );
+    if (!activeButton) return;
+    activeButton.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "nearest",
+    });
+  }, [category]);
 
   const yearNow = new Date().getFullYear();
 
@@ -519,74 +675,92 @@ export default function LandingPage() {
           box-sizing: border-box;
           outline: none !important;
           opacity: 1 !important;
+          transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
         }
         .category-pill-btn:hover {
-          border-color: #9ab8b8 !important;
+          border-color: #b4d7d3 !important;
+          box-shadow: 0 6px 14px rgba(15, 118, 110, 0.12);
+          transform: translateY(-1px);
           opacity: 1 !important;
         }
         .category-pill-btn:active {
+          transform: translateY(0);
+          box-shadow: none;
           opacity: 1 !important;
         }
         .category-pill-btn:focus,
         .category-pill-btn:focus-visible {
           outline: none !important;
-          border-color: #0f766e !important;
-          box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.22) !important;
+          box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.18) !important;
         }
         .category-pill-btn.category-pill-btn--active {
-          border-color: #0f766e !important;
+          border-color: transparent !important;
+        }
+        .main-category-slider {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .main-category-slider::-webkit-scrollbar {
+          display: none;
+          width: 0;
+          height: 0;
+        }
+        .category-scroll-cue {
+          border: none;
+          background: none;
+          padding: 0;
+          margin: 0;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          color: #0f766e;
+          cursor: pointer;
+          font-size: 11px;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+          line-height: 1;
+          white-space: nowrap;
+          opacity: 0.9;
+        }
+        .category-scroll-cue:hover {
+          opacity: 1;
+        }
+        .category-scroll-cue__track {
+          display: inline-flex;
+          align-items: center;
+          gap: 1px;
+        }
+        .category-scroll-cue__chevron {
+          display: inline-block;
+          opacity: 0.2;
+          transform: translateX(0);
+          animation: categoryScrollHint 1.35s ease-in-out infinite;
+        }
+        .category-scroll-cue__chevron:nth-child(2) {
+          animation-delay: 0.16s;
+        }
+        .category-scroll-cue__chevron:nth-child(3) {
+          animation-delay: 0.32s;
+        }
+        @keyframes categoryScrollHint {
+          0%, 100% {
+            opacity: 0.2;
+            transform: translateX(0);
+          }
+          50% {
+            opacity: 1;
+            transform: translateX(3px);
+          }
+        }
+        @media (max-width: 767px) {
+          .category-scroll-cue__text {
+            display: none;
+          }
         }
       `}</style>
 
       <main style={styles.main}>
         <div id="search" style={styles.searchBlock}>
-          <div style={styles.mainCategoryWrap}>
-            <div style={styles.mainCategoryHeader}>
-              <span style={styles.mainCategoryLabel}>Категория</span>
-              <span style={styles.mainCategoryHint}>Избери тип обява за по-точни филтри</span>
-            </div>
-
-            <div className="catsRow formShowGrid category-grid" style={styles.mainCategoryRow}>
-              {CATEGORIES.map((mainCategory) => {
-                const isActive = category === mainCategory.value;
-                const Icon = CATEGORY_ICONS[mainCategory.value] || FaCarSide;
-
-                return (
-                  <button
-                    key={mainCategory.value}
-                    id={`ptico_${mainCategory.value}`}
-                    type="button"
-                    data-title={mainCategory.label}
-                    className={`category-pill-btn cat${mainCategory.value}${isActive ? " active category-pill-btn--active" : ""}`}
-                    style={{
-                      ...styles.mainCategoryButton,
-                      ...(isActive ? styles.mainCategoryButtonActive : {}),
-                    }}
-                    onClick={() => setCategory(mainCategory.value)}
-                    aria-pressed={isActive}
-                    title={mainCategory.label}
-                  >
-                    <span
-                      style={{
-                        ...styles.mainCategoryIconWrap,
-                        ...(isActive
-                          ? {
-                              background: "rgba(255,255,255,0.18)",
-                              color: "#ffffff",
-                              border: "1px solid rgba(255,255,255,0.34)",
-                            }
-                          : {}),
-                      }}
-                    >
-                      <Icon size={17} />
-                    </span>
-                    <span style={styles.mainCategoryText}>{mainCategory.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           <AdvancedSearch
             onSearch={handleAdvancedSearch}
             brands={BRANDS}
@@ -595,7 +769,75 @@ export default function LandingPage() {
             mainCategory={category}
             onMainCategoryChange={setCategory}
             recentSearches={searches}
-            savedSearches={savedSearches}
+            hideMainCategoryField
+            topContent={
+              <div style={styles.mainCategoryWrap}>
+                <div style={styles.mainCategoryHeader}>
+                  <span style={styles.mainCategoryLabel}>Категория</span>
+                  <div style={styles.mainCategoryHeaderRight}>
+                    <button
+                      type="button"
+                      className="category-scroll-cue"
+                      onClick={() => scrollMainCategories("right")}
+                      aria-label="Плъзни надясно за още категории"
+                      title="Плъзни надясно за още категории"
+                    >
+                      <span className="category-scroll-cue__text">Плъзни надясно</span>
+                      <span className="category-scroll-cue__track" aria-hidden="true">
+                        <span className="category-scroll-cue__chevron">›</span>
+                        <span className="category-scroll-cue__chevron">›</span>
+                        <span className="category-scroll-cue__chevron">›</span>
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  ref={mainCategorySliderRef}
+                  className="main-category-slider catsRow formShowGrid category-grid"
+                  style={styles.mainCategoryRow}
+                >
+                  {CATEGORIES.map((mainCategory) => {
+                    const isActive = category === mainCategory.value;
+                    const Icon = CATEGORY_ICONS[mainCategory.value] || CategoryCarIcon;
+
+                    return (
+                      <button
+                        key={mainCategory.value}
+                        id={`ptico_${mainCategory.value}`}
+                        type="button"
+                        data-title={mainCategory.label}
+                        data-category-value={mainCategory.value}
+                        className={`category-pill-btn cat${mainCategory.value}${isActive ? " active category-pill-btn--active" : ""}`}
+                        style={{
+                          ...styles.mainCategoryButton,
+                          ...(isActive ? styles.mainCategoryButtonActive : {}),
+                        }}
+                        onClick={() => setCategory(mainCategory.value)}
+                        aria-pressed={isActive}
+                        title={mainCategory.label}
+                      >
+                        <span
+                          style={{
+                            ...styles.mainCategoryIconWrap,
+                            ...(isActive
+                              ? {
+                                  background: "rgba(255,255,255,0.18)",
+                                  color: "#ffffff",
+                                  border: "1px solid rgba(255,255,255,0.34)",
+                                }
+                              : {}),
+                          }}
+                        >
+                          <Icon size={13} />
+                        </span>
+                        <span style={styles.mainCategoryText}>{mainCategory.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            }
           />
 
           {/* OLD FORM - REPLACED WITH ADVANCEDSEARCH */}
@@ -969,7 +1211,7 @@ export default function LandingPage() {
           `}</style>
 
           <div style={{ ...styles.latestContainer, overflow: "visible", position: "relative", zIndex: 1 }}>
-            <div style={{ ...styles.sectionHeader, ...styles.containerHeader }}>
+            <div style={{ ...styles.sectionHeader, ...styles.containerHeader, marginBottom: 0 }}>
               <h2 style={styles.h2}>Последни обяви</h2>
               <p style={styles.sectionLead}>
                 Най-новите публикувани обяви на пазара
@@ -1355,7 +1597,15 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
   },
 
-  main: { maxWidth: 1200, margin: "0 auto", padding: "20px 20px 60px", width: "100%" },
+  main: {
+    maxWidth: 1200,
+    margin: "0 auto",
+    padding: "20px 20px 60px",
+    width: "100%",
+    display: "flex",
+    flexDirection: "column",
+    gap: "1rem",
+  },
 
   hero: { position: "relative", padding: "0" },
   heroGlow: {
@@ -1394,21 +1644,29 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: "1px solid #e0e0e0",
     background: "#fafafa",
   },
-  searchBlock: { marginBottom: 32 },
+  searchBlock: { marginBottom: 0 },
   mainCategoryWrap: {
-    marginBottom: 14,
-    background: "linear-gradient(180deg, #ffffff 0%, #f8fbfb 100%)",
-    border: "1px solid #dbe9e9",
+    marginBottom: 0,
+    background:
+      "linear-gradient(135deg, rgba(236,253,250,0.95) 0%, rgba(255,255,255,0.98) 55%, rgba(240,253,250,0.95) 100%)",
+    border: "none",
     borderRadius: 14,
-    padding: "12px",
-    boxShadow: "0 8px 18px rgba(15, 23, 42, 0.06)",
+    padding: "8px 9px 7px",
+    boxShadow: "0 7px 16px rgba(15,23,42,0.05)",
   },
   mainCategoryHeader: {
     display: "flex",
-    alignItems: "baseline",
+    alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
-    marginBottom: 10,
+    marginBottom: 7,
+    flexWrap: "wrap",
+  },
+  mainCategoryHeaderRight: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 10,
     flexWrap: "wrap",
   },
   mainCategoryLabel: {
@@ -1417,47 +1675,55 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
   },
   mainCategoryHint: {
-    fontSize: 12,
+    fontSize: 10.5,
     color: "#64748b",
     fontWeight: 500,
   },
   mainCategoryRow: {
-    display: "grid",
-    gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
-    gap: 8,
+    display: "flex",
+    gap: 6,
+    overflowX: "auto",
+    overflowY: "hidden",
+    scrollSnapType: "x mandatory",
+    WebkitOverflowScrolling: "touch",
+    scrollbarGutter: "stable",
+    paddingBottom: 2,
   },
   mainCategoryButton: {
-    borderWidth: 1,
+    borderWidth: 0,
     borderStyle: "solid",
-    borderColor: "#d4e3e3",
+    borderColor: "transparent",
     background: "#ffffff",
     color: "#334155",
     borderRadius: 10,
-    padding: "8px 10px",
+    padding: "5px 8px",
     cursor: "pointer",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 700,
     lineHeight: 1.2,
-    minHeight: 50,
+    minHeight: 36,
     transition: "all 0.2s ease",
     display: "flex",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
     textAlign: "left",
-    width: "100%",
+    width: "fit-content",
+    flex: "0 0 auto",
+    scrollSnapAlign: "start",
+    boxShadow: "0 2px 8px rgba(15, 23, 42, 0.08)",
   },
   mainCategoryButtonActive: {
     background: "linear-gradient(135deg, #0f766e 0%, #0d9488 100%)",
-    borderWidth: 1,
+    borderWidth: 0,
     borderStyle: "solid",
-    borderColor: "#0f766e",
+    borderColor: "transparent",
     color: "#ffffff",
-    boxShadow: "0 7px 16px rgba(15, 118, 110, 0.26)",
+    boxShadow: "0 6px 14px rgba(15, 118, 110, 0.24)",
   },
   mainCategoryIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 5,
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
@@ -1466,8 +1732,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   mainCategoryText: {
-    whiteSpace: "normal",
-    wordBreak: "break-word",
+    whiteSpace: "nowrap",
   },
   searchTitle: {
     fontWeight: 700,
@@ -1570,9 +1835,9 @@ const styles: Record<string, React.CSSProperties> = {
 
   note: { marginTop: 12, fontSize: 13, color: "#999", fontStyle: "italic" },
 
-  section: { padding: "0.1rem 0 0" },
+  section: { padding: 0 },
   sectionHeader: { marginBottom: 16, marginTop: "3rem" },
-  latestSection: { marginBottom: 32 },
+  latestSection: { marginBottom: 0 },
   latestContainer: {
     background: "#fff",
     border: "1px solid #e5e7eb",

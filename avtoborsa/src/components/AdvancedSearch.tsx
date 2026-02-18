@@ -6,7 +6,6 @@ import { BULGARIAN_CITIES_BY_REGION } from "../constants/bulgarianCities";
 import { useRecentSearches } from "../hooks/useRecentSearches";
 import type { RecentSearch } from "../hooks/useRecentSearches";
 import { useSavedSearches } from "../hooks/useSavedSearches";
-import type { SavedSearch } from "../hooks/useSavedSearches";
 import { groupOptionsByInitial, sortUniqueOptions } from "../utils/alphabeticalOptions";
 import {
   getBrandOptionsByMainCategory,
@@ -135,7 +134,8 @@ interface AdvancedSearchProps {
   mainCategory: string;
   onMainCategoryChange?: (value: string) => void;
   recentSearches?: RecentSearch[];
-  savedSearches?: SavedSearch[];
+  hideMainCategoryField?: boolean;
+  topContent?: React.ReactNode;
 }
 
 const FUEL_OPTIONS = ["Бензин", "Дизел", "Газ/Бензин", "Хибрид", "Електро"];
@@ -705,7 +705,8 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   mainCategory,
   onMainCategoryChange,
   recentSearches = [],
-  savedSearches = [],
+  hideMainCategoryField = false,
+  topContent,
 }) => {
   const navigate = useNavigate();
   const { addSearch } = useRecentSearches();
@@ -1388,23 +1389,26 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     }
   };
 
-  const renderMainCategoryField = () => (
-    <div className="adv-field">
-      <label className="adv-label">ТЪРСЕНЕ В КАТЕГОРИЯ</label>
-      <select
-        value={mainCategory}
-        onChange={(e) => onMainCategoryChange?.(e.target.value)}
-        className={`adv-select ${!onMainCategoryChange ? "adv-select--disabled" : ""}`}
-        disabled={!onMainCategoryChange}
-      >
-        {categories.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
+  const renderMainCategoryField = () => {
+    if (hideMainCategoryField) return null;
+    return (
+      <div className="adv-field">
+        <label className="adv-label">ТЪРСЕНЕ В КАТЕГОРИЯ</label>
+        <select
+          value={mainCategory}
+          onChange={(e) => onMainCategoryChange?.(e.target.value)}
+          className={`adv-select ${!onMainCategoryChange ? "adv-select--disabled" : ""}`}
+          disabled={!onMainCategoryChange}
+        >
+          {categories.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  };
 
   const advancedSearchCSS = `
     .adv-search-root {
@@ -1423,8 +1427,15 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       font-size: 26px;
       font-weight: 700;
       color: #333;
-      margin-bottom: 12px;
+      margin-bottom: 8px;
       font-family: "Space Grotesk", "Manrope", "Segoe UI", sans-serif;
+    }
+    .adv-top-content {
+      margin: 0 0 10px;
+      padding: 6px 6px 4px;
+      border-bottom: none;
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.82) 0%, rgba(241,250,248,0.9) 100%);
     }
     .adv-search-form {
       display: flex;
@@ -1623,7 +1634,17 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       display: flex;
       align-items: center;
       gap: 8px;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      padding-bottom: 2px;
+    }
+    .adv-recent-searches::-webkit-scrollbar {
+      display: none;
+      width: 0;
+      height: 0;
     }
     .adv-recent-search-label {
       font-size: 12px;
@@ -1631,6 +1652,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       color: #0f766e;
       text-transform: uppercase;
       letter-spacing: 0.08em;
+      flex: 0 0 auto;
     }
     .adv-recent-search-pill {
       display: inline-block;
@@ -1646,36 +1668,11 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       overflow: hidden;
       text-overflow: ellipsis;
       max-width: 200px;
+      flex: 0 0 auto;
     }
     .adv-recent-search-pill:hover {
       background: #d1fae5;
       border-color: #5eead4;
-    }
-    .adv-saved-search-label {
-      font-size: 12px;
-      font-weight: 600;
-      color: #d97706;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-    .adv-saved-search-pill {
-      display: inline-block;
-      padding: 6px 12px;
-      border-radius: 20px;
-      background: #d97706;
-      border: 1px solid #d97706;
-      font-size: 13px;
-      color: #fff;
-      cursor: pointer;
-      transition: all 0.2s;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 200px;
-    }
-    .adv-saved-search-pill:hover {
-      background: #ea580c;
-      border-color: #ea580c;
     }
     .adv-save-btn {
       display: inline-flex;
@@ -1769,6 +1766,10 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         padding: 20px 16px 18px;
         border-radius: 12px;
       }
+      .adv-top-content {
+        margin-bottom: 8px;
+        padding: 5px 4px 3px;
+      }
       .adv-search-grid,
       .adv-detailed-grid {
         grid-template-columns: 1fr;
@@ -1794,6 +1795,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     <div className="adv-search-root">
       <style>{advancedSearchCSS}</style>
       <div className="adv-search-title">Търсене</div>
+      {topContent && <div className="adv-top-content">{topContent}</div>}
       <form onSubmit={handleSearch} className="adv-search-form">
         {isWheelsCategory ? (
           <div className="adv-search-grid">
@@ -2850,28 +2852,6 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                 title={search.displayLabel}
               >
                 {search.displayLabel}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* SAVED SEARCHES */}
-        {savedSearches.length > 0 && (
-          <div className="adv-recent-searches" style={{ borderTop: "1px solid #e5e7eb", paddingTop: 14 }}>
-            <div className="adv-saved-search-label">Запазени търсения:</div>
-            {savedSearches.map((search) => (
-              <button
-                key={search.id}
-                type="button"
-                className="adv-saved-search-pill"
-                onClick={(e) => {
-                  e.preventDefault();
-                  const queryString = new URLSearchParams(search.criteria).toString();
-                  navigate(`/search?${queryString}`);
-                }}
-                title={search.name}
-              >
-                {search.name}
               </button>
             ))}
           </div>

@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KarBG Public Upload API</title>
+    <style>
+        :root {
+            --ink: #0f172a;
+            --muted: #475569;
+            --line: #dbe2ef;
+            --bg: #f5f7fb;
+            --panel: #ffffff;
+            --accent: #0f766e;
+            --accent-soft: #ccfbf1;
+            --info-soft: #eff6ff;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.5;
+            margin: 0;
+            background: var(--bg);
+            color: var(--ink);
+        }
+        .wrap {
+            max-width: 1120px;
+            margin: 24px auto;
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 24px;
+        }
+        h1, h2, h3 { margin-top: 0; }
+        p { color: var(--muted); }
+        code, pre {
+            font-family: Consolas, "Courier New", monospace;
+            background: #f1f5f9;
+        }
+        code { padding: 2px 6px; border-radius: 4px; }
+        pre {
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            border: 1px solid var(--line);
+            margin: 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 16px;
+        }
+        th, td {
+            border: 1px solid var(--line);
+            padding: 10px;
+            text-align: left;
+            vertical-align: top;
+        }
+        th { background: #eef2ff; }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+        @media (min-width: 980px) {
+            .grid-2 {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 16px;
+            }
+        }
+        .card {
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: #fcfdff;
+            padding: 14px;
+        }
+        .note {
+            background: var(--info-soft);
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            padding: 10px 12px;
+            color: #1e3a8a;
+            margin-top: 10px;
+        }
+        .category-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .category-btn {
+            border: 1px solid #cbd5e1;
+            background: #ffffff;
+            color: #0f172a;
+            border-radius: 999px;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .category-btn.active {
+            border-color: var(--accent);
+            background: var(--accent-soft);
+            color: #115e59;
+            font-weight: 700;
+        }
+        .language-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .lang-btn {
+            border: 1px solid #cbd5e1;
+            background: #ffffff;
+            color: #0f172a;
+            border-radius: 999px;
+            padding: 7px 11px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .lang-btn.active {
+            border-color: var(--accent);
+            background: var(--accent-soft);
+            color: #115e59;
+            font-weight: 700;
+        }
+        .muted {
+            color: var(--muted);
+            font-size: 14px;
+        }
+        .section-title {
+            margin-top: 24px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <h1>Public Listing Upload API</h1>
+    <p>
+        Тези API endpoints позволяват външни системи да създават и публикуват обяви чрез API ключ на потребителя.
+        Обявата винаги се създава към акаунта, който притежава ключа.
+    </p>
+
+    <h2 class="section-title">Authentication</h2>
+    <p>Подай API ключа в един от тези headers:</p>
+    <ul>
+        <li><code>Authorization: ApiKey &lt;YOUR_KEY&gt;</code></li>
+        <li><code>X-Karbg-Api-Key: &lt;YOUR_KEY&gt;</code></li>
+    </ul>
+
+    <h2 class="section-title">Category Endpoints</h2>
+    <table>
+        <thead>
+        <tr>
+            <th>Категория</th>
+            <th>Main Category</th>
+            <th>Endpoint</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+            <td>Автомобили и джипове</td>
+            <td><code>1</code></td>
+            <td><code>POST /api/public/ads/cars/</code></td>
+        </tr>
+        <tr>
+            <td>Мотоциклети</td>
+            <td><code>5</code></td>
+            <td><code>POST /api/public/ads/motorcycles/</code></td>
+        </tr>
+        <tr>
+            <td>Бусове</td>
+            <td><code>3</code></td>
+            <td><code>POST /api/public/ads/buses/</code></td>
+        </tr>
+        <tr>
+            <td>Камиони</td>
+            <td><code>4</code></td>
+            <td><code>POST /api/public/ads/trucks/</code></td>
+        </tr>
+        </tbody>
+    </table>
+
+    <h2 class="section-title">Publish Draft Endpoint</h2>
+    <p><code>POST /api/public/listings/&lt;listing_id&gt;/publish/</code></p>
+
+    <h2 class="section-title">Promotion Plans</h2>
+    <p>Сумата се удържа само при публикуване (не при чернова).</p>
+    <table>
+        <thead>
+        <tr>
+            <th>Тип</th>
+            <th>План</th>
+            <th>Цена (EUR)</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+            <td>TOP</td>
+            <td><code>1d</code> (1 ден)</td>
+            <td>{{ top_1d }}</td>
+        </tr>
+        <tr>
+            <td>TOP</td>
+            <td><code>7d</code> (7 дни)</td>
+            <td>{{ top_7d }}</td>
+        </tr>
+        <tr>
+            <td>VIP</td>
+            <td><code>7d</code> (7 дни)</td>
+            <td>{{ vip_7d }}</td>
+        </tr>
+        <tr>
+            <td>VIP</td>
+            <td><code>lifetime</code> (за живота на обявата)</td>
+            <td>{{ vip_lifetime }}</td>
+        </tr>
+        </tbody>
+    </table>
+
+    <h2 class="section-title">Избери Категория И Полета</h2>
+    <div class="category-buttons" id="category-buttons"></div>
+    <div class="muted" id="selected-endpoint"></div>
+    <div class="note">
+        За директно публикуване използвай <code>is_draft=false</code> + минимум 3 изображения.
+        API приема файлове чрез <code>images_upload</code>, <code>images</code>, <code>images[]</code>, <code>photos</code>.
+    </div>
+
+    <div class="grid" style="margin-top: 14px;">
+        <div class="card">
+            <h3>Payload За Избраната Категория</h3>
+            <pre id="category-payload"></pre>
+        </div>
+    </div>
+
+    <div class="grid-2" style="margin-top: 14px;">
+        <div class="card">
+            <h3>Общи Полета</h3>
+            <table>
+                <thead>
+                <tr>
+                    <th>Поле</th>
+                    <th>Тип</th>
+                    <th>Задължително</th>
+                    <th>Описание</th>
+                </tr>
+                </thead>
+                <tbody id="common-fields-body"></tbody>
+            </table>
+        </div>
+        <div class="card">
+            <h3>Специфични Полета</h3>
+            <table>
+                <thead>
+                <tr>
+                    <th>Поле</th>
+                    <th>Тип</th>
+                    <th>Задължително</th>
+                    <th>Описание</th>
+                </tr>
+                </thead>
+                <tbody id="specific-fields-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <h2 class="section-title">Готов Request Пример (Copy/Paste)</h2>
+    <div class="grid">
+        <div class="card">
+            <div class="language-buttons" id="language-buttons"></div>
+            <h3 id="language-title">cURL пример</h3>
+            <pre id="language-example"></pre>
+        </div>
+    </div>
+
+    <h2 class="section-title">TOP/VIP Пример</h2>
+    <pre>{
+  "listing_type": "top",
+  "top_plan": "7d"
+}</pre>
+</div>
+
+{{ docs_config|json_script:"public-api-docs-config" }}
+<script>
+  const docsConfig = JSON.parse(document.getElementById("public-api-docs-config").textContent);
+  const orderedCategories = ["cars", "motorcycles", "buses", "trucks"];
+  const orderedLanguages = ["curl", "python", "javascript"];
+  const languageLabels = { curl: "cURL", python: "Python", javascript: "JavaScript" };
+  let selectedCategoryKey = orderedCategories[0];
+  let selectedLanguage = orderedLanguages[0];
+  let codeExamplesByLanguage = { curl: "", python: "", javascript: "" };
+
+  const categoryButtonsEl = document.getElementById("category-buttons");
+  const languageButtonsEl = document.getElementById("language-buttons");
+  const selectedEndpointEl = document.getElementById("selected-endpoint");
+  const categoryPayloadEl = document.getElementById("category-payload");
+  const commonFieldsBodyEl = document.getElementById("common-fields-body");
+  const specificFieldsBodyEl = document.getElementById("specific-fields-body");
+  const languageTitleEl = document.getElementById("language-title");
+  const languageExampleEl = document.getElementById("language-example");
+
+  function escapeSingleQuotes(value) {
+    return String(value).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  }
+
+  function escapeDoubleQuotes(value) {
+    return String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  }
+
+  function pythonLiteral(value) {
+    if (value === null || value === undefined) return "None";
+    if (typeof value === "boolean") return value ? "True" : "False";
+    if (typeof value === "number") return String(value);
+    if (Array.isArray(value)) return `[${value.map((item) => pythonLiteral(item)).join(", ")}]`;
+    return `'${escapeSingleQuotes(value)}'`;
+  }
+
+  function buildPayloadForCategory(categoryKey) {
+    const base = docsConfig.base_payload || {};
+    const category = docsConfig.categories[categoryKey] || {};
+    return { ...base, ...(category.payload_overrides || {}) };
+  }
+
+  function renderFieldRows(target, fields) {
+    if (!fields || fields.length === 0) {
+      target.innerHTML = '<tr><td colspan="4">Няма допълнителни специфични полета.</td></tr>';
+      return;
+    }
+    target.innerHTML = fields
+      .map((field) => `
+        <tr>
+          <td><code>${field.name}</code></td>
+          <td>${field.type}</td>
+          <td>${field.required ? "Да" : "Не"}</td>
+          <td>${field.description || ""}</td>
+        </tr>
+      `)
+      .join("");
+  }
+
+  function renderCodeExamples(categoryKey) {
+    const category = docsConfig.categories[categoryKey];
+    const payload = buildPayloadForCategory(categoryKey);
+    const endpoint = category.endpoint;
+    const baseUrl = window.location.origin;
+
+    const curlLines = [];
+    curlLines.push(`curl -X POST "${baseUrl}${endpoint}" \\`);
+    curlLines.push(`  -H "Authorization: ApiKey YOUR_API_KEY" \\`);
+    Object.entries(payload).forEach(([key, value]) => {
+      const serialized = Array.isArray(value) ? JSON.stringify(value) : value;
+      curlLines.push(`  -F "${key}=${escapeDoubleQuotes(serialized)}" \\`);
+    });
+    curlLines.push(`  -F "images_upload=@/path/to/image1.jpg" \\`);
+    curlLines.push(`  -F "images_upload=@/path/to/image2.jpg" \\`);
+    curlLines.push(`  -F "images_upload=@/path/to/image3.jpg"`);
+    const curlSnippet = curlLines.join("\n");
+
+    const pythonDataBody = Object.entries(payload)
+      .map(([key, value]) => `    "${key}": ${pythonLiteral(value)},`)
+      .join("\n");
+    const pythonSnippet = [
+      "import requests",
+      "",
+      'API_KEY = "YOUR_API_KEY"',
+      `BASE_URL = "${baseUrl}"`,
+      `url = f"{BASE_URL}${endpoint}"`,
+      "",
+      "headers = {",
+      '    "Authorization": f"ApiKey {API_KEY}",',
+      "}",
+      "",
+      "data = {",
+      pythonDataBody,
+      "}",
+      "",
+      "files = [",
+      '    ("images_upload", open("image1.jpg", "rb")),',
+      '    ("images_upload", open("image2.jpg", "rb")),',
+      '    ("images_upload", open("image3.jpg", "rb")),',
+      "]",
+      "",
+      "response = requests.post(url, headers=headers, data=data, files=files, timeout=60)",
+      "print(response.status_code)",
+      "print(response.json())",
+    ].join("\n");
+
+    const jsSnippet = [
+      `const API_KEY = "YOUR_API_KEY";`,
+      `const BASE_URL = "${baseUrl}";`,
+      `const ENDPOINT = "${endpoint}";`,
+      "",
+      "const payload = " + JSON.stringify(payload, null, 2) + ";",
+      "",
+      "const formData = new FormData();",
+      "Object.entries(payload).forEach(([key, value]) => {",
+      "  formData.append(key, Array.isArray(value) ? JSON.stringify(value) : String(value));",
+      "});",
+      'formData.append("images_upload", imageFile1);',
+      'formData.append("images_upload", imageFile2);',
+      'formData.append("images_upload", imageFile3);',
+      "",
+      "const response = await fetch(`${BASE_URL}${ENDPOINT}`, {",
+      '  method: "POST",',
+      "  headers: { Authorization: `ApiKey ${API_KEY}` },",
+      "  body: formData,",
+      "});",
+      "",
+      "const result = await response.json();",
+      "console.log(response.status, result);",
+    ].join("\n");
+
+    codeExamplesByLanguage = {
+      curl: curlSnippet,
+      python: pythonSnippet,
+      javascript: jsSnippet,
+    };
+    renderLanguageCode();
+  }
+
+  function renderLanguageCode() {
+    document.querySelectorAll(".lang-btn").forEach((button) => {
+      button.classList.toggle("active", button.dataset.language === selectedLanguage);
+    });
+    languageTitleEl.textContent = `${languageLabels[selectedLanguage]} пример`;
+    languageExampleEl.textContent = codeExamplesByLanguage[selectedLanguage] || "";
+  }
+
+  function renderCategory(categoryKey) {
+    selectedCategoryKey = categoryKey;
+    const category = docsConfig.categories[categoryKey];
+    const payload = buildPayloadForCategory(categoryKey);
+
+    document.querySelectorAll(".category-btn").forEach((button) => {
+      button.classList.toggle("active", button.dataset.key === categoryKey);
+    });
+
+    selectedEndpointEl.innerHTML = `Endpoint: <code>POST ${category.endpoint}</code> (main_category=${category.main_category})`;
+    categoryPayloadEl.textContent = JSON.stringify(payload, null, 2);
+    renderFieldRows(commonFieldsBodyEl, docsConfig.common_fields);
+    renderFieldRows(specificFieldsBodyEl, category.specific_fields || []);
+    renderCodeExamples(categoryKey);
+  }
+
+  function bootstrapCategoryButtons() {
+    orderedCategories.forEach((key) => {
+      const category = docsConfig.categories[key];
+      if (!category) return;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "category-btn";
+      button.dataset.key = key;
+      button.textContent = category.label;
+      button.addEventListener("click", () => renderCategory(key));
+      categoryButtonsEl.appendChild(button);
+    });
+  }
+
+  function bootstrapLanguageButtons() {
+    orderedLanguages.forEach((key) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "lang-btn";
+      button.dataset.language = key;
+      button.textContent = languageLabels[key];
+      button.addEventListener("click", () => {
+        selectedLanguage = key;
+        renderLanguageCode();
+      });
+      languageButtonsEl.appendChild(button);
+    });
+  }
+
+  bootstrapCategoryButtons();
+  bootstrapLanguageButtons();
+  renderCategory(selectedCategoryKey);
+</script>
+</body>
+</html>

@@ -20,6 +20,7 @@ urlpatterns = [
     path('api/admin/', include('backend.adminpanel.urls')),
     path('api/payments/', include('backend.payments.urls')),
     path('api/', include('backend.listings.urls')),
+    path('api/', include('backend.public_api.urls')),
     path('api/', include('backend.reports.urls')),
 ]
 

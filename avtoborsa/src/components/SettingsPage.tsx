@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Clock3,
   Copy,
+  ExternalLink,
   KeyRound,
   Lock,
   RefreshCw,
@@ -17,6 +18,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const PUBLIC_API_DOCS_URL = `${API_BASE_URL}/api/public/docs/`;
 const TRANSACTIONS_PER_PAGE = 5;
 
 type PaymentTransaction = {
@@ -406,7 +408,7 @@ const SettingsPage: React.FC = () => {
     profile: "Управлявай личните си данни за контакт.",
     password: "Обнови достъпа си и защити профила си.",
     transactions: "Прегледай история на добавените средства.",
-    api: "Създай API ключ за импортиране на обяви от Copart.",
+    api: "Създай API ключ и отвори документацията за публичното API.",
     delete: "Контролирай изтриването на профила си.",
   };
 
@@ -1221,6 +1223,16 @@ const SettingsPage: React.FC = () => {
                 )}
 
                 <div style={{ marginTop: 14, display: "flex", flexWrap: "wrap", gap: 10 }}>
+                  <a
+                    href={PUBLIC_API_DOCS_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="settings-ghost-btn"
+                    style={{ ...styles.buttonGhost, display: "inline-flex", alignItems: "center", gap: 7, textDecoration: "none" }}
+                  >
+                    <ExternalLink size={15} />
+                    API документация
+                  </a>
                   <button
                     type="button"
                     className="settings-primary-btn"
