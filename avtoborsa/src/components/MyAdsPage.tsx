@@ -27,6 +27,7 @@ import {
   Palette,
   ShieldCheck,
   Leaf,
+  Tag,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -35,6 +36,7 @@ import {
   formatFuelLabel,
   formatGearboxLabel,
 } from "../utils/listingLabels";
+import { resolvePriceBadgeState } from "../utils/priceChangeBadge";
 import { getMainCategoryLabel } from "../constants/mobileBgData";
 import {
   readMyAdsCache,
@@ -197,6 +199,41 @@ const globalCss = `
   * { box-sizing: border-box; }
   body { margin: 0; font-family: "Manrope", "Segoe UI", sans-serif; font-size: 15px; }
   input, select, button { font-family: inherit; }
+  .myads-icon-btn {
+    position: relative;
+    overflow: visible;
+  }
+  .myads-icon-btn > svg {
+    width: 20px !important;
+    height: 20px !important;
+    stroke-width: 2.2;
+  }
+  .myads-icon-btn::after {
+    content: attr(data-action);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    transform: translate(-50%, 6px);
+    background: rgba(15, 23, 42, 0.96);
+    color: #fff;
+    border-radius: 8px;
+    padding: 6px 9px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    line-height: 1;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    z-index: 25;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.32);
+  }
+  .myads-icon-btn:hover::after,
+  .myads-icon-btn:focus-visible::after {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 `;
 
 const MyAdsPage: React.FC = () => {
@@ -1487,7 +1524,7 @@ const MyAdsPage: React.FC = () => {
     cursor: "pointer",
   },
   modal: {
-    width: "min(560px, 92vw)",
+    width: "min(860px, 96vw)",
     background: "#fff",
     borderRadius: 18,
     padding: "22px",
@@ -1527,6 +1564,22 @@ const MyAdsPage: React.FC = () => {
     gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
     gap: 14,
   },
+  modalContentSplit: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+    gap: 16,
+    alignItems: "start",
+  },
+  modalContentLeft: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 14,
+  },
+  modalContentRight: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+  },
   listingTypeCard: {
     position: "relative" as const,
     borderRadius: 14,
@@ -1535,6 +1588,9 @@ const MyAdsPage: React.FC = () => {
     background: "#fff",
     cursor: "pointer",
     textAlign: "left" as const,
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
     transition: "border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease",
   },
   listingTypeCardSelected: {
@@ -1551,6 +1607,12 @@ const MyAdsPage: React.FC = () => {
     fontSize: 12,
     color: "#666",
     margin: 0,
+  },
+  listingTypePrice: {
+    margin: "2px 0 0 0",
+    fontSize: 12,
+    fontWeight: 800,
+    color: "#0f766e",
   },
   vipPlanGrid: {
     display: "grid",
@@ -1610,6 +1672,87 @@ const MyAdsPage: React.FC = () => {
     fontSize: 12,
     color: "#999",
     margin: 0,
+  },
+  listingTypePreviewCard: {
+    borderRadius: 14,
+    border: "1px solid #e2e8f0",
+    overflow: "visible",
+    background: "#fff",
+    boxShadow: "0 10px 26px rgba(15, 23, 42, 0.08)",
+  },
+  listingTypePreviewMedia: {
+    position: "relative" as const,
+    height: 186,
+    background: "#f1f5f9",
+    overflow: "visible" as const,
+    isolation: "isolate" as const,
+  },
+  listingTypePreviewFrame: {
+    width: "100%",
+    height: "100%",
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    overflow: "hidden",
+  },
+  listingTypePreviewImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover" as const,
+    objectPosition: "center" as const,
+    display: "block",
+  },
+  listingTypePreviewPlaceholder: {
+    width: "100%",
+    height: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#94a3b8",
+    fontSize: 13,
+    gap: 8,
+  },
+  listingTypePreviewBody: {
+    padding: "12px 14px",
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+  },
+  listingTypePreviewTitle: {
+    margin: 0,
+    fontSize: 14,
+    fontWeight: 800,
+    color: "#0f172a",
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+  },
+  listingTypePreviewMeta: {
+    fontSize: 12,
+    color: "#64748b",
+    fontWeight: 600,
+  },
+  listingTypePreviewPrice: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 32,
+    padding: "0 10px",
+    borderRadius: 10,
+    background: "linear-gradient(135deg, #0f766e 0%, #0ea5a3 100%)",
+    color: "#fff",
+    fontWeight: 800,
+    fontSize: 13,
+    width: "fit-content",
+  },
+  listingTypePreviewHint: {
+    margin: "2px 0 0 0",
+    fontSize: 11,
+    color: "#64748b",
+    fontWeight: 700,
+  },
+  listingTypePreviewPromoPrice: {
+    margin: 0,
+    fontSize: 12,
+    color: "#0f172a",
+    fontWeight: 800,
   },
   previewModal: {
     width: "min(980px, 96vw)",
@@ -1747,6 +1890,11 @@ const MyAdsPage: React.FC = () => {
   },
   previewPriceChangeUp: { background: "#dcfce7", color: "#16a34a", border: "1px solid #bbf7d0" },
   previewPriceChangeDown: { background: "#fee2e2", color: "#dc2626", border: "1px solid #fecaca" },
+  previewPriceChangeAnnounced: {
+    background: "#e0f2fe",
+    color: "#0369a1",
+    border: "1px solid #bae6fd",
+  },
   previewSpecs: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
@@ -1978,6 +2126,11 @@ const MyAdsPage: React.FC = () => {
   },
   listingPriceChangeUp: { background: "#dcfce7", color: "#16a34a", border: "1px solid #bbf7d0" },
   listingPriceChangeDown: { background: "#fee2e2", color: "#dc2626", border: "1px solid #fecaca" },
+  listingPriceChangeAnnounced: {
+    background: "#e0f2fe",
+    color: "#0369a1",
+    border: "1px solid #bae6fd",
+  },
   listingContent: {
     padding: "18px",
     display: "flex",
@@ -2070,6 +2223,16 @@ const MyAdsPage: React.FC = () => {
   listingChipIcon: {
     color: "#0f766e",
   },
+  listingActionsLabel: {
+    marginTop: 10,
+    marginBottom: 6,
+    textAlign: "center",
+    fontSize: 11,
+    fontWeight: 800,
+    letterSpacing: "0.4px",
+    textTransform: "uppercase" as const,
+    color: "#64748b",
+  },
   listingActions: {
     display: "flex",
     gap: 8,
@@ -2077,21 +2240,50 @@ const MyAdsPage: React.FC = () => {
     paddingTop: 16,
     borderTop: "1px solid #e0e0e0",
     flexWrap: "wrap",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  deleteConfirmWrap: {
+    marginTop: 8,
+    overflow: "hidden",
+    transition: "max-height 0.28s ease, opacity 0.24s ease, transform 0.24s ease",
+    transformOrigin: "top center",
+  },
+  deleteConfirmWrapOpen: {
+    maxHeight: 72,
+    opacity: 1,
+    transform: "translateY(0)",
+  },
+  deleteConfirmWrapClosed: {
+    maxHeight: 0,
+    opacity: 0,
+    transform: "translateY(-4px)",
+    pointerEvents: "none",
+  },
+  deleteConfirmBox: {
+    padding: "8px 12px",
+    background: "#ffebee",
+    border: "1px solid #ffcdd2",
+    borderRadius: 8,
+    fontSize: 12,
+    color: "#d32f2f",
   },
   actionButton: {
-    flex: 1,
-    padding: "10px 16px",
+    flex: "0 0 36px",
+    width: 36,
+    height: 36,
+    padding: 0,
     border: "none",
-    borderRadius: 4,
-    fontSize: 13,
+    borderRadius: 10,
+    fontSize: 0,
     fontWeight: 700,
     cursor: "pointer",
     transition: "all 0.2s",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    minWidth: "fit-content",
+    gap: 0,
+    minWidth: 36,
   },
   editButton: {
     background: "#d97706",
@@ -2343,6 +2535,36 @@ const MyAdsPage: React.FC = () => {
     listingTypeModal.mode === "republish"
       ? "Обявата ще бъде активна до 30 дни от момента на публикуване."
       : "VIP е визуално открояване, без приоритет в класирането.";
+  const modalSourceListing = listingTypeModal.listingId
+    ? [...activeListings, ...archivedListings, ...draftListings, ...expiredListings].find(
+        (listing) => listing.id === listingTypeModal.listingId
+      ) || null
+    : null;
+  const modalPreviewImage = modalSourceListing ? getCardImageSources(modalSourceListing).display : "";
+  const modalPreviewTitle = (modalSourceListing?.title || listingTypeModal.listingTitle || "Обявата").trim();
+  const modalPreviewPriceValue = modalSourceListing ? Number(modalSourceListing.price) : Number.NaN;
+  const modalPreviewPriceLabel =
+    Number.isFinite(modalPreviewPriceValue) && modalPreviewPriceValue > 0
+      ? `${modalPreviewPriceValue.toLocaleString("bg-BG")} €`
+      : "Цена не е зададена";
+  const modalPreviewBadgeType =
+    listingTypeModal.selectedType === "top"
+      ? "top"
+      : listingTypeModal.selectedType === "vip"
+        ? "vip"
+        : null;
+  const modalPreviewPromoPriceLabel =
+    listingTypeModal.selectedType === "normal"
+      ? "Цена за тип обява: Безплатно"
+      : listingTypeModal.selectedType === "top"
+        ? `Цена за ТОП: €${TOP_LISTING_PRICE_1D_EUR.toFixed(2)}`
+        : `Цена за VIP: €${getVipPrice(listingTypeModal.vipPlan).toFixed(2)}`;
+  const modalPreviewHint =
+    listingTypeModal.selectedType === "top"
+      ? "ТОП значката ще се вижда върху обявата."
+      : listingTypeModal.selectedType === "vip"
+        ? `VIP значка ${getVipPlanLabel(listingTypeModal.vipPlan)}.`
+        : "Без промо значка при нормална обява.";
   const isPreviewTab = activeTab === "archived" || activeTab === "expired" || activeTab === "drafts";
   const previewImages = previewListing ? getPreviewImages(previewListing) : [];
   const previewImage = previewImages[previewImageIndex]?.full || "";
@@ -2352,13 +2574,14 @@ const MyAdsPage: React.FC = () => {
       ? `€${previewPriceValue.toLocaleString("bg-BG")}`
       : "Цена не е зададена";
   const previewLatestHistory = previewListing?.price_history?.[0];
-  const previewDeltaValue = previewLatestHistory ? Number(previewLatestHistory.delta) : Number.NaN;
-  const showPreviewPriceChange = Number.isFinite(previewDeltaValue) && previewDeltaValue !== 0;
-  const previewChangeDirection = previewDeltaValue > 0 ? "up" : "down";
-  const previewChangeLabel = showPreviewPriceChange
-    ? `${Math.abs(previewDeltaValue).toLocaleString("bg-BG")} €`
-    : "";
-  const PreviewChangeIcon = previewChangeDirection === "up" ? TrendingUp : TrendingDown;
+  const previewPriceBadge = resolvePriceBadgeState(previewLatestHistory, currentTimeMs);
+  const showPreviewPriceChange = Boolean(previewPriceBadge);
+  const PreviewChangeIcon =
+    previewPriceBadge?.kind === "announced"
+      ? Clock
+      : previewPriceBadge?.kind === "up"
+        ? TrendingUp
+        : TrendingDown;
   const previewSpecs = previewListing ? getTechnicalSpecs(previewListing).slice(0, 4) : [];
   const previewStatusLabel = getPreviewStatusLabel(previewTab);
   const previewStatusStyle =
@@ -2464,114 +2687,149 @@ const MyAdsPage: React.FC = () => {
                 </button>
               </div>
 
-              <div style={styles.listingTypeGrid}>
-                <button
-                  type="button"
-                  style={{
-                    ...styles.listingTypeCard,
-                    ...(listingTypeModal.selectedType === "normal" ? styles.listingTypeCardSelected : {}),
-                  }}
-                  onClick={() =>
-                    setListingTypeModal((prev) => ({ ...prev, selectedType: "normal" }))
-                  }
-                  disabled={isModalBusy}
-                >
-                  <h3 style={styles.listingTypeTitle}>Нормална обява</h3>
-                  <p style={styles.listingTypeDesc}>
-                    Стандартно публикуване без допълнително позициониране.
-                  </p>
-                </button>
+              <div style={styles.modalContentSplit}>
+                <div style={styles.modalContentLeft}>
+                  <div style={styles.listingTypeGrid}>
+                    <button
+                      type="button"
+                      style={{
+                        ...styles.listingTypeCard,
+                        ...(listingTypeModal.selectedType === "normal" ? styles.listingTypeCardSelected : {}),
+                      }}
+                      onClick={() =>
+                        setListingTypeModal((prev) => ({ ...prev, selectedType: "normal" }))
+                      }
+                      disabled={isModalBusy}
+                    >
+                      <h3 style={styles.listingTypeTitle}>Нормална обява</h3>
+                      <p style={styles.listingTypeDesc}>
+                        Стандартно публикуване без допълнително позициониране.
+                      </p>
+                      <p style={styles.listingTypePrice}>Цена: Безплатно</p>
+                    </button>
 
-                <button
-                  type="button"
-                  style={{
-                    ...styles.listingTypeCard,
-                    ...(listingTypeModal.selectedType === "top" ? styles.listingTypeCardSelected : {}),
-                  }}
-                  onClick={() =>
-                    setListingTypeModal((prev) => ({ ...prev, selectedType: "top" }))
-                  }
-                  disabled={isModalBusy}
-                >
-                  <h3 style={styles.listingTypeTitle}>Топ обява</h3>
-                  <p style={styles.listingTypeDesc}>
-                    Приоритетна видимост и изкарване по-напред в резултатите.
-                  </p>
-                </button>
+                    <button
+                      type="button"
+                      style={{
+                        ...styles.listingTypeCard,
+                        ...(listingTypeModal.selectedType === "top" ? styles.listingTypeCardSelected : {}),
+                      }}
+                      onClick={() =>
+                        setListingTypeModal((prev) => ({ ...prev, selectedType: "top" }))
+                      }
+                      disabled={isModalBusy}
+                    >
+                      <h3 style={styles.listingTypeTitle}>Топ обява</h3>
+                      <p style={styles.listingTypeDesc}>
+                        Приоритетна видимост и изкарване по-напред в резултатите.
+                      </p>
+                      <p style={styles.listingTypePrice}>Цена: €{TOP_LISTING_PRICE_1D_EUR.toFixed(2)}</p>
+                    </button>
 
-                <button
-                  type="button"
-                  style={{
-                    ...styles.listingTypeCard,
-                    ...(listingTypeModal.selectedType === "vip" ? styles.listingTypeCardSelected : {}),
-                  }}
-                  onClick={() =>
-                    setListingTypeModal((prev) => ({ ...prev, selectedType: "vip" }))
-                  }
-                  disabled={isModalBusy}
-                >
-                  <h3 style={styles.listingTypeTitle}>VIP обява</h3>
-                  <p style={styles.listingTypeDesc}>
-                    Визуално открояване с VIP етикет без приоритет в класирането.
-                  </p>
-                </button>
-              </div>
+                    <button
+                      type="button"
+                      style={{
+                        ...styles.listingTypeCard,
+                        ...(listingTypeModal.selectedType === "vip" ? styles.listingTypeCardSelected : {}),
+                      }}
+                      onClick={() =>
+                        setListingTypeModal((prev) => ({ ...prev, selectedType: "vip" }))
+                      }
+                      disabled={isModalBusy}
+                    >
+                      <h3 style={styles.listingTypeTitle}>VIP обява</h3>
+                      <p style={styles.listingTypeDesc}>
+                        Визуално открояване с VIP етикет без приоритет в класирането.
+                      </p>
+                      <p style={styles.listingTypePrice}>
+                        Цена: €{getVipPrice(listingTypeModal.vipPlan).toFixed(2)}
+                      </p>
+                    </button>
+                  </div>
 
-              {listingTypeModal.selectedType === "vip" && (
-                <div style={styles.vipPlanGrid}>
-                  <button
-                    type="button"
-                    style={{
-                      ...styles.vipPlanCard,
-                      ...(listingTypeModal.vipPlan === "7d" ? styles.vipPlanCardSelected : {}),
-                    }}
-                    onClick={() =>
-                      setListingTypeModal((prev) => ({ ...prev, vipPlan: "7d" }))
-                    }
-                    disabled={isModalBusy}
-                  >
-                    <h4 style={styles.vipPlanTitle}>VIP за 7 дни</h4>
-                    <p style={styles.vipPlanDesc}>Цена: €{VIP_LISTING_PRICE_7D_EUR.toFixed(2)}</p>
-                  </button>
-                  <button
-                    type="button"
-                    style={{
-                      ...styles.vipPlanCard,
-                      ...(listingTypeModal.vipPlan === "lifetime" ? styles.vipPlanCardSelected : {}),
-                    }}
-                    onClick={() =>
-                      setListingTypeModal((prev) => ({ ...prev, vipPlan: "lifetime" }))
-                    }
-                    disabled={isModalBusy}
-                  >
-                    <h4 style={styles.vipPlanTitle}>VIP до изтичане</h4>
-                    <p style={styles.vipPlanDesc}>
-                      Цена: €{VIP_LISTING_PRICE_LIFETIME_EUR.toFixed(2)}
-                    </p>
-                  </button>
+                  {listingTypeModal.selectedType === "vip" && (
+                    <div style={styles.vipPlanGrid}>
+                      <button
+                        type="button"
+                        style={{
+                          ...styles.vipPlanCard,
+                          ...(listingTypeModal.vipPlan === "7d" ? styles.vipPlanCardSelected : {}),
+                        }}
+                        onClick={() =>
+                          setListingTypeModal((prev) => ({ ...prev, vipPlan: "7d" }))
+                        }
+                        disabled={isModalBusy}
+                      >
+                        <h4 style={styles.vipPlanTitle}>VIP за 7 дни</h4>
+                        <p style={styles.vipPlanDesc}>Цена: €{VIP_LISTING_PRICE_7D_EUR.toFixed(2)}</p>
+                      </button>
+                      <button
+                        type="button"
+                        style={{
+                          ...styles.vipPlanCard,
+                          ...(listingTypeModal.vipPlan === "lifetime" ? styles.vipPlanCardSelected : {}),
+                        }}
+                        onClick={() =>
+                          setListingTypeModal((prev) => ({ ...prev, vipPlan: "lifetime" }))
+                        }
+                        disabled={isModalBusy}
+                      >
+                        <h4 style={styles.vipPlanTitle}>VIP до изтичане</h4>
+                        <p style={styles.vipPlanDesc}>
+                          Цена: €{VIP_LISTING_PRICE_LIFETIME_EUR.toFixed(2)}
+                        </p>
+                      </button>
+                    </div>
+                  )}
+
+                  <div style={styles.modalActions}>
+                    <button
+                      type="button"
+                      style={{ ...styles.modalButton, ...styles.modalButtonSecondary }}
+                      onClick={closeListingTypeModal}
+                      disabled={isModalBusy}
+                    >
+                      Отказ
+                    </button>
+                    <button
+                      type="button"
+                      style={{ ...styles.modalButton, ...styles.modalButtonPrimary }}
+                      onClick={handleListingTypeConfirm}
+                      disabled={isModalBusy}
+                    >
+                      {isModalBusy ? "Запазване..." : modalPrimaryLabel}
+                    </button>
+                  </div>
+                  <p style={styles.modalHint}>{modalHint}</p>
                 </div>
-              )}
 
-              <div style={styles.modalActions}>
-                <button
-                  type="button"
-                  style={{ ...styles.modalButton, ...styles.modalButtonSecondary }}
-                  onClick={closeListingTypeModal}
-                  disabled={isModalBusy}
-                >
-                  Отказ
-                </button>
-                <button
-                  type="button"
-                  style={{ ...styles.modalButton, ...styles.modalButtonPrimary }}
-                  onClick={handleListingTypeConfirm}
-                  disabled={isModalBusy}
-                >
-                  {isModalBusy ? "Запазване..." : modalPrimaryLabel}
-                </button>
+                <div style={styles.modalContentRight}>
+                  <div style={styles.listingTypePreviewCard}>
+                    <div style={styles.listingTypePreviewMedia}>
+                      {modalPreviewBadgeType && <ListingPromoBadge type={modalPreviewBadgeType} />}
+                      <div style={styles.listingTypePreviewFrame}>
+                        {modalPreviewImage ? (
+                          <img src={modalPreviewImage} alt={modalPreviewTitle} style={styles.listingTypePreviewImage} />
+                        ) : (
+                          <div style={styles.listingTypePreviewPlaceholder}>
+                            <Car size={22} />
+                            Няма снимка
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div style={styles.listingTypePreviewBody}>
+                      <p style={styles.listingTypePreviewTitle}>{modalPreviewTitle}</p>
+                      <div style={styles.listingTypePreviewMeta}>
+                        Преглед как ще изглежда промо етикетът върху картата
+                      </div>
+                      <div style={styles.listingTypePreviewPrice}>{modalPreviewPriceLabel}</div>
+                      <p style={styles.listingTypePreviewPromoPrice}>{modalPreviewPromoPriceLabel}</p>
+                      <p style={styles.listingTypePreviewHint}>{modalPreviewHint}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
-
-              <p style={styles.modalHint}>{modalHint}</p>
             </div>
           </div>
         )}
@@ -2707,15 +2965,18 @@ const MyAdsPage: React.FC = () => {
                       <span
                         style={{
                           ...styles.previewPriceChangeBadge,
-                          ...(previewChangeDirection === "up"
+                          ...(previewPriceBadge?.kind === "up"
                             ? styles.previewPriceChangeUp
-                            : styles.previewPriceChangeDown),
+                            : previewPriceBadge?.kind === "down"
+                              ? styles.previewPriceChangeDown
+                              : styles.previewPriceChangeAnnounced),
                         }}
-                        title={previewChangeDirection === "up" ? "Повишена цена" : "Намалена цена"}
+                        title={previewPriceBadge?.title}
                       >
                         <PreviewChangeIcon size={14} />
-                        {previewChangeDirection === "up" ? "+" : "-"}
-                        {previewChangeLabel}
+                        {previewPriceBadge?.kind === "announced"
+                          ? "Обявена цена"
+                          : `${previewPriceBadge?.kind === "up" ? "+" : "-"}${previewPriceBadge?.amountLabel}`}
                       </span>
                     )}
                   </div>
@@ -2743,6 +3004,9 @@ const MyAdsPage: React.FC = () => {
 
                   <div style={styles.previewActions}>
                     <button
+                      className="myads-icon-btn"
+                      data-action="Редактирай"
+                      aria-label="Редактирай"
                       type="button"
                       style={{ ...styles.actionButton, ...styles.editButton, flex: "0 0 auto" }}
                       onClick={() => {
@@ -2966,13 +3230,14 @@ const MyAdsPage: React.FC = () => {
                       ? `${priceValue.toLocaleString("bg-BG")} €`
                       : "Цена не е зададена";
                   const latestPriceHistory = listing.price_history?.[0];
-                  const latestDeltaValue = latestPriceHistory ? Number(latestPriceHistory.delta) : Number.NaN;
-                  const showPriceChange = Number.isFinite(latestDeltaValue) && latestDeltaValue !== 0;
-                  const priceChangeDirection = latestDeltaValue > 0 ? "up" : "down";
-                  const priceChangeLabel = showPriceChange
-                    ? `${Math.abs(latestDeltaValue).toLocaleString("bg-BG")} €`
-                    : "";
-                  const PriceChangeIcon = priceChangeDirection === "up" ? TrendingUp : TrendingDown;
+                  const priceBadge = resolvePriceBadgeState(latestPriceHistory, currentTimeMs);
+                  const showPriceChange = Boolean(priceBadge);
+                  const PriceChangeIcon =
+                    priceBadge?.kind === "announced"
+                      ? Clock
+                      : priceBadge?.kind === "up"
+                        ? TrendingUp
+                        : TrendingDown;
                   const statusBadgeStyle =
                     statusLabel === "Изтекла"
                       ? { ...styles.statusBadge, ...styles.statusBadgeExpired }
@@ -3063,15 +3328,18 @@ const MyAdsPage: React.FC = () => {
                     <span
                       style={{
                         ...styles.listingPriceChangeBadge,
-                        ...(priceChangeDirection === "up"
+                        ...(priceBadge?.kind === "up"
                           ? styles.listingPriceChangeUp
-                          : styles.listingPriceChangeDown),
+                          : priceBadge?.kind === "down"
+                            ? styles.listingPriceChangeDown
+                            : styles.listingPriceChangeAnnounced),
                       }}
-                      title={priceChangeDirection === "up" ? "Повишена цена" : "Намалена цена"}
+                      title={priceBadge?.title}
                     >
                       <PriceChangeIcon size={12} />
-                      {priceChangeDirection === "up" ? "+" : "-"}
-                      {priceChangeLabel}
+                      {priceBadge?.kind === "announced"
+                        ? "Обявена цена"
+                        : `${priceBadge?.kind === "up" ? "+" : "-"}${priceBadge?.amountLabel}`}
                     </span>
                   )}
                 </div>
@@ -3126,11 +3394,15 @@ const MyAdsPage: React.FC = () => {
                   </div>
                 )}
 
+                <div style={styles.listingActionsLabel}>Управление на обявата</div>
                 <div style={styles.listingActions}>
                   {/* Active Tab Actions: Edit, Archive, Delete */}
                   {(activeTab === "active" || activeTab === "top") && (
                     <>
                       <button
+                        className="myads-icon-btn"
+                        data-action="Редактирай"
+                        aria-label="Редактирай"
                         style={{ ...styles.actionButton, ...styles.editButton }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -3155,6 +3427,9 @@ const MyAdsPage: React.FC = () => {
 
                       {activeTab === "active" && listing.listing_type !== "top" && (
                         <button
+                          className="myads-icon-btn"
+                          data-action="Промотирай"
+                          aria-label="Промотирай"
                           onClick={(e) => {
                             e.stopPropagation();
                             openListingTypeModal(listing, "promote", "top");
@@ -3181,13 +3456,24 @@ const MyAdsPage: React.FC = () => {
                             }
                           }}
                         >
-                          <PackageOpen size={14} />
+                          <Tag size={14} />
                           Промотирай
                         </button>
                       )}
 
                       {isBusinessUser && (
                         <button
+                          className="myads-icon-btn"
+                          data-action={
+                            actionLoading === listing.id
+                              ? "Обработва се"
+                              : listing.is_kaparirano
+                                ? "Махни капаро"
+                                : "Капарирай"
+                          }
+                          aria-label={
+                            listing.is_kaparirano ? "Махни капаро" : "Капарирай"
+                          }
                           onClick={(e) => handleKapariranoToggle(listing, e)}
                           disabled={actionLoading === listing.id}
                           style={{
@@ -3229,6 +3515,9 @@ const MyAdsPage: React.FC = () => {
                       )}
 
                       <button
+                        className="myads-icon-btn"
+                        data-action={actionLoading === listing.id ? "Обработва се" : "Архивирай"}
+                        aria-label="Архивирай"
                         onClick={(e) => handleArchive(listing.id, e)}
                         disabled={actionLoading === listing.id}
                         style={{
@@ -3260,6 +3549,9 @@ const MyAdsPage: React.FC = () => {
                       </button>
 
                       <button
+                        className="myads-icon-btn"
+                        data-action={deleteConfirm === listing.id ? "Потвърди изтриване" : "Изтрий"}
+                        aria-label={deleteConfirm === listing.id ? "Потвърди изтриване" : "Изтрий"}
                         onClick={(e) => handleDelete(listing.id, e)}
                         disabled={actionLoading === listing.id}
                         style={{
@@ -3295,6 +3587,9 @@ const MyAdsPage: React.FC = () => {
                   {activeTab === "archived" && (
                     <>
                       <button
+                        className="myads-icon-btn"
+                        data-action="Преглед"
+                        aria-label="Преглед"
                         onClick={(e) => {
                           e.stopPropagation();
                           openPreview(listing);
@@ -3314,6 +3609,9 @@ const MyAdsPage: React.FC = () => {
                       </button>
 
                       <button
+                        className="myads-icon-btn"
+                        data-action="Редактирай"
+                        aria-label="Редактирай"
                         style={{ ...styles.actionButton, ...styles.editButton }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -3337,6 +3635,9 @@ const MyAdsPage: React.FC = () => {
                       </button>
 
                       <button
+                        className="myads-icon-btn"
+                        data-action={actionLoading === listing.id ? "Обработва се" : "Върни в активни"}
+                        aria-label="Върни в активни"
                         onClick={(e) => handleUnarchive(listing.id, e)}
                         disabled={actionLoading === listing.id}
                         style={{
@@ -3366,6 +3667,9 @@ const MyAdsPage: React.FC = () => {
                       </button>
 
                       <button
+                        className="myads-icon-btn"
+                        data-action={deleteConfirm === listing.id ? "Потвърди изтриване" : "Изтрий"}
+                        aria-label={deleteConfirm === listing.id ? "Потвърди изтриване" : "Изтрий"}
                         onClick={(e) => handleDelete(listing.id, e)}
                         disabled={actionLoading === listing.id}
                         style={{
@@ -3401,6 +3705,9 @@ const MyAdsPage: React.FC = () => {
                   {activeTab === "expired" && (
                     <>
                       <button
+                        className="myads-icon-btn"
+                        data-action="Преглед"
+                        aria-label="Преглед"
                         onClick={(e) => {
                           e.stopPropagation();
                           openPreview(listing);
@@ -3420,6 +3727,9 @@ const MyAdsPage: React.FC = () => {
                       </button>
 
                       <button
+                        className="myads-icon-btn"
+                        data-action="Редактирай"
+                        aria-label="Редактирай"
                         style={{ ...styles.actionButton, ...styles.editButton }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -3443,6 +3753,9 @@ const MyAdsPage: React.FC = () => {
                       </button>
 
                       <button
+                        className="myads-icon-btn"
+                        data-action={actionLoading === listing.id ? "Обработва се" : "Пусни пак"}
+                        aria-label="Пусни пак"
                         onClick={(e) => {
                           e.stopPropagation();
                           const defaultType: ListingType =
@@ -3481,6 +3794,9 @@ const MyAdsPage: React.FC = () => {
                       </button>
 
                       <button
+                        className="myads-icon-btn"
+                        data-action={deleteConfirm === listing.id ? "Потвърди изтриване" : "Изтрий"}
+                        aria-label={deleteConfirm === listing.id ? "Потвърди изтриване" : "Изтрий"}
                         onClick={(e) => handleDelete(listing.id, e)}
                         disabled={actionLoading === listing.id}
                         style={{
@@ -3516,6 +3832,9 @@ const MyAdsPage: React.FC = () => {
                   {activeTab === "drafts" && (
                     <>
                       <button
+                        className="myads-icon-btn"
+                        data-action="Преглед"
+                        aria-label="Преглед"
                         onClick={(e) => {
                           e.stopPropagation();
                           openPreview(listing);
@@ -3535,6 +3854,9 @@ const MyAdsPage: React.FC = () => {
                       </button>
 
                       <button
+                        className="myads-icon-btn"
+                        data-action="Продължи редакция"
+                        aria-label="Продължи редакция"
                         style={{ ...styles.actionButton, ...styles.editButton }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -3554,6 +3876,9 @@ const MyAdsPage: React.FC = () => {
                       </button>
 
                       <button
+                        className="myads-icon-btn"
+                        data-action={deleteConfirm === listing.id ? "Потвърди изтриване" : "Изтрий"}
+                        aria-label={deleteConfirm === listing.id ? "Потвърди изтриване" : "Изтрий"}
                         onClick={(e) => handleDelete(listing.id, e)}
                         disabled={actionLoading === listing.id}
                         style={{
@@ -3588,6 +3913,9 @@ const MyAdsPage: React.FC = () => {
                   {/* Liked Tab Actions: Remove from Favorites */}
                   {activeTab === "liked" && (
                     <button
+                      className="myads-icon-btn"
+                      data-action={actionLoading === listing.id ? "Обработва се" : "Премахни от любими"}
+                      aria-label="Премахни от любими"
                       onClick={(e) => handleRemoveFromFavorites(listing.id, e)}
                       disabled={actionLoading === listing.id}
                       style={{
@@ -3618,19 +3946,19 @@ const MyAdsPage: React.FC = () => {
                   )}
                 </div>
 
-                {deleteConfirm === listing.id && (
-                  <div style={{
-                    marginTop: "8px",
-                    padding: "8px 12px",
-                    background: "#ffebee",
-                    border: "1px solid #ffcdd2",
-                    borderRadius: "4px",
-                    fontSize: "12px",
-                    color: "#d32f2f",
-                  }}>
+                <div
+                  style={{
+                    ...styles.deleteConfirmWrap,
+                    ...(deleteConfirm === listing.id
+                      ? styles.deleteConfirmWrapOpen
+                      : styles.deleteConfirmWrapClosed),
+                  }}
+                  aria-hidden={deleteConfirm === listing.id ? undefined : true}
+                >
+                  <div style={styles.deleteConfirmBox}>
                     Сигурни ли сте, че искате да изтриете тази обява?
                   </div>
-                )}
+                </div>
               </div>
             </div>
           )})}

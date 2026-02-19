@@ -13,6 +13,7 @@ import {
 import { CAR_BRANDS, CAR_MODELS } from "../constants/carBrandModels";
 import { APP_MAIN_CATEGORY_OPTIONS, getMainCategoryLabel } from "../constants/mobileBgData";
 import { formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
+import { resolvePriceBadgeState } from "../utils/priceChangeBadge";
 
 type CarListing = {
   id: number;
@@ -46,6 +47,8 @@ type CarListing = {
     delta?: number | string;
     direction?: string;
     changed_at?: string;
+    old_price?: number | string;
+    new_price?: number | string;
   } | null;
 };
 
@@ -1152,16 +1155,16 @@ export default function LandingPage() {
                   const listingMeta = getLatestListingMeta(listing);
                   const locationLabel = getListingLocationLabel(listing);
                   const listingImageUrl = listing.image_url ? getImageUrl(listing.image_url) : "";
-                  const priceChange = listing.price_change || null;
-                  const deltaRaw = priceChange?.delta;
-                  const deltaValue = deltaRaw === undefined || deltaRaw === null ? Number.NaN : Number(deltaRaw);
-                  const direction = (priceChange?.direction || "").toString().toLowerCase();
-                  const isUp = direction === "up" || (Number.isFinite(deltaValue) && deltaValue > 0);
-                  const isDown = direction === "down" || (Number.isFinite(deltaValue) && deltaValue < 0);
-                  const showPriceChange = isUp || isDown;
-                  const priceChangeLabel = Number.isFinite(deltaValue)
-                    ? `${Math.abs(deltaValue).toLocaleString("bg-BG")} €`
-                    : "";
+                  const priceBadge = resolvePriceBadgeState(
+                    listing.price_change
+                      ? {
+                          ...listing.price_change,
+                          current_price: listing.price,
+                          changed_at: listing.price_change.changed_at || listing.created_at,
+                        }
+                      : null
+                  );
+                  const showPriceChange = Boolean(priceBadge);
                   return (
                     <div
                       key={listing.id}
@@ -1233,19 +1236,38 @@ export default function LandingPage() {
                               borderRadius: 999,
                               fontWeight: 800,
                               fontSize: 12,
-                              background: isUp ? "#dcfce7" : "#fee2e2",
-                              color: isUp ? "#16a34a" : "#dc2626",
-                              border: `1px solid ${isUp ? "#bbf7d0" : "#fecaca"}`,
+                              background:
+                                priceBadge?.kind === "up"
+                                  ? "#dcfce7"
+                                  : priceBadge?.kind === "down"
+                                    ? "#fee2e2"
+                                    : "#e0f2fe",
+                              color:
+                                priceBadge?.kind === "up"
+                                  ? "#16a34a"
+                                  : priceBadge?.kind === "down"
+                                    ? "#dc2626"
+                                    : "#0369a1",
+                              border:
+                                priceBadge?.kind === "up"
+                                  ? "1px solid #bbf7d0"
+                                  : priceBadge?.kind === "down"
+                                    ? "1px solid #fecaca"
+                                    : "1px solid #bae6fd",
                               boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
                               display: "inline-flex",
                               alignItems: "center",
                               gap: 6,
                               zIndex: 9,
                             }}
-                            title={isUp ? "Повишена цена" : "Намалена цена"}
+                            title={priceBadge?.title}
                           >
-                            <span style={{ fontSize: 13 }}>{isUp ? "↑" : "↓"}</span>
-                            {priceChangeLabel || (isUp ? "Повишение" : "Намаление")}
+                            <span style={{ fontSize: 13 }}>
+                              {priceBadge?.kind === "up" ? "↑" : priceBadge?.kind === "down" ? "↓" : "•"}
+                            </span>
+                            {priceBadge?.kind === "announced"
+                              ? "Обявена цена"
+                              : `${priceBadge?.kind === "up" ? "+" : "-"}${priceBadge?.amountLabel}`}
                           </div>
                         )}
                         {/* Price overlay */}

@@ -28,6 +28,7 @@ import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 import { formatConditionLabel, formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 import { getMainCategoryFromTopmenu, getMainCategoryLabel } from "../constants/mobileBgData";
 import { useSavedSearches } from "../hooks/useSavedSearches";
+import { resolvePriceBadgeState } from "../utils/priceChangeBadge";
 import ListingPromoBadge from "./ListingPromoBadge";
 import KapariranoBadge from "./KapariranoBadge";
 
@@ -75,6 +76,8 @@ type CarListing = {
     delta: number | string;
     direction?: string;
     changed_at?: string;
+    old_price?: number | string;
+    new_price?: number | string;
   };
   listing_type?: "top" | "vip" | "normal" | string | number;
   listing_type_display?: string;
@@ -1319,6 +1322,7 @@ const SearchPage: React.FC = () => {
     },
     priceChangeUp: { background: "#dcfce7", color: "#16a34a", border: "1px solid #bbf7d0" },
     priceChangeDown: { background: "#fee2e2", color: "#dc2626", border: "1px solid #fecaca" },
+    priceChangeAnnounced: { background: "#e0f2fe", color: "#0369a1", border: "1px solid #bae6fd" },
     priceChangeText: { fontWeight: 800 },
     itemParams: { display: "flex", flexWrap: "wrap", gap: 8, fontSize: 13, color: "#111827", alignItems: "center" },
     itemParam: { display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 10px", background: "#ecfdf5", border: "1px solid #99f6e4", borderRadius: 999, fontSize: 13, color: "#111827", fontWeight: 700 },
@@ -1560,28 +1564,14 @@ const SearchPage: React.FC = () => {
                     listing.updated_at && listing.updated_at !== listing.created_at
                       ? getRelativeTime(listing.updated_at, "Редактирана")
                       : null;
-                  const priceChangeDirection = listing.price_change?.direction;
-                  const priceChangeDeltaRaw = listing.price_change?.delta;
-                  const priceChangeDeltaValue =
-                    typeof priceChangeDeltaRaw === "string" ? Number(priceChangeDeltaRaw) : priceChangeDeltaRaw;
-                  const priceChangeResolvedDirection =
-                    priceChangeDirection === "up" || priceChangeDirection === "down"
-                      ? priceChangeDirection
-                      : typeof priceChangeDeltaValue === "number"
-                        ? priceChangeDeltaValue > 0
-                          ? "up"
-                          : priceChangeDeltaValue < 0
-                            ? "down"
-                            : "same"
-                        : "same";
-                  const showPriceChange =
-                    priceChangeResolvedDirection === "up" ||
-                    priceChangeResolvedDirection === "down";
-                  const PriceChangeIcon = priceChangeResolvedDirection === "up" ? TrendingUp : TrendingDown;
-                  const priceChangeLabel =
-                    typeof priceChangeDeltaValue === "number" && Number.isFinite(priceChangeDeltaValue)
-                      ? `${priceChangeDeltaValue > 0 ? "+" : "-"}${Math.abs(priceChangeDeltaValue).toLocaleString("bg-BG")} €`
-                      : null;
+                  const priceBadge = resolvePriceBadgeState(listing.price_change);
+                  const showPriceChange = Boolean(priceBadge);
+                  const PriceChangeIcon =
+                    priceBadge?.kind === "announced"
+                      ? Clock
+                      : priceBadge?.kind === "up"
+                        ? TrendingUp
+                        : TrendingDown;
               const sellerTypeLabel =
                 listing.seller_type === "business"
                   ? "Търговец"
@@ -1732,19 +1722,28 @@ const SearchPage: React.FC = () => {
                                 <span
                                   style={{
                                     ...styles.priceChangeBadge,
-                                    ...(priceChangeResolvedDirection === "up" ? styles.priceChangeUp : styles.priceChangeDown),
+                                    ...(priceBadge?.kind === "up"
+                                      ? styles.priceChangeUp
+                                      : priceBadge?.kind === "down"
+                                        ? styles.priceChangeDown
+                                        : styles.priceChangeAnnounced),
                                   }}
-                                  title={
-                                    priceChangeResolvedDirection === "up"
-                                      ? "Повишена цена"
-                                      : "Намалена цена"
-                                  }
+                                  title={priceBadge?.title}
                                 >
                                   <PriceChangeIcon size={14} />
                                   <span style={styles.priceChangeText}>
-                                    {priceChangeResolvedDirection === "up" ? "Повишена" : "Намалена"}
+                                    {priceBadge?.kind === "up"
+                                      ? "Повишена"
+                                      : priceBadge?.kind === "down"
+                                        ? "Намалена"
+                                        : "Обявена цена"}
                                   </span>
-                                  {priceChangeLabel && <span>{priceChangeLabel}</span>}
+                                  {priceBadge?.kind !== "announced" && priceBadge?.amountLabel && (
+                                    <span>
+                                      {priceBadge.kind === "up" ? "+" : "-"}
+                                      {priceBadge.amountLabel}
+                                    </span>
+                                  )}
                                 </span>
                               )}
                               <div style={styles.itemPriceSmall}>

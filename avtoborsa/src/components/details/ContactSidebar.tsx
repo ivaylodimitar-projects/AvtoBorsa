@@ -19,6 +19,7 @@ import {
   Eye,
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
+import { resolvePriceBadgeState } from '../../utils/priceChangeBadge';
 
 const API_BASE_URL = 'http://localhost:8000';
 const DUPLICATE_REPORT_MESSAGE = 'Можете да съобщите за нередност с тази обява само веднъж, благодаря.';
@@ -274,12 +275,14 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
   const priceHistoryMore = priceHistory.length - priceHistoryPreview.length;
   const hasPriceHistory = priceHistory.length > 0;
   const latestPriceChange = priceHistory[0];
-  const latestDeltaValue = latestPriceChange ? Number(latestPriceChange.delta) : Number.NaN;
-  const showPriceDelta = Number.isFinite(latestDeltaValue) && latestDeltaValue !== 0;
-  const priceDeltaLabel = showPriceDelta
-    ? `${Math.abs(latestDeltaValue).toLocaleString('bg-BG')} €`
-    : '';
-  const PriceDeltaIcon = latestDeltaValue > 0 ? TrendingUp : TrendingDown;
+  const latestPriceBadge = resolvePriceBadgeState(latestPriceChange);
+  const showPriceDelta = Boolean(latestPriceBadge);
+  const PriceDeltaIcon =
+    latestPriceBadge?.kind === 'announced'
+      ? Info
+      : latestPriceBadge?.kind === 'up'
+        ? TrendingUp
+        : TrendingDown;
 
   const formatHistoryTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -676,15 +679,31 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                   borderRadius: 999,
                   fontSize: 12,
                   fontWeight: 800,
-                  border: `1px solid ${latestDeltaValue > 0 ? '#bbf7d0' : '#fecaca'}`,
-                  background: latestDeltaValue > 0 ? '#dcfce7' : '#fee2e2',
-                  color: latestDeltaValue > 0 ? '#16a34a' : '#dc2626',
+                  border:
+                    latestPriceBadge?.kind === 'up'
+                      ? '1px solid #bbf7d0'
+                      : latestPriceBadge?.kind === 'down'
+                        ? '1px solid #fecaca'
+                        : '1px solid #bae6fd',
+                  background:
+                    latestPriceBadge?.kind === 'up'
+                      ? '#dcfce7'
+                      : latestPriceBadge?.kind === 'down'
+                        ? '#fee2e2'
+                        : '#e0f2fe',
+                  color:
+                    latestPriceBadge?.kind === 'up'
+                      ? '#16a34a'
+                      : latestPriceBadge?.kind === 'down'
+                        ? '#dc2626'
+                        : '#0369a1',
                 }}
-                title={latestDeltaValue > 0 ? 'Повишена цена' : 'Намалена цена'}
+                title={latestPriceBadge?.title}
               >
                 <PriceDeltaIcon size={14} />
-                {latestDeltaValue > 0 ? '+' : '-'}
-                {priceDeltaLabel}
+                {latestPriceBadge?.kind === 'announced'
+                  ? 'Обявена цена'
+                  : `${latestPriceBadge?.kind === 'up' ? '+' : '-'}${latestPriceBadge?.amountLabel}`}
               </span>
             )}
           </div>
