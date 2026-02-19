@@ -999,7 +999,7 @@ const css = `
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
-  animation: navPublishOrbit 2s linear infinite;
+  // animation: navPublishOrbit 2s linear infinite;
 }
 
 .nav-publish-cta::after {

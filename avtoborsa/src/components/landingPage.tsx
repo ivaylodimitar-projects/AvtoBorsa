@@ -115,6 +115,68 @@ const GEARBOX: Gearbox[] = ["Ръчна", "Автоматик"];
 const MODELS: Record<string, string[]> = CAR_MODELS;
 
 const CATEGORIES = APP_MAIN_CATEGORY_OPTIONS;
+const POPULAR_CAR_BRANDS = [
+  {
+    name: "Audi",
+    logoUrl:
+      "https://static.classistatic.de/consumer-webapp/static/audi-logo-dark.503ee884c7adfa3e4dd3..png",
+  },
+  {
+    name: "BMW",
+    logoUrl:
+      "https://static.classistatic.de/consumer-webapp/static/bmw-logo-dark.360ac732bb2384b16986..png",
+  },
+  {
+    name: "Cupra",
+    logoUrl:
+      "https://static.classistatic.de/static/resources/images/make-logos/dark/cupra-dark.webp",
+  },
+  {
+    name: "Ford",
+    logoUrl:
+      "https://static.classistatic.de/consumer-webapp/static/ford-logo-light.828585c16e15b3d507fe..png",
+  },
+  {
+    name: "Mercedes-Benz",
+    logoUrl:
+      "https://static.classistatic.de/consumer-webapp/static/mercedes-logo-light.d41ca6c5e735131c629b..png",
+  },
+  {
+    name: "Opel",
+    logoUrl:
+      "https://static.classistatic.de/consumer-webapp/static/opel-logo-dark.babda5123fdbc9a0cfc2..png",
+  },
+  {
+    name: "Renault",
+    logoUrl:
+      "https://static.classistatic.de/consumer-webapp/static/renault-logo-dark.32d81c08c606a1dcb90d..png",
+  },
+  {
+    name: "Skoda",
+    logoUrl:
+      "https://static.classistatic.de/consumer-webapp/static/skoda-logo-dark.943964e3340117887756..png",
+  },
+  {
+    name: "Tesla",
+    logoUrl:
+      "https://static.classistatic.de/consumer-webapp/static/tesla-logo-dark.ea078e6378667d6ed858..png",
+  },
+  {
+    name: "Toyota",
+    logoUrl:
+      "https://static.classistatic.de/consumer-webapp/static/toyota-logo-dark.66e8219d3e990b307bd8..png",
+  },
+  {
+    name: "Volvo",
+    logoUrl:
+      "https://static.classistatic.de/consumer-webapp/static/volvo-logo-dark.6de39f8516b0782087e1..png",
+  },
+  {
+    name: "Volkswagen",
+    logoUrl:
+      "https://static.classistatic.de/consumer-webapp/static/vw-logo-dark.c293639b63fc19f1f082..png",
+  },
+] as const;
 const CATEGORY_ICON_WIDTH = 44;
 const CATEGORY_ICON_HEIGHT = 44;
 const CATEGORY_SYMBOL_SIZE = 34;
@@ -1119,15 +1181,68 @@ export default function LandingPage() {
             .view-more-btn:hover {
               box-shadow: 0 4px 14px rgba(15,118,110,0.35);
             }
+            .popular-brand-grid {
+              display: grid;
+              grid-template-columns: repeat(6, minmax(0, 1fr));
+              gap: 12px;
+              margin-top: 4px;
+            }
+            .popular-brand-card {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 10px;
+              min-height: 66px;
+              padding: 10px 12px;
+              border: 1px solid #e2e8f0;
+              border-radius: 12px;
+              background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+              text-decoration: none;
+              transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+            }
+            .popular-brand-card:hover {
+              transform: translateY(-2px);
+              border-color: #99f6e4;
+              box-shadow: 0 10px 20px rgba(15, 118, 110, 0.12);
+              text-decoration: none;
+            }
+            .popular-brand-logo {
+              width: 34px;
+              height: 34px;
+              object-fit: contain;
+              flex-shrink: 0;
+            }
+            .popular-brand-name {
+              font-size: 13px;
+              font-weight: 700;
+              color: #0f172a;
+              line-height: 1.25;
+              text-align: center;
+            }
 
             @media (min-width: 1024px) and (max-width: 1200px) {
               .latest-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+              .popular-brand-grid { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
             }
             @media (min-width: 768px) and (max-width: 1023px) {
               .latest-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+              .popular-brand-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
             }
             @media (max-width: 767px) {
               .latest-grid { grid-template-columns: 1fr !important; gap: 14px !important; padding-top: 10px !important; }
+              .popular-brand-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+              .popular-brand-card {
+                min-height: 60px;
+                padding: 8px;
+                gap: 7px;
+              }
+              .popular-brand-logo {
+                width: 30px;
+                height: 30px;
+              }
+              .popular-brand-name {
+                font-size: 12px;
+              }
             }
           `}</style>
 
@@ -1364,6 +1479,41 @@ export default function LandingPage() {
                 <p style={{ fontSize: 15, color: "#6b7280", margin: 0 }}>Няма налични обяви в момента</p>
               </div>
             )}
+          </div>
+        </section>
+
+        <section id="popular-brands" style={{ ...styles.section, ...styles.popularBrandsSection }}>
+          <div style={styles.popularBrandsContainer}>
+            <div style={{ ...styles.sectionHeader, ...styles.containerHeader, marginBottom: 12 }}>
+              <h2 style={styles.h2}>Популярни марки</h2>
+              <p style={styles.sectionLead}>
+                Избери марка и продължи към търсене на актуални обяви.
+              </p>
+            </div>
+
+            <div className="popular-brand-grid">
+              {POPULAR_CAR_BRANDS.map((brandItem) => (
+                <a
+                  key={brandItem.name}
+                  href={`/search?brand=${encodeURIComponent(brandItem.name)}`}
+                  className="popular-brand-card"
+                  aria-label={brandItem.name}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    navigate(`/search?brand=${encodeURIComponent(brandItem.name)}`);
+                  }}
+                >
+                  <img
+                    src={brandItem.logoUrl}
+                    alt={brandItem.name}
+                    className="popular-brand-logo"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <span className="popular-brand-name">{brandItem.name}</span>
+                </a>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -1780,6 +1930,14 @@ const styles: Record<string, React.CSSProperties> = {
   sectionHeader: { marginBottom: 16, marginTop: "3rem" },
   latestSection: { marginBottom: 0 },
   latestContainer: {
+    background: "#fff",
+    border: "1px solid #e5e7eb",
+    borderRadius: 12,
+    padding: 22,
+    boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
+  },
+  popularBrandsSection: { marginBottom: 0 },
+  popularBrandsContainer: {
     background: "#fff",
     border: "1px solid #e5e7eb",
     borderRadius: 12,
