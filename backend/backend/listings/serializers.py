@@ -237,6 +237,7 @@ class CarListingLiteSerializer(serializers.ModelSerializer):
             'id', 'slug', 'main_category', 'brand', 'model', 'year_from', 'price', 'mileage',
             'fuel', 'fuel_display', 'power', 'city', 'created_at',
             'listing_type', 'listing_type_display', 'image_url', 'price_change',
+            'is_kaparirano',
             'part_for', 'part_element',
         ]
         read_only_fields = fields
@@ -336,7 +337,7 @@ class CarListingListSerializer(serializers.ModelSerializer):
             'category', 'category_display', 'condition', 'condition_display',
             'description_preview', 'created_at', 'updated_at',
             'listing_type', 'listing_type_display',
-            'is_active', 'is_draft', 'is_archived',
+            'is_active', 'is_draft', 'is_archived', 'is_kaparirano',
             'image_url', 'images', 'is_favorited', 'seller_name', 'seller_type', 'price_change'
         ]
         read_only_fields = fields
@@ -474,7 +475,7 @@ class CarListingSearchCompactSerializer(CarListingListSerializer):
             'fuel_display', 'gearbox_display', 'category_display', 'condition_display',
             'description_preview', 'created_at', 'updated_at',
             'listing_type', 'listing_type_display',
-            'image_url', 'images', 'is_favorited', 'seller_name', 'seller_type', 'price_change'
+            'is_kaparirano', 'image_url', 'images', 'is_favorited', 'seller_name', 'seller_type', 'price_change'
         ]
         read_only_fields = fields
 
@@ -616,7 +617,7 @@ class CarListingSerializer(serializers.ModelSerializer):
             'power', 'displacement', 'euro_standard',
             'description', 'phone', 'email', 'features', 'listing_type', 'listing_type_display',
             'top_plan', 'vip_plan', 'top_expires_at', 'vip_expires_at',
-            'view_count', 'is_draft', 'is_active', 'is_archived', 'created_at', 'updated_at', 'images', 'image_url',
+            'view_count', 'is_draft', 'is_active', 'is_archived', 'is_kaparirano', 'created_at', 'updated_at', 'images', 'image_url',
             'is_favorited', 'seller_name', 'seller_type', 'seller_created_at', 'price_history', 'images_upload',
             'wheel_for', 'offer_type',
             'tire_brand', 'tire_width', 'tire_height', 'tire_diameter',
@@ -634,7 +635,7 @@ class CarListingSerializer(serializers.ModelSerializer):
             'id', 'slug', 'user', 'user_email', 'created_at', 'updated_at', 'images', 'image_url', 'is_favorited',
             'is_active', 'fuel_display', 'gearbox_display', 'condition_display', 'category_display',
             'listing_type_display', 'seller_name', 'seller_type', 'seller_created_at', 'price_history',
-            'top_expires_at', 'vip_expires_at', 'view_count'
+            'top_expires_at', 'vip_expires_at', 'view_count', 'is_kaparirano'
         ]
 
     def get_fuel_display(self, obj):

@@ -195,6 +195,20 @@ def _is_business_user(user):
     return hasattr(user, "business_profile")
 
 
+def _parse_optional_boolean(raw_value):
+    """Parse optional boolean values from JSON/form payloads."""
+    if raw_value is None:
+        return None
+    if isinstance(raw_value, bool):
+        return raw_value
+    normalized = str(raw_value).strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValidationError("Невалидна стойност за булево поле")
+
+
 def _set_public_cache_headers(response, max_age=LISTINGS_PUBLIC_CACHE_SECONDS):
     response["Cache-Control"] = (
         f"public, max-age={max_age}, stale-while-revalidate={LISTINGS_PUBLIC_STALE_SECONDS}"
@@ -828,7 +842,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
                     )
                 ).only(
                     'id', 'slug', 'brand', 'model', 'year_from', 'price', 'mileage',
-                    'fuel', 'power', 'city', 'created_at', 'listing_type'
+                    'fuel', 'power', 'city', 'created_at', 'listing_type', 'is_kaparirano'
                 )
             elif compact in {"1", "true", "yes"}:
                 queryset = queryset.annotate(
@@ -844,7 +858,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
                 ).only(
                     'id', 'slug', 'main_category', 'title', 'brand', 'model', 'year_from', 'price', 'mileage',
                     'fuel', 'gearbox', 'power', 'location_country', 'city',
-                    'category', 'condition', 'created_at', 'updated_at', 'listing_type',
+                    'category', 'condition', 'created_at', 'updated_at', 'listing_type', 'is_kaparirano',
                     'user_id', 'user__email',
                     'user__business_profile__dealer_name',
                     'user__private_profile__id'
@@ -859,7 +873,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
                 ).only(
                     'id', 'slug', 'main_category', 'title', 'brand', 'model', 'year_from', 'price', 'mileage',
                     'fuel', 'gearbox', 'power', 'location_country', 'city',
-                    'category', 'condition', 'created_at', 'updated_at', 'listing_type',
+                    'category', 'condition', 'created_at', 'updated_at', 'listing_type', 'is_kaparirano',
                     'is_active', 'is_draft', 'is_archived',
                     'user_id', 'user__email',
                     'user__business_profile__dealer_name',
@@ -1293,6 +1307,42 @@ def update_listing_type(request, listing_id):
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
+def update_kaparirano_status(request, listing_id):
+    """Update reservation flag (Капарирано) for business account listings."""
+    if not _is_business_user(request.user):
+        return Response(
+            {"detail": "Само бизнес профили могат да маркират обяви като Капарирано."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
+
+    raw_value = request.data.get("is_kaparirano")
+    if raw_value is None:
+        raw_value = request.data.get("isKaparirano")
+
+    try:
+        next_value = _parse_optional_boolean(raw_value)
+    except ValidationError as exc:
+        message = exc.detail[0] if isinstance(exc.detail, list) else exc.detail
+        return Response({"detail": message}, status=status.HTTP_400_BAD_REQUEST)
+
+    if next_value is None:
+        next_value = not bool(listing.is_kaparirano)
+
+    CarListing.objects.filter(pk=listing.pk).update(
+        is_kaparirano=next_value,
+        updated_at=timezone.now(),
+    )
+    listing.refresh_from_db()
+    _invalidate_latest_listings_cache()
+
+    serializer = CarListingSerializer(listing, context={'request': request})
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def upload_listing_images(request, listing_id):
     """Upload images for a listing"""
     listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
@@ -1488,7 +1538,7 @@ def latest_listings(request):
         )
         .only(
             'id', 'slug', 'main_category', 'brand', 'model', 'year_from', 'price', 'mileage',
-            'fuel', 'power', 'city', 'created_at', 'listing_type',
+            'fuel', 'power', 'city', 'created_at', 'listing_type', 'is_kaparirano',
             'parts_details__part_for', 'parts_details__part_element'
         )
         .order_by('-created_at')[:16]

@@ -5,6 +5,7 @@ import { AdvancedSearch } from "./AdvancedSearch";
 import { useRecentSearches } from "../hooks/useRecentSearches";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 import ListingPromoBadge from "./ListingPromoBadge";
+import KapariranoBadge from "./KapariranoBadge";
 import {
   readLatestListingsCache,
   writeLatestListingsCache,
@@ -32,6 +33,7 @@ type CarListing = {
   location_country?: string;
   image_url?: string;
   is_active: boolean;
+  is_kaparirano?: boolean;
   created_at: string;
   listing_type?: "top" | "vip" | "normal" | string | number;
   listing_type_display?: string;
@@ -110,174 +112,98 @@ const GEARBOX: Gearbox[] = ["Ръчна", "Автоматик"];
 const MODELS: Record<string, string[]> = CAR_MODELS;
 
 const CATEGORIES = APP_MAIN_CATEGORY_OPTIONS;
+const CATEGORY_ICON_WIDTH = 44;
+const CATEGORY_ICON_HEIGHT = 44;
+const CATEGORY_SYMBOL_SIZE = 34;
 
-type CategoryIconProps = { size?: number; strokeWidth?: number };
+type CategoryIconProps = {
+  size?: number;
+  width?: number;
+  height?: number;
+  fill?: 0 | 1;
+  weight?: number;
+};
 type CategoryIconComponent = (props: CategoryIconProps) => React.JSX.Element;
 
-function CategoryIconBase({
-  size = 13,
-  strokeWidth = 1.9,
-  children,
-}: CategoryIconProps & { children: React.ReactNode }) {
+type MaterialSymbolName =
+  | "directions_car"
+  | "tire_repair"
+  | "build"
+  | "directions_bus"
+  | "local_shipping"
+  | "two_wheeler"
+  | "agriculture"
+  | "precision_manufacturing"
+  | "construction"
+  | "rv_hookup"
+  | "sailing"
+  | "commute"
+  | "settings"
+  | "shopping_cart"
+  | "handyman";
+
+const CATEGORY_SYMBOLS: Record<string, MaterialSymbolName> = {
+  "1": "directions_car",
+  w: "tire_repair",
+  u: "build",
+  "3": "directions_bus",
+  "4": "local_shipping",
+  "5": "two_wheeler",
+  "6": "agriculture",
+  "7": "precision_manufacturing",
+  "8": "construction",
+  "9": "rv_hookup",
+  a: "sailing",
+  b: "commute",
+  v: "settings",
+  y: "shopping_cart",
+  z: "handyman",
+};
+
+function MaterialCategoryIcon({
+  name,
+  size = CATEGORY_SYMBOL_SIZE,
+  width,
+  height,
+  fill = 0,
+  weight = 500,
+}: {
+  name: MaterialSymbolName;
+} & CategoryIconProps) {
+  const iconWidth = width ?? size;
+  const iconHeight = height ?? size;
+  const fontSize = Math.min(iconWidth, iconHeight);
+
   return (
-    <svg
-      viewBox="0 0 24 24"
-      width={size}
-      height={size}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={strokeWidth}
-      strokeLinecap="round"
-      strokeLinejoin="round"
+    <span
+      className="category-material-icon"
+      style={{
+        width: iconWidth,
+        height: iconHeight,
+        fontSize,
+        lineHeight: 1,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontVariationSettings: `"FILL" ${fill}, "wght" ${weight}, "GRAD" 0, "opsz" 48`,
+      }}
       aria-hidden="true"
     >
-      {children}
-    </svg>
+      {name}
+    </span>
   );
 }
 
-const CategoryCarIcon: CategoryIconComponent = (props) => (
-  <CategoryIconBase {...props}>
-    <path d="M3 13l2-5h14l2 5" />
-    <path d="M4 13h16v5H4z" />
-    <circle cx="7.5" cy="18" r="1.5" />
-    <circle cx="16.5" cy="18" r="1.5" />
-  </CategoryIconBase>
+const createCategoryIcon = (name: MaterialSymbolName): CategoryIconComponent => (props) => (
+  <MaterialCategoryIcon name={name} {...props} />
 );
 
-const CategoryWheelIcon: CategoryIconComponent = (props) => (
-  <CategoryIconBase {...props}>
-    <circle cx="12" cy="12" r="8" />
-    <circle cx="12" cy="12" r="2.5" />
-    <path d="M12 4v5M20 12h-5M12 20v-5M4 12h5" />
-  </CategoryIconBase>
+const CATEGORY_ICONS: Record<string, CategoryIconComponent> = Object.fromEntries(
+  Object.entries(CATEGORY_SYMBOLS).map(([categoryKey, symbolName]) => [
+    categoryKey,
+    createCategoryIcon(symbolName),
+  ])
 );
-
-const CategoryPartsIcon: CategoryIconComponent = (props) => (
-  <CategoryIconBase {...props}>
-    <path d="M14.5 4.5l1.8 1.8-2.2 2.2a2.3 2.3 0 0 1-3.2 3.2l-5.4 5.4-2.3-2.3 5.4-5.4a2.3 2.3 0 0 1 3.2-3.2z" />
-    <path d="M16.5 7.5l3.5 3.5" />
-  </CategoryIconBase>
-);
-
-const CategoryVanIcon: CategoryIconComponent = (props) => (
-  <CategoryIconBase {...props}>
-    <path d="M3 9h12l4 4v5H3z" />
-    <path d="M15 9v4h4" />
-    <circle cx="7.5" cy="18" r="1.5" />
-    <circle cx="16.5" cy="18" r="1.5" />
-  </CategoryIconBase>
-);
-
-const CategoryTruckIcon: CategoryIconComponent = (props) => (
-  <CategoryIconBase {...props}>
-    <path d="M3 8h10v10H3z" />
-    <path d="M13 11h4l3 3v4h-7z" />
-    <circle cx="7" cy="18" r="1.5" />
-    <circle cx="17" cy="18" r="1.5" />
-  </CategoryIconBase>
-);
-
-const CategoryMotoIcon: CategoryIconComponent = (props) => (
-  <CategoryIconBase {...props}>
-    <circle cx="6.5" cy="17.5" r="2" />
-    <circle cx="17.5" cy="17.5" r="2" />
-    <path d="M8 17.5h4.5l3-4.5h-4l-2-3H7" />
-    <path d="M15.5 13H19" />
-  </CategoryIconBase>
-);
-
-const CategoryTractorIcon: CategoryIconComponent = (props) => (
-  <CategoryIconBase {...props}>
-    <circle cx="8" cy="17" r="3" />
-    <circle cx="18" cy="18" r="2" />
-    <path d="M5 14h8l2 2h3" />
-    <path d="M10 8h4v6" />
-  </CategoryIconBase>
-);
-
-const CategoryIndustryIcon: CategoryIconComponent = (props) => (
-  <CategoryIconBase {...props}>
-    <path d="M3 20V9l6 3V9l5 3V6l7 4v10z" />
-    <path d="M3 20h18" />
-  </CategoryIconBase>
-);
-
-const CategoryForkliftIcon: CategoryIconComponent = (props) => (
-  <CategoryIconBase {...props}>
-    <circle cx="8" cy="18" r="2" />
-    <circle cx="16.5" cy="18" r="1.5" />
-    <path d="M5 18V9h6l2 3v6" />
-    <path d="M19 9v9M19 18h2" />
-  </CategoryIconBase>
-);
-
-const CategoryCaravanIcon: CategoryIconComponent = (props) => (
-  <CategoryIconBase {...props}>
-    <rect x="3" y="8" width="16" height="8" rx="2" />
-    <circle cx="8" cy="18" r="1.5" />
-    <circle cx="15" cy="18" r="1.5" />
-    <path d="M19 12h2" />
-  </CategoryIconBase>
-);
-
-const CategoryBoatIcon: CategoryIconComponent = (props) => (
-  <CategoryIconBase {...props}>
-    <path d="M12 4v9" />
-    <path d="M12 4l4 3h-4" />
-    <path d="M3 15l4 3h10l4-3H3z" />
-  </CategoryIconBase>
-);
-
-const CategoryTrailerIcon: CategoryIconComponent = (props) => (
-  <CategoryIconBase {...props}>
-    <path d="M4 10h10v5H4z" />
-    <path d="M14 12h5" />
-    <circle cx="7" cy="17.5" r="1.5" />
-    <circle cx="17.5" cy="17.5" r="1.5" />
-  </CategoryIconBase>
-);
-
-const CategoryAccessoryIcon: CategoryIconComponent = (props) => (
-  <CategoryIconBase {...props}>
-    <path d="M10.5 4l1.5 2.5L15 8l-2.5 1.5L11 12l-1.5-2.5L7 8l2.5-1.5z" />
-    <path d="M4 14l2 .8.8 2 .8-2 2-.8-2-.8-.8-2-.8 2z" />
-    <path d="M15.5 14.5l1 .4.4 1 .4-1 1-.4-1-.4-.4-1-.4 1z" />
-  </CategoryIconBase>
-);
-
-const CategoryBuyIcon: CategoryIconComponent = (props) => (
-  <CategoryIconBase {...props}>
-    <path d="M4 6h2l1.3 8h9.8l1.4-6H7.1" />
-    <circle cx="10" cy="18" r="1.5" />
-    <circle cx="17" cy="18" r="1.5" />
-  </CategoryIconBase>
-);
-
-const CategoryServiceIcon: CategoryIconComponent = (props) => (
-  <CategoryIconBase {...props}>
-    <path d="M14.5 4.5l5 5-2 2-5-5z" />
-    <path d="M11 8l5 5-8 8H3v-5z" />
-  </CategoryIconBase>
-);
-
-const CATEGORY_ICONS: Record<string, CategoryIconComponent> = {
-  "1": CategoryCarIcon,
-  w: CategoryWheelIcon,
-  u: CategoryPartsIcon,
-  "3": CategoryVanIcon,
-  "4": CategoryTruckIcon,
-  "5": CategoryMotoIcon,
-  "6": CategoryTractorIcon,
-  "7": CategoryIndustryIcon,
-  "8": CategoryForkliftIcon,
-  "9": CategoryCaravanIcon,
-  a: CategoryBoatIcon,
-  b: CategoryTrailerIcon,
-  v: CategoryAccessoryIcon,
-  y: CategoryBuyIcon,
-  z: CategoryServiceIcon,
-};
 
 function clampNumber(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -418,31 +344,6 @@ export default function LandingPage() {
   const [hasPhotosOnly, setHasPhotosOnly] = useState(false);
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
   const [showFeaturesDropdown, setShowFeaturesDropdown] = useState(false);
-  const mainCategorySliderRef = useRef<HTMLDivElement | null>(null);
-
-  const scrollMainCategories = (direction: "left" | "right") => {
-    const slider = mainCategorySliderRef.current;
-    if (!slider) return;
-    const scrollAmount = Math.max(220, Math.floor(slider.clientWidth * 0.75));
-    slider.scrollBy({
-      left: direction === "left" ? -scrollAmount : scrollAmount,
-      behavior: "smooth",
-    });
-  };
-
-  useEffect(() => {
-    const slider = mainCategorySliderRef.current;
-    if (!slider) return;
-    const activeButton = slider.querySelector<HTMLButtonElement>(
-      `button[data-category-value="${category}"]`
-    );
-    if (!activeButton) return;
-    activeButton.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-      inline: "nearest",
-    });
-  }, [category]);
 
   const yearNow = new Date().getFullYear();
 
@@ -575,10 +476,26 @@ export default function LandingPage() {
     return values.slice(0, 4);
   };
 
+  const selectedCategoryLabel =
+    CATEGORIES.find((mainCategory) => mainCategory.value === category)?.label || "";
+
   return (
     <div style={styles.page}>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+      />
       <style>{globalCss}</style>
       <style>{`
+        .adv-search-root .adv-top-content {
+          margin: 0 0 8px !important;
+          padding: 0 !important;
+          border-radius: 0 !important;
+          background: transparent !important;
+          box-shadow: none !important;
+          border: none !important;
+        }
+
         /* Features dropdown table responsive styles */
         .features-dropdown-table {
           width: 100%;
@@ -675,13 +592,72 @@ export default function LandingPage() {
           box-sizing: border-box;
           outline: none !important;
           opacity: 1 !important;
-          transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+          -webkit-tap-highlight-color: transparent;
+          user-select: none;
+          transition: border-color 0.22s ease, transform 0.22s ease, box-shadow 0.22s ease, background 0.22s ease;
+        }
+        .category-material-icon {
+          font-family: "Material Symbols Rounded";
+          font-style: normal;
+          font-weight: normal;
+          text-transform: none;
+          letter-spacing: normal;
+          white-space: nowrap;
+          word-wrap: normal;
+          direction: ltr;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+          font-feature-settings: "liga";
+          transition: transform 0.22s ease, color 0.22s ease, font-variation-settings 0.22s ease;
+        }
+        .category-pill-label {
+          display: none;
+        }
+        .category-pill-tooltip {
+          position: absolute;
+          left: 50%;
+          bottom: calc(100% + 8px);
+          transform: translate(-50%, 6px) scale(0.96);
+          opacity: 0;
+          pointer-events: none;
+          background: #0f172a;
+          color: #ffffff;
+          border-radius: 7px;
+          padding: 5px 7px;
+          font-size: 11px;
+          line-height: 1.2;
+          font-weight: 600;
+          white-space: nowrap;
+          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.2);
+          transition: opacity 0.16s ease, transform 0.16s ease;
+          z-index: 25;
+        }
+        .category-pill-tooltip::after {
+          content: "";
+          position: absolute;
+          top: 100%;
+          left: 50%;
+          transform: translateX(-50%);
+          border-width: 5px 5px 0 5px;
+          border-style: solid;
+          border-color: #0f172a transparent transparent transparent;
         }
         .category-pill-btn:hover {
-          border-color: #b4d7d3 !important;
-          box-shadow: 0 6px 14px rgba(15, 118, 110, 0.12);
+          box-shadow: none;
+          background: rgba(15, 23, 42, 0.04);
           transform: translateY(-1px);
           opacity: 1 !important;
+        }
+        .category-pill-btn:hover .category-material-icon {
+          transform: scale(1.03);
+        }
+        .category-pill-btn:hover .category-pill-tooltip,
+        .category-pill-btn:focus-visible .category-pill-tooltip {
+          opacity: 1;
+          transform: translate(-50%, 0) scale(1);
+        }
+        .category-pill-btn.category-pill-btn--active .category-material-icon {
+          transform: scale(1.05);
         }
         .category-pill-btn:active {
           transform: translateY(0);
@@ -691,71 +667,23 @@ export default function LandingPage() {
         .category-pill-btn:focus,
         .category-pill-btn:focus-visible {
           outline: none !important;
-          box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.18) !important;
+          box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.24) !important;
+        }
+        .category-pill-btn:focus:not(:focus-visible) {
+          box-shadow: none !important;
         }
         .category-pill-btn.category-pill-btn--active {
-          border-color: transparent !important;
+          box-shadow: none;
+          background: rgba(15, 118, 110, 0.16) !important;
         }
-        .main-category-slider {
+        .main-category-grid {
           scrollbar-width: none;
           -ms-overflow-style: none;
         }
-        .main-category-slider::-webkit-scrollbar {
+        .main-category-grid::-webkit-scrollbar {
           display: none;
           width: 0;
           height: 0;
-        }
-        .category-scroll-cue {
-          border: none;
-          background: none;
-          padding: 0;
-          margin: 0;
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          color: #0f766e;
-          cursor: pointer;
-          font-size: 11px;
-          font-weight: 700;
-          letter-spacing: 0.02em;
-          line-height: 1;
-          white-space: nowrap;
-          opacity: 0.9;
-        }
-        .category-scroll-cue:hover {
-          opacity: 1;
-        }
-        .category-scroll-cue__track {
-          display: inline-flex;
-          align-items: center;
-          gap: 1px;
-        }
-        .category-scroll-cue__chevron {
-          display: inline-block;
-          opacity: 0.2;
-          transform: translateX(0);
-          animation: categoryScrollHint 1.35s ease-in-out infinite;
-        }
-        .category-scroll-cue__chevron:nth-child(2) {
-          animation-delay: 0.16s;
-        }
-        .category-scroll-cue__chevron:nth-child(3) {
-          animation-delay: 0.32s;
-        }
-        @keyframes categoryScrollHint {
-          0%, 100% {
-            opacity: 0.2;
-            transform: translateX(0);
-          }
-          50% {
-            opacity: 1;
-            transform: translateX(3px);
-          }
-        }
-        @media (max-width: 767px) {
-          .category-scroll-cue__text {
-            display: none;
-          }
         }
       `}</style>
 
@@ -773,33 +701,17 @@ export default function LandingPage() {
             topContent={
               <div style={styles.mainCategoryWrap}>
                 <div style={styles.mainCategoryHeader}>
-                  <span style={styles.mainCategoryLabel}>Категория</span>
-                  <div style={styles.mainCategoryHeaderRight}>
-                    <button
-                      type="button"
-                      className="category-scroll-cue"
-                      onClick={() => scrollMainCategories("right")}
-                      aria-label="Плъзни надясно за още категории"
-                      title="Плъзни надясно за още категории"
-                    >
-                      <span className="category-scroll-cue__text">Плъзни надясно</span>
-                      <span className="category-scroll-cue__track" aria-hidden="true">
-                        <span className="category-scroll-cue__chevron">›</span>
-                        <span className="category-scroll-cue__chevron">›</span>
-                        <span className="category-scroll-cue__chevron">›</span>
-                      </span>
-                    </button>
-                  </div>
+                  <span style={styles.mainCategoryLabel}>Категория - {selectedCategoryLabel}</span>
+                  {/* <span style={styles.mainCategoryHint}>{selectedCategoryLabel}</span> */}
                 </div>
 
                 <div
-                  ref={mainCategorySliderRef}
-                  className="main-category-slider catsRow formShowGrid category-grid"
+                  className="main-category-grid"
                   style={styles.mainCategoryRow}
                 >
                   {CATEGORIES.map((mainCategory) => {
                     const isActive = category === mainCategory.value;
-                    const Icon = CATEGORY_ICONS[mainCategory.value] || CategoryCarIcon;
+                    const Icon = CATEGORY_ICONS[mainCategory.value] || CATEGORY_ICONS["1"];
 
                     return (
                       <button
@@ -815,6 +727,7 @@ export default function LandingPage() {
                         }}
                         onClick={() => setCategory(mainCategory.value)}
                         aria-pressed={isActive}
+                        aria-label={mainCategory.label}
                         title={mainCategory.label}
                       >
                         <span
@@ -822,16 +735,22 @@ export default function LandingPage() {
                             ...styles.mainCategoryIconWrap,
                             ...(isActive
                               ? {
-                                  background: "rgba(255,255,255,0.18)",
-                                  color: "#ffffff",
-                                  border: "1px solid rgba(255,255,255,0.34)",
+                                  background: "#f0fdfa",
+                                  color: "#0f766e",
                                 }
                               : {}),
                           }}
                         >
-                          <Icon size={13} />
+                          <Icon
+                            width={CATEGORY_ICON_WIDTH}
+                            height={CATEGORY_ICON_HEIGHT}
+                            fill={isActive ? 1 : 0}
+                            weight={isActive ? 650 : 500}
+                          />
                         </span>
-                        <span style={styles.mainCategoryText}>{mainCategory.label}</span>
+                        <span className="category-pill-tooltip" aria-hidden="true">
+                          {mainCategory.label}
+                        </span>
                       </button>
                     );
                   })}
@@ -1295,6 +1214,7 @@ export default function LandingPage() {
                             </div>
                           )}
                         </div>
+                        {listing.is_kaparirano && <KapariranoBadge size="xs" />}
                         {isNew && (
                           <div
                             className="listing-new-badge"
@@ -1647,32 +1567,25 @@ const styles: Record<string, React.CSSProperties> = {
   searchBlock: { marginBottom: 0 },
   mainCategoryWrap: {
     marginBottom: 0,
-    background:
-      "linear-gradient(135deg, rgba(236,253,250,0.95) 0%, rgba(255,255,255,0.98) 55%, rgba(240,253,250,0.95) 100%)",
+    background: "transparent",
     border: "none",
-    borderRadius: 14,
-    padding: "8px 9px 7px",
-    boxShadow: "0 7px 16px rgba(15,23,42,0.05)",
+    borderRadius: 0,
+    padding: 0,
+    boxShadow: "none",
   },
   mainCategoryHeader: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
-    marginBottom: 7,
-    flexWrap: "wrap",
-  },
-  mainCategoryHeaderRight: {
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    gap: 10,
+    marginBottom: 10,
     flexWrap: "wrap",
   },
   mainCategoryLabel: {
     fontSize: 14,
     color: "#000000",
     fontWeight: 600,
+    marginLeft: 16,
   },
   mainCategoryHint: {
     fontSize: 10.5,
@@ -1681,58 +1594,63 @@ const styles: Record<string, React.CSSProperties> = {
   },
   mainCategoryRow: {
     display: "flex",
-    gap: 6,
+    alignItems: "flex-start",
+    justifyContent: "center",
+    gap: 8,
     overflowX: "auto",
     overflowY: "hidden",
-    scrollSnapType: "x mandatory",
-    WebkitOverflowScrolling: "touch",
-    scrollbarGutter: "stable",
+    paddingTop: "2rem",
     paddingBottom: 2,
   },
   mainCategoryButton: {
+    position: "relative",
     borderWidth: 0,
-    borderStyle: "solid",
+    borderStyle: "none",
     borderColor: "transparent",
-    background: "#ffffff",
-    color: "#334155",
-    borderRadius: 10,
-    padding: "5px 8px",
+    background: "transparent",
+    color: "#111827",
+    borderRadius: 14,
+    padding: "8px 8px 9px",
     cursor: "pointer",
     fontSize: 12,
-    fontWeight: 700,
+    fontWeight: 600,
     lineHeight: 1.2,
-    minHeight: 36,
-    transition: "all 0.2s ease",
+    minHeight: 58,
+    minWidth: 58,
+    transition: "all 0.22s cubic-bezier(0.22, 1, 0.36, 1)",
     display: "flex",
     alignItems: "center",
-    gap: 6,
-    textAlign: "left",
-    width: "fit-content",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 0,
+    textAlign: "center",
+    width: "58px",
     flex: "0 0 auto",
-    scrollSnapAlign: "start",
-    boxShadow: "0 2px 8px rgba(15, 23, 42, 0.08)",
+    boxShadow: "none",
   },
   mainCategoryButtonActive: {
-    background: "linear-gradient(135deg, #0f766e 0%, #0d9488 100%)",
+    background: "rgba(15, 118, 110, 0.16)",
     borderWidth: 0,
-    borderStyle: "solid",
+    borderStyle: "none",
     borderColor: "transparent",
-    color: "#ffffff",
-    boxShadow: "0 6px 14px rgba(15, 118, 110, 0.24)",
+    color: "#0f766e",
+    boxShadow: "none",
   },
   mainCategoryIconWrap: {
-    width: 20,
-    height: 20,
-    borderRadius: 5,
+    width: 38,
+    height: 38,
+    borderRadius: 14,
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    background: "#ecfeff",
-    color: "#0f766e",
+    background: "#f1f5f9",
+    color: "#475569",
+    transition: "all 0.22s ease",
     flexShrink: 0,
   },
   mainCategoryText: {
-    whiteSpace: "nowrap",
+    whiteSpace: "normal",
+    lineHeight: 1.18,
   },
   searchTitle: {
     fontWeight: 700,
@@ -2078,7 +1996,7 @@ const globalCss = `
   /* Tablet Large (1024px - 1200px) */
   @media (min-width: 1024px) and (max-width: 1200px) {
     body { font-size: 15px; }
-    .category-grid { grid-template-columns: repeat(4, minmax(0,1fr)) !important; }
+    .category-grid { grid-template-columns: repeat(5, minmax(0,1fr)) !important; }
     .search-grid { grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
     .cards-grid { grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
     .info-grid { grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
@@ -2087,7 +2005,7 @@ const globalCss = `
   /* Tablet (768px - 1023px) */
   @media (min-width: 768px) and (max-width: 1023px) {
     body { font-size: 15px; }
-    .category-grid { grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
+    .category-grid { grid-template-columns: repeat(4, minmax(0,1fr)) !important; }
     .search-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
     .cards-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
     .info-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
@@ -2097,7 +2015,7 @@ const globalCss = `
   /* Mobile Large (640px - 767px) */
   @media (min-width: 640px) and (max-width: 767px) {
     body { font-size: 14px; }
-    .category-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+    .category-grid { grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
     .search-grid { grid-template-columns: 1fr !important; }
     .cards-grid { grid-template-columns: 1fr !important; }
     .info-grid { grid-template-columns: 1fr !important; }
@@ -2107,7 +2025,7 @@ const globalCss = `
   /* Mobile Small (< 640px) */
   @media (max-width: 639px) {
     body { font-size: 14px; }
-    .category-grid { grid-template-columns: 1fr !important; }
+    .category-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
     .search-grid { grid-template-columns: 1fr !important; }
     .cards-grid { grid-template-columns: 1fr !important; }
     .info-grid { grid-template-columns: 1fr !important; }

@@ -4,6 +4,7 @@ import ThumbnailStrip from './ThumbnailStrip';
 import { useThrottle } from '../../hooks/useThrottle';
 import { useGalleryLazyLoad, useImageUrl } from '../../hooks/useGalleryLazyLoad';
 import ListingPromoBadge from '../ListingPromoBadge';
+import KapariranoBadge from '../KapariranoBadge';
 
 interface Image {
   id: number;
@@ -18,6 +19,7 @@ interface RezonGalleryProps {
   showTopBadge?: boolean;
   showVipBadge?: boolean;
   showNewBadge?: boolean;
+  showKapariranoBadge?: boolean;
 }
 
 // Memoized main image component with lazy loading
@@ -64,6 +66,7 @@ const FullscreenModal = memo<{
   showTopBadge?: boolean;
   showVipBadge?: boolean;
   showNewBadge?: boolean;
+  showKapariranoBadge?: boolean;
 }>(
   ({
     isOpen,
@@ -79,6 +82,7 @@ const FullscreenModal = memo<{
     showTopBadge = false,
     showVipBadge = false,
     showNewBadge = false,
+    showKapariranoBadge = false,
   }) => {
     const [zoomLevel, setZoomLevel] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -395,6 +399,9 @@ const FullscreenModal = memo<{
               />
               {showTopBadge && <ListingPromoBadge type="top" zIndex={24} />}
               {showVipBadge && <ListingPromoBadge type="vip" zIndex={24} />}
+              {showKapariranoBadge && (
+                <KapariranoBadge size={isMobile ? 'sm' : 'default'} zIndex={24} />
+              )}
               {showNewBadge && (
                 <div
                   style={{
@@ -508,6 +515,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
   showTopBadge = false,
   showVipBadge = false,
   showNewBadge = false,
+  showKapariranoBadge = false,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
@@ -753,6 +761,9 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
           {/* Promo Label */}
           {showTopBadge && <ListingPromoBadge type="top" zIndex={20} />}
           {showVipBadge && <ListingPromoBadge type="vip" zIndex={20} />}
+          {showKapariranoBadge && (
+            <KapariranoBadge size={isMobile ? 'sm' : 'default'} zIndex={20} />
+          )}
           {showNewBadge && (
             <div
               style={{
@@ -874,6 +885,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         showTopBadge={showTopBadge}
         showVipBadge={showVipBadge}
         showNewBadge={showNewBadge}
+        showKapariranoBadge={showKapariranoBadge}
       />
     </>
   );

@@ -29,6 +29,7 @@ import { formatConditionLabel, formatFuelLabel, formatGearboxLabel } from "../ut
 import { getMainCategoryFromTopmenu, getMainCategoryLabel } from "../constants/mobileBgData";
 import { useSavedSearches } from "../hooks/useSavedSearches";
 import ListingPromoBadge from "./ListingPromoBadge";
+import KapariranoBadge from "./KapariranoBadge";
 
 type CarListing = {
   id: number;
@@ -56,6 +57,7 @@ type CarListing = {
   is_active: boolean;
   is_draft: boolean;
   is_archived: boolean;
+  is_kaparirano?: boolean;
   is_favorited?: boolean;
   description_preview?: string;
   description?: string;
@@ -1628,6 +1630,7 @@ const SearchPage: React.FC = () => {
                         <div style={styles.photoMain}>
                           {isTop && <ListingPromoBadge type="top" />}
                           {isVip && <ListingPromoBadge type="vip" />}
+                          {listing.is_kaparirano && <KapariranoBadge />}
                           {isNewListing && (
                             <div style={{ ...styles.newBadge, top: "auto", bottom: 10, left: 10 }}>
                               Нова

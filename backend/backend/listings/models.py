@@ -169,6 +169,7 @@ class CarListing(models.Model):
     is_draft = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     is_archived = models.BooleanField(default=False)
+    is_kaparirano = models.BooleanField(default=False)
     listing_type = models.CharField(max_length=10, choices=LISTING_TYPE_CHOICES, default='normal')
     top_plan = models.CharField(max_length=12, choices=TOP_PLAN_CHOICES, null=True, blank=True)
     top_paid_at = models.DateTimeField(null=True, blank=True)

@@ -10,6 +10,7 @@ import SkeletonLoader from './SkeletonLoader';
 import { extractIdFromSlug } from '../../utils/slugify';
 import { useImageUrl } from '../../hooks/useGalleryLazyLoad';
 import ListingPromoBadge from '../ListingPromoBadge';
+import KapariranoBadge from '../KapariranoBadge';
 
 interface CarImage {
   id: number;
@@ -62,6 +63,7 @@ interface CarListing {
   price_history?: PriceHistoryEntry[];
   listing_type?: 'top' | 'vip' | 'normal' | string | number;
   listing_type_display?: string;
+  is_kaparirano?: boolean;
   is_top?: boolean;
   is_top_listing?: boolean;
   is_top_ad?: boolean;
@@ -133,6 +135,7 @@ interface SimilarListing {
   created_at?: string;
   listing_type?: 'top' | 'vip' | 'normal' | string | number;
   listing_type_display?: string;
+  is_kaparirano?: boolean;
   is_top?: boolean;
   is_top_listing?: boolean;
   is_top_ad?: boolean;
@@ -903,6 +906,7 @@ const VehicleDetailsPage: React.FC = () => {
             showTopBadge={isTopListing(listing)}
             showVipBadge={isVipListing(listing)}
             showNewBadge={isNewListing}
+            showKapariranoBadge={Boolean(listing.is_kaparirano)}
           />
 
           <TechnicalDataSection
@@ -1046,6 +1050,7 @@ const VehicleDetailsPage: React.FC = () => {
                         <div style={styles.similarMedia}>
                           {isTop && <ListingPromoBadge type="top" size="xs" shadowVariant="similar" />}
                           {isVip && <ListingPromoBadge type="vip" size="xs" shadowVariant="similar" />}
+                          {item.is_kaparirano && <KapariranoBadge size="xs" />}
                           {isNew && (
                             <span style={{ ...styles.similarNewBadge, top: 'auto', bottom: 10, left: 10 }}>
                               Нова

@@ -20,6 +20,7 @@ urlpatterns = [
     path('listings/<int:listing_id>/delete/', views.delete_listing, name='delete_listing'),
     path('listings/<int:listing_id>/republish/', views.republish_listing, name='republish_listing'),
     path('listings/<int:listing_id>/listing-type/', views.update_listing_type, name='update_listing_type'),
+    path('listings/<int:listing_id>/kaparirano/', views.update_kaparirano_status, name='update_kaparirano_status'),
     path('listings/<int:listing_id>/favorite/', views.add_favorite, name='add_favorite'),
     path('listings/<int:listing_id>/unfavorite/', views.remove_favorite, name='remove_favorite'),
 ]

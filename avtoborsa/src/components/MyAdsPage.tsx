@@ -43,6 +43,7 @@ import {
 } from "../utils/myAdsCache";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 import ListingPromoBadge from "./ListingPromoBadge";
+import KapariranoBadge from "./KapariranoBadge";
 
 interface CarListing {
   id: number;
@@ -74,6 +75,7 @@ interface CarListing {
   updated_at?: string;
   is_archived: boolean;
   is_draft: boolean;
+  is_kaparirano?: boolean;
   listing_type?: "top" | "vip" | "normal" | string;
   listing_type_display?: string;
   top_expires_at?: string;
@@ -204,6 +206,7 @@ const MyAdsPage: React.FC = () => {
   const forceRefreshFromPublish = navigationState?.forceRefresh === true;
   const { isAuthenticated, user, updateBalance } = useAuth();
   const getImageUrl = useImageUrl();
+  const isBusinessUser = user?.userType === "business";
   const [activeListings, setActiveListings] = useState<CarListing[]>([]);
   const [archivedListings, setArchivedListings] = useState<CarListing[]>([]);
   const [draftListings, setDraftListings] = useState<CarListing[]>([]);
@@ -728,6 +731,65 @@ const MyAdsPage: React.FC = () => {
       const errorMsg = err instanceof Error ? err.message : "Грешка при промяна на типа";
       showToast(errorMsg, "error");
       return false;
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleKapariranoToggle = async (listing: CarListing, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isBusinessUser) return;
+
+    setActionLoading(listing.id);
+
+    try {
+      const token = localStorage.getItem("authToken");
+      if (!token) throw new Error("Не сте логнати. Моля, влезте отново.");
+
+      const response = await fetch(`http://localhost:8000/api/listings/${listing.id}/kaparirano/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          is_kaparirano: !Boolean(listing.is_kaparirano),
+        }),
+      });
+
+      if (!response.ok) {
+        let errorMessage = "Неуспешна промяна на статуса Капарирано";
+        try {
+          const errorData = await response.json();
+          if (typeof errorData?.detail === "string" && errorData.detail.trim()) {
+            errorMessage = errorData.detail;
+          }
+        } catch {
+          // ignore JSON parse errors
+        }
+        throw new Error(errorMessage);
+      }
+
+      const updatedListing: CarListing = await response.json();
+      const applyUpdate = (items: CarListing[]) =>
+        items.map((item) => (item.id === updatedListing.id ? updatedListing : item));
+
+      setActiveListings((prev) => applyUpdate(prev));
+      setArchivedListings((prev) => applyUpdate(prev));
+      setDraftListings((prev) => applyUpdate(prev));
+      setExpiredListings((prev) => applyUpdate(prev));
+      setLikedListings((prev) => applyUpdate(prev));
+
+      invalidateMyAdsCache(user?.id);
+      showToast(
+        updatedListing.is_kaparirano
+          ? "Обявата е маркирана като Капарирано."
+          : "Маркировката Капарирано е премахната."
+      );
+    } catch (err) {
+      const errorMsg =
+        err instanceof Error ? err.message : "Грешка при обновяване на статуса Капарирано";
+      showToast(errorMsg, "error");
     } finally {
       setActionLoading(null);
     }
@@ -2579,6 +2641,7 @@ const MyAdsPage: React.FC = () => {
                     {isPreviewVipActive && (
                       <ListingPromoBadge type="vip" />
                     )}
+                    {previewListing.is_kaparirano && <KapariranoBadge size="sm" />}
                     {isPreviewListingNew && (
                       <div
                         style={{
@@ -2950,6 +3013,7 @@ const MyAdsPage: React.FC = () => {
                 {isVipActive && (
                   <ListingPromoBadge type="vip" />
                 )}
+                {listing.is_kaparirano && <KapariranoBadge />}
                 {isNewListing && (
                   <div
                     style={{
@@ -3119,6 +3183,48 @@ const MyAdsPage: React.FC = () => {
                         >
                           <PackageOpen size={14} />
                           Промотирай
+                        </button>
+                      )}
+
+                      {isBusinessUser && (
+                        <button
+                          onClick={(e) => handleKapariranoToggle(listing, e)}
+                          disabled={actionLoading === listing.id}
+                          style={{
+                            ...styles.actionButton,
+                            background: listing.is_kaparirano
+                              ? "linear-gradient(135deg, #0f766e 0%, #115e59 100%)"
+                              : "linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)",
+                            color: "#fff",
+                            opacity: actionLoading === listing.id ? 0.6 : 1,
+                            cursor: actionLoading === listing.id ? "not-allowed" : "pointer",
+                            boxShadow: listing.is_kaparirano
+                              ? "0 2px 8px rgba(15, 118, 110, 0.35)"
+                              : "0 2px 8px rgba(13, 148, 136, 0.35)",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (actionLoading !== listing.id) {
+                              e.currentTarget.style.transform = "translateY(-2px)";
+                              e.currentTarget.style.boxShadow = listing.is_kaparirano
+                                ? "0 4px 12px rgba(15, 118, 110, 0.45)"
+                                : "0 4px 12px rgba(13, 148, 136, 0.45)";
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (actionLoading !== listing.id) {
+                              e.currentTarget.style.transform = "translateY(0)";
+                              e.currentTarget.style.boxShadow = listing.is_kaparirano
+                                ? "0 2px 8px rgba(15, 118, 110, 0.35)"
+                                : "0 2px 8px rgba(13, 148, 136, 0.35)";
+                            }
+                          }}
+                        >
+                          <Lock size={14} />
+                          {actionLoading === listing.id
+                            ? "..."
+                            : listing.is_kaparirano
+                              ? "Махни капаро"
+                              : "Капарирай"}
                         </button>
                       )}
 

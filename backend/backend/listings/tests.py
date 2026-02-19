@@ -3,6 +3,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase, APIClient
 
+from backend.accounts.models import BusinessUser
 from .models import CarListing
 
 
@@ -91,3 +92,97 @@ class ListingViewCountTests(APITestCase):
 
         self.listing.refresh_from_db(fields=["view_count"])
         self.assertEqual(self.listing.view_count, 2)
+
+
+class ListingKapariranoStatusTests(APITestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.business_owner = user_model.objects.create_user(
+            username="business-owner",
+            email="business-owner@example.com",
+            password="testpass123",
+        )
+        BusinessUser.objects.create(
+            user=self.business_owner,
+            dealer_name="Dealer One",
+            city="Sofia",
+            address="bul. Vitosha 1",
+            phone="+359888000001",
+            email="dealer-one@example.com",
+            website="https://dealer-one.example.com",
+            username="dealerone",
+            company_name="Dealer One OOD",
+            registration_address="Sofia",
+            mol="Ivan Ivanov",
+            bulstat="123456789",
+            vat_number="BG123456789",
+            admin_name="Ivan Ivanov",
+            admin_phone="+359888000001",
+        )
+        self.private_owner = user_model.objects.create_user(
+            username="private-owner",
+            email="private-owner@example.com",
+            password="testpass123",
+        )
+
+        self.business_listing = CarListing.objects.create(
+            user=self.business_owner,
+            brand="BMW",
+            model="X5",
+            year_from=2021,
+            price="50000.00",
+            city="Sofia",
+            fuel="dizel",
+            gearbox="avtomatik",
+            mileage=100000,
+            description="Business listing",
+            phone="+359888000001",
+            email="business-owner@example.com",
+        )
+        self.private_listing = CarListing.objects.create(
+            user=self.private_owner,
+            brand="Audi",
+            model="A4",
+            year_from=2020,
+            price="22000.00",
+            city="Plovdiv",
+            fuel="benzin",
+            gearbox="ruchna",
+            mileage=130000,
+            description="Private listing",
+            phone="+359888000002",
+            email="private-owner@example.com",
+        )
+        self.business_url = reverse("update_kaparirano_status", args=[self.business_listing.id])
+        self.private_url = reverse("update_kaparirano_status", args=[self.private_listing.id])
+
+    def test_business_user_can_mark_listing_as_kaparirano(self):
+        self.client.force_authenticate(user=self.business_owner)
+
+        response = self.client.post(self.business_url, {"is_kaparirano": True}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.business_listing.refresh_from_db(fields=["is_kaparirano"])
+        self.assertTrue(self.business_listing.is_kaparirano)
+        self.assertTrue(response.data["is_kaparirano"])
+
+    def test_business_user_can_toggle_kaparirano_without_payload(self):
+        self.client.force_authenticate(user=self.business_owner)
+        CarListing.objects.filter(pk=self.business_listing.pk).update(is_kaparirano=True)
+        self.business_listing.refresh_from_db(fields=["is_kaparirano"])
+
+        response = self.client.post(self.business_url, {}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.business_listing.refresh_from_db(fields=["is_kaparirano"])
+        self.assertFalse(self.business_listing.is_kaparirano)
+        self.assertFalse(response.data["is_kaparirano"])
+
+    def test_private_user_cannot_mark_listing_as_kaparirano(self):
+        self.client.force_authenticate(user=self.private_owner)
+
+        response = self.client.post(self.private_url, {"is_kaparirano": True}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.private_listing.refresh_from_db(fields=["is_kaparirano"])
+        self.assertFalse(self.private_listing.is_kaparirano)
