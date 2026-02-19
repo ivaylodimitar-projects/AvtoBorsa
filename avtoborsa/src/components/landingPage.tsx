@@ -619,7 +619,7 @@ export default function LandingPage() {
         .category-pill-tooltip {
           position: absolute;
           left: 50%;
-          bottom: calc(100% + 8px);
+          bottom: calc(100% + 1px);
           transform: translate(-50%, 6px) scale(0.96);
           opacity: 0;
           pointer-events: none;
@@ -657,7 +657,7 @@ export default function LandingPage() {
         .category-pill-btn:hover .category-pill-tooltip,
         .category-pill-btn:focus-visible .category-pill-tooltip {
           opacity: 1;
-          transform: translate(-50%, 0) scale(1);
+          transform: translate(-50%, 2px) scale(1);
         }
         .category-pill-btn.category-pill-btn--active .category-material-icon {
           transform: scale(1.05);
@@ -677,7 +677,7 @@ export default function LandingPage() {
         }
         .category-pill-btn.category-pill-btn--active {
           box-shadow: none;
-          background: rgba(15, 118, 110, 0.16) !important;
+          background: transparent !important;
         }
         .main-category-grid {
           scrollbar-width: none;
@@ -738,7 +738,6 @@ export default function LandingPage() {
                             ...styles.mainCategoryIconWrap,
                             ...(isActive
                               ? {
-                                  background: "#f0fdfa",
                                   color: "#0f766e",
                                 }
                               : {}),
@@ -1622,7 +1621,8 @@ const styles: Record<string, React.CSSProperties> = {
     overflowX: "auto",
     overflowY: "hidden",
     paddingTop: "2rem",
-    paddingBottom: 2,
+    paddingBottom: "1rem",
+    borderBottom: "3px solid rgb(15, 118, 110)",
   },
   mainCategoryButton: {
     position: "relative",
@@ -1651,12 +1651,13 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: "none",
   },
   mainCategoryButtonActive: {
-    background: "rgba(15, 118, 110, 0.16)",
+    background: "transparent",
     borderWidth: 0,
     borderStyle: "none",
     borderColor: "transparent",
     color: "#0f766e",
     boxShadow: "none",
+    transform: "scale(1.20)",
   },
   mainCategoryIconWrap: {
     width: 38,
@@ -1665,7 +1666,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    background: "#f1f5f9",
+    // background: "#f1f5f9",
     color: "#475569",
     transition: "all 0.22s ease",
     flexShrink: 0,

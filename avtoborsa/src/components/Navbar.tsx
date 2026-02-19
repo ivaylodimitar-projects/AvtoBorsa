@@ -467,25 +467,16 @@ const Navbar: React.FC = () => {
 
             <SavedSearchesMenu />
 
-            {isAuthenticated ? (
-              <Link
-                to="/publish"
-                className={`nav-link ${isActive("/publish") ? "active" : ""}`}
-                onClick={() => setMobileOpen(false)}
-              >
-                <FiPlus size={16} />
-                Добави обява
-              </Link>
-            ) : (
-              <Link
-                to="/publish"
-                className={`nav-link ${isActive("/publish") ? "active" : ""}`}
-                onClick={() => setMobileOpen(false)}
-              >
-                <FiPlus size={16} />
-                Публикуване
-              </Link>
-            )}
+            <Link
+              to="/publish"
+              className={`nav-publish-cta ${isActive("/publish") ? "active" : ""}`}
+              onClick={() => setMobileOpen(false)}
+            >
+              <span className="nav-publish-icon" aria-hidden="true">
+                <FiPlus size={14} />
+              </span>
+              <span className="nav-publish-label">+ Добави обява</span>
+            </Link>
           </div>
 
           <div className="nav-group nav-right">
@@ -972,6 +963,99 @@ const css = `
   align-items: center;
 }
 
+.nav-publish-cta {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 18px 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  text-decoration: none;
+  white-space: nowrap;
+  color: #ffffff;
+  background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
+  box-shadow: 0 10px 24px rgba(15, 118, 110, 0.34);
+  transition: transform 0.2s ease, box-shadow 0.25s ease, filter 0.25s ease;
+}
+
+.nav-publish-cta::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  padding: 2px;
+  pointer-events: none;
+  background: conic-gradient(
+    from 0deg,
+    rgba(45, 212, 191, 0),
+    rgba(153, 246, 228, 0.96),
+    rgba(45, 212, 191, 0)
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: navPublishOrbit 2s linear infinite;
+}
+
+.nav-publish-cta::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0) 45%);
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.nav-publish-cta:hover,
+.nav-publish-cta:focus-visible,
+.nav-publish-cta.active {
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 14px 32px rgba(15, 118, 110, 0.4);
+  filter: saturate(1.08);
+}
+
+.nav-publish-cta:active {
+  transform: scale(1);
+}
+
+.nav-publish-icon,
+.nav-publish-label {
+  position: relative;
+  z-index: 1;
+}
+
+.nav-publish-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+.nav-publish-label {
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  transform: translateY(1px);
+}
+
+@keyframes navPublishOrbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .notifications-wrap {
   position: relative;
 }
@@ -1404,6 +1488,7 @@ const css = `
 }
 
 .nav-link:focus-visible,
+.nav-publish-cta:focus-visible,
 .btn-primary:focus-visible,
 .btn-ghost:focus-visible {
   outline: 3px solid rgba(15, 118, 110, 0.35);
@@ -1560,6 +1645,12 @@ const css = `
     justify-content: center;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-publish-cta,
+  .nav-publish-cta::before {
+    animation: none;
+    transition: none;
+  }
+}
 `;
-
-
