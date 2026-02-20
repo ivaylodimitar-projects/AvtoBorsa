@@ -177,6 +177,27 @@ const POPULAR_CAR_BRANDS = [
       "https://static.classistatic.de/consumer-webapp/static/vw-logo-dark.c293639b63fc19f1f082..png",
   },
 ] as const;
+
+const DEFAULT_BRAND_HERO_IMAGE =
+  "https://loremflickr.com/1600/900/car?lock=99";
+
+const BRAND_HERO_IMAGES: Record<string, string> = {
+  Audi: "https://loremflickr.com/1600/900/audi,car?lock=11",
+  BMW: "https://loremflickr.com/1600/900/bmw,car?lock=12",
+  Cupra: "https://loremflickr.com/1600/900/cupra,car?lock=13",
+  Ford: "https://loremflickr.com/1600/900/ford,car?lock=14",
+  "Mercedes-Benz": "https://loremflickr.com/1600/900/mercedes,car?lock=15",
+  Opel: "https://loremflickr.com/1600/900/opel,car?lock=16",
+  Renault: "https://loremflickr.com/1600/900/renault,car?lock=17",
+  Skoda: "https://loremflickr.com/1600/900/skoda,car?lock=18",
+  Tesla: "https://loremflickr.com/1600/900/tesla,car?lock=19",
+  Toyota: "https://loremflickr.com/1600/900/toyota,car?lock=20",
+  Volvo: "https://loremflickr.com/1600/900/volvo,car?lock=21",
+  Volkswagen: "https://loremflickr.com/1600/900/volkswagen,car?lock=22",
+};
+
+const getBrandHeroImage = (brandName: string) =>
+  BRAND_HERO_IMAGES[brandName] ?? DEFAULT_BRAND_HERO_IMAGE;
 const CATEGORY_ICON_WIDTH = 44;
 const CATEGORY_ICON_HEIGHT = 44;
 const CATEGORY_SYMBOL_SIZE = 34;
@@ -307,6 +328,19 @@ export default function LandingPage() {
   const [listingsLoading, setListingsLoading] = useState(
     () => initialLatestListingsRef.current === null
   );
+  const [activeBrandIndex, setActiveBrandIndex] = useState(() => {
+    const mercedesIndex = POPULAR_CAR_BRANDS.findIndex(
+      (item) => item.name === "Mercedes-Benz"
+    );
+    return mercedesIndex >= 0 ? mercedesIndex : 0;
+  });
+  const [isBrandShowcaseOpen, setIsBrandShowcaseOpen] = useState(true);
+  const [brandSlideDirection, setBrandSlideDirection] = useState<"next" | "prev">("next");
+  const [brandMotionKey, setBrandMotionKey] = useState(0);
+  const [isPopularBrandsInView, setIsPopularBrandsInView] = useState(false);
+  const [isBrandShowcaseHovered, setIsBrandShowcaseHovered] = useState(false);
+  const popularBrandsSectionRef = useRef<HTMLElement | null>(null);
+  const lastBrandsManualActionRef = useRef(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -462,6 +496,67 @@ export default function LandingPage() {
       prev.includes(feature) ? prev.filter((f) => f !== feature) : [...prev, feature]
     );
   };
+
+  const goToPrevBrand = (source: "manual" | "auto" = "manual") => {
+    if (source === "manual") {
+      lastBrandsManualActionRef.current = Date.now();
+    }
+    setIsBrandShowcaseOpen(true);
+    setBrandSlideDirection("prev");
+    setBrandMotionKey((prev) => prev + 1);
+    setActiveBrandIndex((prev) =>
+      (prev - 1 + POPULAR_CAR_BRANDS.length) % POPULAR_CAR_BRANDS.length
+    );
+  };
+
+  const goToNextBrand = (source: "manual" | "auto" = "manual") => {
+    if (source === "manual") {
+      lastBrandsManualActionRef.current = Date.now();
+    }
+    setIsBrandShowcaseOpen(true);
+    setBrandSlideDirection("next");
+    setBrandMotionKey((prev) => prev + 1);
+    setActiveBrandIndex((prev) => (prev + 1) % POPULAR_CAR_BRANDS.length);
+  };
+
+  const activeBrand = POPULAR_CAR_BRANDS[activeBrandIndex];
+  const leftBrand =
+    POPULAR_CAR_BRANDS[
+      (activeBrandIndex - 1 + POPULAR_CAR_BRANDS.length) % POPULAR_CAR_BRANDS.length
+    ];
+  const rightBrand =
+    POPULAR_CAR_BRANDS[(activeBrandIndex + 1) % POPULAR_CAR_BRANDS.length];
+
+  useEffect(() => {
+    const sectionEl = popularBrandsSectionRef.current;
+    if (!sectionEl) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setIsPopularBrandsInView(entry.isIntersecting);
+      },
+      { threshold: 0.35 }
+    );
+
+    observer.observe(sectionEl);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!isPopularBrandsInView || isBrandShowcaseHovered) return;
+
+    const intervalId = window.setInterval(() => {
+      const manualPauseMs = 7000;
+      const isManualPauseActive =
+        Date.now() - lastBrandsManualActionRef.current < manualPauseMs;
+
+      if (!isManualPauseActive) {
+        goToNextBrand("auto");
+      }
+    }, 4500);
+
+    return () => window.clearInterval(intervalId);
+  }, [isPopularBrandsInView, isBrandShowcaseHovered]);
 
   const isListingNew = (createdAt?: string) => {
     if (!createdAt) return false;
@@ -1182,68 +1277,332 @@ export default function LandingPage() {
             .view-more-btn:hover {
               box-shadow: 0 4px 14px rgba(15,118,110,0.35);
             }
-            .popular-brand-grid {
-              display: grid;
-              grid-template-columns: repeat(6, minmax(0, 1fr));
-              gap: 12px;
-              margin-top: 4px;
+            .brand-showcase {
+              margin-top: 6px;
+              border-radius: 16px;
+              border: 1px solid #e2e8f0;
+              background: radial-gradient(circle at 14% 8%, rgba(15, 118, 110, 0.14), transparent 52%),
+                linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+              box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 8px 28px rgba(15, 23, 42, 0.1);
+              padding: 14px;
+              position: relative;
+              perspective: 1400px;
+              overflow: hidden;
             }
-            .popular-brand-card {
+            .brand-stage {
+              display: grid;
+              grid-template-columns: minmax(0, 1fr) minmax(0, 2.4fr) minmax(0, 1fr);
+              align-items: stretch;
+              gap: 12px;
+              transform-style: preserve-3d;
+            }
+            .brand-stage--next {
+              animation: brandShelfDriftNext 0.82s cubic-bezier(0.16, 0.78, 0.18, 1);
+              transform-origin: right center;
+            }
+            .brand-stage--prev {
+              animation: brandShelfDriftPrev 0.82s cubic-bezier(0.16, 0.78, 0.18, 1);
+              transform-origin: left center;
+            }
+            .brand-side-card {
+              border-radius: 14px;
+              border: 1px solid transparent;
+              background: #0b1220;
+              display: flex;
+              justify-content: center;
+              align-items: flex-end;
+              padding: 12px;
+              position: relative;
+              overflow: hidden;
+              opacity: 0.68;
+              transform: scale(0.96);
+              transition: transform 0.32s ease, opacity 0.32s ease;
+            }
+            .brand-showcase.is-open .brand-side-card {
+              opacity: 0.86;
+              transform: scale(1);
+            }
+            .brand-stage--next .brand-side-card--left {
+              animation: brandSideOutLeft 0.78s cubic-bezier(0.16, 0.78, 0.18, 1);
+            }
+            .brand-stage--next .brand-side-card--right {
+              animation: brandSideInRight 0.78s cubic-bezier(0.16, 0.78, 0.18, 1);
+            }
+            .brand-stage--prev .brand-side-card--left {
+              animation: brandSideInLeft 0.78s cubic-bezier(0.16, 0.78, 0.18, 1);
+            }
+            .brand-stage--prev .brand-side-card--right {
+              animation: brandSideOutRight 0.78s cubic-bezier(0.16, 0.78, 0.18, 1);
+            }
+            .brand-side-logo {
+              width: 30px;
+              height: 30px;
+              object-fit: contain;
+              margin-bottom: 0;
+              filter: saturate(0.95);
+            }
+            .brand-side-bg {
+              position: absolute;
+              inset: 0;
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+              transform: scale(1.06);
+              filter: grayscale(0.25) brightness(0.46) contrast(0.94) blur(1.4px);
+              pointer-events: none;
+            }
+            .brand-side-overlay {
+              position: absolute;
+              inset: 0;
+              background: linear-gradient(180deg, rgba(2, 6, 23, 0.35) 0%, rgba(2, 6, 23, 0.82) 100%);
+              pointer-events: none;
+            }
+            .brand-side-meta {
+              position: relative;
+              z-index: 2;
+              display: inline-flex;
+              align-items: center;
+              gap: 8px;
+              background: rgba(2, 6, 23, 0.78);
+              border: 1px solid transparent;
+              border-radius: 999px;
+              padding: 6px 10px;
+              backdrop-filter: blur(1px);
+            }
+            .brand-side-name {
+              font-size: 12px;
+              font-weight: 700;
+              text-align: center;
+              color: #e2e8f0;
+              white-space: nowrap;
+            }
+            .brand-main-card {
+              border: none;
+              border-radius: 14px;
+              background: #0b1220;
+              overflow: hidden;
+              position: relative;
+              color: #fff;
+              text-decoration: none;
+              cursor: pointer;
+              transform: translateY(-2px) scale(1.015);
+              box-shadow: 0 18px 36px rgba(15, 118, 110, 0.26);
+              transition: transform 0.35s ease, box-shadow 0.35s ease;
+              transform-style: preserve-3d;
+              backface-visibility: hidden;
+              will-change: transform, opacity, filter;
+            }
+            .brand-main-card--next {
+              animation: brandCardFlipInNext 0.86s cubic-bezier(0.16, 0.78, 0.18, 1);
+            }
+            .brand-main-card--prev {
+              animation: brandCardFlipInPrev 0.86s cubic-bezier(0.16, 0.78, 0.18, 1);
+            }
+            .brand-main-card:hover {
+              transform: translateY(-4px) scale(1.02);
+              box-shadow: 0 20px 40px rgba(15, 118, 110, 0.32);
+              text-decoration: none;
+            }
+            .brand-main-card:focus,
+            .brand-main-card:focus-visible,
+            .brand-nav:focus,
+            .brand-nav:focus-visible {
+              outline: none;
+            }
+            .brand-main-image-wrap {
+              height: 150px;
+              overflow: hidden;
+              transition: height 0.42s cubic-bezier(0.22, 0.78, 0.14, 1);
+            }
+            .brand-main-image-wrap--next {
+              animation: brandImageParallaxNext 0.9s cubic-bezier(0.16, 0.78, 0.18, 1);
+            }
+            .brand-main-image-wrap--prev {
+              animation: brandImageParallaxPrev 0.9s cubic-bezier(0.16, 0.78, 0.18, 1);
+            }
+            .brand-showcase.is-open .brand-main-image-wrap {
+              height: 300px;
+            }
+            .brand-main-image {
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+              transform: scale(1.01);
+              will-change: transform, filter;
+            }
+            .brand-main-overlay {
+              position: absolute;
+              inset: 0;
+              background: linear-gradient(180deg, rgba(2,6,23,0.15) 0%, rgba(2,6,23,0.78) 100%);
+              pointer-events: none;
+            }
+            .brand-main-meta {
+              position: absolute;
+              bottom: 16px;
+              left: 16px;
+              right: 16px;
+              z-index: 2;
               display: flex;
               align-items: center;
-              justify-content: center;
               gap: 10px;
-              min-height: 66px;
-              padding: 10px 12px;
-              border: 1px solid #e2e8f0;
-              border-radius: 12px;
-              background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-              text-decoration: none;
-              transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+              animation: brandMetaRise 0.62s cubic-bezier(0.22, 0.78, 0.14, 1);
             }
-            .popular-brand-card:hover {
-              transform: translateY(-2px);
-              border-color: #99f6e4;
-              box-shadow: 0 10px 20px rgba(15, 118, 110, 0.12);
-              text-decoration: none;
-            }
-            .popular-brand-logo {
-              width: 34px;
-              height: 34px;
+            .brand-main-logo {
+              width: 44px;
+              height: 44px;
               object-fit: contain;
+              border-radius: 10px;
+              background: rgba(2,6,23,0.82);
+              border: none;
+              padding: 6px;
               flex-shrink: 0;
             }
-            .popular-brand-name {
-              font-size: 13px;
-              font-weight: 700;
-              color: #0f172a;
-              line-height: 1.25;
+            .brand-main-name {
+              color: #f8fafc;
+              font-size: 28px;
+              line-height: 1.1;
+              font-weight: 800;
+              letter-spacing: 0.01em;
+              font-family: "Space Grotesk", "Manrope", "Segoe UI", sans-serif;
+              text-shadow: 0 4px 16px rgba(2, 6, 23, 0.6);
+            }
+            .brand-main-name-badge {
+              display: inline-flex;
+              align-items: center;
+              min-height: 42px;
+              padding: 8px 14px;
+              border-radius: 12px;
+              background: rgba(2, 6, 23, 0.64);
+              border: 1px solid transparent;
+              backdrop-filter: blur(2px);
+            }
+            .brand-nav {
+              position: absolute;
+              top: 50%;
+              transform: translateY(-50%);
+              width: 52px;
+              height: 52px;
+              border-radius: 999px;
+              border: 1.5px solid rgba(255, 255, 255, 0.86);
+              background: rgba(2, 6, 23, 0.78);
+              color: #ffffff;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              cursor: pointer;
+              z-index: 5;
+              transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+            }
+            .brand-nav:hover {
+              background: rgba(15, 118, 110, 0.62);
+              border-color: #ffffff;
+              transform: translateY(-50%) scale(1.04);
+            }
+            .brand-nav--left { left: 12px; }
+            .brand-nav--right { right: 12px; }
+            .brand-showcase-hint {
+              margin-top: 10px;
               text-align: center;
+              color: #0f766e;
+              font-size: 12px;
+              letter-spacing: 0.03em;
+            }
+            @keyframes brandCardFlipInNext {
+              0% {
+                opacity: 1;
+                transform: translateY(10px) translateX(190px) translateZ(-90px) rotateY(-14deg) scale(0.92);
+                filter: blur(2.8px) saturate(0.88) brightness(0.86);
+              }
+              62% {
+                opacity: 1;
+                transform: translateY(-4px) translateX(-18px) translateZ(16px) rotateY(4deg) scale(1.03);
+                filter: blur(0.25px) saturate(1.04) brightness(1);
+              }
+              100% {
+                opacity: 1;
+                transform: translateY(-2px) translateX(0) rotateY(0deg) scale(1.015);
+                filter: blur(0) saturate(1) brightness(1);
+              }
+            }
+            @keyframes brandCardFlipInPrev {
+              0% {
+                opacity: 1;
+                transform: translateY(10px) translateX(-190px) translateZ(-90px) rotateY(14deg) scale(0.92);
+                filter: blur(2.8px) saturate(0.88) brightness(0.86);
+              }
+              62% {
+                opacity: 1;
+                transform: translateY(-4px) translateX(18px) translateZ(16px) rotateY(-4deg) scale(1.03);
+                filter: blur(0.25px) saturate(1.04) brightness(1);
+              }
+              100% {
+                opacity: 1;
+                transform: translateY(-2px) translateX(0) rotateY(0deg) scale(1.015);
+                filter: blur(0) saturate(1) brightness(1);
+              }
+            }
+            @keyframes brandImageParallaxNext {
+              0% { transform: scale(1.22) translateX(170px); filter: brightness(0.82) blur(1.6px); }
+              100% { transform: scale(1.01) translateX(0); filter: brightness(1) blur(0); }
+            }
+            @keyframes brandImageParallaxPrev {
+              0% { transform: scale(1.22) translateX(-170px); filter: brightness(0.82) blur(1.6px); }
+              100% { transform: scale(1.01) translateX(0); filter: brightness(1) blur(0); }
+            }
+            @keyframes brandMetaRise {
+              0% { opacity: 0; transform: translateY(14px) scale(0.98); }
+              100% { opacity: 1; transform: translateY(0) scale(1); }
+            }
+            @keyframes brandShelfDriftNext {
+              0% { transform: translateX(96px) translateZ(-20px) scale(0.975); opacity: 1; }
+              68% { transform: translateX(-10px) translateZ(0) scale(1.008); opacity: 1; }
+              100% { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes brandShelfDriftPrev {
+              0% { transform: translateX(-96px) translateZ(-20px) scale(0.975); opacity: 1; }
+              68% { transform: translateX(10px) translateZ(0) scale(1.008); opacity: 1; }
+              100% { transform: translateX(0); opacity: 1; }
+            }
+            @keyframes brandSideOutLeft {
+              0% { opacity: 0.72; transform: translateX(74px) scale(0.9); }
+              100% { opacity: 0.86; transform: translateX(0) scale(1); }
+            }
+            @keyframes brandSideInRight {
+              0% { opacity: 0.72; transform: translateX(124px) scale(0.9); }
+              100% { opacity: 0.86; transform: translateX(0) scale(1); }
+            }
+            @keyframes brandSideInLeft {
+              0% { opacity: 0.72; transform: translateX(-124px) scale(0.9); }
+              100% { opacity: 0.86; transform: translateX(0) scale(1); }
+            }
+            @keyframes brandSideOutRight {
+              0% { opacity: 0.72; transform: translateX(-74px) scale(0.9); }
+              100% { opacity: 0.86; transform: translateX(0) scale(1); }
             }
 
             @media (min-width: 1024px) and (max-width: 1200px) {
               .latest-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
-              .popular-brand-grid { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; }
+              .brand-main-image-wrap { height: 140px; }
+              .brand-showcase.is-open .brand-main-image-wrap { height: 260px; }
             }
             @media (min-width: 768px) and (max-width: 1023px) {
               .latest-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-              .popular-brand-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+              .brand-stage { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); }
+              .brand-main-name { font-size: 22px; }
+              .brand-main-image-wrap { height: 130px; }
+              .brand-showcase.is-open .brand-main-image-wrap { height: 220px; }
             }
             @media (max-width: 767px) {
               .latest-grid { grid-template-columns: 1fr !important; gap: 14px !important; padding-top: 10px !important; }
-              .popular-brand-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-              .popular-brand-card {
-                min-height: 60px;
-                padding: 8px;
-                gap: 7px;
-              }
-              .popular-brand-logo {
-                width: 30px;
-                height: 30px;
-              }
-              .popular-brand-name {
-                font-size: 12px;
-              }
+              .brand-showcase { padding: 10px; }
+              .brand-stage { grid-template-columns: 1fr; gap: 8px; }
+              .brand-side-card { display: none; }
+              .brand-main-image-wrap { height: 140px; }
+              .brand-showcase.is-open .brand-main-image-wrap { height: 210px; }
+              .brand-main-name { font-size: 18px; }
+              .brand-nav { width: 42px; height: 42px; top: 34%; }
+              .brand-nav--left { left: 8px; }
+              .brand-nav--right { right: 8px; }
             }
           `}</style>
 
@@ -1483,37 +1842,102 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="popular-brands" style={{ ...styles.section, ...styles.popularBrandsSection }}>
+        <section
+          id="popular-brands"
+          ref={popularBrandsSectionRef}
+          style={{ ...styles.section, ...styles.popularBrandsSection }}
+        >
           <div style={styles.popularBrandsContainer}>
             <div style={{ ...styles.sectionHeader, ...styles.containerHeader, marginBottom: 12 }}>
               <h2 style={styles.h2}>Популярни марки</h2>
               <p style={styles.sectionLead}>
-                Избери марка и продължи към търсене на актуални обяви.
+                Навигирай със стрелките и отвори избраната марка.
               </p>
             </div>
 
-            <div className="popular-brand-grid">
-              {POPULAR_CAR_BRANDS.map((brandItem) => (
+            <div
+              className={`brand-showcase ${isBrandShowcaseOpen ? "is-open" : ""}`}
+              onMouseEnter={() => setIsBrandShowcaseHovered(true)}
+              onMouseLeave={() => setIsBrandShowcaseHovered(false)}
+            >
+              <button
+                type="button"
+                className="brand-nav brand-nav--left"
+                aria-label="Предишна марка"
+                onClick={goToPrevBrand}
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m15 18-6-6 6-6" />
+                </svg>
+              </button>
+
+              <div
+                key={brandMotionKey}
+                className={`brand-stage ${brandSlideDirection === "next" ? "brand-stage--next" : "brand-stage--prev"}`}
+              >
+                <div className="brand-side-card brand-side-card--left" aria-hidden="true">
+                  <img src={getBrandHeroImage(leftBrand.name)} alt="" className="brand-side-bg" loading="eager" decoding="async" />
+                  <div className="brand-side-overlay" />
+                  <div className="brand-side-meta">
+                    <img src={leftBrand.logoUrl} alt="" className="brand-side-logo" loading="lazy" decoding="async" />
+                    <div className="brand-side-name">{leftBrand.name}</div>
+                  </div>
+                </div>
+
                 <a
-                  key={brandItem.name}
-                  href={`/search?brand=${encodeURIComponent(brandItem.name)}`}
-                  className="popular-brand-card"
-                  aria-label={brandItem.name}
+                  href={`/search?brand=${encodeURIComponent(activeBrand.name)}`}
+                  className={`brand-main-card ${brandSlideDirection === "next" ? "brand-main-card--next" : "brand-main-card--prev"}`}
+                  aria-label={activeBrand.name}
                   onClick={(event) => {
                     event.preventDefault();
-                    navigate(`/search?brand=${encodeURIComponent(brandItem.name)}`);
+                    navigate(`/search?brand=${encodeURIComponent(activeBrand.name)}`);
                   }}
                 >
-                  <img
-                    src={brandItem.logoUrl}
-                    alt={brandItem.name}
-                    className="popular-brand-logo"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                  <span className="popular-brand-name">{brandItem.name}</span>
+                  <div className={`brand-main-image-wrap ${brandSlideDirection === "next" ? "brand-main-image-wrap--next" : "brand-main-image-wrap--prev"}`}>
+                    <img
+                      src={getBrandHeroImage(activeBrand.name)}
+                      alt={activeBrand.name}
+                      className="brand-main-image"
+                      loading="eager"
+                      fetchPriority="high"
+                      decoding="async"
+                    />
+                  </div>
+                  <div className="brand-main-overlay" />
+                  <div className="brand-main-meta">
+                    <img src={activeBrand.logoUrl} alt="" className="brand-main-logo" loading="lazy" decoding="async" />
+                    <div className="brand-main-name-badge">
+                      <div className="brand-main-name">{activeBrand.name}</div>
+                    </div>
+                  </div>
                 </a>
-              ))}
+
+                <div className="brand-side-card brand-side-card--right" aria-hidden="true">
+                  <img src={getBrandHeroImage(rightBrand.name)} alt="" className="brand-side-bg" loading="eager" decoding="async" />
+                  <div className="brand-side-overlay" />
+                  <div className="brand-side-meta">
+                    <img src={rightBrand.logoUrl} alt="" className="brand-side-logo" loading="lazy" decoding="async" />
+                    <div className="brand-side-name">{rightBrand.name}</div>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className="brand-nav brand-nav--right"
+                aria-label="Следваща марка"
+                onClick={goToNextBrand}
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+              </button>
+
+              <div className="brand-showcase-hint">
+                {isBrandShowcaseOpen
+                  ? "Избери марка от централната карта"
+                  : "Натисни стрелка за разгръщане"}
+              </div>
             </div>
           </div>
         </section>
