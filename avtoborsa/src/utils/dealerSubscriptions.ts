@@ -4,6 +4,8 @@ export const USER_FOLLOWED_DEALERS_STORAGE_KEY_PREFIX =
   "karbg:user-followed-dealers:v1:";
 export const USER_FOLLOWED_DEALERS_UPDATED_EVENT =
   "karbg:user-followed-dealers-updated";
+export const DEALER_LISTINGS_SYNC_REQUEST_EVENT =
+  "karbg:dealer-listings-sync-request";
 
 const MAX_FOLLOWED_DEALERS = 250;
 
@@ -33,9 +35,21 @@ export interface FollowedDealersSyncResult {
 const toStorageKey = (userId: number) =>
   `${USER_FOLLOWED_DEALERS_STORAGE_KEY_PREFIX}${userId}`;
 
-const normalizeListingCount = (value: number) => {
-  if (!Number.isFinite(value) || value < 0) return 0;
-  return Math.floor(value);
+const normalizeNumber = (value: unknown) => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : NaN;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value.trim());
+    return Number.isFinite(parsed) ? parsed : NaN;
+  }
+  return NaN;
+};
+
+const normalizeListingCount = (value: unknown) => {
+  const numericValue = normalizeNumber(value);
+  if (!Number.isFinite(numericValue) || numericValue < 0) return 0;
+  return Math.floor(numericValue);
 };
 
 const normalizeDealerName = (value: unknown) => {
@@ -58,11 +72,12 @@ const toValidFollowedDealer = (value: unknown): FollowedDealer | null => {
   if (!value || typeof value !== "object") return null;
 
   const record = value as Record<string, unknown>;
-  if (typeof record.dealerId !== "number" || !Number.isFinite(record.dealerId)) {
+  const dealerIdValue = normalizeNumber(record.dealerId);
+  if (!Number.isFinite(dealerIdValue)) {
     return null;
   }
 
-  const dealerId = Math.floor(record.dealerId);
+  const dealerId = Math.floor(dealerIdValue);
   if (dealerId <= 0) return null;
 
   const dealerName = normalizeDealerName(record.dealerName);
@@ -82,11 +97,7 @@ const toValidFollowedDealer = (value: unknown): FollowedDealer | null => {
     dealerName,
     dealerCity: normalizeDealerCity(record.dealerCity),
     dealerProfileImageUrl: normalizeDealerImage(record.dealerProfileImageUrl),
-    lastKnownListingCount: normalizeListingCount(
-      typeof record.lastKnownListingCount === "number"
-        ? record.lastKnownListingCount
-        : 0
-    ),
+    lastKnownListingCount: normalizeListingCount(record.lastKnownListingCount),
     followedAt,
     updatedAt,
   };
@@ -101,6 +112,15 @@ const emitFollowedDealersUpdated = (userId: number) => {
   );
 };
 
+export const requestDealerListingsSync = (userId?: number | null) => {
+  if (!userId || typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(DEALER_LISTINGS_SYNC_REQUEST_EVENT, {
+      detail: { userId },
+    })
+  );
+};
+
 const persistUserFollowedDealers = (
   userId: number,
   followedDealers: FollowedDealer[]
@@ -108,6 +128,7 @@ const persistUserFollowedDealers = (
   if (typeof window === "undefined") return;
   localStorage.setItem(toStorageKey(userId), JSON.stringify(followedDealers));
   emitFollowedDealersUpdated(userId);
+  requestDealerListingsSync(userId);
 };
 
 export const getUserFollowedDealersStorageKey = (userId: number) =>
@@ -139,7 +160,8 @@ export const followDealer = (
 ): FollowedDealer | null => {
   if (!userId) return null;
 
-  const dealerId = Number.isFinite(snapshot.id) ? Math.floor(snapshot.id) : 0;
+  const dealerIdValue = normalizeNumber(snapshot.id);
+  const dealerId = Number.isFinite(dealerIdValue) ? Math.floor(dealerIdValue) : 0;
   const dealerName = normalizeDealerName(snapshot.dealer_name);
   if (dealerId <= 0 || !dealerName) return null;
 
@@ -225,7 +247,8 @@ export const syncFollowedDealersWithLatestListings = (
   >();
 
   latestDealers.forEach((snapshot) => {
-    const dealerId = Number.isFinite(snapshot.id) ? Math.floor(snapshot.id) : 0;
+    const dealerIdValue = normalizeNumber(snapshot.id);
+    const dealerId = Number.isFinite(dealerIdValue) ? Math.floor(dealerIdValue) : 0;
     if (dealerId <= 0) return;
 
     const dealerName = normalizeDealerName(snapshot.dealer_name);
@@ -250,14 +273,16 @@ export const syncFollowedDealersWithLatestListings = (
     let nextListingCount = subscription.lastKnownListingCount;
     if (snapshot.listingCount > subscription.lastKnownListingCount) {
       const listingsAdded = snapshot.listingCount - subscription.lastKnownListingCount;
-      const notification = addDealerListingNotification(userId, {
-        dealerId: subscription.dealerId,
-        dealerName: snapshot.dealerName,
-        listingsAdded,
-        totalListings: snapshot.listingCount,
-      });
-      if (notification) {
-        notificationsCreated += 1;
+      for (let step = 1; step <= listingsAdded; step += 1) {
+        const notification = addDealerListingNotification(userId, {
+          dealerId: subscription.dealerId,
+          dealerName: snapshot.dealerName,
+          listingsAdded: 1,
+          totalListings: subscription.lastKnownListingCount + step,
+        });
+        if (notification) {
+          notificationsCreated += 1;
+        }
       }
       nextListingCount = snapshot.listingCount;
     } else if (snapshot.listingCount !== subscription.lastKnownListingCount) {

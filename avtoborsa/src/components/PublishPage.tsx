@@ -15,6 +15,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { invalidateMyAdsCache } from "../utils/myAdsCache";
 import { invalidateLatestListingsCache } from "../utils/latestListingsCache";
+import { requestDealerListingsSync } from "../utils/dealerSubscriptions";
 import { BULGARIAN_CITIES_BY_REGION } from "../constants/bulgarianCities";
 import ListingFormStepper from "./ListingFormStepper";
 import AdvancedImageUpload from "./AdvancedImageUpload";
@@ -1702,6 +1703,7 @@ const PublishPage: React.FC = () => {
   const [loadingListing, setLoadingListing] = useState(false);
   const [redirectingAfterPublish, setRedirectingAfterPublish] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showStepValidation, setShowStepValidation] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   // Check authentication on mount
@@ -2368,6 +2370,18 @@ const PublishPage: React.FC = () => {
       .map((field) => field.label);
   };
 
+  const getMissingFieldKeys = (step: number, data: PublishFormData) => {
+    const stepKey = publishSteps[step - 1]?.key;
+    if (!stepKey || stepKey === "images") return [] as Array<keyof PublishFormData>;
+
+    const requiredByStep = getRequiredFieldsByStep(data.mainCategory);
+    const fields = requiredByStep[stepKey] ?? [];
+    return fields
+      .filter((field) => (field.when ? field.when(data) : true))
+      .filter((field) => isFieldMissing(data[field.key]))
+      .map((field) => field.key);
+  };
+
   const getFirstInvalidStep = (data: PublishFormData) => {
     for (let step = 1; step <= totalSteps; step += 1) {
       const missing = getMissingFields(step, data);
@@ -2796,8 +2810,44 @@ const PublishPage: React.FC = () => {
     ? hasPositiveNumber(formData.price)
     : true;
   const stepMissingFields = getMissingFields(currentStep, formData);
+  const stepMissingFieldKeys = getMissingFieldKeys(currentStep, formData);
   const validationMessage = formatMissingMessage(stepMissingFields);
-  const isNextDisabled = currentStep < totalSteps && stepMissingFields.length > 0;
+  const shownValidationMessage = showStepValidation ? validationMessage : "";
+  const isNextDisabled = loadingListing;
+
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+
+    const missingSet = showStepValidation
+      ? new Set(stepMissingFieldKeys.map((key) => String(key)))
+      : new Set<string>();
+    const controls = form.querySelectorAll<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >("input[name], select[name], textarea[name]");
+
+    const wrapperStates = new Map<Element, boolean>();
+    controls.forEach((control) => {
+      const name = control.getAttribute("name") || "";
+      const isMissing = missingSet.has(name);
+
+      control.classList.toggle("required-missing", isMissing);
+      control.setAttribute("aria-invalid", isMissing ? "true" : "false");
+
+      const wrapper = control.closest("[data-field-wrapper], .field-grid > div");
+      if (wrapper) {
+        wrapperStates.set(wrapper, Boolean(wrapperStates.get(wrapper)) || isMissing);
+      }
+    });
+
+    form
+      .querySelectorAll("[data-field-wrapper], .field-grid > div")
+      .forEach((wrapper) => wrapper.classList.remove("field-required-missing"));
+
+    wrapperStates.forEach((hasMissing, wrapper) => {
+      wrapper.classList.toggle("field-required-missing", hasMissing);
+    });
+  }, [currentStep, stepMissingFieldKeys, showStepValidation]);
 
   useEffect(() => {
     const editIdParam = searchParams.get("edit");
@@ -3356,6 +3406,7 @@ const PublishPage: React.FC = () => {
 
       invalidateMyAdsCache(user?.id);
       invalidateLatestListingsCache();
+      requestDealerListingsSync(user?.id);
       setRedirectingAfterPublish(true);
       if (isEditMode) {
         await new Promise((resolve) => setTimeout(resolve, EDIT_REDIRECT_LOADING_DELAY_MS));
@@ -3384,7 +3435,11 @@ const PublishPage: React.FC = () => {
   const handleNextStep = () => {
     if (currentStep >= totalSteps) return;
     const missing = getMissingFields(currentStep, formData);
-    if (missing.length > 0) return;
+    if (missing.length > 0) {
+      setShowStepValidation(true);
+      return;
+    }
+    setShowStepValidation(false);
     setErrors({});
     setCurrentStep(Math.min(totalSteps, currentStep + 1));
   };
@@ -3398,9 +3453,11 @@ const PublishPage: React.FC = () => {
     if (loadingListing) return;
     const firstInvalid = getFirstInvalidStep(formData);
     if (firstInvalid) {
+      setShowStepValidation(true);
       setCurrentStep(firstInvalid.step);
       return;
     }
+    setShowStepValidation(false);
     const form = formRef.current;
     if (!form) return;
     if (!form.reportValidity()) return;
@@ -3409,12 +3466,17 @@ const PublishPage: React.FC = () => {
 
   const handleStepClick = (step: number) => {
     if (step <= currentStep) {
+      setShowStepValidation(false);
       setErrors({});
       setCurrentStep(step);
       return;
     }
     const missing = getMissingFields(currentStep, formData);
-    if (missing.length > 0) return;
+    if (missing.length > 0) {
+      setShowStepValidation(true);
+      return;
+    }
+    setShowStepValidation(false);
     setErrors({});
     setCurrentStep(step);
   };
@@ -3955,6 +4017,25 @@ const PublishPage: React.FC = () => {
       transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
 
+    .publish-form input.required-missing:not([type="checkbox"]):not([type="file"]),
+    .publish-form select.required-missing,
+    .publish-form textarea.required-missing {
+      border-color: #dc2626 !important;
+      background: #fff7f7;
+      box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.12);
+    }
+
+    .publish-form input.required-missing:not([type="checkbox"]):not([type="file"]):focus,
+    .publish-form select.required-missing:focus,
+    .publish-form textarea.required-missing:focus {
+      border-color: #b91c1c !important;
+      box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.18);
+    }
+
+    .publish-form .field-required-missing label {
+      color: #b91c1c !important;
+    }
+
     .publish-form input[type="number"]::-webkit-outer-spin-button,
     .publish-form input[type="number"]::-webkit-inner-spin-button {
       -webkit-appearance: none;
@@ -4226,9 +4307,9 @@ const PublishPage: React.FC = () => {
             </div>
 
           {/* Error Message */}
-          {(validationMessage || errors.submit) && (
+          {(shownValidationMessage || errors.submit) && (
             <div className="publish-alert error">
-              {validationMessage || errors.submit}
+              {shownValidationMessage || errors.submit}
             </div>
           )}
 
@@ -6164,7 +6245,10 @@ const PublishPage: React.FC = () => {
           <div className="publish-actions">
             <button
               type="button"
-              onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
+              onClick={() => {
+                setShowStepValidation(false);
+                setCurrentStep(Math.max(1, currentStep - 1));
+              }}
               disabled={currentStep === 1}
               className={`publish-btn secondary ${
                 currentStep === 1 ? "disabled" : ""

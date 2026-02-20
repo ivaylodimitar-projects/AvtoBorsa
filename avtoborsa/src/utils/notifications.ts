@@ -211,11 +211,10 @@ export const addDealerListingNotification = (
     return null;
   }
 
-  const notificationId = `dealer-listing-${dealerId}-${totalListings}`;
+  const notificationId = `dealer-listing-${dealerId}-${totalListings}-${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
   const current = getUserNotifications(userId);
-  if (current.some((item) => item.id === notificationId)) {
-    return null;
-  }
 
   const notification: DealerListingNotification = {
     id: notificationId,

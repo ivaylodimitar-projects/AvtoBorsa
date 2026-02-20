@@ -40,6 +40,7 @@ from .serializers import (
     CarImageSerializer,
     FavoriteSerializer,
 )
+from .realtime import broadcast_dealer_listings_updated
 
 
 TOP_LISTING_PRICE_1D_EUR = Decimal("2.49")
@@ -992,6 +993,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
                     ]
                 )
         _invalidate_latest_listings_cache()
+        broadcast_dealer_listings_updated()
 
     def perform_update(self, serializer):
         """Update listing - only owner can update"""
@@ -1095,6 +1097,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
             elif draft_state_update_fields:
                 updated.save(update_fields=draft_state_update_fields)
         _invalidate_latest_listings_cache()
+        broadcast_dealer_listings_updated()
 
     def perform_destroy(self, instance):
         """Delete listing - only owner can delete"""
@@ -1242,6 +1245,7 @@ def republish_listing(request, listing_id):
 
         listing.save()
     _invalidate_latest_listings_cache()
+    broadcast_dealer_listings_updated()
 
     serializer = CarListingSerializer(listing, context={'request': request})
     return Response(serializer.data, status=status.HTTP_200_OK)

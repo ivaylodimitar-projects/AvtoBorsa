@@ -26,17 +26,20 @@ import {
   type DealerListingNotification,
 } from "../utils/notifications";
 import {
+  DEALER_LISTINGS_SYNC_REQUEST_EVENT,
   USER_FOLLOWED_DEALERS_UPDATED_EVENT,
   getUserFollowedDealers,
   getUserFollowedDealersStorageKey,
+  requestDealerListingsSync,
   syncFollowedDealersWithLatestListings,
   unfollowDealer,
   type DealerListingSnapshot,
   type FollowedDealer,
 } from "../utils/dealerSubscriptions";
 
-const DEALER_LISTINGS_POLL_INTERVAL_MS = 20_000;
+const DEALER_LISTINGS_SYNC_COOLDOWN_MS = 15_000;
 const DEALER_NOTIFICATIONS_STACK_WINDOW_MS = 60 * 60 * 1000;
+const DEALER_NOTIFICATIONS_WS_RECONNECT_MS = 5_000;
 
 type NotificationRenderItem =
   | {
@@ -55,22 +58,28 @@ const toDealerListingSnapshots = (value: unknown): DealerListingSnapshot[] => {
   if (!Array.isArray(value)) return [];
 
   const snapshots: DealerListingSnapshot[] = [];
+  const toNumber = (input: unknown) => {
+    if (typeof input === "number") return Number.isFinite(input) ? input : NaN;
+    if (typeof input === "string") {
+      const parsed = Number(input.trim());
+      return Number.isFinite(parsed) ? parsed : NaN;
+    }
+    return NaN;
+  };
 
   value.forEach((item) => {
     if (!item || typeof item !== "object") return;
 
     const record = item as Record<string, unknown>;
-    const idValue = record.id;
+    const idValue = toNumber(record.id);
     const dealerNameValue = record.dealer_name;
-    const listingCountValue = record.listing_count;
+    const listingCountValue = toNumber(record.listing_count);
 
     if (
-      typeof idValue !== "number" ||
       !Number.isFinite(idValue) ||
       idValue <= 0 ||
       typeof dealerNameValue !== "string" ||
       !dealerNameValue.trim() ||
-      typeof listingCountValue !== "number" ||
       !Number.isFinite(listingCountValue)
     ) {
       return;
@@ -91,6 +100,31 @@ const toDealerListingSnapshots = (value: unknown): DealerListingSnapshot[] => {
   return snapshots;
 };
 
+const areFollowedDealersEqual = (
+  left: FollowedDealer[],
+  right: FollowedDealer[]
+) => {
+  if (left.length !== right.length) return false;
+
+  for (let index = 0; index < left.length; index += 1) {
+    const a = left[index];
+    const b = right[index];
+    if (
+      a.dealerId !== b.dealerId ||
+      a.dealerName !== b.dealerName ||
+      a.dealerCity !== b.dealerCity ||
+      a.dealerProfileImageUrl !== b.dealerProfileImageUrl ||
+      a.lastKnownListingCount !== b.lastKnownListingCount ||
+      a.followedAt !== b.followedAt ||
+      a.updatedAt !== b.updatedAt
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -99,7 +133,6 @@ const Navbar: React.FC = () => {
   const [showLogoutModal, setShowLogoutModal] = React.useState(false);
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [showNotificationsMenu, setShowNotificationsMenu] = React.useState(false);
-  const [showAllNotifications, setShowAllNotifications] = React.useState(false);
   const [notificationsTab, setNotificationsTab] = React.useState<
     "notifications" | "subscriptions"
   >("notifications");
@@ -110,7 +143,6 @@ const Navbar: React.FC = () => {
     Record<string, boolean>
   >({});
   const notificationsRef = React.useRef<HTMLDivElement | null>(null);
-  const NOTIFICATIONS_PREVIEW_LIMIT = 5;
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -167,7 +199,10 @@ const Navbar: React.FC = () => {
 
     const storageKey = getUserFollowedDealersStorageKey(user.id);
     const refreshFollowedDealers = () => {
-      setFollowedDealers(getUserFollowedDealers(user.id));
+      const next = getUserFollowedDealers(user.id);
+      setFollowedDealers((prev) =>
+        areFollowedDealersEqual(prev, next) ? prev : next
+      );
     };
 
     refreshFollowedDealers();
@@ -199,10 +234,27 @@ const Navbar: React.FC = () => {
   }, [user?.id]);
 
   React.useEffect(() => {
-    if (!user?.id || followedDealers.length === 0) return;
+    if (!user?.id) return;
 
     let isCancelled = false;
-    const syncNewDealerListings = async () => {
+    let isSyncInFlight = false;
+    let lastSyncAtMs = 0;
+
+    const syncNewDealerListings = async (force = false) => {
+      if (isCancelled) return;
+      if (isSyncInFlight) return;
+
+      // Read directly from storage to avoid missing login catch-up due to UI state race.
+      const followedNow = getUserFollowedDealers(user.id);
+      if (followedNow.length === 0) return;
+
+      const nowMs = Date.now();
+      if (!force && nowMs - lastSyncAtMs < DEALER_LISTINGS_SYNC_COOLDOWN_MS) {
+        return;
+      }
+
+      isSyncInFlight = true;
+      lastSyncAtMs = nowMs;
       try {
         const response = await fetch("http://localhost:8000/api/auth/dealers/", {
           cache: "no-store",
@@ -211,36 +263,109 @@ const Navbar: React.FC = () => {
         const payload: unknown = await response.json();
         if (isCancelled) return;
         const snapshots = toDealerListingSnapshots(payload);
-        syncFollowedDealersWithLatestListings(user.id, snapshots);
+        const syncResult = syncFollowedDealersWithLatestListings(user.id, snapshots);
+        if (syncResult.notificationsCreated > 0) {
+          setNotifications(getUserNotifications(user.id));
+        }
       } catch {
         // silent polling fail
+      } finally {
+        isSyncInFlight = false;
       }
     };
 
-    void syncNewDealerListings();
-
-    const handleWindowFocus = () => {
-      void syncNewDealerListings();
-    };
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        void syncNewDealerListings();
-      }
+    const handleSyncRequest = (event: Event) => {
+      const { detail } = event as CustomEvent<{ userId?: number }>;
+      if (detail?.userId && detail.userId !== user.id) return;
+      void syncNewDealerListings(true);
     };
 
-    const intervalId = window.setInterval(() => {
-      void syncNewDealerListings();
-    }, DEALER_LISTINGS_POLL_INTERVAL_MS);
-    window.addEventListener("focus", handleWindowFocus);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    // Initial one-shot sync on login and a short fallback retry.
+    void syncNewDealerListings(true);
+    const fallbackSyncTimer = window.setTimeout(() => {
+      void syncNewDealerListings(true);
+    }, 2000);
+
+    window.addEventListener(DEALER_LISTINGS_SYNC_REQUEST_EVENT, handleSyncRequest);
 
     return () => {
       isCancelled = true;
-      window.clearInterval(intervalId);
-      window.removeEventListener("focus", handleWindowFocus);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.clearTimeout(fallbackSyncTimer);
+      window.removeEventListener(DEALER_LISTINGS_SYNC_REQUEST_EVENT, handleSyncRequest);
     };
-  }, [followedDealers, user?.id]);
+  }, [user?.id]);
+
+  React.useEffect(() => {
+    if (!user?.id) return;
+
+    let isDisposed = false;
+    let socket: WebSocket | null = null;
+    let reconnectTimerId: number | null = null;
+
+    const getWebSocketUrl = () => {
+      const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+      return `${protocol}://localhost:8000/ws/notifications/`;
+    };
+
+    const clearReconnectTimer = () => {
+      if (reconnectTimerId !== null) {
+        window.clearTimeout(reconnectTimerId);
+        reconnectTimerId = null;
+      }
+    };
+
+    const scheduleReconnect = () => {
+      if (isDisposed || reconnectTimerId !== null) return;
+      reconnectTimerId = window.setTimeout(() => {
+        reconnectTimerId = null;
+        connect();
+      }, DEALER_NOTIFICATIONS_WS_RECONNECT_MS);
+    };
+
+    const connect = () => {
+      if (isDisposed) return;
+      try {
+        socket = new WebSocket(getWebSocketUrl());
+      } catch {
+        scheduleReconnect();
+        return;
+      }
+
+      socket.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data) as { type?: string };
+          if (payload?.type === "dealer_listings_updated") {
+            requestDealerListingsSync(user.id);
+          }
+        } catch {
+          // ignore malformed ws payloads
+        }
+      };
+
+      socket.onopen = () => {
+        requestDealerListingsSync(user.id);
+      };
+
+      socket.onclose = () => {
+        socket = null;
+        scheduleReconnect();
+      };
+
+      socket.onerror = () => {
+        socket?.close();
+      };
+    };
+
+    connect();
+
+    return () => {
+      isDisposed = true;
+      clearReconnectTimer();
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.close();
+      }
+    };
+  }, [user?.id]);
 
   React.useEffect(() => {
     if (!showNotificationsMenu) return;
@@ -277,10 +402,7 @@ const Navbar: React.FC = () => {
   const hasUnreadNotifications = unreadNotificationsCount > 0;
   const hasNotifications = notifications.length > 0;
   const hasFollowedDealers = followedDealers.length > 0;
-  const hasMoreNotifications = notifications.length > NOTIFICATIONS_PREVIEW_LIMIT;
-  const notificationsForDisplay = showAllNotifications
-    ? notifications
-    : notifications.slice(0, NOTIFICATIONS_PREVIEW_LIMIT);
+  const notificationsForDisplay = notifications;
   const notificationRenderItems = React.useMemo<NotificationRenderItem[]>(() => {
     const nowMs = notificationsNowMs;
     const items: NotificationRenderItem[] = [];
@@ -359,7 +481,6 @@ const Navbar: React.FC = () => {
     const nextOpen = !showNotificationsMenu;
     setShowNotificationsMenu(nextOpen);
     if (nextOpen) {
-      setShowAllNotifications(false);
       setNotificationsTab("notifications");
       setExpandedNotificationGroups({});
       setNotificationsNowMs(Date.now());
@@ -475,7 +596,7 @@ const Navbar: React.FC = () => {
               <span className="nav-publish-icon" aria-hidden="true">
                 <FiPlus size={14} />
               </span>
-              <span className="nav-publish-label">+ Добави обява</span>
+              <span className="nav-publish-label">Добави обява</span>
             </Link>
           </div>
 
@@ -484,7 +605,7 @@ const Navbar: React.FC = () => {
               <>
                 <div className="notifications-wrap" ref={notificationsRef}>
                   <button
-                    className={`btn-ghost btn-notifications ${showNotificationsMenu ? "open" : ""}`}
+                    className={`btn-ghost btn-notifications ${showNotificationsMenu ? "open" : ""} ${hasUnreadNotifications ? "has-unread" : ""}`}
                     onClick={handleNotificationsToggle}
                     aria-label="Известия"
                     aria-haspopup="menu"
@@ -692,24 +813,6 @@ const Navbar: React.FC = () => {
                                 );
                               })}
                             </div>
-                            {hasMoreNotifications && !showAllNotifications && (
-                              <button
-                                type="button"
-                                className="notifications-footer-link"
-                                onClick={() => setShowAllNotifications(true)}
-                              >
-                                Виж всички известия
-                              </button>
-                            )}
-                            {hasMoreNotifications && showAllNotifications && (
-                              <button
-                                type="button"
-                                className="notifications-footer-link"
-                                onClick={() => setShowAllNotifications(false)}
-                              >
-                                Покажи само 5
-                              </button>
-                            )}
                           </>
                         )
                       ) : !hasFollowedDealers ? (
@@ -944,6 +1047,12 @@ const styles: Record<string, React.CSSProperties> = {
 };
 
 const css = `
+@property --publish-cta-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
 .nav {
   font-family: "Manrope", "Segoe UI", -apple-system, system-ui, sans-serif;
 }
@@ -964,6 +1073,7 @@ const css = `
 }
 
 .nav-publish-cta {
+  --publish-cta-angle: 0deg;
   position: relative;
   isolation: isolate;
   display: inline-flex;
@@ -973,33 +1083,34 @@ const css = `
   height: 42px;
   padding: 0 18px 0 12px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.24);
+  border: 1px solid #99f6e4;
   text-decoration: none;
   white-space: nowrap;
-  color: #ffffff;
-  background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
-  box-shadow: 0 10px 24px rgba(15, 118, 110, 0.34);
-  transition: transform 0.2s ease, box-shadow 0.25s ease, filter 0.25s ease;
+  color: #111827;
+  background: #ecfdf5;
+  transition: transform 0.2s ease, box-shadow 0.25s ease, filter 0.25s ease,
+    background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
 .nav-publish-cta::before {
   content: "";
   position: absolute;
-  inset: -3px;
+  inset: 0;
   border-radius: inherit;
-  padding: 2px;
   pointer-events: none;
+  padding: 1.5px;
   background: conic-gradient(
-    from 0deg,
-    rgba(45, 212, 191, 0),
-    rgba(153, 246, 228, 0.96),
-    rgba(45, 212, 191, 0)
+    from var(--publish-cta-angle),
+    rgba(106, 207, 143, 0) 0deg,
+    rgba(134, 239, 172, 0) 250deg,
+    rgba(76, 185, 116, 0.78) 300deg,
+    rgba(134, 239, 172, 0) 360deg
   );
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
-  // animation: navPublishOrbit 2s linear infinite;
+  animation: navPublishBorderOrbit 2.6s linear infinite;
 }
 
 .nav-publish-cta::after {
@@ -1007,8 +1118,8 @@ const css = `
   position: absolute;
   inset: 1px;
   border-radius: inherit;
-  background: linear-gradient(120deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0) 45%);
-  opacity: 0.55;
+  background: linear-gradient(120deg, rgba(15, 118, 110, 0.1), rgba(15, 118, 110, 0) 45%);
+  opacity: 0.35;
   pointer-events: none;
   z-index: 0;
 }
@@ -1017,7 +1128,9 @@ const css = `
 .nav-publish-cta:focus-visible,
 .nav-publish-cta.active {
   transform: translateY(-1px) scale(1.03);
-  box-shadow: 0 14px 32px rgba(15, 118, 110, 0.4);
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #fff;
   filter: saturate(1.08);
 }
 
@@ -1038,8 +1151,18 @@ const css = `
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  background: rgba(15, 118, 110, 0.12);
+  color: #111827;
+  box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.2);
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.nav-publish-cta:hover .nav-publish-icon,
+.nav-publish-cta:focus-visible .nav-publish-icon,
+.nav-publish-cta.active .nav-publish-icon {
   background: rgba(255, 255, 255, 0.2);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
 }
 
 .nav-publish-label {
@@ -1050,9 +1173,9 @@ const css = `
   transform: translateY(1px);
 }
 
-@keyframes navPublishOrbit {
+@keyframes navPublishBorderOrbit {
   to {
-    transform: rotate(360deg);
+    --publish-cta-angle: 360deg;
   }
 }
 
@@ -1075,10 +1198,35 @@ const css = `
   display: block;
 }
 
+.btn-notifications.has-unread .notifications-bell-icon {
+  transform-origin: top center;
+  animation: bellGentleSwing 2.2s ease-in-out infinite;
+}
+
 .btn-notifications.open {
   background: #ecfdf5;
   border-color: #99f6e4;
   color: #0f766e;
+}
+
+@keyframes bellGentleSwing {
+  0%,
+  62%,
+  100% {
+    transform: rotate(0deg);
+  }
+  68% {
+    transform: rotate(10deg);
+  }
+  74% {
+    transform: rotate(-8deg);
+  }
+  80% {
+    transform: rotate(5deg);
+  }
+  86% {
+    transform: rotate(-3deg);
+  }
 }
 
 .notification-dot {
@@ -1338,23 +1486,6 @@ const css = `
   font-size: 11px;
   color: #64748b;
   margin-top: 2px;
-}
-
-.notifications-footer-link {
-  margin-top: 8px;
-  width: 100%;
-  border: 1px solid #99f6e4;
-  background: #ecfdf5;
-  color: #0f766e;
-  border-radius: 10px;
-  padding: 8px 10px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.notifications-footer-link:hover {
-  background: #d1fae5;
 }
 
 .notifications-mark-all-btn {
@@ -1648,7 +1779,9 @@ const css = `
 
 @media (prefers-reduced-motion: reduce) {
   .nav-publish-cta,
-  .nav-publish-cta::before {
+  .nav-publish-cta::before,
+  .nav-publish-icon,
+  .btn-notifications.has-unread .notifications-bell-icon {
     animation: none;
     transition: none;
   }

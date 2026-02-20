@@ -114,7 +114,7 @@ const FormFieldWithTooltip: React.FC<FormFieldWithTooltipProps> = ({
   };
 
   return (
-    <div style={styles.container}>
+    <div style={styles.container} data-field-wrapper>
       <div style={styles.labelContainer}>
         <label style={styles.label}>
           {label}

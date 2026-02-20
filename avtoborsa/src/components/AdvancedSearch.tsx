@@ -1,6 +1,6 @@
 ﻿import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, Search, Bookmark, Lock } from "lucide-react";
+import { ChevronDown, ChevronLeft, Search, Bookmark, Lock, X } from "lucide-react";
 import { BrandSelector } from "./BrandSelector";
 import { BULGARIAN_CITIES_BY_REGION } from "../constants/bulgarianCities";
 import { useRecentSearches } from "../hooks/useRecentSearches";
@@ -713,6 +713,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   const { saveSearch } = useSavedSearches();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showRecentSearches, setShowRecentSearches] = useState(false);
   const [searchName, setSearchName] = useState("");
   const [searchCriteria, setSearchCriteria] = useState<SearchCriteria>({
     category: "",
@@ -1430,6 +1431,16 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       margin-bottom: 8px;
       font-family: "Space Grotesk", "Manrope", "Segoe UI", sans-serif;
     }
+    .adv-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 8px;
+    }
+    .adv-header .adv-search-title {
+      margin-bottom: 0;
+    }
     .adv-top-content {
       margin: 0 0 10px;
       padding: 6px 6px 4px;
@@ -1564,7 +1575,88 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       align-items: center;
       gap: 16px;
       margin-top: 2px;
-      justify-content: right;
+      justify-content: flex-end;
+    }
+    .adv-action-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+    .adv-recent-dropdown {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      margin-left: auto;
+    }
+    .adv-recent-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 42px;
+      justify-content: flex-start;
+      padding: 0 12px;
+      border: 1.5px solid #99f6e4;
+      border-radius: 999px;
+      background: #ecfdf5;
+      color: #115e59;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+    }
+    .adv-recent-toggle-text {
+      opacity: 1;
+      max-width: 180px;
+      margin-left: 2px;
+      overflow: hidden;
+      transition: opacity 0.18s ease, max-width 0.2s ease, margin-left 0.2s ease;
+    }
+    .adv-recent-toggle-text.is-hidden {
+      opacity: 0;
+      max-width: 0;
+      margin-left: 0;
+    }
+    .adv-recent-toggle:hover {
+      background: #d1fae5;
+      border-color: #5eead4;
+    }
+    .adv-recent-toggle-icon {
+      transition: transform 0.2s;
+    }
+    .adv-recent-dropdown-panel {
+      order: -1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 0;
+      max-width: 0;
+      min-width: 0;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      background: #ffffff;
+      overflow: hidden;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(10px) scaleX(0.88);
+      transform-origin: right center;
+      transition: width 0.36s cubic-bezier(0.22, 0.78, 0.14, 1),
+        max-width 0.36s cubic-bezier(0.22, 0.78, 0.14, 1), opacity 0.24s ease,
+        transform 0.36s cubic-bezier(0.22, 0.78, 0.14, 1), padding 0.28s ease,
+        border-color 0.2s ease;
+    }
+    .adv-recent-dropdown-panel.is-open {
+      width: clamp(340px, 46vw, 640px);
+      max-width: clamp(340px, 46vw, 640px);
+      padding: 6px 8px;
+      border-color: #99f6e4;
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0) scaleX(1);
     }
     .adv-search-btn {
       display: inline-flex;
@@ -1635,29 +1727,15 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       align-items: center;
       gap: 8px;
       flex-wrap: nowrap;
-      overflow-x: auto;
+      overflow-x: hidden;
       overflow-y: hidden;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
-      padding-bottom: 2px;
-    }
-    .adv-recent-searches::-webkit-scrollbar {
-      display: none;
-      width: 0;
-      height: 0;
-    }
-    .adv-recent-search-label {
-      font-size: 12px;
-      font-weight: 600;
-      color: #0f766e;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      flex: 0 0 auto;
+      min-width: 0;
     }
     .adv-recent-search-pill {
       display: inline-block;
+      text-align: center;
       padding: 6px 12px;
-      border-radius: 20px;
+      border-radius: 999px;
       background: #ecfdf5;
       border: 1px solid #99f6e4;
       font-size: 13px;
@@ -1667,13 +1745,26 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 200px;
+      max-width: 220px;
       flex: 0 0 auto;
+      opacity: 0;
+      transform: translateX(18px);
+      transition: all 0.24s ease;
     }
     .adv-recent-search-pill:hover {
       background: #d1fae5;
       border-color: #5eead4;
     }
+    .adv-recent-dropdown-panel.is-open .adv-recent-search-pill {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    .adv-recent-dropdown-panel.is-open .adv-recent-search-pill:nth-child(1) { transition-delay: 0.04s; }
+    .adv-recent-dropdown-panel.is-open .adv-recent-search-pill:nth-child(2) { transition-delay: 0.07s; }
+    .adv-recent-dropdown-panel.is-open .adv-recent-search-pill:nth-child(3) { transition-delay: 0.1s; }
+    .adv-recent-dropdown-panel.is-open .adv-recent-search-pill:nth-child(4) { transition-delay: 0.13s; }
+    .adv-recent-dropdown-panel.is-open .adv-recent-search-pill:nth-child(5) { transition-delay: 0.16s; }
+    .adv-recent-dropdown-panel.is-open .adv-recent-search-pill:nth-child(6) { transition-delay: 0.19s; }
     .adv-save-btn {
       display: inline-flex;
       align-items: center;
@@ -1770,6 +1861,10 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         margin-bottom: 8px;
         padding: 5px 4px 3px;
       }
+      .adv-header {
+        flex-direction: column;
+        align-items: stretch;
+      }
       .adv-search-grid,
       .adv-detailed-grid {
         grid-template-columns: 1fr;
@@ -1778,6 +1873,27 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       .adv-action-row {
         flex-direction: column;
         gap: 10px;
+        align-items: stretch;
+      }
+      .adv-action-controls {
+        width: 100%;
+        justify-content: space-between;
+      }
+      .adv-recent-toggle {
+        width: 42px;
+      }
+      .adv-recent-dropdown {
+        display: block;
+      }
+      .adv-recent-dropdown-panel {
+        width: 0;
+        max-width: 0;
+        margin-top: 8px;
+        transform-origin: top center;
+      }
+      .adv-recent-dropdown-panel.is-open {
+        width: 100%;
+        max-width: none;
       }
       .adv-search-btn {
         width: 100%;
@@ -1794,7 +1910,49 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   return (
     <div className="adv-search-root">
       <style>{advancedSearchCSS}</style>
-      <div className="adv-search-title">Търсене</div>
+      <div className="adv-header">
+        <div className="adv-search-title">Търсене</div>
+        {recentSearches.length > 0 && (
+          <div className="adv-recent-dropdown">
+            <button
+              type="button"
+              className="adv-recent-toggle"
+              onClick={() => setShowRecentSearches((prev) => !prev)}
+              aria-label={showRecentSearches ? "Скрий последни търсения" : "Покажи последни търсения"}
+              title={showRecentSearches ? "Скрий последни търсения" : "Покажи последни търсения"}
+            >
+              {showRecentSearches ? <X size={15} className="adv-recent-toggle-icon" /> : <ChevronLeft size={15} className="adv-recent-toggle-icon" />}
+              <span className={`adv-recent-toggle-text ${showRecentSearches ? "is-hidden" : ""}`}>
+                Последни търсения
+              </span>
+            </button>
+
+            <div
+              className={`adv-recent-dropdown-panel ${showRecentSearches ? "is-open" : ""}`}
+              aria-hidden={!showRecentSearches}
+            >
+              <div className="adv-recent-searches">
+                {recentSearches.map((search) => (
+                  <button
+                    key={search.id}
+                    type="button"
+                    className="adv-recent-search-pill"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setShowRecentSearches(false);
+                      const queryString = new URLSearchParams(search.criteria).toString();
+                      navigate(`/search?${queryString}`);
+                    }}
+                    title={search.displayLabel}
+                  >
+                    {search.displayLabel}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
       {topContent && <div className="adv-top-content">{topContent}</div>}
       <form onSubmit={handleSearch} className="adv-search-form">
         {isWheelsCategory ? (
@@ -2707,15 +2865,37 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
 
             {/* Region */}
             <div className="adv-field">
-              <label className="adv-label">РЕГИОН</label>
+              <label className="adv-label">ОБЛАСТ</label>
               <select
                 value={searchCriteria.region}
-                onChange={(e) => handleInputChange("region", e.target.value)}
+                onChange={(e) => {
+                  handleInputChange("region", e.target.value);
+                  handleInputChange("city", "");
+                }}
                 className="adv-select"
               >
                 <option value="">Цяла България</option>
                 {regions.map((region) => (
                   <option key={region} value={region}>{region}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="adv-field">
+              <label className="adv-label">ГРАД / ОБЩИНА</label>
+              <select
+                value={searchCriteria.city}
+                onChange={(e) => handleInputChange("city", e.target.value)}
+                className={`adv-select ${cities.length === 0 ? "adv-select--disabled" : ""}`}
+                disabled={cities.length === 0}
+              >
+                <option value="">
+                  {cities.length > 0 ? "Всички" : "Избери област първо"}
+                </option>
+                {cities.map((cityOption) => (
+                  <option key={cityOption.value} value={cityOption.value}>
+                    {cityOption.label}
+                  </option>
                 ))}
               </select>
             </div>
@@ -2801,23 +2981,23 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
 
         {/* ACTION ROW — Search button + Detailed Search link */}
         <div className="adv-action-row">
-          <button
-            type="button"
-            className="adv-detailed-link"
-            onClick={() => setShowAdvanced(!showAdvanced)}
-          >
-            <ChevronDown
-              size={14}
-              style={{
-                transform: showAdvanced ? "rotate(180deg)" : "rotate(0deg)",
-                transition: "transform 0.3s",
-                marginRight: 4,
-              }}
-            />
-            {usesCompactMainCategoryForm ? "Още критерии за търсене" : "Детайлно търсене"}
-          </button>
+          <div className="adv-action-controls">
+            <button
+              type="button"
+              className="adv-detailed-link"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+            >
+              <ChevronDown
+                size={14}
+                style={{
+                  transform: showAdvanced ? "rotate(180deg)" : "rotate(0deg)",
+                  transition: "transform 0.3s",
+                  marginRight: 4,
+                }}
+              />
+              {usesCompactMainCategoryForm ? "Още критерии за търсене" : "Детайлно търсене"}
+            </button>
 
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
             <button
               type="button"
               className="adv-save-btn"
@@ -2834,28 +3014,6 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
           </div>
 
         </div>
-
-        {/* RECENT SEARCHES */}
-        {recentSearches.length > 0 && (
-          <div className="adv-recent-searches">
-            <div className="adv-recent-search-label">Последни търсения:</div>
-            {recentSearches.map((search) => (
-              <button
-                key={search.id}
-                type="button"
-                className="adv-recent-search-pill"
-                onClick={(e) => {
-                  e.preventDefault();
-                  const queryString = new URLSearchParams(search.criteria).toString();
-                  navigate(`/search?${queryString}`);
-                }}
-                title={search.displayLabel}
-              >
-                {search.displayLabel}
-              </button>
-            ))}
-          </div>
-        )}
 
         {/* ADVANCED / DETAILED FILTERS */}
         {showAdvanced && (

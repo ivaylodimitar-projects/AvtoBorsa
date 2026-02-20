@@ -969,7 +969,6 @@ const SearchPage: React.FC = () => {
       addCriterion("Гориво", formatFuelLabel(fuelOrEngineType));
       addCriterion("Скоростна кутия", formatGearboxLabel(getParam("gearbox")));
       addRangeCriterion("Кубатура", getParam("displacementFrom"), getParam("displacementTo"), " куб.см.");
-      addCriterion("Евростандарт", getParam("euroStandard"));
     } else {
       addCriterion("Вид двигател", fuelOrEngineType);
     }

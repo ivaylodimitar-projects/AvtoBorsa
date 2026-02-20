@@ -43,6 +43,7 @@ import {
   writeMyAdsCache,
   invalidateMyAdsCache,
 } from "../utils/myAdsCache";
+import { requestDealerListingsSync } from "../utils/dealerSubscriptions";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 import ListingPromoBadge from "./ListingPromoBadge";
 import KapariranoBadge from "./KapariranoBadge";
@@ -160,6 +161,7 @@ const NEW_LISTING_BADGE_REFRESH_MS = 30_000;
 const TOP_LISTING_PRICE_1D_EUR = 2.49;
 const VIP_LISTING_PRICE_7D_EUR = 1.99;
 const VIP_LISTING_PRICE_LIFETIME_EUR = 6.99;
+const LISTING_EXPIRY_DAYS = 30;
 const PAGE_SIZE = 21;
 const CATEGORY_AS_BRAND_MAIN_CATEGORIES = new Set(["6", "7", "8", "a", "b"]);
 const GENERIC_BRAND_TERMS = new Set([
@@ -540,6 +542,24 @@ const MyAdsPage: React.FC = () => {
     });
   };
 
+  const getListingExpiryLabel = (listing: CarListing) => {
+    if (!listing.created_at) return "";
+    const createdAtMs = new Date(listing.created_at).getTime();
+    if (Number.isNaN(createdAtMs)) return "";
+
+    const expiresAtMs = createdAtMs + LISTING_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+    const formatted = new Date(expiresAtMs).toLocaleDateString("bg-BG", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+
+    if (!formatted) return "";
+    return expiresAtMs <= currentTimeMs
+      ? `Изтекла на: ${formatted}`
+      : `Изтича на: ${formatted}`;
+  };
+
 
   const getShortDescription = (text?: string, maxLength = 140) => {
     if (!text) return "";
@@ -686,6 +706,7 @@ const MyAdsPage: React.FC = () => {
             ? `Обявата е публикувана отново като VIP ${getVipPlanLabel(vipPlan)}.`
             : "Обявата е публикувана отново като нормална."
       );
+      requestDealerListingsSync(user?.id);
       if (listingType === "top" || listingType === "vip") {
         await refreshBalance();
       }
@@ -2268,6 +2289,15 @@ const MyAdsPage: React.FC = () => {
     fontSize: 12,
     color: "#d32f2f",
   },
+  listingExpiryInfo: {
+    marginTop: 10,
+    marginLeft: "auto",
+    alignSelf: "flex-end",
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#475569",
+    textAlign: "right" as const,
+  },
   actionButton: {
     flex: "0 0 42px",
     width: 42,
@@ -3248,6 +3278,7 @@ const MyAdsPage: React.FC = () => {
                   const cardImage = getCardImageSources(listing);
                   const isPriorityImage = index < 4;
                   const categoryBadgeLabel = getListingCategoryBadge(listing);
+                  const listingExpiryLabel = getListingExpiryLabel(listing);
 
             return (
             <div
@@ -3959,6 +3990,9 @@ const MyAdsPage: React.FC = () => {
                     Сигурни ли сте, че искате да изтриете тази обява?
                   </div>
                 </div>
+                {listingExpiryLabel && (
+                  <div style={styles.listingExpiryInfo}>{listingExpiryLabel}</div>
+                )}
               </div>
             </div>
           )})}
