@@ -193,13 +193,13 @@ type CategoryIconComponent = (props: CategoryIconProps) => React.JSX.Element;
 type MaterialSymbolName =
   | "directions_car"
   | "tire_repair"
-  | "build"
+  | "manufacturing"
   | "directions_bus"
   | "local_shipping"
   | "two_wheeler"
   | "agriculture"
-  | "precision_manufacturing"
-  | "construction"
+  | "front_loader"
+  | "forklift"
   | "rv_hookup"
   | "sailing"
   | "commute"
@@ -210,13 +210,13 @@ type MaterialSymbolName =
 const CATEGORY_SYMBOLS: Record<string, MaterialSymbolName> = {
   "1": "directions_car",
   w: "tire_repair",
-  u: "build",
+  u: "manufacturing",
   "3": "directions_bus",
   "4": "local_shipping",
   "5": "two_wheeler",
   "6": "agriculture",
-  "7": "precision_manufacturing",
-  "8": "construction",
+  "7": "front_loader",
+  "8": "forklift",
   "9": "rv_hookup",
   a: "sailing",
   b: "commute",
@@ -776,6 +776,7 @@ export default function LandingPage() {
                 >
                   {CATEGORIES.map((mainCategory) => {
                     const isActive = category === mainCategory.value;
+                    const isForkliftCategory = mainCategory.value === "8";
                     const Icon = CATEGORY_ICONS[mainCategory.value] || CATEGORY_ICONS["1"];
 
                     return (
@@ -806,10 +807,10 @@ export default function LandingPage() {
                           }}
                         >
                           <Icon
-                            width={CATEGORY_ICON_WIDTH}
-                            height={CATEGORY_ICON_HEIGHT}
-                            fill={isActive ? 1 : 0}
-                            weight={isActive ? 650 : 500}
+                            width={isForkliftCategory ? 42 : CATEGORY_ICON_WIDTH}
+                            height={isForkliftCategory ? 42 : CATEGORY_ICON_HEIGHT}
+                            fill={isForkliftCategory ? 0 : isActive ? 1 : 0}
+                            weight={isForkliftCategory ? (isActive ? 500 : 400) : isActive ? 650 : 500}
                           />
                         </span>
                         <span className="category-pill-tooltip" aria-hidden="true">

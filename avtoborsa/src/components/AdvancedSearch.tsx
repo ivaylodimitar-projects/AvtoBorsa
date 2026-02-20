@@ -1,6 +1,6 @@
 ﻿import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, ChevronLeft, Search, Bookmark, Lock, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, Circle, Search, Bookmark, Lock } from "lucide-react";
 import { BrandSelector } from "./BrandSelector";
 import { BULGARIAN_CITIES_BY_REGION } from "../constants/bulgarianCities";
 import { useRecentSearches } from "../hooks/useRecentSearches";
@@ -714,7 +714,9 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showRecentSearches, setShowRecentSearches] = useState(false);
+  const [showRecentScrollHint, setShowRecentScrollHint] = useState(false);
   const [searchName, setSearchName] = useState("");
+  const recentSearchesRef = React.useRef<HTMLDivElement | null>(null);
   const [searchCriteria, setSearchCriteria] = useState<SearchCriteria>({
     category: "",
     wheelFor: "1",
@@ -819,6 +821,55 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     boatFeatures: [],
     trailerFeatures: [],
   });
+
+  React.useEffect(() => {
+    if (!showRecentSearches) {
+      setShowRecentScrollHint(false);
+      return;
+    }
+
+    const scrollContainer = recentSearchesRef.current;
+    if (!scrollContainer) {
+      setShowRecentScrollHint(false);
+      return;
+    }
+
+    const syncHintVisibility = () => {
+      const maxScrollLeft = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+      const hasOverflow = maxScrollLeft > 4;
+      const reachedRightEdge = scrollContainer.scrollLeft >= maxScrollLeft - 8;
+      setShowRecentScrollHint(hasOverflow && !reachedRightEdge);
+    };
+
+    const frameId = window.requestAnimationFrame(syncHintVisibility);
+    const delayedSyncId = window.setTimeout(syncHintVisibility, 380);
+    let nudgeBackId: number | null = null;
+    const nudgeId = window.setTimeout(() => {
+      const maxScrollLeft = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+      if (maxScrollLeft <= 12 || scrollContainer.scrollLeft > 2) return;
+
+      scrollContainer.scrollTo({ left: Math.min(40, maxScrollLeft), behavior: "smooth" });
+      nudgeBackId = window.setTimeout(() => {
+        if (scrollContainer.scrollLeft <= 52) {
+          scrollContainer.scrollTo({ left: 0, behavior: "smooth" });
+        }
+      }, 520);
+    }, 520);
+
+    scrollContainer.addEventListener("scroll", syncHintVisibility, { passive: true });
+    window.addEventListener("resize", syncHintVisibility);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.clearTimeout(delayedSyncId);
+      window.clearTimeout(nudgeId);
+      if (nudgeBackId !== null) {
+        window.clearTimeout(nudgeBackId);
+      }
+      scrollContainer.removeEventListener("scroll", syncHintVisibility);
+      window.removeEventListener("resize", syncHintVisibility);
+    };
+  }, [showRecentSearches, recentSearches.length]);
 
   const isWheelsCategory = mainCategory === "w";
   const isPartsCategory = mainCategory === "u";
@@ -1414,6 +1465,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   const advancedSearchCSS = `
     .adv-search-root {
       position: relative;
+      z-index: 40;
       background: #ffffff;
       border-radius: 16px;
       padding: 28px 24px 24px;
@@ -1586,10 +1638,12 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     }
     .adv-recent-dropdown {
       display: flex;
+      position: relative;
       align-items: center;
       gap: 8px;
       min-width: 0;
       margin-left: auto;
+      flex-shrink: 0;
     }
     .adv-recent-toggle {
       display: inline-flex;
@@ -1615,11 +1669,6 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       overflow: hidden;
       transition: opacity 0.18s ease, max-width 0.2s ease, margin-left 0.2s ease;
     }
-    .adv-recent-toggle-text.is-hidden {
-      opacity: 0;
-      max-width: 0;
-      margin-left: 0;
-    }
     .adv-recent-toggle:hover {
       background: #d1fae5;
       border-color: #5eead4;
@@ -1628,7 +1677,10 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       transition: transform 0.2s;
     }
     .adv-recent-dropdown-panel {
-      order: -1;
+      position: absolute;
+      top: 50%;
+      right: calc(100% + 8px);
+      z-index: 1200;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -1642,7 +1694,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       overflow: hidden;
       opacity: 0;
       pointer-events: none;
-      transform: translateX(10px) scaleX(0.88);
+      transform: translateY(-50%) translateX(10px) scaleX(0.88);
       transform-origin: right center;
       transition: width 0.36s cubic-bezier(0.22, 0.78, 0.14, 1),
         max-width 0.36s cubic-bezier(0.22, 0.78, 0.14, 1), opacity 0.24s ease,
@@ -1656,7 +1708,107 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       border-color: #99f6e4;
       opacity: 1;
       pointer-events: auto;
-      transform: translateX(0) scaleX(1);
+      transform: translateY(-50%) translateX(0) scaleX(1);
+    }
+    .adv-recent-scroll-hint {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      bottom: 2px;
+      z-index: 6;
+      width: 158px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 0 12px 0 28px;
+      border-radius: 10px;
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(13, 148, 136, 0.24) 42%, rgba(15, 118, 110, 0.88) 100%);
+      box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(1px);
+      color: #ecfeff;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.24);
+      opacity: 0;
+      transform: translateX(10px);
+      transition: opacity 0.28s ease, transform 0.28s ease;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .adv-recent-scroll-hint::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: -45%;
+      bottom: 0;
+      width: 60%;
+      background: linear-gradient(120deg, rgba(255, 255, 255, 0) 12%, rgba(236, 254, 255, 0.55) 50%, rgba(255, 255, 255, 0) 88%);
+      filter: blur(0.4px);
+      transform: translateX(-150%);
+    }
+    .adv-recent-scroll-hint.is-visible {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    .adv-recent-scroll-hint.is-visible::before {
+      animation: advRecentHintShimmer 1.9s ease-in-out infinite;
+    }
+    .adv-recent-scroll-hint__text-wrap {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 2px;
+      line-height: 1;
+    }
+    .adv-recent-scroll-hint__text {
+      font-size: 10.4px;
+      font-weight: 800;
+      letter-spacing: 0.075em;
+      text-transform: uppercase;
+      animation: advRecentHintPulse 1.4s ease-in-out infinite;
+    }
+    .adv-recent-scroll-hint__direction {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      opacity: 0.9;
+    }
+    .adv-recent-scroll-hint__arrows {
+      position: relative;
+      z-index: 1;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .adv-recent-scroll-hint__arrow {
+      font-size: 14px;
+      font-weight: 900;
+      line-height: 1;
+      opacity: 0.24;
+      transform: translateX(-2px);
+      animation: advRecentArrowFlow 1.2s ease-in-out infinite;
+    }
+    .adv-recent-scroll-hint__arrow:nth-child(2) {
+      animation-delay: 0.12s;
+    }
+    .adv-recent-scroll-hint__arrow:nth-child(3) {
+      animation-delay: 0.24s;
+    }
+    @keyframes advRecentHintPulse {
+      0%, 100% { opacity: 0.55; }
+      50% { opacity: 1; }
+    }
+    @keyframes advRecentArrowFlow {
+      0% { opacity: 0.2; transform: translateX(-2px); }
+      45% { opacity: 1; transform: translateX(1px); }
+      100% { opacity: 0.2; transform: translateX(5px); }
+    }
+    @keyframes advRecentHintShimmer {
+      0% { transform: translateX(-150%); opacity: 0; }
+      20% { opacity: 0.72; }
+      70% { opacity: 0.72; }
+      100% { transform: translateX(140%); opacity: 0; }
     }
     .adv-search-btn {
       display: inline-flex;
@@ -1727,9 +1879,18 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       align-items: center;
       gap: 8px;
       flex-wrap: nowrap;
-      overflow-x: hidden;
+      width: 100%;
+      overflow-x: auto;
       overflow-y: hidden;
       min-width: 0;
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+      scroll-behavior: smooth;
+    }
+    .adv-recent-searches::-webkit-scrollbar {
+      display: none;
+      width: 0;
+      height: 0;
     }
     .adv-recent-search-pill {
       display: inline-block;
@@ -1880,20 +2041,38 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         justify-content: space-between;
       }
       .adv-recent-toggle {
-        width: 42px;
+        width: fit-content;
       }
       .adv-recent-dropdown {
         display: block;
+        width: 100%;
       }
       .adv-recent-dropdown-panel {
-        width: 0;
-        max-width: 0;
-        margin-top: 8px;
+        top: calc(100% + 8px);
+        right: 0;
+        left: 0;
+        width: 100%;
+        max-width: none;
         transform-origin: top center;
+        transform: translateY(-6px) scale(0.98);
       }
       .adv-recent-dropdown-panel.is-open {
         width: 100%;
         max-width: none;
+        transform: translateY(0) scale(1);
+      }
+      .adv-recent-scroll-hint {
+        width: 118px;
+        padding: 0 8px 0 14px;
+      }
+      .adv-recent-scroll-hint__text {
+        font-size: 9.7px;
+      }
+      .adv-recent-scroll-hint__direction {
+        display: none;
+      }
+      .adv-recent-scroll-hint__arrow {
+        font-size: 12.5px;
       }
       .adv-search-btn {
         width: 100%;
@@ -1921,8 +2100,8 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               aria-label={showRecentSearches ? "Скрий последни търсения" : "Покажи последни търсения"}
               title={showRecentSearches ? "Скрий последни търсения" : "Покажи последни търсения"}
             >
-              {showRecentSearches ? <X size={15} className="adv-recent-toggle-icon" /> : <ChevronLeft size={15} className="adv-recent-toggle-icon" />}
-              <span className={`adv-recent-toggle-text ${showRecentSearches ? "is-hidden" : ""}`}>
+              {showRecentSearches ? <ChevronLeft size={15} className="adv-recent-toggle-icon" /> : <Circle size={15} className="adv-recent-toggle-icon" />}
+              <span className="adv-recent-toggle-text">
                 Последни търсения
               </span>
             </button>
@@ -1931,7 +2110,17 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               className={`adv-recent-dropdown-panel ${showRecentSearches ? "is-open" : ""}`}
               aria-hidden={!showRecentSearches}
             >
-              <div className="adv-recent-searches">
+              <div
+                className={`adv-recent-scroll-hint ${showRecentSearches && showRecentScrollHint ? "is-visible" : ""}`}
+                aria-hidden="true"
+              >
+                <span className="adv-recent-scroll-hint__arrows">
+                  <span className="adv-recent-scroll-hint__arrow">›</span>
+                  <span className="adv-recent-scroll-hint__arrow">›</span>
+                  <span className="adv-recent-scroll-hint__arrow">›</span>
+                </span>
+              </div>
+              <div className="adv-recent-searches" ref={recentSearchesRef}>
                 {recentSearches.map((search) => (
                   <button
                     key={search.id}

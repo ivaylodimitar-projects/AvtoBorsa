@@ -28,7 +28,11 @@ import {
   ShieldCheck,
   Leaf,
   Tag,
+  Printer,
 } from "lucide-react";
+import Lottie from "lottie-react";
+import QRCode from "qrcode";
+import { jsPDF } from "jspdf";
 import { useAuth } from "../context/AuthContext";
 import {
   formatConditionLabel,
@@ -47,6 +51,7 @@ import { requestDealerListingsSync } from "../utils/dealerSubscriptions";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 import ListingPromoBadge from "./ListingPromoBadge";
 import KapariranoBadge from "./KapariranoBadge";
+import karBgQrCodeAnimation from "../assets/karbgqrcode.json";
 
 interface CarListing {
   id: number;
@@ -163,6 +168,7 @@ const VIP_LISTING_PRICE_7D_EUR = 1.99;
 const VIP_LISTING_PRICE_LIFETIME_EUR = 6.99;
 const LISTING_EXPIRY_DAYS = 30;
 const PAGE_SIZE = 21;
+const QR_BRAND_TAG = "Kar.bg";
 const CATEGORY_AS_BRAND_MAIN_CATEGORIES = new Set(["6", "7", "8", "a", "b"]);
 const GENERIC_BRAND_TERMS = new Set([
   "трактор",
@@ -281,6 +287,12 @@ const MyAdsPage: React.FC = () => {
   const [previewListing, setPreviewListing] = useState<CarListing | null>(null);
   const [previewTab, setPreviewTab] = useState<TabType | null>(null);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
+  const [qrListing, setQrListing] = useState<CarListing | null>(null);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
+  const [qrTargetUrl, setQrTargetUrl] = useState("");
+  const [qrGenerationError, setQrGenerationError] = useState<string | null>(null);
+  const [isQrGenerating, setIsQrGenerating] = useState(false);
+  const qrGenerationRequestRef = React.useRef(0);
   const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
 
   useEffect(() => {
@@ -475,6 +487,249 @@ const MyAdsPage: React.FC = () => {
   const closePreview = () => {
     setPreviewListing(null);
     setPreviewTab(null);
+  };
+
+  const getListingDisplayTitle = (listing: CarListing) => {
+    const fallbackTitle = `${listing.brand || ""} ${listing.model || ""}`.trim();
+    return (listing.title || fallbackTitle || "Обява").trim();
+  };
+
+  const buildListingQrTargetUrl = (listing: CarListing) => {
+    const url = new URL(`/details/${encodeURIComponent(listing.slug)}`, window.location.origin);
+    url.searchParams.set("source", QR_BRAND_TAG);
+    return url.toString();
+  };
+
+  const loadImageFromDataUrl = (dataUrl: string) =>
+    new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("Failed to load QR image."));
+      image.src = dataUrl;
+    });
+
+  const generateBrandedQrDataUrl = async (targetUrl: string) => {
+    const baseQrDataUrl = await QRCode.toDataURL(targetUrl, {
+      width: 720,
+      margin: 2,
+      errorCorrectionLevel: "H",
+      color: {
+        dark: "#0f172a",
+        light: "#ffffff",
+      },
+    });
+
+    const qrImage = await loadImageFromDataUrl(baseQrDataUrl);
+    const size = qrImage.naturalWidth || qrImage.width || 720;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) {
+      return baseQrDataUrl;
+    }
+
+    ctx.drawImage(qrImage, 0, 0, size, size);
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.strokeStyle = "#ffffff";
+    ctx.fillStyle = "#0f766e";
+    ctx.lineJoin = "round";
+
+    const drawOutlinedCenteredText = (
+      text: string,
+      y: number,
+      fontSize: number,
+      fontWeight = 900
+    ) => {
+      ctx.font = `${fontWeight} ${fontSize}px "Manrope", "Segoe UI", sans-serif`;
+      ctx.lineWidth = Math.max(5, Math.round(fontSize * 0.15));
+      ctx.strokeText(text, size / 2, y);
+      ctx.fillText(text, size / 2, y);
+    };
+
+    const textBlockShiftY = Math.round(size * 0.12);
+    const karBgY = size / 2 + textBlockShiftY;
+    const sellY = Math.round(size * 0.16) + textBlockShiftY;
+    const inY = Math.round((sellY + karBgY) / 2);
+
+    const karBgFontSize = Math.max(66, Math.round(size * 0.145));
+    const sellFontSize = karBgFontSize;
+    const inFontSize = Math.max(52, Math.round(size * 0.115));
+
+    drawOutlinedCenteredText("Продава се", sellY, sellFontSize, 900);
+    drawOutlinedCenteredText("В", inY, inFontSize, 900);
+    drawOutlinedCenteredText(QR_BRAND_TAG, karBgY, karBgFontSize, 900);
+
+    return canvas.toDataURL("image/png");
+  };
+
+  const closeQrModal = () => {
+    qrGenerationRequestRef.current += 1;
+    setQrListing(null);
+    setQrCodeDataUrl("");
+    setQrTargetUrl("");
+    setQrGenerationError(null);
+    setIsQrGenerating(false);
+  };
+
+  const openQrModal = async (listing: CarListing) => {
+    const requestId = qrGenerationRequestRef.current + 1;
+    qrGenerationRequestRef.current = requestId;
+    const targetUrl = buildListingQrTargetUrl(listing);
+    setQrListing(listing);
+    setQrTargetUrl(targetUrl);
+    setQrCodeDataUrl("");
+    setQrGenerationError(null);
+    setIsQrGenerating(true);
+
+    try {
+      const generatedQr = await generateBrandedQrDataUrl(targetUrl);
+      if (qrGenerationRequestRef.current === requestId) {
+        setQrCodeDataUrl(generatedQr);
+      }
+    } catch (err) {
+      if (qrGenerationRequestRef.current === requestId) {
+        console.error("MyAds: failed to generate QR code", err);
+        setQrGenerationError("Неуспешно генериране на QR кода. Опитайте отново.");
+      }
+    } finally {
+      if (qrGenerationRequestRef.current === requestId) {
+        setIsQrGenerating(false);
+      }
+    }
+  };
+
+  const printQrCodeCard = async () => {
+    if (!qrListing || !qrCodeDataUrl || !qrTargetUrl) {
+      showToast("Няма готов QR код за PDF.", "error");
+      return;
+    }
+
+    try {
+      const listingTitle = getListingDisplayTitle(qrListing);
+      const qrImage = await loadImageFromDataUrl(qrCodeDataUrl);
+
+      const canvas = document.createElement("canvas");
+      const canvasWidth = 1240;
+      const canvasHeight = 1754;
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+      const ctx = canvas.getContext("2d");
+
+      if (!ctx) {
+        showToast("Неуспешно генериране на PDF.", "error");
+        return;
+      }
+
+      const drawWrappedCenteredText = (
+        text: string,
+        y: number,
+        maxWidth: number,
+        lineHeight: number,
+        maxLines: number
+      ) => {
+        const words = text.split(/\s+/).filter(Boolean);
+        const lines: string[] = [];
+        let currentLine = "";
+
+        words.forEach((word) => {
+          const testLine = currentLine ? `${currentLine} ${word}` : word;
+          const measured = ctx.measureText(testLine).width;
+          if (measured <= maxWidth || !currentLine) {
+            currentLine = testLine;
+          } else if (lines.length < maxLines - 1) {
+            lines.push(currentLine);
+            currentLine = word;
+          }
+        });
+
+        if (currentLine && lines.length < maxLines) {
+          lines.push(currentLine);
+        }
+
+        lines.forEach((line, index) => {
+          ctx.fillText(line, canvasWidth / 2, y + index * lineHeight);
+        });
+      };
+
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+      const cardMargin = 70;
+      const cardX = cardMargin;
+      const cardY = cardMargin;
+      const cardWidth = canvasWidth - cardMargin * 2;
+      const cardHeight = canvasHeight - cardMargin * 2;
+
+      ctx.strokeStyle = "#0f172a";
+      ctx.lineWidth = 4;
+      ctx.strokeRect(cardX, cardY, cardWidth, cardHeight);
+
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+
+      ctx.fillStyle = "#0f766e";
+      ctx.font = '800 56px "Manrope", "Segoe UI", sans-serif';
+      ctx.fillText(QR_BRAND_TAG, canvasWidth / 2, cardY + 56);
+
+      ctx.fillStyle = "#0f172a";
+      ctx.font = '800 48px "Manrope", "Segoe UI", sans-serif';
+      drawWrappedCenteredText(listingTitle, cardY + 140, cardWidth - 140, 56, 2);
+
+      ctx.fillStyle = "#334155";
+      ctx.font = '700 28px "Manrope", "Segoe UI", sans-serif';
+      ctx.fillText("Сканирай за директен достъп до обявата", canvasWidth / 2, cardY + 270);
+
+      const qrBoxSize = Math.round(cardWidth * 0.72);
+      const qrBoxX = Math.round((canvasWidth - qrBoxSize) / 2);
+      const qrBoxY = cardY + 350;
+      const qrPadding = 20;
+
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(qrBoxX, qrBoxY, qrBoxSize, qrBoxSize);
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(qrBoxX, qrBoxY, qrBoxSize, qrBoxSize);
+
+      ctx.drawImage(
+        qrImage,
+        qrBoxX + qrPadding,
+        qrBoxY + qrPadding,
+        qrBoxSize - qrPadding * 2,
+        qrBoxSize - qrPadding * 2
+      );
+
+      ctx.fillStyle = "#475569";
+      ctx.font = '600 20px "Manrope", "Segoe UI", sans-serif';
+      drawWrappedCenteredText(qrTargetUrl, qrBoxY + qrBoxSize + 44, cardWidth - 120, 28, 4);
+
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "pt",
+        format: "a4",
+        compress: true,
+      });
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const canvasData = canvas.toDataURL("image/png");
+      pdf.addImage(canvasData, "PNG", 0, 0, pdfWidth, pdfHeight, undefined, "FAST");
+
+      const normalizedSlug = listingTitle
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+      const safeName = normalizedSlug || `listing-${qrListing.id}`;
+      pdf.save(`karbg-qr-${safeName}.pdf`);
+      showToast("PDF файлът е свален.", "success");
+    } catch (err) {
+      console.error("MyAds: failed to download QR PDF", err);
+      showToast("Неуспешно сваляне на PDF файла.", "error");
+    }
   };
 
   const getCardImageSources = (listing: CarListing) => {
@@ -1580,6 +1835,127 @@ const MyAdsPage: React.FC = () => {
     cursor: "pointer",
     padding: 4,
   },
+  qrModal: {
+    width: "min(460px, 96vw)",
+    background: "#fff",
+    borderRadius: 18,
+    padding: "20px",
+    boxShadow: "0 30px 60px rgba(15, 23, 42, 0.35)",
+    display: "flex",
+    flexDirection: "column",
+    gap: 14,
+  },
+  qrModalHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  qrModalTitle: {
+    margin: 0,
+    fontSize: 20,
+    fontWeight: 800,
+    color: "#0f172a",
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+  },
+  qrModalSubtitle: {
+    margin: "6px 0 0 0",
+    color: "#475569",
+    fontSize: 13,
+    lineHeight: 1.45,
+  },
+  qrModalBody: {
+    borderRadius: 14,
+    border: "1px solid #e2e8f0",
+    background: "#f8fafc",
+    padding: "14px 14px 12px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 10,
+  },
+  qrLoadingText: {
+    margin: 0,
+    fontSize: 13,
+    color: "#334155",
+    fontWeight: 700,
+    textAlign: "center",
+  },
+  qrErrorText: {
+    margin: 0,
+    fontSize: 13,
+    color: "#b91c1c",
+    fontWeight: 700,
+    textAlign: "center",
+  },
+  qrCodeCard: {
+    borderRadius: 14,
+    border: "1px solid #cbd5e1",
+    background: "#fff",
+    padding: 10,
+  },
+  qrCodeImage: {
+    width: 260,
+    height: 260,
+    display: "block",
+  },
+  qrBrandPill: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 999,
+    border: "1px solid #0f172a",
+    padding: "3px 10px",
+    fontSize: 12,
+    fontWeight: 800,
+    color: "#0f172a",
+    letterSpacing: "0.3px",
+  },
+  qrTargetUrl: {
+    margin: 0,
+    width: "100%",
+    color: "#475569",
+    fontSize: 11,
+    lineHeight: 1.45,
+    wordBreak: "break-all",
+    textAlign: "center",
+  },
+  qrModalActions: {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  qrPrintButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "10px 14px",
+    borderRadius: 10,
+    border: "1px solid #0f766e",
+    background: "#0f766e",
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
+  qrPrintButtonDisabled: {
+    opacity: 0.5,
+    cursor: "not-allowed",
+  },
+  qrSecondaryButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "10px 14px",
+    borderRadius: 10,
+    border: "1px solid #cbd5e1",
+    background: "#fff",
+    color: "#334155",
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: "pointer",
+  },
   listingTypeGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
@@ -2289,14 +2665,51 @@ const MyAdsPage: React.FC = () => {
     fontSize: 12,
     color: "#d32f2f",
   },
-  listingExpiryInfo: {
+  listingExpiryRow: {
     marginTop: 10,
+    width: "100%",
+    alignSelf: "stretch",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  listingExpiryInfo: {
     marginLeft: "auto",
-    alignSelf: "flex-end",
     fontSize: 12,
     fontWeight: 700,
     color: "#475569",
     textAlign: "right" as const,
+  },
+  qrTriggerButton: {
+    width: 58,
+    height: 58,
+    minWidth: 58,
+    borderRadius: 12,
+    border: "1px solid #cbd5e1",
+    background: "#fff",
+    color: "#0f766e",
+    cursor: "pointer",
+    padding: 0,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease",
+    boxShadow: "0 2px 10px rgba(15, 23, 42, 0.1)",
+  },
+  qrTriggerButtonDisabled: {
+    opacity: 0.5,
+    cursor: "not-allowed",
+    boxShadow: "none",
+  },
+  qrTriggerIconWrap: {
+    width: 44,
+    height: 44,
+    pointerEvents: "none" as const,
+  },
+  qrTriggerIcon: {
+    width: "100%",
+    height: "100%",
   },
   actionButton: {
     flex: "0 0 42px",
@@ -2633,6 +3046,11 @@ const MyAdsPage: React.FC = () => {
     (!previewListing.vip_expires_at ||
       (Number.isFinite(new Date(previewListing.vip_expires_at).getTime()) &&
         new Date(previewListing.vip_expires_at).getTime() > currentTimeMs));
+  const qrListingTitle = qrListing ? getListingDisplayTitle(qrListing) : "";
+  const isQrPrintReady = Boolean(
+    qrListing && qrCodeDataUrl && qrTargetUrl && !isQrGenerating && !qrGenerationError
+  );
+
   if (totalListings === 0) {
     return (
       <div style={styles.page}>
@@ -2877,6 +3295,78 @@ const MyAdsPage: React.FC = () => {
                 </button>
                 <button style={styles.confirmButtonPrimary} onClick={confirmTopListingAction}>
                   Продължи
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {qrListing && (
+          <div style={styles.modalOverlay} onClick={closeQrModal}>
+            <div
+              style={styles.qrModal}
+              role="dialog"
+              aria-modal="true"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={styles.qrModalHeader}>
+                <div>
+                  <h2 style={styles.qrModalTitle}>QR код за обявата</h2>
+                  <p style={styles.qrModalSubtitle}>{qrListingTitle}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeQrModal}
+                  style={styles.modalClose}
+                  aria-label="Затвори"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div style={styles.qrModalBody}>
+                <div style={styles.qrBrandPill}>{QR_BRAND_TAG}</div>
+                {isQrGenerating && (
+                  <p style={styles.qrLoadingText}>Генерираме QR кода...</p>
+                )}
+                {qrGenerationError && (
+                  <p style={styles.qrErrorText}>{qrGenerationError}</p>
+                )}
+                {qrCodeDataUrl && (
+                  <div style={styles.qrCodeCard}>
+                    <img
+                      src={qrCodeDataUrl}
+                      alt={`QR код за ${qrListingTitle}`}
+                      style={styles.qrCodeImage}
+                    />
+                  </div>
+                )}
+                {qrTargetUrl && (
+                  <p style={styles.qrTargetUrl}>{qrTargetUrl}</p>
+                )}
+              </div>
+
+              <div style={styles.qrModalActions}>
+                <button
+                  type="button"
+                  style={styles.qrSecondaryButton}
+                  onClick={closeQrModal}
+                >
+                  Затвори
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    ...styles.qrPrintButton,
+                    ...(isQrPrintReady ? {} : styles.qrPrintButtonDisabled),
+                  }}
+                  disabled={!isQrPrintReady}
+                  onClick={() => {
+                    void printQrCodeCard();
+                  }}
+                >
+                  <Printer size={15} />
+                  PDF
                 </button>
               </div>
             </div>
@@ -3279,6 +3769,7 @@ const MyAdsPage: React.FC = () => {
                   const isPriorityImage = index < 4;
                   const categoryBadgeLabel = getListingCategoryBadge(listing);
                   const listingExpiryLabel = getListingExpiryLabel(listing);
+                  const hasQrTarget = Boolean(listing.slug && listing.slug.trim());
 
             return (
             <div
@@ -3991,7 +4482,45 @@ const MyAdsPage: React.FC = () => {
                   </div>
                 </div>
                 {listingExpiryLabel && (
-                  <div style={styles.listingExpiryInfo}>{listingExpiryLabel}</div>
+                  <div style={styles.listingExpiryRow}>
+                    <button
+                      type="button"
+                      aria-label={`QR код за ${listingTitle}`}
+                      data-action="QR код"
+                      className="myads-icon-btn"
+                      style={{
+                        ...styles.qrTriggerButton,
+                        ...(hasQrTarget ? {} : styles.qrTriggerButtonDisabled),
+                      }}
+                      disabled={!hasQrTarget}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void openQrModal(listing);
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!hasQrTarget) return;
+                        e.currentTarget.style.transform = "translateY(-1px)";
+                        e.currentTarget.style.borderColor = "#0f766e";
+                        e.currentTarget.style.boxShadow = "0 4px 12px rgba(15, 118, 110, 0.28)";
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!hasQrTarget) return;
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.borderColor = "#cbd5e1";
+                        e.currentTarget.style.boxShadow = "0 2px 10px rgba(15, 23, 42, 0.1)";
+                      }}
+                    >
+                      <span style={styles.qrTriggerIconWrap}>
+                        <Lottie
+                          animationData={karBgQrCodeAnimation}
+                          loop
+                          autoplay
+                          style={styles.qrTriggerIcon}
+                        />
+                      </span>
+                    </button>
+                    <div style={styles.listingExpiryInfo}>{listingExpiryLabel}</div>
+                  </div>
                 )}
               </div>
             </div>
