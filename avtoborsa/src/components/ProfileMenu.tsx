@@ -4,7 +4,6 @@ import { useAuth } from "../context/AuthContext";
 import {
   User,
   Settings,
-  HelpCircle,
   Wallet,
   Plus,
   List,
@@ -398,7 +397,7 @@ const ProfileMenu: React.FC = () => {
       borderRadius: 8,
     },
     menuItemDanger: {
-      color: "#b91c1c",
+      color: "#6b7280",
       fontWeight: 600,
     },
     menuItemDangerDisabled: {
@@ -660,26 +659,6 @@ const ProfileMenu: React.FC = () => {
                   <span>Настройки</span>
                 </Link>
 
-                <button
-                  type="button"
-                  style={styles.menuItem}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = "#ecfdf5";
-                    (e.currentTarget as HTMLElement).style.color = "#0f766e";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = "none";
-                    (e.currentTarget as HTMLElement).style.color = "#333";
-                  }}
-                  onClick={() => {
-                    // TODO: Navigate to help
-                    closeDropdown();
-                  }}
-                >
-                  <HelpCircle size={18} />
-                  <span>Помощ</span>
-                </button>
-
                 <div style={styles.divider} />
 
                 <button
@@ -696,7 +675,7 @@ const ProfileMenu: React.FC = () => {
                   }}
                   onMouseLeave={(e) => {
                     (e.currentTarget as HTMLElement).style.background = "none";
-                    (e.currentTarget as HTMLElement).style.color = "#b91c1c";
+                    (e.currentTarget as HTMLElement).style.color = "#6b7280";
                   }}
                   onClick={handleLogout}
                   disabled={isLoggingOut}

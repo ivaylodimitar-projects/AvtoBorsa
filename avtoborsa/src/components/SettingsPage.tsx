@@ -10,16 +10,24 @@ import {
   KeyRound,
   Lock,
   RefreshCw,
+  ShoppingCart,
   ShieldCheck,
   Trash2,
   Wallet,
   User,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import {
+  USER_BALANCE_USAGE_STORAGE_KEY_PREFIX,
+  USER_BALANCE_USAGE_UPDATED_EVENT,
+  getUserBalanceUsageHistory,
+  type BalanceUsageRecord,
+} from "../utils/balanceUsageHistory";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 const PUBLIC_API_DOCS_URL = `${API_BASE_URL}/api/public/docs/`;
 const TRANSACTIONS_PER_PAGE = 5;
+const SITE_PURCHASES_PER_PAGE = 5;
 
 type PaymentTransaction = {
   id: number;
@@ -39,13 +47,18 @@ type ImportApiKeyStatus = {
 };
 
 type TabKey = "profile" | "password" | "transactions" | "api" | "delete";
+type TransactionsInnerTab = "topups" | "sitePurchases";
 
 const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, isLoading, logout, setUserFromToken } = useAuth();
   const [activeTab, setActiveTab] = useState<TabKey>("password");
+  const [activeTransactionsInnerTab, setActiveTransactionsInnerTab] =
+    useState<TransactionsInnerTab>("topups");
   const [transactions, setTransactions] = useState<PaymentTransaction[]>([]);
   const [transactionsPage, setTransactionsPage] = useState(1);
+  const [sitePurchases, setSitePurchases] = useState<BalanceUsageRecord[]>([]);
+  const [sitePurchasesPage, setSitePurchasesPage] = useState(1);
   const [loadingTransactions, setLoadingTransactions] = useState(true);
   const [txError, setTxError] = useState<string | null>(null);
 
@@ -108,14 +121,67 @@ const SettingsPage: React.FC = () => {
   }, [user]);
 
   useEffect(() => {
+    if (!user?.id) {
+      setSitePurchases([]);
+      return;
+    }
+
+    const syncPurchases = () => {
+      setSitePurchases(getUserBalanceUsageHistory(user.id));
+    };
+    const storageKey = `${USER_BALANCE_USAGE_STORAGE_KEY_PREFIX}${user.id}`;
+
+    syncPurchases();
+
+    const handleUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<{ userId?: number }>;
+      if (
+        customEvent?.detail?.userId &&
+        customEvent.detail.userId !== user.id
+      ) {
+        return;
+      }
+      syncPurchases();
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key && event.key !== storageKey) return;
+      syncPurchases();
+    };
+
+    window.addEventListener(
+      USER_BALANCE_USAGE_UPDATED_EVENT,
+      handleUpdated as EventListener
+    );
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener(
+        USER_BALANCE_USAGE_UPDATED_EVENT,
+        handleUpdated as EventListener
+      );
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
     if (activeTab !== "transactions") return;
     setTransactionsPage(1);
+    setSitePurchasesPage(1);
+    setActiveTransactionsInnerTab("topups");
   }, [activeTab]);
 
   useEffect(() => {
     const totalPages = Math.max(1, Math.ceil(transactions.length / TRANSACTIONS_PER_PAGE));
     setTransactionsPage((prev) => Math.min(prev, totalPages));
   }, [transactions.length]);
+
+  useEffect(() => {
+    const totalPages = Math.max(
+      1,
+      Math.ceil(sitePurchases.length / SITE_PURCHASES_PER_PAGE)
+    );
+    setSitePurchasesPage((prev) => Math.min(prev, totalPages));
+  }, [sitePurchases.length]);
 
   const fetchImportApiKeyStatus = useCallback(async () => {
     const token = localStorage.getItem("authToken");
@@ -407,7 +473,7 @@ const SettingsPage: React.FC = () => {
   const tabDescriptions: Record<TabKey, string> = {
     profile: "Управлявай личните си данни за контакт.",
     password: "Обнови достъпа си и защити профила си.",
-    transactions: "Прегледай история на добавените средства.",
+    transactions: "Прегледай историята на добавени средства и покупки в сайта.",
     api: "Създай API ключ и отвори документацията за публичното API.",
     delete: "Контролирай изтриването на профила си.",
   };
@@ -435,6 +501,42 @@ const SettingsPage: React.FC = () => {
       minute: "2-digit",
     });
   };
+
+  const formatPurchaseSourceLabel = (source: BalanceUsageRecord["source"]) => {
+    switch (source) {
+      case "publish":
+        return "Пусни обява";
+      case "republish":
+        return "Пусни отново";
+      case "promote":
+        return "Промотиране";
+      default:
+        return "Покупка";
+    }
+  };
+
+  const formatPurchasePlanLabel = (record: BalanceUsageRecord) => {
+    if (record.listingType === "top") {
+      return record.plan === "7d" ? "7 дни" : "1 ден";
+    }
+
+    return record.plan === "lifetime" ? "до изтичане" : "7 дни";
+  };
+
+  const formatPurchaseTitle = (record: BalanceUsageRecord) =>
+    `${record.listingType === "top" ? "ТОП" : "VIP"} • ${formatPurchasePlanLabel(record)}`;
+
+  const formatPurchaseListing = (record: BalanceUsageRecord) => {
+    if (record.listingTitle) return record.listingTitle;
+    if (record.listingId) return `Обява #${record.listingId}`;
+    return "Обява";
+  };
+
+  const formatPurchaseAmount = (record: BalanceUsageRecord) =>
+    `${record.amount.toLocaleString("bg-BG", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })} ${record.currency || "EUR"}`;
 
   const globalCss = `
     @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
@@ -739,6 +841,60 @@ const SettingsPage: React.FC = () => {
       lineHeight: 1.5,
       marginTop: 12,
     },
+    transactionInnerTabs: {
+      marginTop: 14,
+      display: "inline-flex",
+      gap: 6,
+      padding: 4,
+      borderRadius: 12,
+      border: "1px solid #dbeafe",
+      background: "#f8fafc",
+    },
+    transactionInnerTabButton: {
+      border: "1px solid transparent",
+      background: "transparent",
+      color: "#475569",
+      borderRadius: 9,
+      padding: "8px 12px",
+      fontSize: 12,
+      fontWeight: 800,
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      cursor: "pointer",
+      lineHeight: 1,
+    },
+    transactionInnerTabButtonActive: {
+      background: "#ffffff",
+      borderColor: "#99f6e4",
+      color: "#0f766e",
+      boxShadow: "0 6px 12px rgba(15, 118, 110, 0.12)",
+    },
+    transactionSection: {
+      marginTop: 14,
+      paddingTop: 14,
+      borderTop: "1px solid #edf2f7",
+    },
+    transactionSectionHeader: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+      flexWrap: "wrap",
+    },
+    transactionSectionTitle: {
+      fontSize: 14,
+      fontWeight: 800,
+      color: "#0f172a",
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 7,
+    },
+    transactionSectionHint: {
+      fontSize: 12,
+      color: "#64748b",
+      fontWeight: 600,
+    },
     transactionList: { marginTop: 16, display: "flex", flexDirection: "column", gap: 12 },
     transactionRow: {
       display: "flex",
@@ -762,10 +918,22 @@ const SettingsPage: React.FC = () => {
       color: "#0f766e",
       flexShrink: 0,
     },
+    spendIconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      background: "#fff7ed",
+      border: "1px solid #fdba74",
+      display: "grid",
+      placeItems: "center",
+      color: "#c2410c",
+      flexShrink: 0,
+    },
     transactionInfo: { minWidth: 0 },
     transactionTitle: { fontSize: 13, fontWeight: 800, color: "#0f172a" },
     transactionMeta: { fontSize: 12, color: "#64748b", display: "flex", gap: 8, alignItems: "center", marginTop: 2, flexWrap: "wrap" },
     transactionAmount: { fontSize: 16, fontWeight: 800, color: "#0f766e", whiteSpace: "nowrap" },
+    spendAmount: { fontSize: 16, fontWeight: 800, color: "#dc2626", whiteSpace: "nowrap" },
     statusPill: {
       display: "inline-flex",
       alignItems: "center",
@@ -868,6 +1036,25 @@ const SettingsPage: React.FC = () => {
   const visibleTransactions = transactions.slice(transactionStartIndex, transactionEndIndex);
   const visibleFrom = transactions.length === 0 ? 0 : transactionStartIndex + 1;
   const visibleTo = Math.min(transactionEndIndex, transactions.length);
+
+  const totalSitePurchasePages = Math.max(
+    1,
+    Math.ceil(sitePurchases.length / SITE_PURCHASES_PER_PAGE)
+  );
+  const currentSitePurchasePage = Math.min(
+    sitePurchasesPage,
+    totalSitePurchasePages
+  );
+  const sitePurchaseStartIndex =
+    (currentSitePurchasePage - 1) * SITE_PURCHASES_PER_PAGE;
+  const sitePurchaseEndIndex = sitePurchaseStartIndex + SITE_PURCHASES_PER_PAGE;
+  const visibleSitePurchases = sitePurchases.slice(
+    sitePurchaseStartIndex,
+    sitePurchaseEndIndex
+  );
+  const sitePurchaseVisibleFrom =
+    sitePurchases.length === 0 ? 0 : sitePurchaseStartIndex + 1;
+  const sitePurchaseVisibleTo = Math.min(sitePurchaseEndIndex, sitePurchases.length);
 
   return (
     <div style={styles.page}>
@@ -1059,101 +1246,253 @@ const SettingsPage: React.FC = () => {
             <div style={styles.sectionHeader}>
               <div>
                 <h2 style={styles.sectionTitle}>Транзакции</h2>
-                <div style={styles.sectionDescription}>Хронология на добавените средства с точна дата и час.</div>
+                <div style={styles.sectionDescription}>
+                  История на добавените средства и отделно на покупките в сайта.
+                </div>
               </div>
               <div style={styles.sectionBadge}>
                 <Wallet size={13} />
                 {tabTitles.transactions}
               </div>
             </div>
-            {loadingTransactions ? (
-              <div style={styles.empty}>Зареждане...</div>
-            ) : txError ? (
-              <div style={styles.error}>{txError}</div>
-            ) : transactions.length === 0 ? (
-              <div style={styles.empty}>Няма налични транзакции.</div>
-            ) : (
-              <>
-                <div style={styles.transactionList}>
-                  {visibleTransactions.map((tx) => {
-                    const txColor = statusColor(tx.status);
-                    return (
-                      <div key={tx.id} style={styles.transactionRow} className="transaction-row">
-                        <div style={styles.transactionLeft}>
-                          <div style={styles.transactionIconWrap}>
-                            <Wallet size={16} />
-                          </div>
-                          <div style={styles.transactionInfo}>
-                            <div style={styles.transactionTitle}>Добавени средства</div>
-                            <div style={styles.transactionMeta}>
-                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                                <Clock3 size={12} />
-                                {formatTransactionDateTime(tx.created_at)}
-                              </span>
-                              <span
-                                style={{
-                                  ...styles.statusPill,
-                                  color: txColor,
-                                  borderColor: `${txColor}55`,
-                                  backgroundColor: `${txColor}12`,
-                                }}
-                              >
-                                {statusIcon(tx.status)}
-                                {statusLabel(tx.status)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <div style={styles.transactionAmount}>+{amountLabel(tx)}</div>
-                      </div>
-                    );
-                  })}
+
+            <div style={styles.transactionInnerTabs}>
+              <button
+                type="button"
+                style={{
+                  ...styles.transactionInnerTabButton,
+                  ...(activeTransactionsInnerTab === "topups"
+                    ? styles.transactionInnerTabButtonActive
+                    : {}),
+                }}
+                onClick={() => setActiveTransactionsInnerTab("topups")}
+              >
+                <Wallet size={14} />
+                Добавени средства
+              </button>
+              <button
+                type="button"
+                style={{
+                  ...styles.transactionInnerTabButton,
+                  ...(activeTransactionsInnerTab === "sitePurchases"
+                    ? styles.transactionInnerTabButtonActive
+                    : {}),
+                }}
+                onClick={() => setActiveTransactionsInnerTab("sitePurchases")}
+              >
+                <ShoppingCart size={14} />
+                Покупки в сайта
+              </button>
+            </div>
+
+            {activeTransactionsInnerTab === "topups" && (
+              <div
+                style={{
+                  ...styles.transactionSection,
+                  marginTop: 16,
+                  paddingTop: 0,
+                  borderTop: "none",
+                }}
+              >
+                <div style={styles.transactionSectionHeader}>
+                  <div style={styles.transactionSectionTitle}>
+                    <Wallet size={15} />
+                    Добавени средства
+                  </div>
+                  <div style={styles.transactionSectionHint}>Stripe транзакции</div>
                 </div>
-                {totalTransactionPages > 1 && (
-                  <div style={styles.paginationWrap}>
-                    <div style={styles.paginationInfo}>
-                      Показани {visibleFrom}-{visibleTo} от {transactions.length}
-                    </div>
-                    <div style={styles.paginationControls}>
-                      <button
-                        type="button"
-                        className="settings-pagination-btn"
-                        style={styles.paginationButton}
-                        disabled={currentTransactionsPage <= 1}
-                        onClick={() => setTransactionsPage((prev) => Math.max(1, prev - 1))}
-                      >
-                        Назад
-                      </button>
-                      {Array.from({ length: totalTransactionPages }, (_, index) => {
-                        const pageNumber = index + 1;
+
+                {loadingTransactions ? (
+                  <div style={styles.empty}>Зареждане...</div>
+                ) : txError ? (
+                  <div style={styles.error}>{txError}</div>
+                ) : transactions.length === 0 ? (
+                  <div style={styles.empty}>Няма налични транзакции.</div>
+                ) : (
+                  <>
+                    <div style={styles.transactionList}>
+                      {visibleTransactions.map((tx) => {
+                        const txColor = statusColor(tx.status);
                         return (
-                          <button
-                            key={pageNumber}
-                            type="button"
-                            className="settings-pagination-btn"
-                            style={{
-                              ...styles.paginationButton,
-                              ...(pageNumber === currentTransactionsPage ? styles.paginationButtonActive : {}),
-                            }}
-                            onClick={() => setTransactionsPage(pageNumber)}
-                          >
-                            {pageNumber}
-                          </button>
+                          <div key={tx.id} style={styles.transactionRow} className="transaction-row">
+                            <div style={styles.transactionLeft}>
+                              <div style={styles.transactionIconWrap}>
+                                <Wallet size={16} />
+                              </div>
+                              <div style={styles.transactionInfo}>
+                                <div style={styles.transactionTitle}>Добавени средства</div>
+                                <div style={styles.transactionMeta}>
+                                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                    <Clock3 size={12} />
+                                    {formatTransactionDateTime(tx.created_at)}
+                                  </span>
+                                  <span
+                                    style={{
+                                      ...styles.statusPill,
+                                      color: txColor,
+                                      borderColor: `${txColor}55`,
+                                      backgroundColor: `${txColor}12`,
+                                    }}
+                                  >
+                                    {statusIcon(tx.status)}
+                                    {statusLabel(tx.status)}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <div style={styles.transactionAmount}>+{amountLabel(tx)}</div>
+                          </div>
                         );
                       })}
-                      <button
-                        type="button"
-                        className="settings-pagination-btn"
-                        style={styles.paginationButton}
-                        disabled={currentTransactionsPage >= totalTransactionPages}
-                        onClick={() => setTransactionsPage((prev) => Math.min(totalTransactionPages, prev + 1))}
-                      >
-                        Напред
-                      </button>
                     </div>
-                  </div>
+                    {totalTransactionPages > 1 && (
+                      <div style={styles.paginationWrap}>
+                        <div style={styles.paginationInfo}>
+                          Показани {visibleFrom}-{visibleTo} от {transactions.length}
+                        </div>
+                        <div style={styles.paginationControls}>
+                          <button
+                            type="button"
+                            className="settings-pagination-btn"
+                            style={styles.paginationButton}
+                            disabled={currentTransactionsPage <= 1}
+                            onClick={() => setTransactionsPage((prev) => Math.max(1, prev - 1))}
+                          >
+                            Назад
+                          </button>
+                          {Array.from({ length: totalTransactionPages }, (_, index) => {
+                            const pageNumber = index + 1;
+                            return (
+                              <button
+                                key={pageNumber}
+                                type="button"
+                                className="settings-pagination-btn"
+                                style={{
+                                  ...styles.paginationButton,
+                                  ...(pageNumber === currentTransactionsPage ? styles.paginationButtonActive : {}),
+                                }}
+                                onClick={() => setTransactionsPage(pageNumber)}
+                              >
+                                {pageNumber}
+                              </button>
+                            );
+                          })}
+                          <button
+                            type="button"
+                            className="settings-pagination-btn"
+                            style={styles.paginationButton}
+                            disabled={currentTransactionsPage >= totalTransactionPages}
+                            onClick={() =>
+                              setTransactionsPage((prev) => Math.min(totalTransactionPages, prev + 1))
+                            }
+                          >
+                            Напред
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
-              </>
+              </div>
+            )}
+
+            {activeTransactionsInnerTab === "sitePurchases" && (
+              <div
+                style={{
+                  ...styles.transactionSection,
+                  marginTop: 16,
+                  paddingTop: 0,
+                  borderTop: "none",
+                }}
+              >
+                <div style={styles.transactionSectionHeader}>
+                  <div style={styles.transactionSectionTitle}>
+                    <ShoppingCart size={15} />
+                    Покупки в сайта
+                  </div>
+                  <div style={styles.transactionSectionHint}>
+                    Последни до 50 използвания на баланс
+                  </div>
+                </div>
+
+                {sitePurchases.length === 0 ? (
+                  <div style={styles.empty}>Няма покупки с баланс.</div>
+                ) : (
+                  <>
+                    <div style={styles.transactionList}>
+                      {visibleSitePurchases.map((record) => (
+                        <div key={record.id} style={styles.transactionRow} className="transaction-row">
+                          <div style={styles.transactionLeft}>
+                            <div style={styles.spendIconWrap}>
+                              <ShoppingCart size={16} />
+                            </div>
+                            <div style={styles.transactionInfo}>
+                              <div style={styles.transactionTitle}>{formatPurchaseTitle(record)}</div>
+                              <div style={styles.transactionMeta}>
+                                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                  <Clock3 size={12} />
+                                  {formatTransactionDateTime(record.createdAt)}
+                                </span>
+                                <span>{formatPurchaseSourceLabel(record.source)}</span>
+                              </div>
+                              <div style={styles.transactionMeta}>
+                                Обява: {formatPurchaseListing(record)}
+                              </div>
+                            </div>
+                          </div>
+                          <div style={styles.spendAmount}>-{formatPurchaseAmount(record)}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {totalSitePurchasePages > 1 && (
+                      <div style={styles.paginationWrap}>
+                        <div style={styles.paginationInfo}>
+                          Показани {sitePurchaseVisibleFrom}-{sitePurchaseVisibleTo} от {sitePurchases.length}
+                        </div>
+                        <div style={styles.paginationControls}>
+                          <button
+                            type="button"
+                            className="settings-pagination-btn"
+                            style={styles.paginationButton}
+                            disabled={currentSitePurchasePage <= 1}
+                            onClick={() => setSitePurchasesPage((prev) => Math.max(1, prev - 1))}
+                          >
+                            Назад
+                          </button>
+                          {Array.from({ length: totalSitePurchasePages }, (_, index) => {
+                            const pageNumber = index + 1;
+                            return (
+                              <button
+                                key={pageNumber}
+                                type="button"
+                                className="settings-pagination-btn"
+                                style={{
+                                  ...styles.paginationButton,
+                                  ...(pageNumber === currentSitePurchasePage ? styles.paginationButtonActive : {}),
+                                }}
+                                onClick={() => setSitePurchasesPage(pageNumber)}
+                              >
+                                {pageNumber}
+                              </button>
+                            );
+                          })}
+                          <button
+                            type="button"
+                            className="settings-pagination-btn"
+                            style={styles.paginationButton}
+                            disabled={currentSitePurchasePage >= totalSitePurchasePages}
+                            onClick={() =>
+                              setSitePurchasesPage((prev) => Math.min(totalSitePurchasePages, prev + 1))
+                            }
+                          >
+                            Напред
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             )}
           </div>
         )}

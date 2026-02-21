@@ -6,6 +6,34 @@ import { useRecentSearches } from "../hooks/useRecentSearches";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 import ListingPromoBadge from "./ListingPromoBadge";
 import KapariranoBadge from "./KapariranoBadge";
+import sportCarIcon from "../assets/sport-car.png";
+import tiresIcon from "../assets/tires.png";
+import carPartsIcon from "../assets/car-parts.png";
+import vanIcon from "../assets/van.png";
+import truckIcon from "../assets/truck.png";
+import motorbikeIcon from "../assets/motorbike.png";
+import tractorIcon from "../assets/tractor.png";
+import forkliftIcon from "../assets/forklift.png";
+import carTrailerIcon from "../assets/car-trailer.png";
+import yachtIcon from "../assets/yacht.png";
+import excavatorIcon from "../assets/excavator.png";
+import camperVanIcon from "../assets/camper-van.png";
+import automotiveIcon from "../assets/automotive.png";
+import dealIcon from "../assets/deal.png";
+import customerSupportIcon from "../assets/customer-support.png";
+import mercedesThumbnailImage from "../assets/mercedes-thumbnail.jpg";
+import bmwThumbnailImage from "../assets/bmw-thumbnail.jpg";
+import opelThumbnailImage from "../assets/opel-thumbnail.jpg";
+import audiThumbnailImage from "../assets/audi-thumbnail.jpg";
+import skodaThumbnailImage from "../assets/skoda-thumbnail.jpeg";
+import toyotaThumbnailImage from "../assets/toyota-thumbnail.jpg";
+import mustangThumbnailImage from "../assets/mustang-thumbnail.jpg";
+import volvoThumbnailImage from "../assets/volvo-thumbnail.jpg";
+import volkswagenThumbnailImage from "../assets/volkswagen-thumbnail.jpg";
+import renaultThumbnailImage from "../assets/renault-thumbnail.jpeg";
+import teslaThumbnailImage from "../assets/tesla-thumbnail.jpg";
+import porscheThumbnailImage from "../assets/porsche-thumbnail.jpg";
+import porscheLogoImage from "../assets/porsche-logo.png";
 import {
   readLatestListingsCache,
   writeLatestListingsCache,
@@ -127,9 +155,8 @@ const POPULAR_CAR_BRANDS = [
       "https://static.classistatic.de/consumer-webapp/static/bmw-logo-dark.360ac732bb2384b16986..png",
   },
   {
-    name: "Cupra",
-    logoUrl:
-      "https://static.classistatic.de/static/resources/images/make-logos/dark/cupra-dark.webp",
+    name: "Porsche",
+    logoUrl: porscheLogoImage,
   },
   {
     name: "Ford",
@@ -182,25 +209,29 @@ const DEFAULT_BRAND_HERO_IMAGE =
   "https://loremflickr.com/1600/900/car?lock=99";
 
 const BRAND_HERO_IMAGES: Record<string, string> = {
-  Audi: "https://loremflickr.com/1600/900/audi,car?lock=11",
-  BMW: "https://loremflickr.com/1600/900/bmw,car?lock=12",
-  Cupra: "https://loremflickr.com/1600/900/cupra,car?lock=13",
-  Ford: "https://loremflickr.com/1600/900/ford,car?lock=14",
-  "Mercedes-Benz": "https://loremflickr.com/1600/900/mercedes,car?lock=15",
-  Opel: "https://loremflickr.com/1600/900/opel,car?lock=16",
-  Renault: "https://loremflickr.com/1600/900/renault,car?lock=17",
-  Skoda: "https://loremflickr.com/1600/900/skoda,car?lock=18",
-  Tesla: "https://loremflickr.com/1600/900/tesla,car?lock=19",
-  Toyota: "https://loremflickr.com/1600/900/toyota,car?lock=20",
-  Volvo: "https://loremflickr.com/1600/900/volvo,car?lock=21",
-  Volkswagen: "https://loremflickr.com/1600/900/volkswagen,car?lock=22",
+  Audi: audiThumbnailImage,
+  BMW: bmwThumbnailImage,
+  Porsche: porscheThumbnailImage,
+  Ford: mustangThumbnailImage,
+  "Mercedes-Benz": mercedesThumbnailImage,
+  Opel: opelThumbnailImage,
+  Renault: renaultThumbnailImage,
+  Skoda: skodaThumbnailImage,
+  Tesla: teslaThumbnailImage,
+  Toyota: toyotaThumbnailImage,
+  Volvo: volvoThumbnailImage,
+  Volkswagen: volkswagenThumbnailImage,
 };
 
 const getBrandHeroImage = (brandName: string) =>
   BRAND_HERO_IMAGES[brandName] ?? DEFAULT_BRAND_HERO_IMAGE;
-const CATEGORY_ICON_WIDTH = 44;
-const CATEGORY_ICON_HEIGHT = 44;
-const CATEGORY_SYMBOL_SIZE = 34;
+const CATEGORY_ICON_WIDTH = 46;
+const CATEGORY_ICON_HEIGHT = 46;
+const CATEGORY_SYMBOL_SIZE = 36;
+const CAR_CATEGORY_ICON_WIDTH = 54;
+const CAR_CATEGORY_ICON_HEIGHT = 54;
+const SERVICES_CATEGORY_ICON_WIDTH = 40;
+const SERVICES_CATEGORY_ICON_HEIGHT = 40;
 
 type CategoryIconProps = {
   size?: number;
@@ -284,12 +315,60 @@ const createCategoryIcon = (name: MaterialSymbolName): CategoryIconComponent => 
   <MaterialCategoryIcon name={name} {...props} />
 );
 
-const CATEGORY_ICONS: Record<string, CategoryIconComponent> = Object.fromEntries(
-  Object.entries(CATEGORY_SYMBOLS).map(([categoryKey, symbolName]) => [
-    categoryKey,
-    createCategoryIcon(symbolName),
-  ])
-);
+const CATEGORY_IMAGE_SOURCES: Record<string, string> = {
+  "1": sportCarIcon,
+  w: tiresIcon,
+  u: carPartsIcon,
+  "3": vanIcon,
+  "4": truckIcon,
+  "5": motorbikeIcon,
+  "6": tractorIcon,
+  "7": excavatorIcon,
+  "8": forkliftIcon,
+  "9": camperVanIcon,
+  a: yachtIcon,
+  b: carTrailerIcon,
+  v: automotiveIcon,
+  y: dealIcon,
+  z: customerSupportIcon,
+};
+
+const createImageCategoryIcon = (src: string): CategoryIconComponent => ({
+  size = CATEGORY_SYMBOL_SIZE,
+  width,
+  height,
+}) => {
+  const iconWidth = width ?? size;
+  const iconHeight = height ?? size;
+
+  return (
+    <img
+      className="category-image-icon"
+      src={src}
+      alt=""
+      width={iconWidth}
+      height={iconHeight}
+      loading="lazy"
+      decoding="async"
+      aria-hidden="true"
+    />
+  );
+};
+
+const CATEGORY_ICONS: Record<string, CategoryIconComponent> = {
+  ...(Object.fromEntries(
+    Object.entries(CATEGORY_SYMBOLS).map(([categoryKey, symbolName]) => [
+      categoryKey,
+      createCategoryIcon(symbolName),
+    ])
+  ) as Record<string, CategoryIconComponent>),
+  ...(Object.fromEntries(
+    Object.entries(CATEGORY_IMAGE_SOURCES).map(([categoryKey, src]) => [
+      categoryKey,
+      createImageCategoryIcon(src),
+    ])
+  ) as Record<string, CategoryIconComponent>),
+};
 
 function clampNumber(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -754,7 +833,11 @@ export default function LandingPage() {
           opacity: 1 !important;
           -webkit-tap-highlight-color: transparent;
           user-select: none;
-          transition: border-color 0.22s ease, transform 0.22s ease, box-shadow 0.22s ease, background 0.22s ease;
+          transition:
+            border-color 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+            transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+            box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+            background 0.32s cubic-bezier(0.22, 1, 0.36, 1);
         }
         .category-material-icon {
           font-family: "Material Symbols Rounded";
@@ -768,39 +851,27 @@ export default function LandingPage() {
           -webkit-font-smoothing: antialiased;
           -moz-osx-font-smoothing: grayscale;
           font-feature-settings: "liga";
-          transition: transform 0.22s ease, color 0.22s ease, font-variation-settings 0.22s ease;
+          transform-origin: center center;
+          will-change: transform, color;
+          transition:
+            transform 0.36s cubic-bezier(0.22, 1, 0.36, 1),
+            color 0.28s ease,
+            font-variation-settings 0.3s ease;
+        }
+        .category-image-icon {
+          display: inline-block;
+          vertical-align: middle;
+          object-fit: contain;
+          transform-origin: center center;
+          will-change: transform, filter;
+          filter: drop-shadow(0 2px 5px rgba(15, 23, 42, 0.2));
+          transition:
+            transform 0.38s cubic-bezier(0.22, 1, 0.36, 1),
+            filter 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+            opacity 0.28s ease;
         }
         .category-pill-label {
           display: none;
-        }
-        .category-pill-tooltip {
-          position: absolute;
-          left: 50%;
-          bottom: calc(100% + 1px);
-          transform: translate(-50%, 6px) scale(0.96);
-          opacity: 0;
-          pointer-events: none;
-          background: #0f172a;
-          color: #ffffff;
-          border-radius: 7px;
-          padding: 5px 7px;
-          font-size: 11px;
-          line-height: 1.2;
-          font-weight: 600;
-          white-space: nowrap;
-          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.2);
-          transition: opacity 0.16s ease, transform 0.16s ease;
-          z-index: 25;
-        }
-        .category-pill-tooltip::after {
-          content: "";
-          position: absolute;
-          top: 100%;
-          left: 50%;
-          transform: translateX(-50%);
-          border-width: 5px 5px 0 5px;
-          border-style: solid;
-          border-color: #0f172a transparent transparent transparent;
         }
         .category-pill-btn:hover {
           box-shadow: none;
@@ -811,13 +882,23 @@ export default function LandingPage() {
         .category-pill-btn:hover .category-material-icon {
           transform: scale(1.03);
         }
-        .category-pill-btn:hover .category-pill-tooltip,
-        .category-pill-btn:focus-visible .category-pill-tooltip {
-          opacity: 1;
-          transform: translate(-50%, 2px) scale(1);
+        .category-pill-btn:hover .category-image-icon {
+          transform: scale(1.02);
+          filter: drop-shadow(0 3px 8px rgba(15, 23, 42, 0.24));
         }
         .category-pill-btn.category-pill-btn--active .category-material-icon {
-          transform: scale(1.05);
+          transform: scale(1.08);
+          animation: categoryIconPopIn 0.34s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+        }
+        .category-pill-btn.category-pill-btn--active .category-image-icon {
+          transform: scale(1.08) translateY(0);
+          animation:
+            categoryIconPopIn 0.34s cubic-bezier(0.2, 0.9, 0.3, 1) both,
+            categoryIconDrift 2.2s ease-in-out 0.34s infinite;
+          filter:
+            brightness(0) saturate(100%)
+            invert(37%) sepia(55%) saturate(540%) hue-rotate(125deg) brightness(92%) contrast(95%)
+            drop-shadow(0 3px 9px rgba(15, 118, 110, 0.3));
         }
         .category-pill-btn:active {
           transform: translateY(0);
@@ -827,14 +908,36 @@ export default function LandingPage() {
         .category-pill-btn:focus,
         .category-pill-btn:focus-visible {
           outline: none !important;
-          box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.24) !important;
+          box-shadow: none !important;
         }
         .category-pill-btn:focus:not(:focus-visible) {
           box-shadow: none !important;
         }
         .category-pill-btn.category-pill-btn--active {
-          box-shadow: none;
           background: transparent !important;
+          box-shadow: none;
+        }
+        @keyframes categoryIconPopIn {
+          0% {
+            transform: scale(1);
+          }
+          55% {
+            transform: scale(1.11);
+          }
+          100% {
+            transform: scale(1.08);
+          }
+        }
+        @keyframes categoryIconDrift {
+          0% {
+            transform: scale(1.08) translateY(0);
+          }
+          50% {
+            transform: scale(1.08) translateY(-1.1px);
+          }
+          100% {
+            transform: scale(1.08) translateY(0);
+          }
         }
         .main-category-grid {
           scrollbar-width: none;
@@ -871,7 +974,8 @@ export default function LandingPage() {
                 >
                   {CATEGORIES.map((mainCategory) => {
                     const isActive = category === mainCategory.value;
-                    const isForkliftCategory = mainCategory.value === "8";
+                    const isCarCategory = mainCategory.value === "1";
+                    const isServicesCategory = mainCategory.value === "z";
                     const Icon = CATEGORY_ICONS[mainCategory.value] || CATEGORY_ICONS["1"];
 
                     return (
@@ -889,7 +993,6 @@ export default function LandingPage() {
                         onClick={() => setCategory(mainCategory.value)}
                         aria-pressed={isActive}
                         aria-label={mainCategory.label}
-                        title={mainCategory.label}
                       >
                         <span
                           style={{
@@ -902,14 +1005,23 @@ export default function LandingPage() {
                           }}
                         >
                           <Icon
-                            width={isForkliftCategory ? 42 : CATEGORY_ICON_WIDTH}
-                            height={isForkliftCategory ? 42 : CATEGORY_ICON_HEIGHT}
-                            fill={isForkliftCategory ? 0 : isActive ? 1 : 0}
-                            weight={isForkliftCategory ? (isActive ? 500 : 400) : isActive ? 650 : 500}
+                            width={
+                              isCarCategory
+                                ? CAR_CATEGORY_ICON_WIDTH
+                                : isServicesCategory
+                                  ? SERVICES_CATEGORY_ICON_WIDTH
+                                  : CATEGORY_ICON_WIDTH
+                            }
+                            height={
+                              isCarCategory
+                                ? CAR_CATEGORY_ICON_HEIGHT
+                                : isServicesCategory
+                                  ? SERVICES_CATEGORY_ICON_HEIGHT
+                                  : CATEGORY_ICON_HEIGHT
+                            }
+                            fill={isActive ? 1 : 0}
+                            weight={isActive ? 650 : 500}
                           />
-                        </span>
-                        <span className="category-pill-tooltip" aria-hidden="true">
-                          {mainCategory.label}
                         </span>
                       </button>
                     );
@@ -1297,11 +1409,11 @@ export default function LandingPage() {
               transform-style: preserve-3d;
             }
             .brand-stage--next {
-              animation: brandShelfDriftNext 0.82s cubic-bezier(0.16, 0.78, 0.18, 1);
+              animation: brandShelfDriftNext 0.68s cubic-bezier(0.22, 0.61, 0.36, 1);
               transform-origin: right center;
             }
             .brand-stage--prev {
-              animation: brandShelfDriftPrev 0.82s cubic-bezier(0.16, 0.78, 0.18, 1);
+              animation: brandShelfDriftPrev 0.68s cubic-bezier(0.22, 0.61, 0.36, 1);
               transform-origin: left center;
             }
             .brand-side-card {
@@ -1316,23 +1428,23 @@ export default function LandingPage() {
               overflow: hidden;
               opacity: 0.68;
               transform: scale(0.96);
-              transition: transform 0.32s ease, opacity 0.32s ease;
+              transition: transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.4s ease;
             }
             .brand-showcase.is-open .brand-side-card {
               opacity: 0.86;
               transform: scale(1);
             }
             .brand-stage--next .brand-side-card--left {
-              animation: brandSideOutLeft 0.78s cubic-bezier(0.16, 0.78, 0.18, 1);
+              animation: brandSideOutLeft 0.66s cubic-bezier(0.22, 0.61, 0.36, 1);
             }
             .brand-stage--next .brand-side-card--right {
-              animation: brandSideInRight 0.78s cubic-bezier(0.16, 0.78, 0.18, 1);
+              animation: brandSideInRight 0.66s cubic-bezier(0.22, 0.61, 0.36, 1);
             }
             .brand-stage--prev .brand-side-card--left {
-              animation: brandSideInLeft 0.78s cubic-bezier(0.16, 0.78, 0.18, 1);
+              animation: brandSideInLeft 0.66s cubic-bezier(0.22, 0.61, 0.36, 1);
             }
             .brand-stage--prev .brand-side-card--right {
-              animation: brandSideOutRight 0.78s cubic-bezier(0.16, 0.78, 0.18, 1);
+              animation: brandSideOutRight 0.66s cubic-bezier(0.22, 0.61, 0.36, 1);
             }
             .brand-side-logo {
               width: 30px;
@@ -1387,16 +1499,16 @@ export default function LandingPage() {
               cursor: pointer;
               transform: translateY(-2px) scale(1.015);
               box-shadow: 0 18px 36px rgba(15, 118, 110, 0.26);
-              transition: transform 0.35s ease, box-shadow 0.35s ease;
+              transition: transform 0.42s cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 0.42s ease;
               transform-style: preserve-3d;
               backface-visibility: hidden;
-              will-change: transform, opacity, filter;
+              will-change: transform;
             }
             .brand-main-card--next {
-              animation: brandCardFlipInNext 0.86s cubic-bezier(0.16, 0.78, 0.18, 1);
+              animation: brandCardFlipInNext 0.72s cubic-bezier(0.22, 0.61, 0.36, 1);
             }
             .brand-main-card--prev {
-              animation: brandCardFlipInPrev 0.86s cubic-bezier(0.16, 0.78, 0.18, 1);
+              animation: brandCardFlipInPrev 0.72s cubic-bezier(0.22, 0.61, 0.36, 1);
             }
             .brand-main-card:hover {
               transform: translateY(-4px) scale(1.02);
@@ -1415,10 +1527,10 @@ export default function LandingPage() {
               transition: height 0.42s cubic-bezier(0.22, 0.78, 0.14, 1);
             }
             .brand-main-image-wrap--next {
-              animation: brandImageParallaxNext 0.9s cubic-bezier(0.16, 0.78, 0.18, 1);
+              animation: brandImageParallaxNext 0.72s cubic-bezier(0.22, 0.61, 0.36, 1);
             }
             .brand-main-image-wrap--prev {
-              animation: brandImageParallaxPrev 0.9s cubic-bezier(0.16, 0.78, 0.18, 1);
+              animation: brandImageParallaxPrev 0.72s cubic-bezier(0.22, 0.61, 0.36, 1);
             }
             .brand-showcase.is-open .brand-main-image-wrap {
               height: 300px;
@@ -1428,12 +1540,18 @@ export default function LandingPage() {
               height: 100%;
               object-fit: cover;
               transform: scale(1.01);
-              will-change: transform, filter;
+              will-change: transform;
             }
             .brand-main-overlay {
               position: absolute;
               inset: 0;
-              background: linear-gradient(180deg, rgba(2,6,23,0.15) 0%, rgba(2,6,23,0.78) 100%);
+              background: linear-gradient(
+                180deg,
+                rgba(2, 6, 23, 0) 0%,
+                rgba(2, 6, 23, 0) 56%,
+                rgba(2, 6, 23, 0.28) 76%,
+                rgba(2, 6, 23, 0.62) 100%
+              );
               pointer-events: none;
             }
             .brand-main-meta {
@@ -1445,7 +1563,8 @@ export default function LandingPage() {
               display: flex;
               align-items: center;
               gap: 10px;
-              animation: brandMetaRise 0.62s cubic-bezier(0.22, 0.78, 0.14, 1);
+              transform: translateZ(0);
+              backface-visibility: hidden;
             }
             .brand-main-logo {
               width: 44px;
@@ -1475,6 +1594,7 @@ export default function LandingPage() {
               background: rgba(2, 6, 23, 0.64);
               border: 1px solid transparent;
               backdrop-filter: blur(2px);
+              transform: translateZ(0);
             }
             .brand-nav {
               position: absolute;
@@ -1509,74 +1629,64 @@ export default function LandingPage() {
             }
             @keyframes brandCardFlipInNext {
               0% {
-                opacity: 1;
-                transform: translateY(10px) translateX(190px) translateZ(-90px) rotateY(-14deg) scale(0.92);
-                filter: blur(2.8px) saturate(0.88) brightness(0.86);
+                opacity: 0.9;
+                transform: translateY(8px) translateX(92px) translateZ(-36px) rotateY(-8deg) scale(0.98);
               }
-              62% {
+              68% {
                 opacity: 1;
-                transform: translateY(-4px) translateX(-18px) translateZ(16px) rotateY(4deg) scale(1.03);
-                filter: blur(0.25px) saturate(1.04) brightness(1);
+                transform: translateY(-2px) translateX(-8px) translateZ(6px) rotateY(1deg) scale(1.02);
               }
               100% {
                 opacity: 1;
                 transform: translateY(-2px) translateX(0) rotateY(0deg) scale(1.015);
-                filter: blur(0) saturate(1) brightness(1);
               }
             }
             @keyframes brandCardFlipInPrev {
               0% {
-                opacity: 1;
-                transform: translateY(10px) translateX(-190px) translateZ(-90px) rotateY(14deg) scale(0.92);
-                filter: blur(2.8px) saturate(0.88) brightness(0.86);
+                opacity: 0.9;
+                transform: translateY(8px) translateX(-92px) translateZ(-36px) rotateY(8deg) scale(0.98);
               }
-              62% {
+              68% {
                 opacity: 1;
-                transform: translateY(-4px) translateX(18px) translateZ(16px) rotateY(-4deg) scale(1.03);
-                filter: blur(0.25px) saturate(1.04) brightness(1);
+                transform: translateY(-2px) translateX(8px) translateZ(6px) rotateY(-1deg) scale(1.02);
               }
               100% {
                 opacity: 1;
                 transform: translateY(-2px) translateX(0) rotateY(0deg) scale(1.015);
-                filter: blur(0) saturate(1) brightness(1);
               }
             }
             @keyframes brandImageParallaxNext {
-              0% { transform: scale(1.22) translateX(170px); filter: brightness(0.82) blur(1.6px); }
-              100% { transform: scale(1.01) translateX(0); filter: brightness(1) blur(0); }
+              0% { transform: scale(1.09) translateX(58px); }
+              100% { transform: scale(1.01) translateX(0); }
             }
             @keyframes brandImageParallaxPrev {
-              0% { transform: scale(1.22) translateX(-170px); filter: brightness(0.82) blur(1.6px); }
-              100% { transform: scale(1.01) translateX(0); filter: brightness(1) blur(0); }
-            }
-            @keyframes brandMetaRise {
-              0% { opacity: 0; transform: translateY(14px) scale(0.98); }
-              100% { opacity: 1; transform: translateY(0) scale(1); }
+              0% { transform: scale(1.09) translateX(-58px); }
+              100% { transform: scale(1.01) translateX(0); }
             }
             @keyframes brandShelfDriftNext {
-              0% { transform: translateX(96px) translateZ(-20px) scale(0.975); opacity: 1; }
-              68% { transform: translateX(-10px) translateZ(0) scale(1.008); opacity: 1; }
+              0% { transform: translateX(48px) translateZ(-8px) scale(0.99); opacity: 1; }
+              68% { transform: translateX(-4px) translateZ(0) scale(1.004); opacity: 1; }
               100% { transform: translateX(0); opacity: 1; }
             }
             @keyframes brandShelfDriftPrev {
-              0% { transform: translateX(-96px) translateZ(-20px) scale(0.975); opacity: 1; }
-              68% { transform: translateX(10px) translateZ(0) scale(1.008); opacity: 1; }
+              0% { transform: translateX(-48px) translateZ(-8px) scale(0.99); opacity: 1; }
+              68% { transform: translateX(4px) translateZ(0) scale(1.004); opacity: 1; }
               100% { transform: translateX(0); opacity: 1; }
             }
             @keyframes brandSideOutLeft {
-              0% { opacity: 0.72; transform: translateX(74px) scale(0.9); }
+              0% { opacity: 0.72; transform: translateX(40px) scale(0.93); }
               100% { opacity: 0.86; transform: translateX(0) scale(1); }
             }
             @keyframes brandSideInRight {
-              0% { opacity: 0.72; transform: translateX(124px) scale(0.9); }
+              0% { opacity: 0.72; transform: translateX(64px) scale(0.93); }
               100% { opacity: 0.86; transform: translateX(0) scale(1); }
             }
             @keyframes brandSideInLeft {
-              0% { opacity: 0.72; transform: translateX(-124px) scale(0.9); }
+              0% { opacity: 0.72; transform: translateX(-64px) scale(0.93); }
               100% { opacity: 0.86; transform: translateX(0) scale(1); }
             }
             @keyframes brandSideOutRight {
-              0% { opacity: 0.72; transform: translateX(-74px) scale(0.9); }
+              0% { opacity: 0.72; transform: translateX(-40px) scale(0.93); }
               100% { opacity: 0.86; transform: translateX(0) scale(1); }
             }
 
@@ -1905,7 +2015,7 @@ export default function LandingPage() {
                   </div>
                   <div className="brand-main-overlay" />
                   <div className="brand-main-meta">
-                    <img src={activeBrand.logoUrl} alt="" className="brand-main-logo" loading="lazy" decoding="async" />
+                    <img src={activeBrand.logoUrl} alt="" className="brand-main-logo" loading="eager" decoding="async" />
                     <div className="brand-main-name-badge">
                       <div className="brand-main-name">{activeBrand.name}</div>
                     </div>
@@ -2172,10 +2282,14 @@ const styles: Record<string, React.CSSProperties> = {
     flexWrap: "wrap",
   },
   mainCategoryLabel: {
+    display: "block",
     fontSize: 14,
+    lineHeight: 1.35,
     color: "#000000",
     fontWeight: 600,
     marginLeft: 16,
+    whiteSpace: "normal",
+    overflowWrap: "anywhere",
   },
   mainCategoryHint: {
     fontSize: 10.5,
@@ -2184,11 +2298,13 @@ const styles: Record<string, React.CSSProperties> = {
   },
   mainCategoryRow: {
     display: "flex",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "center",
     gap: 8,
     overflowX: "auto",
     overflowY: "hidden",
+    paddingLeft: 6,
+    paddingRight: 6,
     paddingTop: "2rem",
     paddingBottom: "1rem",
     borderBottom: "3px solid rgb(15, 118, 110)",
@@ -2200,14 +2316,14 @@ const styles: Record<string, React.CSSProperties> = {
     borderColor: "transparent",
     background: "transparent",
     color: "#111827",
-    borderRadius: 14,
-    padding: "8px 8px 9px",
+    borderRadius: 15,
+    padding: "5px 4px",
     cursor: "pointer",
     fontSize: 12,
     fontWeight: 600,
     lineHeight: 1.2,
-    minHeight: 58,
-    minWidth: 58,
+    minHeight: 64,
+    minWidth: 64,
     transition: "all 0.22s cubic-bezier(0.22, 1, 0.36, 1)",
     display: "flex",
     alignItems: "center",
@@ -2215,7 +2331,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: "row",
     gap: 0,
     textAlign: "center",
-    width: "58px",
+    width: "64px",
     flex: "0 0 auto",
     boxShadow: "none",
   },
@@ -2226,11 +2342,11 @@ const styles: Record<string, React.CSSProperties> = {
     borderColor: "transparent",
     color: "#0f766e",
     boxShadow: "none",
-    transform: "scale(1.20)",
+    transform: "none",
   },
   mainCategoryIconWrap: {
-    width: 38,
-    height: 38,
+    width: 54,
+    height: 54,
     borderRadius: 14,
     display: "inline-flex",
     alignItems: "center",

@@ -1125,6 +1125,7 @@ const VehicleDetailsPage: React.FC = () => {
             isMobile={false}
             title={title}
             city={listing.city}
+            createdAt={listing.created_at}
             updatedLabel={updatedLabel}
             updatedAt={listing.updated_at}
             priceHistory={priceHistory}
@@ -1146,6 +1147,7 @@ const VehicleDetailsPage: React.FC = () => {
           isMobile={true}
           title={title}
           city={listing.city}
+          createdAt={listing.created_at}
           updatedLabel={updatedLabel}
           updatedAt={listing.updated_at}
           priceHistory={priceHistory}

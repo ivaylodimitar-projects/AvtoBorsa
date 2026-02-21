@@ -16,6 +16,7 @@ import { useAuth } from "../context/AuthContext";
 import { invalidateMyAdsCache } from "../utils/myAdsCache";
 import { invalidateLatestListingsCache } from "../utils/latestListingsCache";
 import { requestDealerListingsSync } from "../utils/dealerSubscriptions";
+import { addBalanceUsageRecord } from "../utils/balanceUsageHistory";
 import { BULGARIAN_CITIES_BY_REGION } from "../constants/bulgarianCities";
 import ListingFormStepper from "./ListingFormStepper";
 import AdvancedImageUpload from "./AdvancedImageUpload";
@@ -3129,17 +3130,22 @@ const PublishPage: React.FC = () => {
 
   const submitListing = async () => {
     setErrors({});
-    if (formData.listingType === "top" || formData.listingType === "vip") {
-      const balance = user?.balance;
-      const requiredAmount =
-        formData.listingType === "top"
-          ? formData.topPlan === "7d"
-            ? TOP_LISTING_PRICE_7D_EUR
-            : TOP_LISTING_PRICE_1D_EUR
-          : formData.vipPlan === "lifetime"
+    const isPaidListingType =
+      formData.listingType === "top" || formData.listingType === "vip";
+    const expectedSpendAmount =
+      formData.listingType === "top"
+        ? formData.topPlan === "7d"
+          ? TOP_LISTING_PRICE_7D_EUR
+          : TOP_LISTING_PRICE_1D_EUR
+        : formData.listingType === "vip"
+          ? formData.vipPlan === "lifetime"
             ? VIP_LISTING_PRICE_LIFETIME_EUR
-            : VIP_LISTING_PRICE_7D_EUR;
-      if (typeof balance === "number" && balance < requiredAmount) {
+            : VIP_LISTING_PRICE_7D_EUR
+          : 0;
+
+    if (isPaidListingType) {
+      const balance = user?.balance;
+      if (typeof balance === "number" && balance < expectedSpendAmount) {
         setToast({ message: "Недостатъчни средства", type: "error" });
         return;
       }
@@ -3456,8 +3462,13 @@ const PublishPage: React.FC = () => {
       }
 
       const savedListing = parsedResponse;
+      const balanceBefore =
+        typeof user?.balance === "number" && Number.isFinite(user.balance)
+          ? user.balance
+          : null;
+      let refreshedBalance: number | null = null;
 
-      if (formData.listingType === "top" || formData.listingType === "vip") {
+      if (isPaidListingType) {
         try {
           const meToken = localStorage.getItem("authToken");
           if (meToken) {
@@ -3467,12 +3478,48 @@ const PublishPage: React.FC = () => {
             if (meRes.ok) {
               const meData = await meRes.json();
               if (typeof meData.balance === "number") {
+                refreshedBalance = meData.balance;
                 updateBalance(meData.balance);
               }
             }
           }
         } catch {
           // ignore balance refresh errors
+        }
+      }
+
+      if (isPaidListingType) {
+        let spentAmount: number | null = null;
+
+        if (balanceBefore !== null && refreshedBalance !== null) {
+          const delta = Math.round((balanceBefore - refreshedBalance) * 100) / 100;
+          if (Number.isFinite(delta) && delta > 0) {
+            spentAmount = delta;
+          }
+        }
+
+        if (spentAmount === null && !isEditMode && expectedSpendAmount > 0) {
+          spentAmount = expectedSpendAmount;
+        }
+
+        if (spentAmount !== null && spentAmount > 0) {
+          const listingTitleForHistory =
+            typeof savedListing?.title === "string" && savedListing.title.trim()
+              ? savedListing.title.trim()
+              : normalizedTitle;
+
+          addBalanceUsageRecord(user?.id, {
+            amount: spentAmount,
+            currency: "EUR",
+            listingType: formData.listingType === "top" ? "top" : "vip",
+            plan: formData.listingType === "top" ? formData.topPlan : formData.vipPlan,
+            source: isEditMode ? "promote" : "publish",
+            listingId:
+              typeof savedListing?.id === "number" && Number.isFinite(savedListing.id)
+                ? savedListing.id
+                : null,
+            listingTitle: listingTitleForHistory,
+          });
         }
       }
 

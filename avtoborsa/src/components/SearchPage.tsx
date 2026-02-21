@@ -1243,8 +1243,22 @@ const SearchPage: React.FC = () => {
     container: { width: "100%", maxWidth: 1200, margin: "0 auto", padding: "0 20px" },
     header: { marginBottom: 24, background: "#fff", padding: 24, borderRadius: 10, boxShadow: "0 6px 18px rgba(15, 23, 42, 0.08)" },
     headerTop: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" },
-    title: { fontSize: 28, fontWeight: 700, color: "#0f172a", margin: 0 },
-    headerLead: { margin: "6px 0 0", color: "#666", fontSize: 15, lineHeight: 1.6 },
+    title: {
+      fontSize: "clamp(2rem, 2.4vw, 2.55rem)",
+      fontWeight: 800,
+      letterSpacing: "-0.02em",
+      lineHeight: 1.08,
+      color: "#0f172a",
+      margin: 0,
+      fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+    },
+    headerLead: {
+      margin: "8px 0 0",
+      color: "#475569",
+      fontSize: 16,
+      lineHeight: 1.65,
+      fontWeight: 600,
+    },
     headerDivider: {
       height: 2,
       margin: "18px 0 0",
@@ -1342,7 +1356,16 @@ const SearchPage: React.FC = () => {
       overflow: "hidden",
       textOverflow: "ellipsis",
     },
-    itemTitle: { fontSize: 20, fontWeight: 700, color: "#111827", marginBottom: 0, textDecoration: "none", lineHeight: 1.3 },
+    itemTitle: {
+      fontSize: 23,
+      fontWeight: 800,
+      letterSpacing: "-0.01em",
+      color: "#0b1220",
+      marginBottom: 0,
+      textDecoration: "none",
+      lineHeight: 1.22,
+      fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+    },
     itemPrice: { fontSize: 24, fontWeight: 700, color: "#0f766e", marginBottom: 4, textAlign: "right" as const, flexShrink: 0 },
     itemPriceSmall: { fontSize: 13, color: "#64748b", fontWeight: 500 },
     priceChangeBadge: {
@@ -1404,6 +1427,22 @@ const SearchPage: React.FC = () => {
     metaIcon: { color: "#64748b" },
     metaMuted: { color: "#94a3b8", fontWeight: 600 },
     empty: { textAlign: "center", padding: 60, background: "#fff", borderRadius: 10, boxShadow: "0 2px 4px rgba(0,0,0,0.08)" },
+    emptyTitle: {
+      fontSize: 24,
+      fontWeight: 800,
+      color: "#0f172a",
+      margin: "0 0 12px 0",
+      letterSpacing: "-0.015em",
+      lineHeight: 1.2,
+      fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+    },
+    emptyText: {
+      fontSize: 15,
+      color: "#64748b",
+      margin: 0,
+      lineHeight: 1.6,
+      fontWeight: 500,
+    },
     loading: { textAlign: "center", padding: 60, background: "#fff", borderRadius: 10, boxShadow: "0 2px 4px rgba(0,0,0,0.08)" },
     pagination: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 24, flexWrap: "wrap" },
     paginationButton: { minWidth: 36, height: 36, borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#1f2937", fontWeight: 600, cursor: "pointer", padding: "0 10px" },
@@ -1452,7 +1491,14 @@ const SearchPage: React.FC = () => {
       boxSizing: "border-box",
       boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
     },
-    modalTitle: { fontSize: 18, fontWeight: 700, color: "#333", margin: "0 0 16px 0" },
+    modalTitle: {
+      fontSize: 22,
+      fontWeight: 800,
+      color: "#0f172a",
+      margin: "0 0 16px 0",
+      letterSpacing: "-0.01em",
+      fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+    },
     modalInput: {
       width: "100%",
       padding: "10px 12px",
@@ -1582,8 +1628,8 @@ const SearchPage: React.FC = () => {
           </div>
         ) : error ? (
           <div style={styles.empty}>
-            <h3 style={{ fontSize: 20, color: "#333", marginBottom: 12 }}>Грешка при зареждане</h3>
-            <p style={{ fontSize: 14, color: "#666", margin: 0 }}>{error}</p>
+            <h3 style={styles.emptyTitle}>Грешка при зареждане</h3>
+            <p style={styles.emptyText}>{error}</p>
           </div>
         ) : results.length > 0 ? (
           <>
@@ -1900,8 +1946,8 @@ const SearchPage: React.FC = () => {
           </>
         ) : (
           <div style={styles.empty}>
-            <h3 style={{ fontSize: 20, color: "#333", marginBottom: 12 }}>Няма намерени обяви</h3>
-            <p style={{ fontSize: 14, color: "#666", margin: 0 }}>Опитайте да промените филтрите или се върнете на начална страница</p>
+            <h3 style={styles.emptyTitle}>Няма намерени обяви</h3>
+            <p style={styles.emptyText}>Опитайте да промените филтрите или се върнете на начална страница</p>
           </div>
         )}
 
@@ -1947,3 +1993,4 @@ const SearchPage: React.FC = () => {
 };
 
 export default SearchPage;
+

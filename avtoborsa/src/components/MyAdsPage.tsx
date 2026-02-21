@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   Archive,
   Trash2,
+  Trash,
   Edit2,
   ArchiveRestore,
   Heart,
@@ -48,6 +49,7 @@ import {
   invalidateMyAdsCache,
 } from "../utils/myAdsCache";
 import { requestDealerListingsSync } from "../utils/dealerSubscriptions";
+import { addBalanceUsageRecord } from "../utils/balanceUsageHistory";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 import ListingPromoBadge from "./ListingPromoBadge";
 import KapariranoBadge from "./KapariranoBadge";
@@ -224,6 +226,38 @@ const globalCss = `
     width: 20px !important;
     height: 20px !important;
     stroke-width: 2.2;
+  }
+  .myads-delete-icon-wrap {
+    width: 16px;
+    height: 16px;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 16px;
+  }
+  .myads-delete-icon {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 16px;
+    height: 16px;
+    stroke-width: 2.2;
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+    transition: opacity 0.24s cubic-bezier(0.22, 1, 0.36, 1), transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .myads-delete-icon--confirm {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.7) rotate(-18deg);
+  }
+  .myads-delete-icon-wrap.is-confirm .myads-delete-icon--primary {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.7) rotate(18deg);
+  }
+  .myads-delete-icon-wrap.is-confirm .myads-delete-icon--confirm {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
   }
   .myads-icon-btn::after {
     content: attr(data-action);
@@ -485,20 +519,23 @@ const MyAdsPage: React.FC = () => {
     }
   };
 
-  const refreshBalance = async () => {
+  const refreshBalance = async (): Promise<number | null> => {
     try {
       const token = localStorage.getItem("authToken");
-      if (!token) return;
+      if (!token) return null;
       const response = await fetch("http://localhost:8000/api/auth/me/", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!response.ok) return;
+      if (!response.ok) return null;
       const data = await response.json();
       if (typeof data.balance === "number") {
         updateBalance(data.balance);
+        return data.balance;
       }
+      return null;
     } catch {
       // ignore balance refresh errors
+      return null;
     }
   };
 
@@ -856,6 +893,37 @@ const MyAdsPage: React.FC = () => {
     return `${clean.slice(0, maxLength).trim()}…`;
   };
 
+  const getAdaptiveCardChipLimit = (
+    chipsCount: number,
+    descriptionSnippet: string,
+    subtitle: string,
+    mainCategory: string
+  ) => {
+    // Base density for normal cards.
+    const isHeavyCard = mainCategory === "3" || mainCategory === "4";
+    let limit = isHeavyCard ? 6 : 4;
+    const descriptionLength = descriptionSnippet.trim().length;
+
+    // Fill free card space when listing text is short.
+    if (descriptionLength === 0) {
+      limit += 4;
+    } else if (descriptionLength < 60) {
+      limit += 3;
+    } else if (descriptionLength < 95) {
+      limit += 2;
+    } else if (descriptionLength < 120) {
+      limit += 1;
+    }
+
+    if (!subtitle.trim()) {
+      limit += 1;
+    }
+
+    const maxLimit = isHeavyCard ? 12 : 9;
+    const minLimit = isHeavyCard ? 6 : 4;
+    return Math.max(minLimit, Math.min(chipsCount, limit, maxLimit));
+  };
+
   const isListingNew = (createdAt?: string) => {
     if (!createdAt) return false;
     const createdAtMs = new Date(createdAt).getTime();
@@ -958,6 +1026,22 @@ const MyAdsPage: React.FC = () => {
     return baseVip;
   };
 
+  const resolveSpentAmount = (
+    balanceBefore: number | null,
+    balanceAfter: number | null,
+    fallbackAmount: number
+  ) => {
+    if (balanceBefore !== null && balanceAfter !== null) {
+      const delta = Math.round((balanceBefore - balanceAfter) * 100) / 100;
+      return Number.isFinite(delta) && delta > 0 ? delta : 0;
+    }
+
+    const normalizedFallback = Math.round(fallbackAmount * 100) / 100;
+    return Number.isFinite(normalizedFallback) && normalizedFallback > 0
+      ? normalizedFallback
+      : 0;
+  };
+
   const openListingTypeModal = (
     listing: CarListing,
     mode: "republish" | "promote",
@@ -993,6 +1077,20 @@ const MyAdsPage: React.FC = () => {
     vipPlan: VipPlan
   ) => {
     setActionLoading(listingId);
+    const sourceListing =
+      expiredListings.find((item) => item.id === listingId) ||
+      activeListings.find((item) => item.id === listingId) ||
+      archivedListings.find((item) => item.id === listingId) ||
+      draftListings.find((item) => item.id === listingId) ||
+      null;
+    const fallbackSpendAmount =
+      listingType === "top" || listingType === "vip"
+        ? getPromotePrice(sourceListing, listingType, topPlan, vipPlan)
+        : 0;
+    const balanceBefore =
+      typeof user?.balance === "number" && Number.isFinite(user.balance)
+        ? user.balance
+        : null;
 
     try {
       const token = localStorage.getItem("authToken");
@@ -1022,7 +1120,7 @@ const MyAdsPage: React.FC = () => {
         throw new Error(errorMessage);
       }
 
-      const updatedListing = await response.json();
+      const updatedListing = (await response.json()) as CarListing;
 
       setExpiredListings((prev) => prev.filter((l) => l.id !== listingId));
       setActiveListings((prev) => [
@@ -1039,7 +1137,24 @@ const MyAdsPage: React.FC = () => {
       );
       requestDealerListingsSync(user?.id);
       if (listingType === "top" || listingType === "vip") {
-        await refreshBalance();
+        const balanceAfter = await refreshBalance();
+        const spentAmount = resolveSpentAmount(
+          balanceBefore,
+          balanceAfter,
+          fallbackSpendAmount
+        );
+
+        if (spentAmount > 0) {
+          addBalanceUsageRecord(user?.id, {
+            amount: spentAmount,
+            currency: "EUR",
+            listingType: listingType === "top" ? "top" : "vip",
+            plan: listingType === "top" ? topPlan : vipPlan,
+            source: "republish",
+            listingId: updatedListing.id || listingId,
+            listingTitle: getListingDisplayTitle(updatedListing),
+          });
+        }
       }
       return true;
     } catch (err) {
@@ -1058,6 +1173,19 @@ const MyAdsPage: React.FC = () => {
     vipPlan: VipPlan
   ) => {
     setActionLoading(listingId);
+    const sourceListing =
+      activeListings.find((item) => item.id === listingId) ||
+      expiredListings.find((item) => item.id === listingId) ||
+      null;
+    const fallbackSpendAmount =
+      listingType === "top" || listingType === "vip"
+        ? getPromotePrice(sourceListing, listingType, topPlan, vipPlan)
+        : 0;
+    const balanceBefore =
+      typeof user?.balance === "number" && Number.isFinite(user.balance)
+        ? user.balance
+        : null;
+
     try {
       const token = localStorage.getItem("authToken");
       if (!token) throw new Error("Не сте логнати. Моля, влезте отново.");
@@ -1086,7 +1214,7 @@ const MyAdsPage: React.FC = () => {
         throw new Error(errorMessage);
       }
 
-      const updatedListing = await response.json();
+      const updatedListing = (await response.json()) as CarListing;
       setActiveListings((prev) =>
         prev.map((l) => (l.id === listingId ? updatedListing : l))
       );
@@ -1099,7 +1227,24 @@ const MyAdsPage: React.FC = () => {
             : "Типът на обявата е обновен."
       );
       if (listingType === "top" || listingType === "vip") {
-        await refreshBalance();
+        const balanceAfter = await refreshBalance();
+        const spentAmount = resolveSpentAmount(
+          balanceBefore,
+          balanceAfter,
+          fallbackSpendAmount
+        );
+
+        if (spentAmount > 0) {
+          addBalanceUsageRecord(user?.id, {
+            amount: spentAmount,
+            currency: "EUR",
+            listingType: listingType === "top" ? "top" : "vip",
+            plan: listingType === "top" ? topPlan : vipPlan,
+            source: "promote",
+            listingId: updatedListing.id || listingId,
+            listingTitle: getListingDisplayTitle(updatedListing),
+          });
+        }
       }
       return true;
     } catch (err) {
@@ -1440,9 +1585,13 @@ const MyAdsPage: React.FC = () => {
 
   const getTechnicalSpecs = (listing: CarListing) => {
     const specs: Array<{ label: string; value: string; icon: React.ComponentType<any> }> = [];
+    const seenSpecs = new Set<string>();
     const addSpec = (label: string, value: unknown, icon: React.ComponentType<any>) => {
       const normalized = toText(value);
       if (!normalized) return;
+      const dedupeKey = `${label}::${normalized.toLowerCase()}`;
+      if (seenSpecs.has(dedupeKey)) return;
+      seenSpecs.add(dedupeKey);
       specs.push({ label, value: normalized, icon });
     };
     const addNumeric = (
@@ -1468,7 +1617,6 @@ const MyAdsPage: React.FC = () => {
 
     switch (mainCategory) {
       case "u":
-        addSpec("Категория", listing.part_category, PackageOpen);
         addSpec("Част", listing.part_element, Settings);
         addSpec("За", formatTopmenuCategory(listing.part_for), Car);
         addSpec("Години", formatYearRange(listing.part_year_from, listing.part_year_to), Calendar);
@@ -1486,7 +1634,6 @@ const MyAdsPage: React.FC = () => {
         addSpec("PCD", listing.pcd, Ruler);
         break;
       case "v":
-        addSpec("Категория", listing.accessory_category, PackageOpen);
         addSpec("За", formatTopmenuCategory(listing.classified_for), Car);
         addSpec("Състояние", conditionLabel, ShieldCheck);
         break;
@@ -1500,11 +1647,18 @@ const MyAdsPage: React.FC = () => {
         break;
       case "3":
       case "4":
+        addSpec("Марка", getEffectiveListingBrand(listing), Tag);
+        addSpec("Модел", listing.model, Car);
+        addSpec("Град", listing.city, MapPin);
+        addNumeric("Пробег", listing.mileage, "км", Gauge);
         addNumeric("Оси", listing.axles, "", Settings);
         addNumeric("Седалки", listing.seats, "", PackageOpen);
         addNumeric("Товар", listing.load_kg, "кг", Gauge);
         addSpec("Трансмисия", listing.transmission, Settings);
         addSpec("Двигател", listing.engine_type, Fuel);
+        addSpec("Гориво", formatFuelLabel(listing.fuel), Fuel);
+        addSpec("Кутия", formatGearboxLabel(listing.gearbox), Settings);
+        addNumeric("Кубатура", listing.displacement_cc ?? listing.displacement, "cc", Ruler);
         addSpec(
           "Еко",
           formatEuroStandardLabel(toText(listing.heavy_euro_standard) || toText(listing.euro_standard)),
@@ -1520,7 +1674,6 @@ const MyAdsPage: React.FC = () => {
         break;
       case "6":
       case "7":
-        addSpec("Категория", listing.equipment_type, PackageOpen);
         addSpec("Двигател", listing.engine_type, Fuel);
         addNumeric("Мощност", listing.power, "к.с.", Zap);
         addSpec("Състояние", conditionLabel, ShieldCheck);
@@ -1540,7 +1693,6 @@ const MyAdsPage: React.FC = () => {
         addBoolean("Климатик", listing.has_air_conditioning, ShieldCheck);
         break;
       case "a":
-        addSpec("Категория", listing.boat_category, PackageOpen);
         addSpec("Двигател", listing.engine_type, Fuel);
         addNumeric("Брой двигатели", listing.engine_count, "", Settings);
         addSpec("Материал", listing.material, Palette);
@@ -1550,7 +1702,6 @@ const MyAdsPage: React.FC = () => {
         addNumeric("Часове", listing.hours, "ч", Clock);
         break;
       case "b":
-        addSpec("Категория", listing.trailer_category, PackageOpen);
         addNumeric("Товар", listing.load_kg, "кг", Gauge);
         addNumeric("Оси", listing.axles, "", Settings);
         break;
@@ -1570,6 +1721,25 @@ const MyAdsPage: React.FC = () => {
         addSpec("Цвят", listing.color, Palette);
         break;
     }
+
+    // Universal fallback so every category can fill spare card space with useful data.
+    addSpec("Година", listing.year_from ? `${listing.year_from}` : "", Calendar);
+    addSpec("Състояние", conditionLabel, ShieldCheck);
+    addSpec("Град", listing.city, MapPin);
+    addNumeric("Пробег", listing.mileage, "км", Gauge);
+    addNumeric("Кубатура", listing.displacement_cc ?? listing.displacement, "cc", Ruler);
+    addNumeric("Мощност", listing.power, "к.с.", Zap);
+    addSpec("Гориво", formatFuelLabel(listing.fuel), Fuel);
+    addSpec("Кутия", formatGearboxLabel(listing.gearbox), Settings);
+    addSpec(
+      "Еко",
+      formatEuroStandardLabel(toText(listing.heavy_euro_standard) || toText(listing.euro_standard)),
+      Leaf
+    );
+    addSpec("Цвят", listing.color, Palette);
+    addNumeric("Седалки", listing.seats, "", PackageOpen);
+    addNumeric("Товар", listing.load_kg, "кг", Gauge);
+    addNumeric("Оси", listing.axles, "", Settings);
 
     if (specs.length === 0) {
       addSpec("Състояние", conditionLabel, ShieldCheck);
@@ -2636,6 +2806,9 @@ const MyAdsPage: React.FC = () => {
     gap: 12,
     flex: 1,
   },
+  listingContentSpacer: {
+    marginTop: "auto",
+  },
   listingTitleRow: {
     display: "flex",
     alignItems: "flex-start",
@@ -2655,23 +2828,18 @@ const MyAdsPage: React.FC = () => {
     color: "#666",
     whiteSpace: "nowrap",
   },
-  listingMetaCreated: {
-    fontSize: 12,
-    color: "rgb(15, 118, 110)",
-    fontWeight: 700,
-    whiteSpace: "nowrap",
-  },
   listingMetaUpdated: {
     fontSize: 12,
     color: "#f97316",
     fontWeight: 700,
     whiteSpace: "nowrap",
   },
-  listingMetaStack: {
+  listingPromoStatusStack: {
     display: "flex",
     flexDirection: "column",
-    alignItems: "flex-end",
+    alignItems: "center",
     gap: 4,
+    marginBottom: 6,
   },
   topTimer: {
     fontSize: 12,
@@ -2734,7 +2902,7 @@ const MyAdsPage: React.FC = () => {
   listingActions: {
     display: "flex",
     gap: 8,
-    marginTop: "auto",
+    marginTop: 0,
     paddingTop: 16,
     borderTop: "1px solid #e0e0e0",
     flexWrap: "wrap",
@@ -2781,6 +2949,48 @@ const MyAdsPage: React.FC = () => {
     fontWeight: 700,
     color: "#475569",
     textAlign: "right" as const,
+  },
+  listingDateRow: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 6,
+    width: "100%",
+    marginBottom: 3,
+  },
+  listingDateIcon: {
+    width: 13,
+    height: 13,
+    strokeWidth: 2.2,
+    flexShrink: 0,
+  },
+  listingPublishedInfo: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#0f766e",
+    textAlign: "right" as const,
+  },
+  listingPublishedIcon: {
+    color: "#0f766e",
+  },
+  listingEditedInfo: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#ea580c",
+    textAlign: "right" as const,
+  },
+  listingEditedIcon: {
+    color: "#ea580c",
+  },
+  listingExpiryMainInfo: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#475569",
+    textAlign: "right" as const,
+    marginBottom: 0,
+  },
+  listingExpiryIcon: {
+    color: "#475569",
   },
   qrTriggerButton: {
     width: 58,
@@ -4061,7 +4271,15 @@ const MyAdsPage: React.FC = () => {
                       ? { ...styles.statusBadge, ...styles.statusBadgeExpired }
                       : styles.statusBadge;
                   const chips = getTechnicalSpecs(listing);
-                  const visibleChips = chips.slice(0, 4);
+                  const visibleChips = chips.slice(
+                    0,
+                    getAdaptiveCardChipLimit(
+                      chips.length,
+                      descriptionSnippet,
+                      subtitle,
+                      toText(listing.main_category)
+                    )
+                  );
                   const isNewListing = isListingNew(listing.created_at);
                   const cardImage = getCardImageSources(listing);
                   const isPriorityImage = index < 4;
@@ -4170,25 +4388,6 @@ const MyAdsPage: React.FC = () => {
               <div style={styles.listingContent}>
                 <div style={styles.listingTitleRow}>
                   <h3 style={styles.listingTitle}>{listingTitle}</h3>
-                  {(createdLabel || topRemainingLabel || vipRemainingLabel || nonPromotedLabel) && (
-                    <div style={styles.listingMetaStack}>
-                      {createdLabel && (
-                        <span style={styles.listingMetaCreated}>Създадена: {createdLabel}</span>
-                      )}
-                      {updatedLabel && (
-                        <span style={styles.listingMetaUpdated}>Редактирана: {updatedLabel}</span>
-                      )}
-                      {topRemainingLabel && (
-                        <span style={styles.topTimer}>{topRemainingLabel}</span>
-                      )}
-                      {vipRemainingLabel && (
-                        <span style={styles.vipTimer}>{vipRemainingLabel}</span>
-                      )}
-                      {nonPromotedLabel && (
-                        <span style={styles.nonPromotedTimer}>{nonPromotedLabel}</span>
-                      )}
-                    </div>
-                  )}
                 </div>
 
                 {subtitle && (
@@ -4216,7 +4415,21 @@ const MyAdsPage: React.FC = () => {
                   </div>
                 )}
 
+                <div style={styles.listingContentSpacer} />
                 <div style={styles.listingActionsLabel}>Управление на обявата</div>
+                {(topRemainingLabel || vipRemainingLabel || nonPromotedLabel) && (
+                  <div style={styles.listingPromoStatusStack}>
+                    {topRemainingLabel && (
+                      <span style={styles.topTimer}>{topRemainingLabel}</span>
+                    )}
+                    {vipRemainingLabel && (
+                      <span style={styles.vipTimer}>{vipRemainingLabel}</span>
+                    )}
+                    {nonPromotedLabel && (
+                      <span style={styles.nonPromotedTimer}>{nonPromotedLabel}</span>
+                    )}
+                  </div>
+                )}
                 <div style={styles.listingActions}>
                   {/* Active Tab Actions: Edit, Archive, Delete */}
                   {(activeTab === "active" || activeTab === "top" || activeTab === "vip") && (
@@ -4405,7 +4618,13 @@ const MyAdsPage: React.FC = () => {
                           }
                         }}
                       >
-                        <Trash2 size={14} />
+                        <span
+                          className={`myads-delete-icon-wrap${deleteConfirm === listing.id ? " is-confirm" : ""}`}
+                          aria-hidden="true"
+                        >
+                          <Trash2 className="myads-delete-icon myads-delete-icon--primary" size={14} />
+                          <Trash className="myads-delete-icon myads-delete-icon--confirm" size={14} />
+                        </span>
                         {deleteConfirm === listing.id ? "Потвърди" : "Изтрий"}
                       </button>
                     </>
@@ -4523,7 +4742,13 @@ const MyAdsPage: React.FC = () => {
                           }
                         }}
                       >
-                        <Trash2 size={14} />
+                        <span
+                          className={`myads-delete-icon-wrap${deleteConfirm === listing.id ? " is-confirm" : ""}`}
+                          aria-hidden="true"
+                        >
+                          <Trash2 className="myads-delete-icon myads-delete-icon--primary" size={14} />
+                          <Trash className="myads-delete-icon myads-delete-icon--confirm" size={14} />
+                        </span>
                         {deleteConfirm === listing.id ? "Потвърди" : "Изтрий"}
                       </button>
                     </>
@@ -4650,7 +4875,13 @@ const MyAdsPage: React.FC = () => {
                           }
                         }}
                       >
-                        <Trash2 size={14} />
+                        <span
+                          className={`myads-delete-icon-wrap${deleteConfirm === listing.id ? " is-confirm" : ""}`}
+                          aria-hidden="true"
+                        >
+                          <Trash2 className="myads-delete-icon myads-delete-icon--primary" size={14} />
+                          <Trash className="myads-delete-icon myads-delete-icon--confirm" size={14} />
+                        </span>
                         {deleteConfirm === listing.id ? "Потвърди" : "Изтрий"}
                       </button>
                     </>
@@ -4732,7 +4963,13 @@ const MyAdsPage: React.FC = () => {
                           }
                         }}
                       >
-                        <Trash2 size={14} />
+                        <span
+                          className={`myads-delete-icon-wrap${deleteConfirm === listing.id ? " is-confirm" : ""}`}
+                          aria-hidden="true"
+                        >
+                          <Trash2 className="myads-delete-icon myads-delete-icon--primary" size={14} />
+                          <Trash className="myads-delete-icon myads-delete-icon--confirm" size={14} />
+                        </span>
                         {deleteConfirm === listing.id ? "Потвърди" : "Изтрий"}
                       </button>
                     </>
@@ -4826,7 +5063,24 @@ const MyAdsPage: React.FC = () => {
                         </span>
                       </button>
                     )}
-                    <div style={styles.listingExpiryInfo}>{listingExpiryLabel}</div>
+                    <div style={styles.listingExpiryInfo}>
+                      {createdLabel && (
+                        <div style={{ ...styles.listingDateRow, ...styles.listingPublishedInfo }}>
+                          <Calendar size={13} style={{ ...styles.listingDateIcon, ...styles.listingPublishedIcon }} />
+                          <span>Публикувана на: {createdLabel}</span>
+                        </div>
+                      )}
+                      {updatedLabel && (
+                        <div style={{ ...styles.listingDateRow, ...styles.listingEditedInfo }}>
+                          <Edit2 size={13} style={{ ...styles.listingDateIcon, ...styles.listingEditedIcon }} />
+                          <span>Редактирана на: {updatedLabel}</span>
+                        </div>
+                      )}
+                      <div style={{ ...styles.listingDateRow, ...styles.listingExpiryMainInfo }}>
+                        <Clock size={13} style={{ ...styles.listingDateIcon, ...styles.listingExpiryIcon }} />
+                        <span>{listingExpiryLabel}</span>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

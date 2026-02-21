@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -54,8 +54,21 @@ type NotificationRenderItem =
       notifications: DealerListingNotification[];
     };
 
+const toDealersPayloadList = (value: unknown): unknown[] => {
+  if (Array.isArray(value)) return value;
+  if (!value || typeof value !== "object") return [];
+
+  const payload = value as Record<string, unknown>;
+  if (Array.isArray(payload.results)) return payload.results;
+  if (Array.isArray(payload.items)) return payload.items;
+  if (Array.isArray(payload.data)) return payload.data;
+
+  return [];
+};
+
 const toDealerListingSnapshots = (value: unknown): DealerListingSnapshot[] => {
-  if (!Array.isArray(value)) return [];
+  const dealersList = toDealersPayloadList(value);
+  if (dealersList.length === 0) return [];
 
   const snapshots: DealerListingSnapshot[] = [];
   const toNumber = (input: unknown) => {
@@ -67,7 +80,7 @@ const toDealerListingSnapshots = (value: unknown): DealerListingSnapshot[] => {
     return NaN;
   };
 
-  value.forEach((item) => {
+  dealersList.forEach((item) => {
     if (!item || typeof item !== "object") return;
 
     const record = item as Record<string, unknown>;
@@ -266,18 +279,31 @@ const Navbar: React.FC = () => {
       void syncNewDealerListings(true);
     };
 
-    // Initial one-shot sync on login and a short fallback retry.
+    const handleWindowFocus = () => {
+      void syncNewDealerListings(true);
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return;
+      void syncNewDealerListings(true);
+    };
+
+    // Initial catch-up on login and a short fallback retry.
     void syncNewDealerListings(true);
     const fallbackSyncTimer = window.setTimeout(() => {
       void syncNewDealerListings(true);
     }, 2000);
 
     window.addEventListener(DEALER_LISTINGS_SYNC_REQUEST_EVENT, handleSyncRequest);
+    window.addEventListener("focus", handleWindowFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       isCancelled = true;
       window.clearTimeout(fallbackSyncTimer);
       window.removeEventListener(DEALER_LISTINGS_SYNC_REQUEST_EVENT, handleSyncRequest);
+      window.removeEventListener("focus", handleWindowFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [user?.id]);
 
@@ -433,6 +459,24 @@ const Navbar: React.FC = () => {
     return items;
   }, [notificationsForDisplay, notificationsNowMs]);
 
+  const dealerAvatarById = React.useMemo(() => {
+    const avatarById = new Map<number, string>();
+    followedDealers.forEach((dealer) => {
+      if (
+        typeof dealer.dealerProfileImageUrl === "string" &&
+        dealer.dealerProfileImageUrl.trim()
+      ) {
+        avatarById.set(dealer.dealerId, dealer.dealerProfileImageUrl.trim());
+      }
+    });
+    return avatarById;
+  }, [followedDealers]);
+
+  const getDealerAvatarUrl = React.useCallback(
+    (dealerId: number) => dealerAvatarById.get(dealerId) || null,
+    [dealerAvatarById]
+  );
+
   const formatNotificationDate = (value: string) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "";
@@ -578,9 +622,11 @@ const Navbar: React.FC = () => {
                     aria-expanded={showNotificationsMenu}
                     title="Известия"
                   >
-                    <FiBell size={21} className="notifications-bell-icon" />
+                    <FiBell size={25} className="notifications-bell-icon" />
                     {hasUnreadNotifications && (
-                      <span className="notification-dot" aria-hidden="true" />
+                      <span className="notification-count-badge">
+                        {unreadNotificationsCount > 99 ? "99+" : unreadNotificationsCount}
+                      </span>
                     )}
                   </button>
 
@@ -631,6 +677,7 @@ const Navbar: React.FC = () => {
                                   );
                                   const latestNotification = item.notifications[0];
                                   const firstNotification = item.notifications[item.notifications.length - 1];
+                                  const groupAvatarUrl = getDealerAvatarUrl(item.dealerId);
 
                                   return (
                                     <div
@@ -639,7 +686,20 @@ const Navbar: React.FC = () => {
                                       role="menuitem"
                                     >
                                       <div className="notification-item-top">
-                                        <span className="notification-item-type">Дилър (1 ч.)</span>
+                                        <div className="notification-item-identity">
+                                          {groupAvatarUrl ? (
+                                            <span className="notification-avatar" aria-hidden="true">
+                                              <img
+                                                src={groupAvatarUrl}
+                                                alt=""
+                                                className="notification-avatar-image"
+                                              />
+                                            </span>
+                                          ) : null}
+                                          <span className="notification-item-type">
+                                            Дилър {item.dealerName}
+                                          </span>
+                                        </div>
                                         <span className="notification-item-time">
                                           {formatNotificationDate(latestNotification.createdAt)}
                                         </span>
@@ -716,6 +776,10 @@ const Navbar: React.FC = () => {
                                 }
 
                                 const notification = item.notification;
+                                const dealerAvatarUrl =
+                                  notification.type === "dealer_listing"
+                                    ? getDealerAvatarUrl(notification.dealerId)
+                                    : null;
                                 return (
                                   <div
                                     key={notification.id}
@@ -723,9 +787,22 @@ const Navbar: React.FC = () => {
                                     role="menuitem"
                                   >
                                     <div className="notification-item-top">
-                                      <span className="notification-item-type">
-                                        {notification.type === "deposit" ? "Депозит" : "Дилър"}
-                                      </span>
+                                      <div className="notification-item-identity">
+                                        {dealerAvatarUrl ? (
+                                          <span className="notification-avatar" aria-hidden="true">
+                                            <img
+                                              src={dealerAvatarUrl}
+                                              alt=""
+                                              className="notification-avatar-image"
+                                            />
+                                          </span>
+                                        ) : null}
+                                        <span className="notification-item-type">
+                                          {notification.type === "deposit"
+                                            ? "Депозит"
+                                            : `Дилър ${notification.dealerName}`}
+                                        </span>
+                                      </div>
                                       <span className="notification-item-time">
                                         {formatNotificationDate(notification.createdAt)}
                                       </span>
@@ -787,33 +864,50 @@ const Navbar: React.FC = () => {
                         </div>
                       ) : (
                         <div className="subscriptions-list">
-                          {followedDealers.map((dealer) => (
-                            <div key={dealer.dealerId} className="subscription-item">
-                              <div className="subscription-main">
-                                <div className="subscription-name">{dealer.dealerName}</div>
-                                <div className="subscription-meta">
-                                  {dealer.dealerCity ? `${dealer.dealerCity} · ` : ""}
-                                  {formatTotalListings(dealer.lastKnownListingCount)}
+                          {followedDealers.map((dealer) => {
+                            const subscriptionAvatarUrl =
+                              typeof dealer.dealerProfileImageUrl === "string"
+                                ? dealer.dealerProfileImageUrl.trim()
+                                : "";
+                            return (
+                              <div key={dealer.dealerId} className="subscription-item">
+                                <div className="subscription-header">
+                                  {subscriptionAvatarUrl ? (
+                                    <span className="subscription-avatar" aria-hidden="true">
+                                      <img
+                                        src={subscriptionAvatarUrl}
+                                        alt=""
+                                        className="subscription-avatar-image"
+                                      />
+                                    </span>
+                                  ) : null}
+                                  <div className="subscription-main">
+                                    <div className="subscription-name">{dealer.dealerName}</div>
+                                    <div className="subscription-meta">
+                                      {dealer.dealerCity ? `${dealer.dealerCity} · ` : ""}
+                                      {formatTotalListings(dealer.lastKnownListingCount)}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="subscription-actions">
+                                  <button
+                                    type="button"
+                                    className="subscription-open-btn"
+                                    onClick={() => handleOpenFollowedDealer(dealer.dealerId)}
+                                  >
+                                    Профил
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="subscription-remove-btn"
+                                    onClick={() => handleUnfollowDealer(dealer.dealerId)}
+                                  >
+                                    Премахни
+                                  </button>
                                 </div>
                               </div>
-                              <div className="subscription-actions">
-                                <button
-                                  type="button"
-                                  className="subscription-open-btn"
-                                  onClick={() => handleOpenFollowedDealer(dealer.dealerId)}
-                                >
-                                  Профил
-                                </button>
-                                <button
-                                  type="button"
-                                  className="subscription-remove-btn"
-                                  onClick={() => handleUnfollowDealer(dealer.dealerId)}
-                                >
-                                  Премахни
-                                </button>
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -993,9 +1087,8 @@ const css = `
 }
 
 .nav-publish-cta:hover,
-.nav-publish-cta:focus-visible,
-.nav-publish-cta.active {
-  transform: translateY(-1px) scale(1.015);
+.nav-publish-cta:focus-visible {
+  transform: translateY(-1px) scale(1.01);
   background-position: 100% 50%;
   border-color: #0b5f59;
   color: #fff;
@@ -1004,11 +1097,25 @@ const css = `
 }
 
 .nav-publish-cta:hover::before,
-.nav-publish-cta:focus-visible::before,
-.nav-publish-cta.active::before {
+.nav-publish-cta:focus-visible::before {
   animation: none;
   opacity: 0;
   transform: scale(1.14);
+}
+
+.nav-publish-cta.active {
+  transform: translateY(0);
+  background-position: 100% 50%;
+  border-color: #0b5f59;
+  color: #fff;
+  box-shadow: 0 14px 26px rgba(15, 118, 110, 0.38), 0 0 0 2px rgba(94, 234, 212, 0.28);
+  animation: none;
+}
+
+.nav-publish-cta.active::before {
+  animation: none;
+  opacity: 0.2;
+  transform: scale(1.04);
 }
 
 .nav-publish-cta:active {
@@ -1114,19 +1221,30 @@ const css = `
 }
 
 .btn-notifications {
-  width: 42px;
-  min-width: 42px;
-  height: 42px;
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
   padding: 0;
   justify-content: center;
   position: relative;
-  color: #334155;
-  border-color: #d1d5db;
-  background: #ffffff;
+  color: #0f766e;
+  border: 1px solid #99f6e4;
+  background: linear-gradient(180deg, #ffffff 0%, #ecfdf5 100%);
+  box-shadow: 0 8px 18px rgba(15, 118, 110, 0.18);
+}
+
+.btn-notifications:hover {
+  color: #0b5f59;
+  border-color: #5eead4;
+  background: linear-gradient(180deg, #ffffff 0%, #d1fae5 100%);
+  box-shadow: 0 10px 22px rgba(15, 118, 110, 0.24);
 }
 
 .notifications-bell-icon {
   display: block;
+  width: 24px;
+  height: 24px;
+  stroke-width: 2.25;
 }
 
 .btn-notifications.has-unread .notifications-bell-icon {
@@ -1135,9 +1253,9 @@ const css = `
 }
 
 .btn-notifications.open {
-  background: #f8fafc;
-  border-color: #94a3b8;
-  color: #1f2937;
+  background: linear-gradient(180deg, #f0fdfa 0%, #ccfbf1 100%);
+  border-color: #2dd4bf;
+  color: #0f766e;
 }
 
 @keyframes bellGentleSwing {
@@ -1160,15 +1278,24 @@ const css = `
   }
 }
 
-.notification-dot {
+.notification-count-badge {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #ef4444;
+  top: -3px;
+  right: -3px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 2px solid #fff;
+  box-shadow: 0 2px 7px rgba(220, 38, 38, 0.4);
 }
 
 .notifications-menu {
@@ -1262,12 +1389,40 @@ const css = `
   gap: 8px;
 }
 
+.notification-item-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.notification-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid #fdba74;
+  background: #fff7ed;
+}
+
+.notification-avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .notification-item-type {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.2px;
-  color: #0f766e;
+  letter-spacing: 0.25px;
+  color: #d97706;
+  line-height: 1.2;
 }
 
 .notification-item-time {
@@ -1461,6 +1616,33 @@ const css = `
   display: flex;
   flex-direction: column;
   gap: 9px;
+}
+
+.subscription-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.subscription-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+}
+
+.subscription-avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .subscription-main {
@@ -1714,3 +1896,5 @@ const css = `
   }
 }
 `;
+
+

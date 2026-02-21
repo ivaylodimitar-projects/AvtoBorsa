@@ -17,6 +17,7 @@ import {
   MessageCircle,
   Send,
   Eye,
+  Calendar,
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
 import { resolvePriceBadgeState } from '../../utils/priceChangeBadge';
@@ -46,6 +47,7 @@ interface ContactSidebarProps {
   isMobile?: boolean;
   title?: string;
   city?: string;
+  createdAt?: string;
 }
 
 type FavoriteResponseItem = {
@@ -75,6 +77,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
   isMobile = false,
   title = '',
   city = '',
+  createdAt,
 }) => {
   const { showToast } = useToast();
   const [isFavorite, setIsFavorite] = useState(false);
@@ -322,7 +325,24 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
     return date.toLocaleDateString('bg-BG', { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
+  const formatAccountDateTime = (dateString?: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return '';
+    const datePart = date.toLocaleDateString('bg-BG', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+    const timePart = date.toLocaleTimeString('bg-BG', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    return `${datePart} · ${timePart} ч.`;
+  };
+
   const updatedTimeLabel = formatClockTime(updatedAt);
+  const publishedDateLabel = formatAccountDateTime(createdAt);
   const sellerSinceLabel = sellerType === 'business' ? formatAccountDate(sellerCreatedAt) : '';
   const viewCountValue = Number.isFinite(viewCount ?? Number.NaN) ? Number(viewCount) : null;
 
@@ -627,6 +647,12 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
             <MapPin size={14} color="#111827" />
             Намира се в {city}
           </div>
+          {publishedDateLabel && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, color: '#6b7280' }}>
+              <Calendar size={13} color="#6b7280" />
+              <span>Публикувана на {publishedDateLabel}</span>
+            </div>
+          )}
           {updatedLabel && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, color: '#f97316' }}>
               <Clock size={13} color="#f97316" />
