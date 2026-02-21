@@ -717,6 +717,10 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   const [showRecentScrollHint, setShowRecentScrollHint] = useState(false);
   const [searchName, setSearchName] = useState("");
   const recentSearchesRef = React.useRef<HTMLDivElement | null>(null);
+  const actionRowRef = React.useRef<HTMLDivElement | null>(null);
+  const [showStickySearchBar, setShowStickySearchBar] = useState(false);
+  const [liveResultCount, setLiveResultCount] = useState<number | null>(null);
+  const [isLiveCountLoading, setIsLiveCountLoading] = useState(false);
   const hasRecentSearches = recentSearches.length > 0;
   const [searchCriteria, setSearchCriteria] = useState<SearchCriteria>({
     category: "",
@@ -927,6 +931,15 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     usesVehicleForSelect || isHeavyCategory || isEquipmentCategory || isBuyOrServicesCategory;
   const hasConditionCheckboxes = !isBuyOrServicesCategory;
   const hasAdditionalCriteria = !isBuyOrServicesCategory;
+  const formattedResultCount =
+    liveResultCount !== null ? liveResultCount.toLocaleString("bg-BG") : null;
+  const searchActionLabel = formattedResultCount
+    ? `Търси ${formattedResultCount} обяви`
+    : "Търси обяви";
+  const stickyMainCategoryLabel = useMemo(
+    () => categories.find((option) => option.value === mainCategory)?.label || "Всички категории",
+    [categories, mainCategory]
+  );
 
   React.useEffect(() => {
     if (!hasAdditionalCriteria && showAdvanced) {
@@ -1039,7 +1052,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     });
   };
 
-  const buildSearchQuery = () => {
+  const buildSearchQuery = React.useCallback(() => {
     const query: Record<string, string> = {};
     if (mainCategory) query.mainCategory = mainCategory;
 
@@ -1339,7 +1352,91 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     if (searchCriteria.sortBy) query.sortBy = searchCriteria.sortBy;
 
     return query;
-  };
+  }, [
+    agriFieldVisibility,
+    isAccessoriesCategory,
+    isAgroCategory,
+    isBoatsCategory,
+    isBusesCategory,
+    isBuyOrServicesCategory,
+    isCaravanCategory,
+    isCategoryBasedBrandModel,
+    isEquipmentCategory,
+    isForkliftCategory,
+    isHeavyCategory,
+    isIndustrialCategory,
+    isMotoCategory,
+    isPartsCategory,
+    isTrailersCategory,
+    isTrucksCategory,
+    isWheelsCategory,
+    mainCategory,
+    searchCriteria,
+  ]);
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+    setIsLiveCountLoading(true);
+    const debounceId = window.setTimeout(async () => {
+      try {
+        const params = new URLSearchParams(buildSearchQuery());
+        params.set("page", "1");
+        params.set("page_size", "1");
+        params.set("compact", "1");
+        const response = await fetch(`http://localhost:8000/api/listings/?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("Failed to fetch listings count");
+        const payload: unknown = await response.json();
+        if (controller.signal.aborted) return;
+        const count =
+          payload &&
+          typeof payload === "object" &&
+          typeof (payload as { count?: unknown }).count === "number"
+            ? (payload as { count: number }).count
+            : payload &&
+                typeof payload === "object" &&
+                Array.isArray((payload as { results?: unknown[] }).results)
+              ? (payload as { results: unknown[] }).results.length
+              : 0;
+        setLiveResultCount(Math.max(0, Math.floor(count)));
+      } catch {
+        if (!controller.signal.aborted) {
+          setLiveResultCount(null);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLiveCountLoading(false);
+        }
+      }
+    }, 360);
+
+    return () => {
+      controller.abort();
+      window.clearTimeout(debounceId);
+    };
+  }, [buildSearchQuery]);
+
+  React.useEffect(() => {
+    const syncStickyBar = () => {
+      const actionRow = actionRowRef.current;
+      if (!actionRow || showSaveModal) {
+        setShowStickySearchBar(false);
+        return;
+      }
+      const rect = actionRow.getBoundingClientRect();
+      const shouldShow = rect.bottom < -14 && window.scrollY > 200;
+      setShowStickySearchBar((prev) => (prev === shouldShow ? prev : shouldShow));
+    };
+
+    syncStickyBar();
+    window.addEventListener("scroll", syncStickyBar, { passive: true });
+    window.addEventListener("resize", syncStickyBar);
+    return () => {
+      window.removeEventListener("scroll", syncStickyBar);
+      window.removeEventListener("resize", syncStickyBar);
+    };
+  }, [showSaveModal]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1876,6 +1973,103 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     .adv-search-btn:active {
       transform: translateY(0);
     }
+    .adv-loading-dots {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: 8px;
+    }
+    .adv-loading-dots > span {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.9);
+      animation: advLoadingDots 1.2s ease-in-out infinite;
+    }
+    .adv-loading-dots > span:nth-child(2) {
+      animation-delay: 0.15s;
+    }
+    .adv-loading-dots > span:nth-child(3) {
+      animation-delay: 0.3s;
+    }
+    @keyframes advLoadingDots {
+      0%, 80%, 100% {
+        transform: scale(0.65);
+        opacity: 0.45;
+      }
+      40% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+    .adv-sticky-submit-bar {
+      position: fixed;
+      left: 50%;
+      bottom: 16px;
+      z-index: 1100;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      width: fit-content;
+      max-width: min(860px, calc(100vw - 24px));
+      border-radius: 14px;
+      border: 1px solid rgba(15, 118, 110, 0.2);
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: 0 14px 30px rgba(15, 23, 42, 0.18);
+      backdrop-filter: blur(10px);
+      transform: translate(-50%, 18px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.24s ease, transform 0.24s ease;
+    }
+    .adv-sticky-submit-bar.is-visible {
+      opacity: 1;
+      transform: translate(-50%, 0);
+      pointer-events: auto;
+    }
+    .adv-sticky-submit-results {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 190px;
+      max-width: 360px;
+      height: 42px;
+      padding: 0 12px;
+      border-radius: 10px;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      color: #0f172a;
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .adv-sticky-submit-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 42px;
+      border: none;
+      border-radius: 11px;
+      background: #0f766e;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 800;
+      padding: 0 18px;
+      cursor: pointer;
+      white-space: nowrap;
+      box-shadow: 0 10px 18px rgba(15, 118, 110, 0.28);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .adv-sticky-submit-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 24px rgba(15, 118, 110, 0.34);
+    }
+    .adv-sticky-submit-btn:active {
+      transform: translateY(0);
+    }
     .adv-detailed-link {
       display: inline-flex;
       align-items: center;
@@ -2124,6 +2318,29 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       }
       .adv-search-btn {
         width: 100%;
+      }
+      .adv-sticky-submit-bar {
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+        width: auto;
+        max-width: none;
+        transform: translateY(18px);
+      }
+      .adv-sticky-submit-bar.is-visible {
+        transform: translateY(0);
+      }
+      .adv-sticky-submit-results {
+        min-width: 138px;
+        max-width: 46vw;
+        font-size: 12px;
+        padding: 0 10px;
+      }
+      .adv-sticky-submit-btn {
+        flex: 1;
+        min-width: 0;
+        font-size: 14px;
+        padding: 0 14px;
       }
     }
     @media (min-width: 769px) and (max-width: 1024px) {
@@ -3035,7 +3252,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
           </div>
         ) : (
           <div className="adv-search-grid">
-            {/* Make */}
+            {/* Step 1: Make */}
             <div className="adv-field">
               <label className="adv-label">МАРКА</label>
               <BrandSelector
@@ -3049,7 +3266,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               />
             </div>
 
-            {/* Model — locked until Make is selected */}
+            {/* Step 2: Model */}
             <div className="adv-field">
               <label className="adv-label">МОДЕЛ</label>
               <div style={{ position: "relative" }}>
@@ -3074,30 +3291,9 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               </div>
             </div>
 
-            {/* Body Type */}
+            {/* Step 3: Price */}
             <div className="adv-field">
-              <label className="adv-label">ТИП</label>
-              <select
-                value={searchCriteria.category}
-                onChange={(e) => handleInputChange("category", e.target.value)}
-                className="adv-select"
-              >
-                <option value="">Всички типове</option>
-                <option value="Седан">Седан</option>
-                <option value="Хечбек">Хечбек</option>
-                <option value="Комби">Комби</option>
-                <option value="Купе">Купе</option>
-                <option value="Кабрио">Кабрио</option>
-                <option value="Джип">Джип / SUV</option>
-                <option value="Ван">Ван</option>
-                <option value="Миниван">Миниван</option>
-                <option value="Пикап">Пикап</option>
-              </select>
-            </div>
-
-            {/* Max Price */}
-            <div className="adv-field">
-              <label className="adv-label">МАКС. ЦЕНА</label>
+              <label className="adv-label">ЦЕНА ДО</label>
               <input
                 type="number"
                 placeholder="€ Без ограничение"
@@ -3107,22 +3303,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               />
             </div>
 
-            {/* Year From */}
-            <div className="adv-field">
-              <label className="adv-label">ГОДИНА ОТ</label>
-              <select
-                value={searchCriteria.yearFrom}
-                onChange={(e) => handleInputChange("yearFrom", e.target.value)}
-                className="adv-select"
-              >
-                <option value="">Всички години</option>
-                {Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i).map((year) => (
-                  <option key={year} value={year}>{year}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Region */}
+            {/* Step 4: Location */}
             <div className="adv-field">
               <label className="adv-label">ОБЛАСТ</label>
               <select
@@ -3159,7 +3340,41 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               </select>
             </div>
 
-            {/* Fuel */}
+            {/* Secondary filters */}
+            <div className="adv-field">
+              <label className="adv-label">ТИП</label>
+              <select
+                value={searchCriteria.category}
+                onChange={(e) => handleInputChange("category", e.target.value)}
+                className="adv-select"
+              >
+                <option value="">Всички типове</option>
+                <option value="Седан">Седан</option>
+                <option value="Хечбек">Хечбек</option>
+                <option value="Комби">Комби</option>
+                <option value="Купе">Купе</option>
+                <option value="Кабрио">Кабрио</option>
+                <option value="Джип">Джип / SUV</option>
+                <option value="Ван">Ван</option>
+                <option value="Миниван">Миниван</option>
+                <option value="Пикап">Пикап</option>
+              </select>
+            </div>
+
+            <div className="adv-field">
+              <label className="adv-label">ГОДИНА ОТ</label>
+              <select
+                value={searchCriteria.yearFrom}
+                onChange={(e) => handleInputChange("yearFrom", e.target.value)}
+                className="adv-select"
+              >
+                <option value="">Всички години</option>
+                {Array.from({ length: 30 }, (_, i) => new Date().getFullYear() - i).map((year) => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
+
             <div className="adv-field">
               <label className="adv-label">ГОРИВО</label>
               <select
@@ -3174,7 +3389,6 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               </select>
             </div>
 
-            {/* Gearbox */}
             <div className="adv-field">
               <label className="adv-label">СКОРОСТИ</label>
               <select
@@ -3189,7 +3403,6 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               </select>
             </div>
 
-            {/* Sort */}
             <div className="adv-field">
               <label className="adv-label">ПОДРЕДИ ПО</label>
               <select
@@ -3239,7 +3452,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         )}
 
         {/* ACTION ROW — Search button + Detailed Search link */}
-        <div className="adv-action-row">
+        <div className="adv-action-row" ref={actionRowRef}>
           <div className="adv-action-controls">
             {hasAdditionalCriteria && (
               <button
@@ -3270,7 +3483,14 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
 
             <button type="submit" className="adv-search-btn">
               <Search size={18} style={{ marginRight: 8 }} />
-              Търси обяви
+              <span>{searchActionLabel}</span>
+              {isLiveCountLoading && (
+                <span className="adv-loading-dots" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                </span>
+              )}
             </button>
           </div>
 
@@ -4694,6 +4914,23 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
             </button>
           </div>
         )}
+
+        <div className={`adv-sticky-submit-bar ${showStickySearchBar ? "is-visible" : ""}`}>
+          <span className="adv-sticky-submit-results">
+            {stickyMainCategoryLabel}
+          </span>
+          <button type="submit" className="adv-sticky-submit-btn">
+            <Search size={17} style={{ marginRight: 8 }} />
+            <span>{searchActionLabel}</span>
+            {isLiveCountLoading && (
+              <span className="adv-loading-dots" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+              </span>
+            )}
+          </button>
+        </div>
       </form>
 
       {/* SAVE SEARCH MODAL */}
