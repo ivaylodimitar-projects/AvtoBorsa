@@ -1046,33 +1046,15 @@ const css = `
   background: linear-gradient(135deg, #0f766e 0%, #0f766e 58%, #0d9488 100%);
   background-size: 140% 140%;
   background-position: 0% 50%;
-  box-shadow: 0 10px 20px rgba(15, 118, 110, 0.33), inset 0 1px 0 rgba(255, 255, 255, 0.24);
-  /* 2.8s pulse phase inside a 7s cycle for premium, non-constant attention. */
-  animation: navPublishPulse 7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  box-shadow: none;
+  animation: navPublishPulse 3.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 0.32s cubic-bezier(0.4, 0, 0.2, 1),
     background-position 0.32s cubic-bezier(0.4, 0, 0.2, 1),
     border-color 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .nav-publish-cta::before {
-  content: "";
-  position: absolute;
-  inset: -14px;
-  border-radius: 28px;
-  pointer-events: none;
-  z-index: -1;
-  background: radial-gradient(
-    circle at 50% 50%,
-    rgba(45, 212, 191, 0.32) 0%,
-    rgba(45, 212, 191, 0.16) 36%,
-    rgba(45, 212, 191, 0.06) 58%,
-    rgba(45, 212, 191, 0) 74%
-  );
-  opacity: 0;
-  transform: scale(0.96);
-  filter: blur(10px);
-  animation: navPublishGlow 7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  content: none;
 }
 
 .nav-publish-cta::after {
@@ -1092,15 +1074,13 @@ const css = `
   background-position: 100% 50%;
   border-color: #0b5f59;
   color: #fff;
-  box-shadow: 0 16px 30px rgba(15, 118, 110, 0.4), 0 0 0 1px rgba(153, 246, 228, 0.34);
+  box-shadow: none;
   animation: none;
 }
 
 .nav-publish-cta:hover::before,
 .nav-publish-cta:focus-visible::before {
-  animation: none;
-  opacity: 0;
-  transform: scale(1.14);
+  content: none;
 }
 
 .nav-publish-cta.active {
@@ -1108,19 +1088,17 @@ const css = `
   background-position: 100% 50%;
   border-color: #0b5f59;
   color: #fff;
-  box-shadow: 0 14px 26px rgba(15, 118, 110, 0.38), 0 0 0 2px rgba(94, 234, 212, 0.28);
+  box-shadow: none;
   animation: none;
 }
 
 .nav-publish-cta.active::before {
-  animation: none;
-  opacity: 0.2;
-  transform: scale(1.04);
+  content: none;
 }
 
 .nav-publish-cta:active {
   transform: translateY(0) scale(0.992);
-  box-shadow: 0 8px 16px rgba(15, 118, 110, 0.31);
+  box-shadow: none;
 }
 
 .nav-publish-icon,
@@ -1175,44 +1153,18 @@ const css = `
 
 @keyframes navPublishPulse {
   0%,
-  58%,
+  62%,
   100% {
-    box-shadow: 0 10px 20px rgba(15, 118, 110, 0.33), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+    transform: scale(1);
+    background-position: 0% 50%;
   }
-  14% {
-    box-shadow: 0 12px 24px rgba(15, 118, 110, 0.37), inset 0 1px 0 rgba(255, 255, 255, 0.24);
-  }
-  28% {
-    box-shadow: 0 16px 30px rgba(15, 118, 110, 0.43), 0 0 0 2px rgba(94, 234, 212, 0.12),
-      inset 0 1px 0 rgba(255, 255, 255, 0.24);
-  }
-  40% {
-    box-shadow: 0 12px 24px rgba(15, 118, 110, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.24);
-  }
-}
-
-@keyframes navPublishGlow {
-  0%,
-  58%,
-  100% {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-  16% {
-    opacity: 0.2;
-    transform: scale(1.03);
+  18% {
+    transform: scale(1.02);
+    background-position: 14% 50%;
   }
   30% {
-    opacity: 0.34;
-    transform: scale(1.11);
-  }
-  40% {
-    opacity: 0.14;
-    transform: scale(1.22);
-  }
-  48% {
-    opacity: 0;
-    transform: scale(1.28);
+    transform: scale(1.008);
+    background-position: 8% 50%;
   }
 }
 
