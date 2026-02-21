@@ -1932,12 +1932,6 @@ export default function LandingPage() {
                   <path d="m9 18 6-6-6-6" />
                 </svg>
               </button>
-
-              <div className="brand-showcase-hint">
-                {isBrandShowcaseOpen
-                  ? "Избери марка от централната карта"
-                  : "Натисни стрелка за разгръщане"}
-              </div>
             </div>
           </div>
         </section>

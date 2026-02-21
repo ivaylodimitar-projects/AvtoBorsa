@@ -52,6 +52,8 @@ import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 import ListingPromoBadge from "./ListingPromoBadge";
 import KapariranoBadge from "./KapariranoBadge";
 import karBgQrCodeAnimation from "../assets/karbgqrcode.json";
+import topBadgeImage from "../assets/top_badge.png";
+import vipBadgeImage from "../assets/vip_badge.jpg";
 
 interface CarListing {
   id: number;
@@ -86,6 +88,7 @@ interface CarListing {
   is_kaparirano?: boolean;
   listing_type?: "top" | "vip" | "normal" | string;
   listing_type_display?: string;
+  top_plan?: "1d" | "7d" | string;
   top_expires_at?: string;
   vip_plan?: "7d" | "lifetime" | string;
   vip_expires_at?: string;
@@ -156,16 +159,22 @@ type MyAdsNavigationState = {
   publishedListingId?: number | null;
 };
 
-type TabType = "active" | "archived" | "drafts" | "liked" | "top" | "expired";
+type TabType = "active" | "archived" | "drafts" | "liked" | "top" | "vip" | "expired";
 type ListingType = "normal" | "top" | "vip";
+type TopPlan = "1d" | "7d";
 type VipPlan = "7d" | "lifetime";
 // Change this value to control how long the "Нова" badge remains visible.
 const NEW_LISTING_BADGE_MINUTES = 10;
 const NEW_LISTING_BADGE_WINDOW_MS = NEW_LISTING_BADGE_MINUTES * 60 * 1000;
 const NEW_LISTING_BADGE_REFRESH_MS = 30_000;
 const TOP_LISTING_PRICE_1D_EUR = 2.49;
+const TOP_LISTING_PRICE_7D_EUR = 7.49;
 const VIP_LISTING_PRICE_7D_EUR = 1.99;
 const VIP_LISTING_PRICE_LIFETIME_EUR = 6.99;
+const TOP_RENEWAL_DISCOUNT_RATIO = 0.85;
+const VIP_RENEWAL_DISCOUNT_RATIO = 0.85;
+const TOP_TO_VIP_DISCOUNT_RATIO = 0.9;
+const VIP_PREPAY_ALLOWED_REMAINING_DAYS = 3;
 const LISTING_EXPIRY_DAYS = 30;
 const PAGE_SIZE = 21;
 const QR_BRAND_TAG = "Kar.bg";
@@ -275,6 +284,7 @@ const MyAdsPage: React.FC = () => {
     listingTitle: string;
     mode: "republish" | "promote";
     selectedType: ListingType;
+    topPlan: TopPlan;
     vipPlan: VipPlan;
   }>({
     isOpen: false,
@@ -282,6 +292,7 @@ const MyAdsPage: React.FC = () => {
     listingTitle: "",
     mode: "republish",
     selectedType: "normal",
+    topPlan: "1d",
     vipPlan: "7d",
   });
   const [previewListing, setPreviewListing] = useState<CarListing | null>(null);
@@ -293,6 +304,7 @@ const MyAdsPage: React.FC = () => {
   const [qrGenerationError, setQrGenerationError] = useState<string | null>(null);
   const [isQrGenerating, setIsQrGenerating] = useState(false);
   const qrGenerationRequestRef = React.useRef(0);
+  const tabsSliderRef = React.useRef<HTMLDivElement | null>(null);
   const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
 
   useEffect(() => {
@@ -456,6 +468,23 @@ const MyAdsPage: React.FC = () => {
     setToast({ message, type });
   };
 
+  const handleTabsWheel: React.WheelEventHandler<HTMLDivElement> = (event) => {
+    const slider = tabsSliderRef.current;
+    if (!slider) return;
+    const hasOverflow = slider.scrollWidth > slider.clientWidth + 2;
+    if (!hasOverflow) return;
+
+    const delta = Math.abs(event.deltaY) > Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
+    if (!delta) return;
+
+    const startLeft = slider.scrollLeft;
+    slider.scrollLeft += delta;
+
+    if (slider.scrollLeft !== startLeft) {
+      event.preventDefault();
+    }
+  };
+
   const refreshBalance = async () => {
     try {
       const token = localStorage.getItem("authToken");
@@ -576,7 +605,7 @@ const MyAdsPage: React.FC = () => {
   };
 
   const openQrModal = async (listing: CarListing) => {
-    if (activeTab !== "active" && activeTab !== "top") {
+    if (activeTab !== "active" && activeTab !== "top" && activeTab !== "vip") {
       return;
     }
 
@@ -870,8 +899,64 @@ const MyAdsPage: React.FC = () => {
   const getVipPrice = (vipPlan: VipPlan) =>
     vipPlan === "lifetime" ? VIP_LISTING_PRICE_LIFETIME_EUR : VIP_LISTING_PRICE_7D_EUR;
 
+  const getTopPrice = (topPlan: TopPlan) =>
+    topPlan === "7d" ? TOP_LISTING_PRICE_7D_EUR : TOP_LISTING_PRICE_1D_EUR;
+
+  const getTopPlanLabel = (topPlan: TopPlan) =>
+    topPlan === "7d" ? "за 7 дни" : "за 1 ден";
+
   const getVipPlanLabel = (vipPlan: VipPlan) =>
     vipPlan === "lifetime" ? "до изтичане на обявата (30 дни)" : "за 7 дни";
+
+  const isTopActive = (listing: CarListing | null) =>
+    Boolean(
+      listing &&
+        listing.listing_type === "top" &&
+        listing.top_expires_at &&
+        Number.isFinite(new Date(listing.top_expires_at).getTime()) &&
+        new Date(listing.top_expires_at).getTime() > currentTimeMs
+    );
+
+  const isVipActive = (listing: CarListing | null) =>
+    Boolean(
+      listing &&
+        listing.listing_type === "vip" &&
+        listing.vip_expires_at &&
+        Number.isFinite(new Date(listing.vip_expires_at).getTime()) &&
+        new Date(listing.vip_expires_at).getTime() > currentTimeMs
+    );
+
+  const getVipRemainingDays = (listing: CarListing | null) => {
+    if (!isVipActive(listing) || !listing?.vip_expires_at) return 0;
+    const diffMs = new Date(listing.vip_expires_at).getTime() - currentTimeMs;
+    if (diffMs <= 0) return 0;
+    return Math.ceil(diffMs / (24 * 60 * 60 * 1000));
+  };
+
+  const getPromotePrice = (
+    listing: CarListing | null,
+    listingType: ListingType,
+    topPlan: TopPlan,
+    vipPlan: VipPlan
+  ) => {
+    if (listingType === "normal") {
+      return 0;
+    }
+
+    if (listingType === "top") {
+      const baseTop = getTopPrice(topPlan);
+      return isTopActive(listing) ? baseTop * TOP_RENEWAL_DISCOUNT_RATIO : baseTop;
+    }
+
+    const baseVip = getVipPrice(vipPlan);
+    if (isTopActive(listing)) {
+      return baseVip * TOP_TO_VIP_DISCOUNT_RATIO;
+    }
+    if (isVipActive(listing)) {
+      return baseVip * VIP_RENEWAL_DISCOUNT_RATIO;
+    }
+    return baseVip;
+  };
 
   const openListingTypeModal = (
     listing: CarListing,
@@ -886,6 +971,7 @@ const MyAdsPage: React.FC = () => {
       listingTitle: `${listing.brand} ${listing.model}`,
       mode,
       selectedType: defaultType,
+      topPlan: listing.top_plan === "7d" ? "7d" : "1d",
       vipPlan: listing.vip_plan === "lifetime" ? "lifetime" : "7d",
     });
   };
@@ -903,23 +989,9 @@ const MyAdsPage: React.FC = () => {
   const submitRepublish = async (
     listingId: number,
     listingType: ListingType,
+    topPlan: TopPlan,
     vipPlan: VipPlan
   ) => {
-    if (listingType === "top") {
-      const balance = user?.balance;
-      if (typeof balance === "number" && balance < TOP_LISTING_PRICE_1D_EUR) {
-        showToast("Недостатъчни средства", "error");
-        return false;
-      }
-    } else if (listingType === "vip") {
-      const balance = user?.balance;
-      const vipPrice = getVipPrice(vipPlan);
-      if (typeof balance === "number" && balance < vipPrice) {
-        showToast("Недостатъчни средства", "error");
-        return false;
-      }
-    }
-
     setActionLoading(listingId);
 
     try {
@@ -934,7 +1006,7 @@ const MyAdsPage: React.FC = () => {
         },
         body: JSON.stringify({
           listing_type: listingType,
-          top_plan: listingType === "top" ? "1d" : undefined,
+          top_plan: listingType === "top" ? topPlan : undefined,
           vip_plan: listingType === "vip" ? vipPlan : undefined,
         }),
       });
@@ -960,7 +1032,7 @@ const MyAdsPage: React.FC = () => {
       invalidateMyAdsCache(user?.id);
       showToast(
         listingType === "top"
-          ? "Обявата е публикувана отново като ТОП!"
+          ? `Обявата е публикувана отново като ТОП ${getTopPlanLabel(topPlan)}.`
           : listingType === "vip"
             ? `Обявата е публикувана отново като VIP ${getVipPlanLabel(vipPlan)}.`
             : "Обявата е публикувана отново като нормална."
@@ -982,23 +1054,9 @@ const MyAdsPage: React.FC = () => {
   const submitListingTypeUpdate = async (
     listingId: number,
     listingType: ListingType,
+    topPlan: TopPlan,
     vipPlan: VipPlan
   ) => {
-    if (listingType === "top") {
-      const balance = user?.balance;
-      if (typeof balance === "number" && balance < TOP_LISTING_PRICE_1D_EUR) {
-        showToast("Недостатъчни средства", "error");
-        return false;
-      }
-    } else if (listingType === "vip") {
-      const balance = user?.balance;
-      const vipPrice = getVipPrice(vipPlan);
-      if (typeof balance === "number" && balance < vipPrice) {
-        showToast("Недостатъчни средства", "error");
-        return false;
-      }
-    }
-
     setActionLoading(listingId);
     try {
       const token = localStorage.getItem("authToken");
@@ -1012,7 +1070,7 @@ const MyAdsPage: React.FC = () => {
         },
         body: JSON.stringify({
           listing_type: listingType,
-          top_plan: listingType === "top" ? "1d" : undefined,
+          top_plan: listingType === "top" ? topPlan : undefined,
           vip_plan: listingType === "vip" ? vipPlan : undefined,
         }),
       });
@@ -1035,7 +1093,7 @@ const MyAdsPage: React.FC = () => {
       invalidateMyAdsCache(user?.id);
       showToast(
         listingType === "top"
-          ? "Обявата е промотирана до ТОП!"
+          ? `Обявата е промотирана като ТОП ${getTopPlanLabel(topPlan)}.`
           : listingType === "vip"
             ? `Обявата е маркирана като VIP ${getVipPlanLabel(vipPlan)}.`
             : "Типът на обявата е обновен."
@@ -1114,11 +1172,11 @@ const MyAdsPage: React.FC = () => {
 
   const executeListingTypeConfirm = async () => {
     if (!listingTypeModal.listingId) return;
-    const { listingId, selectedType, mode, vipPlan } = listingTypeModal;
+    const { listingId, selectedType, mode, topPlan, vipPlan } = listingTypeModal;
     const success =
       mode === "republish"
-        ? await submitRepublish(listingId, selectedType, vipPlan)
-        : await submitListingTypeUpdate(listingId, selectedType, vipPlan);
+        ? await submitRepublish(listingId, selectedType, topPlan, vipPlan)
+        : await submitListingTypeUpdate(listingId, selectedType, topPlan, vipPlan);
     if (success) {
       closeListingTypeModal();
     }
@@ -1646,23 +1704,39 @@ const MyAdsPage: React.FC = () => {
   },
   tabsContainer: {
     display: "flex",
-    gap: 12,
-    marginBottom: 32,
+    flexWrap: "nowrap",
+    overflowX: "auto",
+    overflowY: "hidden",
+    scrollbarWidth: "none",
+    msOverflowStyle: "none",
+    WebkitOverflowScrolling: "touch",
+    scrollSnapType: "x proximity",
+    gap: 10,
+    marginBottom: 24,
+    width: "100%",
+    paddingBottom: 4,
   },
   tab: {
-    padding: "12px 24px",
+    padding: "11px 12px",
     background: "#fff",
     color: "#333",
     border: "1px solid #e0e0e0",
     borderRadius: 6,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 600,
     cursor: "pointer",
     transition: "all 0.2s",
-    whiteSpace: "nowrap",
+    whiteSpace: "normal",
     display: "flex",
     alignItems: "center",
+    justifyContent: "center",
     gap: 10,
+    width: "auto",
+    minWidth: 148,
+    flex: "0 0 auto",
+    scrollSnapAlign: "start",
+    textAlign: "center",
+    lineHeight: 1.25,
   },
   tabActive: {
     background: "#0f766e",
@@ -1685,6 +1759,13 @@ const MyAdsPage: React.FC = () => {
     borderRadius: 10,
     fontSize: 12,
     fontWeight: 700,
+  },
+  tabPromoBadgeImage: {
+    width: 22,
+    height: 22,
+    objectFit: "contain",
+    display: "block",
+    filter: "drop-shadow(0 2px 4px rgba(15, 23, 42, 0.25))",
   },
   filterRow: {
     display: "flex",
@@ -2073,6 +2154,22 @@ const MyAdsPage: React.FC = () => {
     fontSize: 12,
     color: "#999",
     margin: 0,
+  },
+  promoDetailsBox: {
+    border: "1px solid #fecaca",
+    background: "#fff1f2",
+    borderRadius: 10,
+    padding: "10px 12px",
+    display: "flex",
+    flexDirection: "column",
+    gap: 4,
+  },
+  promoDetailsLine: {
+    margin: 0,
+    fontSize: 12,
+    color: "#b91c1c",
+    fontWeight: 700,
+    lineHeight: 1.35,
   },
   listingTypePreviewCard: {
     borderRadius: 14,
@@ -2864,6 +2961,8 @@ const MyAdsPage: React.FC = () => {
         return activeListings;
       case "top":
         return activeListings.filter((listing) => listing.listing_type === "top");
+      case "vip":
+        return activeListings.filter((listing) => listing.listing_type === "vip");
       case "archived":
         return archivedListings;
       case "drafts":
@@ -2969,6 +3068,7 @@ const MyAdsPage: React.FC = () => {
     expiredListings.length +
     likedListings.length;
   const topListingsCount = activeListings.filter((listing) => listing.listing_type === "top").length;
+  const vipListingsCount = activeListings.filter((listing) => listing.listing_type === "vip").length;
   const isModalBusy =
     listingTypeModal.isOpen && actionLoading === listingTypeModal.listingId;
   const modalTitle =
@@ -2987,6 +3087,98 @@ const MyAdsPage: React.FC = () => {
         (listing) => listing.id === listingTypeModal.listingId
       ) || null
     : null;
+  const modalIsTopActive = isTopActive(modalSourceListing);
+  const modalIsVipActive = isVipActive(modalSourceListing);
+  const modalVipRemainingDays = getVipRemainingDays(modalSourceListing);
+  const modalVipPrepayBlocked =
+    listingTypeModal.selectedType === "vip" &&
+    modalIsVipActive &&
+    modalVipRemainingDays > VIP_PREPAY_ALLOWED_REMAINING_DAYS;
+  const modalVipPrepayMessage = modalVipPrepayBlocked
+    ? `VIP предплащане е позволено само при оставащи до ${VIP_PREPAY_ALLOWED_REMAINING_DAYS} дни (в момента: ${modalVipRemainingDays} дни).`
+    : "";
+  const modalPromoPrice = getPromotePrice(
+    modalSourceListing,
+    listingTypeModal.selectedType,
+    listingTypeModal.topPlan,
+    listingTypeModal.vipPlan
+  );
+  const topConfirmBasePrice = getTopPrice(listingTypeModal.topPlan);
+  const topConfirmPrice = getPromotePrice(
+    modalSourceListing,
+    "top",
+    listingTypeModal.topPlan,
+    listingTypeModal.vipPlan
+  );
+  const topConfirmDiscountAmount = Math.max(0, topConfirmBasePrice - topConfirmPrice);
+  const modalBasePromoPrice =
+    listingTypeModal.selectedType === "normal"
+      ? 0
+      : listingTypeModal.selectedType === "top"
+        ? getTopPrice(listingTypeModal.topPlan)
+        : getVipPrice(listingTypeModal.vipPlan);
+  const modalDiscountAmount = Math.max(0, modalBasePromoPrice - modalPromoPrice);
+  const modalDiscountPercent =
+    modalBasePromoPrice > 0
+      ? Math.round((modalDiscountAmount / modalBasePromoPrice) * 100)
+      : 0;
+  const dayMs = 24 * 60 * 60 * 1000;
+  const listingExpiryMs =
+    modalSourceListing?.created_at &&
+    Number.isFinite(new Date(modalSourceListing.created_at).getTime())
+      ? new Date(modalSourceListing.created_at).getTime() + LISTING_EXPIRY_DAYS * dayMs
+      : Number.NaN;
+  const listingRemainingMs =
+    Number.isFinite(listingExpiryMs) && listingExpiryMs > currentTimeMs
+      ? listingExpiryMs - currentTimeMs
+      : 0;
+  const currentTopRemainingMs =
+    modalSourceListing?.top_expires_at &&
+    Number.isFinite(new Date(modalSourceListing.top_expires_at).getTime()) &&
+    new Date(modalSourceListing.top_expires_at).getTime() > currentTimeMs
+      ? new Date(modalSourceListing.top_expires_at).getTime() - currentTimeMs
+      : 0;
+  const currentVipRemainingMs =
+    modalSourceListing?.vip_expires_at &&
+    Number.isFinite(new Date(modalSourceListing.vip_expires_at).getTime()) &&
+    new Date(modalSourceListing.vip_expires_at).getTime() > currentTimeMs
+      ? new Date(modalSourceListing.vip_expires_at).getTime() - currentTimeMs
+      : 0;
+  const formatPromoDuration = (durationMs: number) => {
+    if (!Number.isFinite(durationMs) || durationMs <= 0) return "0мин";
+    const totalMinutes = Math.ceil(durationMs / 60000);
+    const days = Math.floor(totalMinutes / (60 * 24));
+    const hours = Math.floor((totalMinutes - days * 24 * 60) / 60);
+    const minutes = totalMinutes - days * 24 * 60 - hours * 60;
+    if (days > 0) return `${days}д ${hours}ч`;
+    if (hours > 0) return `${hours}ч ${minutes}мин`;
+    return `${minutes}мин`;
+  };
+  const currentPromoLabel = modalIsTopActive ? "TOP" : modalIsVipActive ? "VIP" : "Няма";
+  const currentPromoDuration = modalIsTopActive
+    ? formatPromoDuration(currentTopRemainingMs)
+    : modalIsVipActive
+      ? formatPromoDuration(currentVipRemainingMs)
+      : "0мин";
+  const projectedPromoDurationMs =
+    listingTypeModal.selectedType === "normal"
+      ? 0
+      : listingTypeModal.selectedType === "top"
+        ? currentTopRemainingMs + (listingTypeModal.topPlan === "7d" ? 7 * dayMs : dayMs)
+        : listingTypeModal.vipPlan === "lifetime"
+          ? listingRemainingMs
+          : Math.min(
+              (modalIsVipActive ? currentVipRemainingMs : 0) + 7 * dayMs,
+              listingRemainingMs > 0 ? listingRemainingMs : 7 * dayMs
+            );
+  const projectedPromoDuration = formatPromoDuration(projectedPromoDurationMs);
+  const selectedPromoLabel =
+    listingTypeModal.selectedType === "normal"
+      ? "Нормална"
+      : listingTypeModal.selectedType === "top"
+        ? "TOP"
+        : "VIP";
+  const showModalPromoDetails = listingTypeModal.selectedType !== "normal";
   const modalPreviewImage = modalSourceListing ? getCardImageSources(modalSourceListing).display : "";
   const modalPreviewTitle = (modalSourceListing?.title || listingTypeModal.listingTitle || "Обявата").trim();
   const modalPreviewPriceValue = modalSourceListing ? Number(modalSourceListing.price) : Number.NaN;
@@ -3004,13 +3196,19 @@ const MyAdsPage: React.FC = () => {
     listingTypeModal.selectedType === "normal"
       ? "Цена за тип обява: Безплатно"
       : listingTypeModal.selectedType === "top"
-        ? `Цена за ТОП: €${TOP_LISTING_PRICE_1D_EUR.toFixed(2)}`
-        : `Цена за VIP: €${getVipPrice(listingTypeModal.vipPlan).toFixed(2)}`;
+        ? `Цена за ТОП ${getTopPlanLabel(listingTypeModal.topPlan)}: €${modalPromoPrice.toFixed(2)}`
+        : `Цена за VIP ${getVipPlanLabel(listingTypeModal.vipPlan)}: €${modalPromoPrice.toFixed(2)}`;
   const modalPreviewHint =
     listingTypeModal.selectedType === "top"
-      ? "ТОП значката ще се вижда върху обявата."
+      ? modalIsTopActive
+        ? "ТОП е активен и ще надчислим дните към оставащия период."
+        : "ТОП значката ще се вижда върху обявата."
       : listingTypeModal.selectedType === "vip"
-        ? `VIP значка ${getVipPlanLabel(listingTypeModal.vipPlan)}.`
+        ? modalIsTopActive
+          ? `Преминаване от ТОП към VIP с промо цена (${Math.round((1 - TOP_TO_VIP_DISCOUNT_RATIO) * 100)}% отстъпка).`
+          : modalIsVipActive
+            ? `VIP ще се поднови с промо цена (${Math.round((1 - VIP_RENEWAL_DISCOUNT_RATIO) * 100)}% отстъпка).`
+            : `VIP значка ${getVipPlanLabel(listingTypeModal.vipPlan)}.`
         : "Без промо значка при нормална обява.";
   const isPreviewTab = activeTab === "archived" || activeTab === "expired" || activeTab === "drafts";
   const previewImages = previewListing ? getPreviewImages(previewListing) : [];
@@ -3175,7 +3373,9 @@ const MyAdsPage: React.FC = () => {
                       <p style={styles.listingTypeDesc}>
                         Приоритетна видимост и изкарване по-напред в резултатите.
                       </p>
-                      <p style={styles.listingTypePrice}>Цена: €{TOP_LISTING_PRICE_1D_EUR.toFixed(2)}</p>
+                      <p style={styles.listingTypePrice}>
+                        Цена: €{getPromotePrice(modalSourceListing, "top", listingTypeModal.topPlan, listingTypeModal.vipPlan).toFixed(2)}
+                      </p>
                     </button>
 
                     <button
@@ -3194,10 +3394,43 @@ const MyAdsPage: React.FC = () => {
                         Визуално открояване с VIP етикет без приоритет в класирането.
                       </p>
                       <p style={styles.listingTypePrice}>
-                        Цена: €{getVipPrice(listingTypeModal.vipPlan).toFixed(2)}
+                        Цена: €{getPromotePrice(modalSourceListing, "vip", listingTypeModal.topPlan, listingTypeModal.vipPlan).toFixed(2)}
                       </p>
                     </button>
                   </div>
+
+                  {listingTypeModal.selectedType === "top" && (
+                    <div style={styles.vipPlanGrid}>
+                      <button
+                        type="button"
+                        style={{
+                          ...styles.vipPlanCard,
+                          ...(listingTypeModal.topPlan === "1d" ? styles.vipPlanCardSelected : {}),
+                        }}
+                        onClick={() =>
+                          setListingTypeModal((prev) => ({ ...prev, topPlan: "1d" }))
+                        }
+                        disabled={isModalBusy}
+                      >
+                        <h4 style={styles.vipPlanTitle}>TOP за 1 ден</h4>
+                        <p style={styles.vipPlanDesc}>Базова цена: €{TOP_LISTING_PRICE_1D_EUR.toFixed(2)}</p>
+                      </button>
+                      <button
+                        type="button"
+                        style={{
+                          ...styles.vipPlanCard,
+                          ...(listingTypeModal.topPlan === "7d" ? styles.vipPlanCardSelected : {}),
+                        }}
+                        onClick={() =>
+                          setListingTypeModal((prev) => ({ ...prev, topPlan: "7d" }))
+                        }
+                        disabled={isModalBusy}
+                      >
+                        <h4 style={styles.vipPlanTitle}>TOP за 7 дни</h4>
+                        <p style={styles.vipPlanDesc}>Базова цена: €{TOP_LISTING_PRICE_7D_EUR.toFixed(2)}</p>
+                      </button>
+                    </div>
+                  )}
 
                   {listingTypeModal.selectedType === "vip" && (
                     <div style={styles.vipPlanGrid}>
@@ -3247,11 +3480,16 @@ const MyAdsPage: React.FC = () => {
                       type="button"
                       style={{ ...styles.modalButton, ...styles.modalButtonPrimary }}
                       onClick={handleListingTypeConfirm}
-                      disabled={isModalBusy}
+                      disabled={isModalBusy || modalVipPrepayBlocked}
                     >
                       {isModalBusy ? "Запазване..." : modalPrimaryLabel}
                     </button>
                   </div>
+                  {modalVipPrepayMessage && (
+                    <p style={{ ...styles.modalHint, color: "#b91c1c", fontWeight: 700 }}>
+                      {modalVipPrepayMessage}
+                    </p>
+                  )}
                   <p style={styles.modalHint}>{modalHint}</p>
                 </div>
 
@@ -3277,6 +3515,22 @@ const MyAdsPage: React.FC = () => {
                       </div>
                       <div style={styles.listingTypePreviewPrice}>{modalPreviewPriceLabel}</div>
                       <p style={styles.listingTypePreviewPromoPrice}>{modalPreviewPromoPriceLabel}</p>
+                      {showModalPromoDetails && (
+                        <div style={styles.promoDetailsBox}>
+                          <p style={styles.promoDetailsLine}>
+                            Текуща промоция: {currentPromoLabel} ({currentPromoDuration} оставащи)
+                          </p>
+                          <p style={styles.promoDetailsLine}>
+                            След промяна: {selectedPromoLabel} ({projectedPromoDuration})
+                          </p>
+                          <p style={styles.promoDetailsLine}>
+                            Редовна цена: €{modalBasePromoPrice.toFixed(2)} | Крайна цена: €{modalPromoPrice.toFixed(2)}
+                          </p>
+                          <p style={styles.promoDetailsLine}>
+                            Отстъпка: -€{modalDiscountAmount.toFixed(2)} ({modalDiscountPercent}%)
+                          </p>
+                        </div>
+                      )}
                       <p style={styles.listingTypePreviewHint}>{modalPreviewHint}</p>
                     </div>
                   </div>
@@ -3291,7 +3545,13 @@ const MyAdsPage: React.FC = () => {
             <div style={styles.confirmModal} onClick={(e) => e.stopPropagation()}>
               <h3 style={styles.confirmTitle}>ТОП обява</h3>
               <p style={styles.confirmText}>
-                Публикуването на обява като "ТОП" струва 3 EUR.
+                {modalIsTopActive
+                  ? topConfirmDiscountAmount > 0
+                    ? `Предплащане на ТОП ${getTopPlanLabel(listingTypeModal.topPlan)}: €${topConfirmPrice.toFixed(2)} (вместо €${topConfirmBasePrice.toFixed(2)}).`
+                    : `Предплащане на ТОП ${getTopPlanLabel(listingTypeModal.topPlan)}: €${topConfirmPrice.toFixed(2)}.`
+                  : topConfirmDiscountAmount > 0
+                    ? `Публикуването като "ТОП" ${getTopPlanLabel(listingTypeModal.topPlan)} е €${topConfirmPrice.toFixed(2)} (вместо €${topConfirmBasePrice.toFixed(2)}).`
+                    : `Публикуването като "ТОП" ${getTopPlanLabel(listingTypeModal.topPlan)} е €${topConfirmPrice.toFixed(2)}.`}
               </p>
               <div style={styles.confirmActions}>
                 <button style={styles.confirmButtonGhost} onClick={cancelTopListingAction}>
@@ -3329,7 +3589,6 @@ const MyAdsPage: React.FC = () => {
               </div>
 
               <div style={styles.qrModalBody}>
-                <div style={styles.qrBrandPill}>{QR_BRAND_TAG}</div>
                 {isQrGenerating && (
                   <p style={styles.qrLoadingText}>Генерираме QR кода...</p>
                 )}
@@ -3344,9 +3603,6 @@ const MyAdsPage: React.FC = () => {
                       style={styles.qrCodeImage}
                     />
                   </div>
-                )}
-                {qrTargetUrl && (
-                  <p style={styles.qrTargetUrl}>{qrTargetUrl}</p>
                 )}
               </div>
 
@@ -3370,7 +3626,7 @@ const MyAdsPage: React.FC = () => {
                   }}
                 >
                   <Printer size={15} />
-                  PDF
+                  Свали и принтирай QR кода
                 </button>
               </div>
             </div>
@@ -3556,10 +3812,15 @@ const MyAdsPage: React.FC = () => {
         )}
 
         {/* Tabs */}
-        <div style={styles.tabsContainer}>
+        <div
+          style={styles.tabsContainer}
+          ref={tabsSliderRef}
+          onWheel={handleTabsWheel}
+        >
           {[
           { id: "active", label: "Активни", Icon: List, count: activeListings.length },
-          { id: "top", label: "Топ обяви", Icon: PackageOpen, count: topListingsCount },
+          { id: "top", label: "Топ обяви", Icon: PackageOpen, count: topListingsCount, promoBadge: "top" as const },
+          { id: "vip", label: "VIP обяви", Icon: Tag, count: vipListingsCount, promoBadge: "vip" as const },
           { id: "archived", label: "Архивирани", Icon: Archive, count: archivedListings.length },
           { id: "expired", label: "Изтекли", Icon: Clock, count: expiredListings.length },
           { id: "drafts", label: "Чернови", Icon: FileText, count: draftListings.length },
@@ -3593,7 +3854,17 @@ const MyAdsPage: React.FC = () => {
                   }
                 }}
               >
-                <tab.Icon size={18} />
+                {tab.promoBadge ? (
+                  <img
+                    src={tab.promoBadge === "top" ? topBadgeImage : vipBadgeImage}
+                    alt={tab.promoBadge === "top" ? "Топ" : "VIP"}
+                    style={styles.tabPromoBadgeImage}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ) : (
+                  <tab.Icon size={18} />
+                )}
                 {tab.label}
                 <span style={isActive ? styles.tabBadge : styles.tabBadgeInactive}>
                   {tab.count}
@@ -3667,6 +3938,7 @@ const MyAdsPage: React.FC = () => {
             <div style={styles.emptyIconWrapper}>
               {activeTab === "active" && <Inbox size={40} style={styles.emptyIcon} />}
               {activeTab === "top" && <PackageOpen size={40} style={styles.emptyIcon} />}
+              {activeTab === "vip" && <Tag size={40} style={styles.emptyIcon} />}
               {activeTab === "archived" && <PackageOpen size={40} style={styles.emptyIcon} />}
               {activeTab === "expired" && <Clock size={40} style={styles.emptyIcon} />}
               {activeTab === "drafts" && <FileText size={40} style={styles.emptyIcon} />}
@@ -3675,6 +3947,7 @@ const MyAdsPage: React.FC = () => {
             <p style={styles.emptyText}>
               {activeTab === "active" && "Нямаш активни обяви"}
               {activeTab === "top" && "Нямаш топ обяви"}
+              {activeTab === "vip" && "Нямаш VIP обяви"}
               {activeTab === "archived" && "Нямаш архивирани обяви"}
               {activeTab === "expired" && "Нямаш изтекли обяви"}
               {activeTab === "drafts" && "Нямаш чернови обяви"}
@@ -3683,12 +3956,13 @@ const MyAdsPage: React.FC = () => {
             <p style={styles.emptySubtext}>
               {activeTab === "active" && "Публикувай нова обява, за да я видиш тук"}
               {activeTab === "top" && "Маркирай обява като топ, за да се появи тук"}
+              {activeTab === "vip" && "Маркирай обява като VIP, за да се появи тук"}
               {activeTab === "archived" && "Архивирани обяви ще се появят тук"}
               {activeTab === "expired" && "Изтеклите обяви ще се появят тук"}
               {activeTab === "drafts" && "Начни да пишеш нова обява"}
               {activeTab === "liked" && "Добави обяви в любими"}
             </p>
-            {(activeTab === "active" || activeTab === "top") && (
+            {(activeTab === "active" || activeTab === "top" || activeTab === "vip") && (
               <a
                 href="/publish"
                 style={styles.ctaButton}
@@ -3746,6 +4020,26 @@ const MyAdsPage: React.FC = () => {
                         new Date(listing.vip_expires_at).getTime() > currentTimeMs));
                   const topRemainingLabel = isTopActive ? getTopRemainingLabel(listing) : "";
                   const vipRemainingLabel = isVipActive ? getVipRemainingLabel(listing) : "";
+                  const topRemainingDays =
+                    isTopActive && listing.top_expires_at
+                      ? Math.ceil(
+                          (new Date(listing.top_expires_at).getTime() - currentTimeMs) /
+                            (24 * 60 * 60 * 1000)
+                        )
+                      : 0;
+                  const vipRemainingDays =
+                    isVipActive && listing.vip_expires_at
+                      ? Math.ceil(
+                          (new Date(listing.vip_expires_at).getTime() - currentTimeMs) /
+                            (24 * 60 * 60 * 1000)
+                        )
+                      : 0;
+                  const isPrepayWindowOpen =
+                    !isTopActive && !isVipActive
+                      ? true
+                      : isTopActive
+                        ? topRemainingDays <= VIP_PREPAY_ALLOWED_REMAINING_DAYS
+                        : vipRemainingDays <= VIP_PREPAY_ALLOWED_REMAINING_DAYS;
                   const nonPromotedLabel =
                     !topRemainingLabel && !vipRemainingLabel ? "Непромотирана обява" : "";
                   const priceValue = Number(listing.price);
@@ -3774,7 +4068,8 @@ const MyAdsPage: React.FC = () => {
                   const categoryBadgeLabel = getListingCategoryBadge(listing);
                   const listingExpiryLabel = getListingExpiryLabel(listing);
                   const hasQrTarget = Boolean(listing.slug && listing.slug.trim());
-                  const showQrTrigger = activeTab === "active" || activeTab === "top";
+                  const showQrTrigger =
+                    activeTab === "active" || activeTab === "top" || activeTab === "vip";
 
             return (
             <div
@@ -3924,7 +4219,7 @@ const MyAdsPage: React.FC = () => {
                 <div style={styles.listingActionsLabel}>Управление на обявата</div>
                 <div style={styles.listingActions}>
                   {/* Active Tab Actions: Edit, Archive, Delete */}
-                  {(activeTab === "active" || activeTab === "top") && (
+                  {(activeTab === "active" || activeTab === "top" || activeTab === "vip") && (
                     <>
                       <button
                         className="myads-icon-btn"
@@ -3952,14 +4247,20 @@ const MyAdsPage: React.FC = () => {
                         Редактирай
                       </button>
 
-                      {activeTab === "active" && listing.listing_type !== "top" && (
+                      {isPrepayWindowOpen && (
                         <button
                           className="myads-icon-btn"
                           data-action="Промотирай"
                           aria-label="Промотирай"
                           onClick={(e) => {
                             e.stopPropagation();
-                            openListingTypeModal(listing, "promote", "top");
+                            const defaultType: ListingType =
+                              listing.listing_type === "top"
+                                ? "top"
+                                : listing.listing_type === "vip"
+                                  ? "vip"
+                                  : "top";
+                            openListingTypeModal(listing, "promote", defaultType);
                           }}
                           disabled={actionLoading === listing.id}
                           style={{

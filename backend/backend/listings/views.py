@@ -47,6 +47,10 @@ TOP_LISTING_PRICE_1D_EUR = Decimal("2.49")
 TOP_LISTING_PRICE_7D_EUR = Decimal("7.49")
 VIP_LISTING_PRICE_7D_EUR = Decimal("1.99")
 VIP_LISTING_PRICE_LIFETIME_EUR = Decimal("6.99")
+TOP_RENEWAL_DISCOUNT_RATIO = Decimal("0.85")
+VIP_RENEWAL_DISCOUNT_RATIO = Decimal("0.85")
+TOP_TO_VIP_DISCOUNT_RATIO = Decimal("0.90")
+VIP_PREPAY_ALLOWED_REMAINING_DAYS = 3
 VIP_PLAN_7D = "7d"
 VIP_PLAN_LIFETIME = "lifetime"
 LISTINGS_PUBLIC_CACHE_SECONDS = 30
@@ -130,9 +134,10 @@ def _normalize_top_plan(raw_plan):
     return normalized
 
 
-def _charge_top_listing_fee(user, top_plan):
+def _charge_top_listing_fee(user, top_plan, discount_ratio=None):
     """Charge the top listing fee from the user's wallet."""
-    price = TOP_LISTING_PRICE_7D_EUR if top_plan == TOP_PLAN_7D else TOP_LISTING_PRICE_1D_EUR
+    base_price = TOP_LISTING_PRICE_7D_EUR if top_plan == TOP_PLAN_7D else TOP_LISTING_PRICE_1D_EUR
+    price = _apply_price_discount(base_price, discount_ratio)
     with db_transaction.atomic():
         profile, _ = UserProfile.objects.select_for_update().get_or_create(user=user)
         if profile.balance < price:
@@ -142,9 +147,18 @@ def _charge_top_listing_fee(user, top_plan):
         return profile
 
 
-def _charge_vip_listing_fee(user, vip_plan):
+def _apply_price_discount(price, discount_ratio):
+    if discount_ratio is None:
+        return price
+    if discount_ratio <= 0:
+        return Decimal("0.00")
+    return (price * discount_ratio).quantize(Decimal("0.01"))
+
+
+def _charge_vip_listing_fee(user, vip_plan, discount_ratio=None):
     """Charge the VIP listing fee from the user's wallet."""
-    price = VIP_LISTING_PRICE_LIFETIME_EUR if vip_plan == VIP_PLAN_LIFETIME else VIP_LISTING_PRICE_7D_EUR
+    base_price = VIP_LISTING_PRICE_LIFETIME_EUR if vip_plan == VIP_PLAN_LIFETIME else VIP_LISTING_PRICE_7D_EUR
+    price = _apply_price_discount(base_price, discount_ratio)
     with db_transaction.atomic():
         profile, _ = UserProfile.objects.select_for_update().get_or_create(user=user)
         if profile.balance < price:
@@ -181,6 +195,50 @@ def _apply_vip_listing_window(listing, vip_plan, now=None):
         listing.vip_expires_at = get_listing_expiry(listing.created_at, now=current)
     else:
         listing.vip_expires_at = get_vip_short_expiry(current)
+    _clear_top_listing_window(listing)
+
+
+def _extend_top_listing_window(listing, top_plan, now=None):
+    current = now or timezone.now()
+    duration_days = 1 if top_plan == TOP_PLAN_1D else 7
+    base_start = current
+    if (
+        listing.listing_type == "top"
+        and listing.top_expires_at
+        and listing.top_expires_at > current
+    ):
+        base_start = listing.top_expires_at
+
+    listing.listing_type = "top"
+    listing.top_plan = top_plan
+    listing.top_paid_at = current
+    listing.top_expires_at = base_start + timedelta(days=duration_days)
+    _clear_vip_listing_window(listing)
+
+
+def _extend_vip_listing_window(listing, vip_plan, now=None):
+    current = now or timezone.now()
+    listing_expiry = get_listing_expiry(listing.created_at, now=current)
+    if vip_plan == VIP_PLAN_LIFETIME:
+        listing.listing_type = "vip"
+        listing.vip_plan = vip_plan
+        listing.vip_paid_at = current
+        listing.vip_expires_at = listing_expiry
+        _clear_top_listing_window(listing)
+        return
+
+    base_start = current
+    if (
+        listing.listing_type == "vip"
+        and listing.vip_expires_at
+        and listing.vip_expires_at > current
+    ):
+        base_start = listing.vip_expires_at
+
+    listing.listing_type = "vip"
+    listing.vip_plan = vip_plan
+    listing.vip_paid_at = current
+    listing.vip_expires_at = min(base_start + timedelta(days=7), listing_expiry)
     _clear_top_listing_window(listing)
 
 
@@ -1276,27 +1334,51 @@ def update_listing_type(request, listing_id):
         )
 
     now = timezone.now()
+    vip_prepay_limit = timedelta(days=VIP_PREPAY_ALLOWED_REMAINING_DAYS)
+
     with db_transaction.atomic():
         if listing_type == "top":
-            is_current_top = (
+            is_current_top_active = (
                 listing.listing_type == "top"
-                and listing.top_plan == top_plan
                 and listing.top_expires_at
                 and listing.top_expires_at > now
             )
-            if not is_current_top:
-                _charge_top_listing_fee(request.user, top_plan)
-                _apply_top_listing_window(listing, top_plan=top_plan, now=now)
+            top_discount_ratio = TOP_RENEWAL_DISCOUNT_RATIO if is_current_top_active else None
+            _charge_top_listing_fee(request.user, top_plan, discount_ratio=top_discount_ratio)
+            _extend_top_listing_window(listing, top_plan=top_plan, now=now)
         elif listing_type == "vip":
-            is_current_vip = (
+            is_current_vip_active = (
                 listing.listing_type == "vip"
-                and listing.vip_plan == vip_plan
                 and listing.vip_expires_at
                 and listing.vip_expires_at > now
             )
-            if not is_current_vip:
-                _charge_vip_listing_fee(request.user, vip_plan)
-                _apply_vip_listing_window(listing, vip_plan=vip_plan, now=now)
+            if is_current_vip_active:
+                remaining = listing.vip_expires_at - now
+                if remaining > vip_prepay_limit:
+                    return Response(
+                        {
+                            "detail": (
+                                "VIP предплащане е позволено само когато остават до "
+                                f"{VIP_PREPAY_ALLOWED_REMAINING_DAYS} дни."
+                            )
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            is_top_to_vip_downgrade = (
+                listing.listing_type == "top"
+                and listing.top_expires_at
+                and listing.top_expires_at > now
+            )
+            if is_top_to_vip_downgrade:
+                vip_discount_ratio = TOP_TO_VIP_DISCOUNT_RATIO
+            elif is_current_vip_active:
+                vip_discount_ratio = VIP_RENEWAL_DISCOUNT_RATIO
+            else:
+                vip_discount_ratio = None
+
+            _charge_vip_listing_fee(request.user, vip_plan, discount_ratio=vip_discount_ratio)
+            _extend_vip_listing_window(listing, vip_plan=vip_plan, now=now)
         else:
             listing.listing_type = "normal"
             _clear_top_listing_window(listing)

@@ -9,6 +9,7 @@ import KapariranoBadge from '../KapariranoBadge';
 interface Image {
   id: number;
   image: string;
+  thumbnail?: string | null;
 }
 
 interface RezonGalleryProps {
@@ -24,15 +25,16 @@ interface RezonGalleryProps {
 
 // Memoized main image component with lazy loading
 const MainCarouselImage = memo<{
-  image: Image;
+  src: string;
   title: string;
-  getImageUrl: (path: string) => string;
   isActive: boolean;
-}>(({ image, title, getImageUrl, isActive }) => (
+}>(({ src, title, isActive }) => (
   <img
-    src={getImageUrl(image.image)}
+    src={src}
     alt={title}
     loading={isActive ? 'eager' : 'lazy'}
+    decoding="async"
+    fetchPriority={isActive ? 'high' : 'auto'}
     draggable={false}
     style={{
       width: '100%',
@@ -54,14 +56,13 @@ MainCarouselImage.displayName = 'MainCarouselImage';
 // Fullscreen modal component
 const FullscreenModal = memo<{
   isOpen: boolean;
-  image: Image;
+  imageSrc: string;
   title: string;
   currentIndex: number;
   totalImages: number;
   onClose: () => void;
   onPrevious: () => void;
   onNext: () => void;
-  getImageUrl: (path: string) => string;
   isMobile: boolean;
   showTopBadge?: boolean;
   showVipBadge?: boolean;
@@ -70,14 +71,13 @@ const FullscreenModal = memo<{
 }>(
   ({
     isOpen,
-    image,
+    imageSrc,
     title,
     currentIndex,
     totalImages,
     onClose,
     onPrevious,
     onNext,
-    getImageUrl,
     isMobile,
     showTopBadge = false,
     showVipBadge = false,
@@ -87,26 +87,25 @@ const FullscreenModal = memo<{
     const [zoomLevel, setZoomLevel] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
+    const [maxZoom, setMaxZoom] = useState(isMobile ? 4 : 6);
     const containerRef = useRef<HTMLDivElement | null>(null);
     const imageRef = useRef<HTMLImageElement | null>(null);
     const isPanningRef = useRef(false);
     const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
-    const zoomStep = 0.25;
     const minZoom = 1;
-    const maxZoom = 3;
 
     useEffect(() => {
       if (isOpen) {
         setZoomLevel(1);
         setPan({ x: 0, y: 0 });
       }
-    }, [isOpen, image?.image]);
+    }, [isOpen, imageSrc]);
 
-    const getBounds = useCallback((zoom: number) => {
+    const getGeometry = useCallback((zoom: number) => {
       const container = containerRef.current;
       const img = imageRef.current;
       if (!container || !img || !img.naturalWidth || !img.naturalHeight) {
-        return { maxX: 0, maxY: 0 };
+        return null;
       }
       const { width: cW, height: cH } = container.getBoundingClientRect();
       const ratio = Math.min(cW / img.naturalWidth, cH / img.naturalHeight);
@@ -115,10 +114,22 @@ const FullscreenModal = memo<{
       const scaledW = baseW * zoom;
       const scaledH = baseH * zoom;
       return {
+        cW,
+        cH,
+        baseW,
+        baseH,
+        scaledW,
+        scaledH,
         maxX: Math.max(0, (scaledW - cW) / 2),
         maxY: Math.max(0, (scaledH - cH) / 2),
       };
     }, []);
+
+    const getBounds = useCallback((zoom: number) => {
+      const geometry = getGeometry(zoom);
+      if (!geometry) return { maxX: 0, maxY: 0 };
+      return { maxX: geometry.maxX, maxY: geometry.maxY };
+    }, [getGeometry]);
 
     const clampPan = useCallback(
       (nextPan: { x: number; y: number }, zoom: number) => {
@@ -143,14 +154,77 @@ const FullscreenModal = memo<{
       return () => window.removeEventListener('resize', handleResize);
     }, [clampPan, zoomLevel]);
 
+    const recomputeMaxZoom = useCallback(() => {
+      const container = containerRef.current;
+      const img = imageRef.current;
+      if (!container || !img || !img.naturalWidth || !img.naturalHeight) {
+        setMaxZoom(isMobile ? 4 : 6);
+        return;
+      }
+
+      const { width: cW, height: cH } = container.getBoundingClientRect();
+      if (!cW || !cH) {
+        setMaxZoom(isMobile ? 4 : 6);
+        return;
+      }
+
+      const ratio = Math.min(cW / img.naturalWidth, cH / img.naturalHeight);
+      const baseW = img.naturalWidth * ratio;
+      const baseH = img.naturalHeight * ratio;
+      const nativeDensity = Math.min(
+        img.naturalWidth / Math.max(baseW, 1),
+        img.naturalHeight / Math.max(baseH, 1)
+      );
+      const headroom = isMobile ? 1.5 : 2;
+      const computed = Math.min(
+        isMobile ? 6 : 10,
+        Math.max(isMobile ? 3 : 4, Number((nativeDensity * headroom).toFixed(2)))
+      );
+      setMaxZoom(computed);
+    }, [isMobile]);
+
+    useEffect(() => {
+      recomputeMaxZoom();
+      const handleResize = () => recomputeMaxZoom();
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }, [recomputeMaxZoom]);
+
+    useEffect(() => {
+      setZoomLevel((prev) => Math.min(prev, maxZoom));
+    }, [maxZoom]);
+
+    const applyZoom = useCallback(
+      (nextZoomRaw: number, anchor?: { x: number; y: number }) => {
+        const nextZoom = Math.max(minZoom, Math.min(maxZoom, Number(nextZoomRaw.toFixed(3))));
+        if (nextZoom === zoomLevel) return;
+
+        const ax = anchor?.x ?? 0;
+        const ay = anchor?.y ?? 0;
+        const ratio = nextZoom / zoomLevel;
+
+        setPan((prev) => {
+          const nextPan = {
+            x: prev.x * ratio + (1 - ratio) * ax,
+            y: prev.y * ratio + (1 - ratio) * ay,
+          };
+          return clampPan(nextPan, nextZoom);
+        });
+        setZoomLevel(nextZoom);
+      },
+      [clampPan, maxZoom, zoomLevel]
+    );
+
     const handleZoomIn = (e: React.MouseEvent) => {
       e.stopPropagation();
-      setZoomLevel((prev) => Math.min(maxZoom, Number((prev + zoomStep).toFixed(2))));
+      const zoomStep = zoomLevel < 2 ? 0.2 : zoomLevel < 4 ? 0.35 : 0.5;
+      applyZoom(zoomLevel + zoomStep);
     };
 
     const handleZoomOut = (e: React.MouseEvent) => {
       e.stopPropagation();
-      setZoomLevel((prev) => Math.max(minZoom, Number((prev - zoomStep).toFixed(2))));
+      const zoomStep = zoomLevel <= 2 ? 0.2 : zoomLevel <= 4 ? 0.35 : 0.5;
+      applyZoom(zoomLevel - zoomStep);
     };
 
     const handleZoomReset = (e: React.MouseEvent) => {
@@ -161,29 +235,22 @@ const FullscreenModal = memo<{
 
     const handleWheelZoom = (e: React.WheelEvent) => {
       e.preventDefault();
-      const direction = e.deltaY > 0 ? -1 : 1;
-      const nextZoomRaw = zoomLevel + direction * zoomStep;
-      const nextZoom = Math.max(minZoom, Math.min(maxZoom, Number(nextZoomRaw.toFixed(2))));
-      if (nextZoom === zoomLevel) return;
-
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) {
-        setZoomLevel(nextZoom);
         return;
       }
 
       const cx = e.clientX - rect.left - rect.width / 2;
       const cy = e.clientY - rect.top - rect.height / 2;
-      const ratio = nextZoom / zoomLevel;
+      const wheelIntensity = e.ctrlKey ? 0.0042 : 0.0022;
+      const factor = Math.exp(-e.deltaY * wheelIntensity);
+      applyZoom(zoomLevel * factor, { x: cx, y: cy });
+    };
 
-      setPan((prev) => {
-        const nextPan = {
-          x: prev.x * ratio + (1 - ratio) * cx,
-          y: prev.y * ratio + (1 - ratio) * cy,
-        };
-        return clampPan(nextPan, nextZoom);
-      });
-      setZoomLevel(nextZoom);
+    const handleZoomSlider = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const next = Number(e.target.value);
+      if (Number.isNaN(next)) return;
+      applyZoom(next);
     };
 
     const handlePointerDown = (e: React.PointerEvent) => {
@@ -209,6 +276,28 @@ const FullscreenModal = memo<{
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
     };
 
+    const miniMapData = useMemo(() => {
+      if (zoomLevel <= 1) return null;
+      const geometry = getGeometry(zoomLevel);
+      if (!geometry) return null;
+
+      const visibleWBase = Math.min(geometry.baseW, geometry.cW / zoomLevel);
+      const visibleHBase = Math.min(geometry.baseH, geometry.cH / zoomLevel);
+      const leftBaseRaw = ((-geometry.cW / 2 - pan.x) / zoomLevel) + geometry.baseW / 2;
+      const topBaseRaw = ((-geometry.cH / 2 - pan.y) / zoomLevel) + geometry.baseH / 2;
+      const leftBase = Math.max(0, Math.min(geometry.baseW - visibleWBase, leftBaseRaw));
+      const topBase = Math.max(0, Math.min(geometry.baseH - visibleHBase, topBaseRaw));
+
+      const miniW = isMobile ? 92 : 150;
+      const miniH = Math.max(56, Math.round((geometry.baseH / Math.max(geometry.baseW, 1)) * miniW));
+      const rectLeft = (leftBase / geometry.baseW) * miniW;
+      const rectTop = (topBase / geometry.baseH) * miniH;
+      const rectW = (visibleWBase / geometry.baseW) * miniW;
+      const rectH = (visibleHBase / geometry.baseH) * miniH;
+
+      return { miniW, miniH, rectLeft, rectTop, rectW, rectH };
+    }, [getGeometry, isMobile, pan.x, pan.y, zoomLevel]);
+
     if (!isOpen) return null;
 
     return (
@@ -220,10 +309,9 @@ const FullscreenModal = memo<{
           right: 0,
           bottom: 0,
           background: 'rgba(0,0,0,0.95)',
-          display: 'flex',
-          flexDirection: 'column',
           zIndex: 1000,
           backfaceVisibility: 'hidden',
+          overflow: 'hidden',
         }}
         onClick={onClose}
       >
@@ -234,7 +322,12 @@ const FullscreenModal = memo<{
             justifyContent: 'space-between',
             alignItems: 'center',
             padding: isMobile ? '12px' : '20px',
-            borderBottom: '1px solid rgba(255,255,255,0.1)',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 30,
+            background: 'linear-gradient(to bottom, rgba(2,6,23,0.6), rgba(2,6,23,0))',
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -276,6 +369,22 @@ const FullscreenModal = memo<{
               <span style={{ color: '#fff', fontSize: isMobile ? 11 : 12, fontWeight: 600, minWidth: 42, textAlign: 'center' }}>
                 {zoomLevel.toFixed(2)}x
               </span>
+              {!isMobile && (
+                <input
+                  type="range"
+                  min={minZoom}
+                  max={maxZoom}
+                  step={0.01}
+                  value={zoomLevel}
+                  onChange={handleZoomSlider}
+                  aria-label="Zoom level"
+                  style={{
+                    width: 160,
+                    accentColor: '#34d399',
+                    cursor: 'pointer',
+                  }}
+                />
+              )}
               <button
                 onClick={handleZoomIn}
                 disabled={zoomLevel >= maxZoom}
@@ -336,12 +445,13 @@ const FullscreenModal = memo<{
         {/* Image Container */}
         <div
           style={{
-            flex: 1,
+            position: 'absolute',
+            inset: 0,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: isMobile ? '12px' : '20px',
-            position: 'relative',
+            padding: 0,
+            overflow: 'hidden',
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -353,26 +463,30 @@ const FullscreenModal = memo<{
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
             style={{
-              maxWidth: '90vw',
-              maxHeight: '80vh',
               width: '100%',
               height: '100%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               overflow: 'hidden',
-              borderRadius: 12,
-              background: 'rgba(15, 23, 42, 0.35)',
-              padding: isMobile ? 4 : 8,
+              borderRadius: 0,
+              background: 'rgba(0, 0, 0, 0.92)',
+              padding: 0,
               cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
               touchAction: zoomLevel > 1 ? 'none' : 'pan-y',
               overscrollBehavior: 'contain',
+              position: 'relative',
+              zIndex: 1,
             }}
           >
             <div
               style={{
                 position: 'relative',
-                display: 'inline-block',
+                display: 'flex',
+                width: '100%',
+                height: '100%',
+                alignItems: 'center',
+                justifyContent: 'center',
                 lineHeight: 0,
                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomLevel})`,
                 transformOrigin: 'center center',
@@ -382,13 +496,14 @@ const FullscreenModal = memo<{
             >
               <img
                 ref={imageRef}
-                src={getImageUrl(image.image)}
+                src={imageSrc}
                 alt={title}
                 draggable={false}
                 style={{
+                  width: 'auto',
+                  height: 'auto',
                   maxWidth: '100%',
                   maxHeight: '100%',
-                  objectFit: 'contain',
                   display: 'block',
                   imageRendering: 'auto',
                   userSelect: 'none',
@@ -396,6 +511,7 @@ const FullscreenModal = memo<{
                   msUserSelect: 'none',
                 }}
                 onDragStart={(e) => e.preventDefault()}
+                onLoad={recomputeMaxZoom}
               />
               {showTopBadge && <ListingPromoBadge type="top" zIndex={24} />}
               {showVipBadge && <ListingPromoBadge type="vip" zIndex={24} />}
@@ -486,16 +602,78 @@ const FullscreenModal = memo<{
               </button>
             </>
           )}
+
+          {/* Zoom mini-map */}
+          {!isMobile && miniMapData && (
+            <div
+              style={{
+                position: 'absolute',
+                right: 18,
+                bottom: 18,
+                background: 'rgba(15, 23, 42, 0.58)',
+                border: '1px solid rgba(255,255,255,0.24)',
+                borderRadius: 10,
+                padding: 6,
+                zIndex: 12,
+                pointerEvents: 'none',
+                backdropFilter: 'blur(4px)',
+              }}
+            >
+              <div
+                style={{
+                  position: 'relative',
+                  width: miniMapData.miniW,
+                  height: miniMapData.miniH,
+                  borderRadius: 6,
+                  overflow: 'hidden',
+                  background: '#111827',
+                }}
+              >
+                <img
+                  src={imageSrc}
+                  alt=""
+                  aria-hidden="true"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    opacity: 0.82,
+                    filter: 'saturate(0.9)',
+                  }}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: miniMapData.rectLeft,
+                    top: miniMapData.rectTop,
+                    width: miniMapData.rectW,
+                    height: miniMapData.rectH,
+                    border: '2px solid #34d399',
+                    boxShadow: '0 0 0 999px rgba(15, 23, 42, 0.26)',
+                    borderRadius: 4,
+                  }}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Counter */}
         <div
           style={{
+            position: 'absolute',
+            left: '50%',
+            bottom: isMobile ? 8 : 14,
+            transform: 'translateX(-50%)',
             textAlign: 'center',
             color: '#fff',
-            padding: isMobile ? '8px' : '12px',
+            padding: isMobile ? '6px 10px' : '8px 12px',
             fontSize: isMobile ? 12 : 14,
-            borderTop: '1px solid rgba(255,255,255,0.1)',
+            border: '1px solid rgba(255,255,255,0.18)',
+            borderRadius: 999,
+            background: 'rgba(2,6,23,0.5)',
+            zIndex: 30,
+            backdropFilter: 'blur(4px)',
           }}
         >
           {currentIndex + 1} / {totalImages}
@@ -521,6 +699,20 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
   const touchStartRef = useRef<number>(0);
   const getImageUrl = useImageUrl();
+  const isThumbnailPath = useCallback((path?: string | null) => {
+    const normalized = (path || '').toLowerCase();
+    return normalized.includes('/thumbs/') || /_sm\.(webp|jpg|jpeg|png)$/.test(normalized);
+  }, []);
+  const resolveMainImagePath = useCallback((img: Image) => {
+    const originalPath = (img?.image || '').trim();
+    const thumbPath = (img?.thumbnail || '').trim();
+    if (!originalPath) return thumbPath;
+    if (!thumbPath) return originalPath;
+    if (isThumbnailPath(originalPath) && !isThumbnailPath(thumbPath)) {
+      return thumbPath;
+    }
+    return originalPath;
+  }, [isThumbnailPath]);
   const safeImages = useMemo(
     () =>
       (Array.isArray(images) ? images : []).filter(
@@ -613,6 +805,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
 
   const safeIndex = Math.min(Math.max(currentIndex, 0), safeImages.length - 1);
   const currentImage = safeImages[safeIndex];
+  const currentImageSrc = getImageUrl(resolveMainImagePath(currentImage));
 
   const styles = useMemo(
     () => ({
@@ -651,6 +844,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         justifyContent: 'center',
         overflow: 'hidden',
         borderRadius: 8,
+        background: '#0f172a',
         willChange: 'transform',
         backfaceVisibility: 'hidden' as const,
         transform: 'translateZ(0)',
@@ -751,9 +945,8 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         >
           <div style={styles.carouselInner}>
               <MainCarouselImage
-                image={currentImage}
+                src={currentImageSrc}
                 title={title}
-                getImageUrl={getImageUrl}
                 isActive={true}
             />
           </div>
@@ -873,14 +1066,13 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
       {/* Fullscreen Modal */}
       <FullscreenModal
         isOpen={isFullscreenOpen}
-        image={currentImage}
+        imageSrc={currentImageSrc}
         title={title}
         currentIndex={safeIndex}
         totalImages={safeImages.length}
         onClose={() => setIsFullscreenOpen(false)}
         onPrevious={() => throttledPrevious()}
         onNext={() => throttledNext()}
-        getImageUrl={getImageUrl}
         isMobile={isMobile}
         showTopBadge={showTopBadge}
         showVipBadge={showVipBadge}

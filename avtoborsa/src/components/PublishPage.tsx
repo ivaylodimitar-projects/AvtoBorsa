@@ -622,8 +622,8 @@ const CAR_CATEGORY_OPTIONS = [
 
 const AGRI_DRIVE_TYPE_OPTIONS = ["2x4", "4x4", "Верижно", "Друго"];
 
-const CATEGORY_AS_BRAND_MAIN_CATEGORIES = new Set<MainCategoryKey>(["6", "7", "8", "a", "b"]);
-const UNSORTED_BRAND_OPTION_MAIN_CATEGORIES = new Set<MainCategoryKey>(["6", "7", "8", "a", "b"]);
+const CATEGORY_AS_BRAND_MAIN_CATEGORIES = new Set<MainCategoryKey>(["6", "7", "8", "9", "a", "b"]);
+const UNSORTED_BRAND_OPTION_MAIN_CATEGORIES = new Set<MainCategoryKey>(["6", "7", "8", "9", "a", "b"]);
 
 type AgriFieldVisibility = {
   showEngineType: boolean;
@@ -802,6 +802,69 @@ const TRAILER_FEATURE_GROUPS: CarFeatureGroup[] = [
   },
 ];
 
+const CARAVAN_FEATURE_GROUPS: CarFeatureGroup[] = [
+  {
+    key: "bezopasnost",
+    title: "Безопасност",
+    items: ["GPS система за проследяване"],
+  },
+  {
+    key: "komfort",
+    title: "Комфорт",
+    items: [
+      "Антивибрационен теглич",
+      "Бойлер",
+      "Газ",
+      "Генератор-220в",
+      "Кухненски бокс",
+      "Осветление",
+      "Печка",
+      "Резервоар за вода",
+      "Сгъваема мивка",
+      "Стационарно ползване",
+      "Стерео уредба",
+      "Телевизор",
+      "Тента",
+      "Форселт",
+      "Хладилник",
+    ],
+  },
+  {
+    key: "drugi",
+    title: "Други",
+    items: [
+      "12\\220 волта",
+      "4x4",
+      "Бартер",
+      "Бърза връзка вода",
+      "Бърза връзка ток",
+      "Зарядно за акумулатор",
+      "Капариран/Продаден",
+      "Лизинг",
+      "Мувер",
+      "Нов внос",
+      "С регистрация",
+    ],
+  },
+  {
+    key: "zashtita",
+    title: "Защита",
+    items: ["Аларма", "Каско"],
+  },
+  {
+    key: "interior",
+    title: "Интериор",
+    items: [
+      "Баня",
+      "Двуетажни легла",
+      "Десен волан",
+      "Масичка/столове",
+      "Мокро помещение",
+      "Щори и комарници",
+    ],
+  },
+];
+
 const BOAT_FEATURE_GROUPS: CarFeatureGroup[] = [
   {
     key: "bezopasnost",
@@ -857,6 +920,7 @@ const getFeatureGroupsByMainCategory = (mainCategory: MainCategoryKey) => {
   if (mainCategory === "6") return AGRI_FEATURE_GROUPS;
   if (mainCategory === "7") return INDUSTRIAL_FEATURE_GROUPS;
   if (mainCategory === "8") return FORKLIFT_FEATURE_GROUPS;
+  if (mainCategory === "9") return CARAVAN_FEATURE_GROUPS;
   if (mainCategory === "a") return BOAT_FEATURE_GROUPS;
   if (mainCategory === "b") return TRAILER_FEATURE_GROUPS;
   return [];
@@ -2382,6 +2446,17 @@ const PublishPage: React.FC = () => {
       .map((field) => field.key);
   };
 
+  const getRequiredFieldKeys = (step: number, data: PublishFormData) => {
+    const stepKey = publishSteps[step - 1]?.key;
+    if (!stepKey || stepKey === "images") return [] as Array<keyof PublishFormData>;
+
+    const requiredByStep = getRequiredFieldsByStep(data.mainCategory);
+    const fields = requiredByStep[stepKey] ?? [];
+    return fields
+      .filter((field) => (field.when ? field.when(data) : true))
+      .map((field) => field.key);
+  };
+
   const getFirstInvalidStep = (data: PublishFormData) => {
     for (let step = 1; step <= totalSteps; step += 1) {
       const missing = getMissingFields(step, data);
@@ -2811,6 +2886,7 @@ const PublishPage: React.FC = () => {
     : true;
   const stepMissingFields = getMissingFields(currentStep, formData);
   const stepMissingFieldKeys = getMissingFieldKeys(currentStep, formData);
+  const stepRequiredFieldKeys = getRequiredFieldKeys(currentStep, formData);
   const validationMessage = formatMissingMessage(stepMissingFields);
   const shownValidationMessage = showStepValidation ? validationMessage : "";
   const isNextDisabled = loadingListing;
@@ -4292,6 +4368,7 @@ const PublishPage: React.FC = () => {
             className="publish-form publish-card"
             onSubmit={handleFormSubmit}
             ref={formRef}
+            data-required-field-keys={stepRequiredFieldKeys.map((key) => String(key)).join(",")}
           >
             <div className="publish-heading">
               <div>
@@ -4406,7 +4483,7 @@ const PublishPage: React.FC = () => {
                 </FormFieldWithTooltip>
 
                 {formData.mainCategory === "1" && (
-                  <FormFieldWithTooltip label="Тип автомобил" tooltip="Тип на купето">
+                  <FormFieldWithTooltip label="Тип автомобил" required tooltip="Тип на купето">
                     <select
                       style={styles.input}
                       name="category"
@@ -4436,6 +4513,8 @@ const PublishPage: React.FC = () => {
                               ? "Категория на индустриалната техника"
                               : formData.mainCategory === "8"
                                 ? "Категория на кари техниката"
+                              : formData.mainCategory === "9"
+                                ? "Категория на караваната"
                               : formData.mainCategory === "a"
                                 ? "Категория на яхтата/лодката"
                                 : "Категория на ремаркето"
@@ -4481,6 +4560,8 @@ const PublishPage: React.FC = () => {
                               ? "Марка на индустриалната техника"
                               : formData.mainCategory === "8"
                                 ? "Марка на кари техниката"
+                              : formData.mainCategory === "9"
+                                ? "Марка на караваната"
                               : formData.mainCategory === "a"
                                 ? "Марка на яхтата/лодката"
                                 : "Марка на ремаркето"
@@ -4845,7 +4926,7 @@ const PublishPage: React.FC = () => {
                       />
                     </FormFieldWithTooltip>
 
-                    <FormFieldWithTooltip label="Мощност (к.с.)">
+                    <FormFieldWithTooltip label="Мощност (к.с.)" required>
                       <input
                         style={styles.input}
                         type="number"
@@ -4857,7 +4938,7 @@ const PublishPage: React.FC = () => {
                       />
                     </FormFieldWithTooltip>
 
-                    <FormFieldWithTooltip label="Кубатура (куб. см.)">
+                    <FormFieldWithTooltip label="Кубатура (куб. см.)" required>
                       <input
                         style={styles.input}
                         type="number"
@@ -4868,7 +4949,7 @@ const PublishPage: React.FC = () => {
                       />
                     </FormFieldWithTooltip>
 
-                    <FormFieldWithTooltip label="Евростандарт">
+                    <FormFieldWithTooltip label="Евростандарт" required>
                       <select
                         style={styles.input}
                         name="euroStandard"
@@ -5674,33 +5755,45 @@ const PublishPage: React.FC = () => {
                     </FormFieldWithTooltip>
 
                     <FormFieldWithTooltip label="Оборудване">
-                      <div style={{ display: "grid", gap: 8 }}>
-                        <label>
+                      <div className="feature-grid">
+                        <label className={`feature-card ${formData.caravanHasToilet ? "is-selected" : ""}`}>
                           <input
                             type="checkbox"
                             name="caravanHasToilet"
                             checked={formData.caravanHasToilet}
                             onChange={handleChange}
-                          />{" "}
-                          Тоалетна
+                            className="feature-checkbox"
+                          />
+                          <span className="feature-check" aria-hidden="true">
+                            <FiCheck size={12} />
+                          </span>
+                          <span className="feature-label">Тоалетна</span>
                         </label>
-                        <label>
+                        <label className={`feature-card ${formData.caravanHasHeating ? "is-selected" : ""}`}>
                           <input
                             type="checkbox"
                             name="caravanHasHeating"
                             checked={formData.caravanHasHeating}
                             onChange={handleChange}
-                          />{" "}
-                          Отопление
+                            className="feature-checkbox"
+                          />
+                          <span className="feature-check" aria-hidden="true">
+                            <FiCheck size={12} />
+                          </span>
+                          <span className="feature-label">Отопление</span>
                         </label>
-                        <label>
+                        <label className={`feature-card ${formData.caravanHasAc ? "is-selected" : ""}`}>
                           <input
                             type="checkbox"
                             name="caravanHasAc"
                             checked={formData.caravanHasAc}
                             onChange={handleChange}
-                          />{" "}
-                          Климатик
+                            className="feature-checkbox"
+                          />
+                          <span className="feature-check" aria-hidden="true">
+                            <FiCheck size={12} />
+                          </span>
+                          <span className="feature-label">Климатик</span>
                         </label>
                       </div>
                     </FormFieldWithTooltip>
@@ -5830,7 +5923,7 @@ const PublishPage: React.FC = () => {
                 )}
 
                 {!["y", "z", "u"].includes(formData.mainCategory) && (
-                  <FormFieldWithTooltip label="Цвят">
+                  <FormFieldWithTooltip label="Цвят" required>
                     <select style={styles.input} name="color" value={formData.color} onChange={handleChange}>
                       <option value="">Избери цвят</option>
                       {COLOR_OPTIONS.map((option) => (

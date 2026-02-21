@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { AlertTriangle, HelpCircle, Info, Lightbulb } from "lucide-react";
 
 interface FormFieldWithTooltipProps {
@@ -23,6 +23,48 @@ const FormFieldWithTooltip: React.FC<FormFieldWithTooltipProps> = ({
   hint,
 }) => {
   const [showTooltip, setShowTooltip] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [requiredFromStepRules, setRequiredFromStepRules] = useState(false);
+  const hasRequiredChild = (node: React.ReactNode): boolean => {
+    if (node == null || typeof node === "boolean") return false;
+    if (Array.isArray(node)) return node.some((item) => hasRequiredChild(item));
+    if (!React.isValidElement(node)) return false;
+
+    const nodeProps = (node.props ?? {}) as {
+      required?: boolean;
+      children?: React.ReactNode;
+    };
+
+    if (nodeProps.required === true) return true;
+    return hasRequiredChild(nodeProps.children);
+  };
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const form = container.closest("form");
+    const rawKeys = form?.getAttribute("data-required-field-keys") || "";
+    const requiredKeys = new Set(
+      rawKeys
+        .split(",")
+        .map((key) => key.trim())
+        .filter(Boolean)
+    );
+    if (requiredKeys.size === 0) {
+      setRequiredFromStepRules(false);
+      return;
+    }
+
+    const controls = container.querySelectorAll<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >("input[name], select[name], textarea[name]");
+    const hasRequiredByRules = Array.from(controls).some((control) =>
+      requiredKeys.has(control.name)
+    );
+    setRequiredFromStepRules(hasRequiredByRules);
+  }, [children, label]);
+
+  const isRequired = required || hasRequiredChild(children) || requiredFromStepRules;
 
   const styles: Record<string, React.CSSProperties> = {
     container: {
@@ -40,7 +82,7 @@ const FormFieldWithTooltip: React.FC<FormFieldWithTooltipProps> = ({
       color: "#333",
     },
     required: {
-      color: "#b91c1c",
+      color: "rgb(185, 28, 28)",
       fontWeight: 800,
       marginLeft: 4,
     },
@@ -114,11 +156,11 @@ const FormFieldWithTooltip: React.FC<FormFieldWithTooltipProps> = ({
   };
 
   return (
-    <div style={styles.container} data-field-wrapper>
+    <div style={styles.container} data-field-wrapper ref={containerRef}>
       <div style={styles.labelContainer}>
         <label style={styles.label}>
           {label}
-          {required && <span style={styles.required}>*</span>}
+          {isRequired && <span style={styles.required}>*</span>}
         </label>
         {tooltip && (
           <div
@@ -140,7 +182,7 @@ const FormFieldWithTooltip: React.FC<FormFieldWithTooltipProps> = ({
           <span>{helperText}</span>
         </div>
       )}
-      {example && <div style={styles.example}>Пример: {example}</div>}
+      {example && <div style={styles.example}>??????: {example}</div>}
       {hint && (
         <div style={styles.hint}>
           <Lightbulb size={14} />
@@ -158,3 +200,5 @@ const FormFieldWithTooltip: React.FC<FormFieldWithTooltipProps> = ({
 };
 
 export default FormFieldWithTooltip;
+
+

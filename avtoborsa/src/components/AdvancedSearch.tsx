@@ -926,6 +926,13 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   const usesCompactMainCategoryForm =
     usesVehicleForSelect || isHeavyCategory || isEquipmentCategory || isBuyOrServicesCategory;
   const hasConditionCheckboxes = !isBuyOrServicesCategory;
+  const hasAdditionalCriteria = !isBuyOrServicesCategory;
+
+  React.useEffect(() => {
+    if (!hasAdditionalCriteria && showAdvanced) {
+      setShowAdvanced(false);
+    }
+  }, [hasAdditionalCriteria, showAdvanced]);
   const showsWheelTireFilters =
     isWheelsCategory &&
     (searchCriteria.wheelOfferType === "" ||
@@ -990,6 +997,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     () => sortUniqueOptions(availableBrands),
     [availableBrands]
   );
+  const brandOptionsForDropdown = isCaravanCategory ? availableBrands : sortedAvailableBrands;
 
   const selectedBrand = isCategoryBasedBrandModel
     ? searchCriteria.agriType
@@ -2708,14 +2716,14 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
             ) : (
               <>
                 <div className="adv-field">
-                  <label className="adv-label">МАРКА</label>
+                  <label className="adv-label">{isCaravanCategory ? "КАТЕГОРИЯ" : "МАРКА"}</label>
                   <BrandSelector
                     value={searchCriteria.brand}
                     onChange={(brand) => {
                       handleInputChange("brand", brand);
                       handleInputChange("model", "");
                     }}
-                    brands={sortedAvailableBrands}
+                    brands={brandOptionsForDropdown}
                     placeholder="Всички"
                   />
                 </div>
@@ -2729,7 +2737,9 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                       className={`adv-select ${!searchCriteria.brand ? "adv-select--disabled" : ""}`}
                       disabled={!searchCriteria.brand}
                     >
-                      <option value="">{searchCriteria.brand ? "Всички" : "Избери марка първо"}</option>
+                      <option value="">
+                        {searchCriteria.brand ? "Всички" : isCaravanCategory ? "Избери категория първо" : "Избери марка първо"}
+                      </option>
                       {groupedAvailableModels.map((group) => (
                         <optgroup key={group.label} label={group.label}>
                           {group.options.map((model) => (
@@ -2741,7 +2751,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                       ))}
                     </select>
                     {!searchCriteria.brand && (
-                      <span className="adv-lock-icon" title="Избери марка първо">
+                      <span className="adv-lock-icon" title={isCaravanCategory ? "Избери категория първо" : "Избери марка първо"}>
                         <Lock size={14} />
                       </span>
                     )}
@@ -3231,21 +3241,23 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         {/* ACTION ROW — Search button + Detailed Search link */}
         <div className="adv-action-row">
           <div className="adv-action-controls">
-            <button
-              type="button"
-              className="adv-detailed-link"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-            >
-              <ChevronDown
-                size={14}
-                style={{
-                  transform: showAdvanced ? "rotate(180deg)" : "rotate(0deg)",
-                  transition: "transform 0.3s",
-                  marginRight: 4,
-                }}
-              />
-              {usesCompactMainCategoryForm ? "Още критерии за търсене" : "Детайлно търсене"}
-            </button>
+            {hasAdditionalCriteria && (
+              <button
+                type="button"
+                className="adv-detailed-link"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+              >
+                <ChevronDown
+                  size={14}
+                  style={{
+                    transform: showAdvanced ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 0.3s",
+                    marginRight: 4,
+                  }}
+                />
+                {usesCompactMainCategoryForm ? "Още критерии за търсене" : "Детайлно търсене"}
+              </button>
+            )}
 
             <button
               type="button"
@@ -3265,7 +3277,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         </div>
 
         {/* ADVANCED / DETAILED FILTERS */}
-        {showAdvanced && (
+        {hasAdditionalCriteria && showAdvanced && (
           <div className="adv-detailed-section">
             <div className="adv-detailed-grid">
               {usesCompactMainCategoryForm && hasConditionCheckboxes ? (
@@ -3302,7 +3314,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                       {!usesVehicleForSelect && <option value="За части">За части</option>}
                     </select>
                   </div>
-                  {(isPartsCategory || isHeavyCategory || isEquipmentCategory || isAccessoriesCategory) && (
+                  {(isPartsCategory || isHeavyCategory || isEquipmentCategory || isAccessoriesCategory || isCaravanCategory) && (
                     <div className="adv-field">
                       <label className="adv-label">ЦЕНА</label>
                       <label style={{ fontSize: 13, color: "#334155", display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>

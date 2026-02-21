@@ -719,7 +719,24 @@ const SearchPage: React.FC = () => {
         break;
     }
 
+    const isCategoryBasedBrandModel = ["6", "7", "8", "9", "a", "b"].includes(mainCategory);
     const fallbackCandidates: Array<{ label: string; value: string; icon: React.ComponentType<any> }> = [
+      {
+        label: "Легла",
+        value:
+          mainCategory === "9" && toPositiveNumber(listing.beds) !== null
+            ? `${Math.round(Number(listing.beds))}`
+            : "",
+        icon: PackageOpen,
+      },
+      {
+        label: "Дължина",
+        value:
+          mainCategory === "9" && toPositiveNumber(listing.length_m) !== null
+            ? `${Number(listing.length_m)} м`
+            : "",
+        icon: Ruler,
+      },
       {
         label: "Локация",
         value: [listing.location_country, listing.city].filter(Boolean).join(", "),
@@ -741,12 +758,12 @@ const SearchPage: React.FC = () => {
         icon: Gauge,
       },
       {
-        label: ["6", "8"].includes(mainCategory) ? "Категория" : "Марка",
+        label: isCategoryBasedBrandModel ? "Категория" : "Марка",
         value: toText(listing.brand),
         icon: PackageOpen,
       },
       {
-        label: "Модел",
+        label: isCategoryBasedBrandModel ? "Марка" : "Модел",
         value: toText(listing.model),
         icon: Settings,
       },
@@ -756,6 +773,7 @@ const SearchPage: React.FC = () => {
       if (params.length >= 5) break;
       if (mainCategory === "u" && fallback.label === "Пробег") continue;
       if (mainCategory === "u" && fallback.label === "Марка") continue;
+      if (mainCategory === "9" && fallback.label === "Локация") continue;
       if (!toText(fallback.value)) continue;
       const exists = params.some((param) => param.label === fallback.label);
       if (!exists) {
@@ -957,12 +975,12 @@ const SearchPage: React.FC = () => {
       return criteria;
     }
 
-    if (mainCategory === "8") {
+    if (mainCategory === "8" || mainCategory === "9") {
       addCriterion("Категория", getParam("brand", "marka"));
     } else {
       addCriterion("Марка", getParam("brand", "marka"));
     }
-    addCriterion("Модел", getParam("model"));
+    addCriterion(mainCategory === "8" || mainCategory === "9" ? "Марка" : "Модел", getParam("model"));
     addCriterion("Тип", mainCategory === "5" ? getParam("motoCategory") : category);
     const fuelOrEngineType = getParam("fuel");
     if (mainCategory === "1") {
@@ -995,6 +1013,16 @@ const SearchPage: React.FC = () => {
     if (["1", "true", "True"].includes(getParam("hasToilet"))) addCriterion("Тоалетна", "Да");
     if (["1", "true", "True"].includes(getParam("hasHeating"))) addCriterion("Отопление", "Да");
     if (["1", "true", "True"].includes(getParam("hasAirConditioning"))) addCriterion("Климатик", "Да");
+    const listingFeatures = getParam("features");
+    if (listingFeatures) {
+      const normalizedFeatures = listingFeatures
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+      if (normalizedFeatures.length > 0) {
+        addCriterion("Екстри", normalizedFeatures.join(", "));
+      }
+    }
     addCriterion("Цвят", getParam("color"));
 
     const fallbackLabels: Record<string, string> = {
@@ -1094,6 +1122,15 @@ const SearchPage: React.FC = () => {
       if (trailerCategory) return `${mainCategoryLabel} • ${trailerCategory}`;
       if (brand && model) return `${mainCategoryLabel} • ${brand} / ${model}`;
       if (brand) return `${mainCategoryLabel} • ${brand}`;
+      return mainCategoryLabel;
+    }
+
+    if (mainCategory === "9") {
+      const caravanCategory = getParam("brand", "marka");
+      const caravanBrand = getParam("model");
+      if (caravanCategory && caravanBrand) return `${mainCategoryLabel} • ${caravanCategory} • ${caravanBrand}`;
+      if (caravanCategory) return `${mainCategoryLabel} • ${caravanCategory}`;
+      if (caravanBrand) return `${mainCategoryLabel} • ${caravanBrand}`;
       return mainCategoryLabel;
     }
 
