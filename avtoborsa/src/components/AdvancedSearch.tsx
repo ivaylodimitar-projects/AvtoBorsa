@@ -717,6 +717,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   const [showRecentScrollHint, setShowRecentScrollHint] = useState(false);
   const [searchName, setSearchName] = useState("");
   const recentSearchesRef = React.useRef<HTMLDivElement | null>(null);
+  const hasRecentSearches = recentSearches.length > 0;
   const [searchCriteria, setSearchCriteria] = useState<SearchCriteria>({
     category: "",
     wheelFor: "1",
@@ -823,7 +824,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   });
 
   React.useEffect(() => {
-    if (!showRecentSearches) {
+    if (!showRecentSearches || !hasRecentSearches) {
       setShowRecentScrollHint(false);
       return;
     }
@@ -869,7 +870,33 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       scrollContainer.removeEventListener("scroll", syncHintVisibility);
       window.removeEventListener("resize", syncHintVisibility);
     };
-  }, [showRecentSearches, recentSearches.length]);
+  }, [showRecentSearches, hasRecentSearches]);
+
+  React.useEffect(() => {
+    if (!hasRecentSearches) {
+      setShowRecentSearches(false);
+      setShowRecentScrollHint(false);
+    }
+  }, [hasRecentSearches]);
+
+  const handleRecentSearchesWheel: React.WheelEventHandler<HTMLDivElement> = (event) => {
+    const scrollContainer = recentSearchesRef.current;
+    if (!scrollContainer || !showRecentSearches) return;
+
+    const hasHorizontalOverflow = scrollContainer.scrollWidth - scrollContainer.clientWidth > 2;
+    if (!hasHorizontalOverflow) return;
+
+    const scrollDelta =
+      Math.abs(event.deltaY) > Math.abs(event.deltaX) ? event.deltaY : event.deltaX;
+    if (scrollDelta === 0) return;
+
+    const startLeft = scrollContainer.scrollLeft;
+    scrollContainer.scrollLeft += scrollDelta;
+
+    if (scrollContainer.scrollLeft !== startLeft) {
+      event.preventDefault();
+    }
+  };
 
   const isWheelsCategory = mainCategory === "w";
   const isPartsCategory = mainCategory === "u";
@@ -1662,6 +1689,16 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       white-space: nowrap;
       transition: background 0.2s, border-color 0.2s, color 0.2s;
     }
+    .adv-recent-toggle:disabled {
+      background: #f3f4f6;
+      border-color: #d1d5db;
+      color: #9ca3af;
+      cursor: not-allowed;
+    }
+    .adv-recent-toggle:disabled:hover {
+      background: #f3f4f6;
+      border-color: #d1d5db;
+    }
     .adv-recent-toggle-text {
       opacity: 1;
       max-width: 180px;
@@ -1886,6 +1923,9 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       -ms-overflow-style: none;
       scrollbar-width: none;
       scroll-behavior: smooth;
+      overscroll-behavior-x: contain;
+      overscroll-behavior-y: contain;
+      touch-action: pan-x;
     }
     .adv-recent-searches::-webkit-scrollbar {
       display: none;
@@ -2091,21 +2131,37 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       <style>{advancedSearchCSS}</style>
       <div className="adv-header">
         <div className="adv-search-title">Търсене</div>
-        {recentSearches.length > 0 && (
-          <div className="adv-recent-dropdown">
-            <button
-              type="button"
-              className="adv-recent-toggle"
-              onClick={() => setShowRecentSearches((prev) => !prev)}
-              aria-label={showRecentSearches ? "Скрий последни търсения" : "Покажи последни търсения"}
-              title={showRecentSearches ? "Скрий последни търсения" : "Покажи последни търсения"}
-            >
-              {showRecentSearches ? <ChevronLeft size={15} className="adv-recent-toggle-icon" /> : <Circle size={15} className="adv-recent-toggle-icon" />}
-              <span className="adv-recent-toggle-text">
-                Последни търсения
-              </span>
-            </button>
+        <div className="adv-recent-dropdown">
+          <button
+            type="button"
+            className="adv-recent-toggle"
+            onClick={() => {
+              if (!hasRecentSearches) return;
+              setShowRecentSearches((prev) => !prev);
+            }}
+            aria-label={
+              hasRecentSearches
+                ? showRecentSearches
+                  ? "Скрий последни търсения"
+                  : "Покажи последни търсения"
+                : "Няма последни търсения"
+            }
+            title={
+              hasRecentSearches
+                ? showRecentSearches
+                  ? "Скрий последни търсения"
+                  : "Покажи последни търсения"
+                : "Няма последни търсения"
+            }
+            disabled={!hasRecentSearches}
+          >
+            {showRecentSearches ? <ChevronLeft size={15} className="adv-recent-toggle-icon" /> : <Circle size={15} className="adv-recent-toggle-icon" />}
+            <span className="adv-recent-toggle-text">
+              Последни търсения
+            </span>
+          </button>
 
+          {hasRecentSearches && (
             <div
               className={`adv-recent-dropdown-panel ${showRecentSearches ? "is-open" : ""}`}
               aria-hidden={!showRecentSearches}
@@ -2120,7 +2176,11 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                   <span className="adv-recent-scroll-hint__arrow">›</span>
                 </span>
               </div>
-              <div className="adv-recent-searches" ref={recentSearchesRef}>
+              <div
+                className="adv-recent-searches"
+                ref={recentSearchesRef}
+                onWheel={handleRecentSearchesWheel}
+              >
                 {recentSearches.map((search) => (
                   <button
                     key={search.id}
@@ -2139,8 +2199,8 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                 ))}
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
       {topContent && <div className="adv-top-content">{topContent}</div>}
       <form onSubmit={handleSearch} className="adv-search-form">
