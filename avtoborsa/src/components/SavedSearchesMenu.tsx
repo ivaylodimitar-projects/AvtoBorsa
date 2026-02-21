@@ -11,8 +11,21 @@ const SavedSearchesMenu: React.FC = () => {
 
   const closeDropdown = () => setIsDropdownOpen(false);
 
-  const handleSearchClick = (criteria: Record<string, any>) => {
-    const queryString = new URLSearchParams(criteria).toString();
+  const serializeCriteria = (criteria: Record<string, unknown>) => {
+    const params = new URLSearchParams();
+    Object.entries(criteria).forEach(([key, value]) => {
+      if (value === null || value === undefined || value === "") return;
+      if (Array.isArray(value)) {
+        value.forEach((item) => params.append(key, String(item)));
+        return;
+      }
+      params.set(key, String(value));
+    });
+    return params.toString();
+  };
+
+  const handleSearchClick = (criteria: Record<string, unknown>) => {
+    const queryString = serializeCriteria(criteria);
     navigate(`/search?${queryString}`);
     closeDropdown();
   };
@@ -27,29 +40,34 @@ const SavedSearchesMenu: React.FC = () => {
       position: "relative",
     },
     navLink: {
+      color: "#334155",
       textDecoration: "none",
       fontSize: 14,
-      padding: "0 16px",
+      padding: "0 8px",
       height: 40,
-      borderRadius: 999,
-      fontWeight: 600,
-      transition: "all 0.2s ease",
+      borderRadius: 8,
+      fontWeight: 650,
+      transition: "color 0.2s ease",
       display: "flex",
       alignItems: "center",
-      gap: 8,
+      gap: 7,
       cursor: "pointer",
       position: "relative",
+      background: "transparent",
+      border: "none",
     },
     navLinkActive: {
-      background: "#0f766e",
-      color: "#fff",
-      border: "1px solid #0f766e",
-      boxShadow: "0 6px 16px rgba(15,118,110,0.28)",
+      color: "#0f766e",
+      fontWeight: 800,
+      textDecoration: "underline",
+      textUnderlineOffset: "8px",
+      textDecorationThickness: "2px",
+      textDecorationColor: "#0f766e",
     },
     badge: {
       position: "absolute",
-      top: -4,
-      right: -4,
+      top: 2,
+      right: -10,
       background: "#0f766e",
       color: "#fff",
       borderRadius: "50%",

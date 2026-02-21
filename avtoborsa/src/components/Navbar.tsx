@@ -9,13 +9,13 @@ import {
   FiChevronUp,
   FiExternalLink,
   FiHome,
-  FiLogOut,
   FiMenu,
   FiPlus,
   FiUser,
 } from "react-icons/fi";
 import ProfileMenu from "./ProfileMenu";
 import SavedSearchesMenu from "./SavedSearchesMenu";
+import BezplatnoBadge from "./BezplatnoBadge";
 import {
   USER_NOTIFICATIONS_UPDATED_EVENT,
   getUserNotifications,
@@ -128,10 +128,8 @@ const areFollowedDealersEqual = (
 const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout, isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [mobileOpen, setMobileOpen] = React.useState(false);
-  const [showLogoutModal, setShowLogoutModal] = React.useState(false);
-  const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [showNotificationsMenu, setShowNotificationsMenu] = React.useState(false);
   const [notificationsTab, setNotificationsTab] = React.useState<
     "notifications" | "subscriptions"
@@ -145,18 +143,6 @@ const Navbar: React.FC = () => {
   const notificationsRef = React.useRef<HTMLDivElement | null>(null);
 
   const isActive = (path: string) => location.pathname === path;
-
-  React.useEffect(() => {
-    if (!showLogoutModal) return;
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !isLoggingOut) {
-        setShowLogoutModal(false);
-      }
-    };
-
-    window.addEventListener("keydown", handleEsc);
-    return () => window.removeEventListener("keydown", handleEsc);
-  }, [showLogoutModal, isLoggingOut]);
 
   React.useEffect(() => {
     if (!user?.id) {
@@ -536,15 +522,6 @@ const Navbar: React.FC = () => {
     unfollowDealer(user.id, dealerId);
   };
 
-  const handleLogoutConfirm = async () => {
-    setIsLoggingOut(true);
-    await logout();
-    setIsLoggingOut(false);
-    setShowLogoutModal(false);
-    setMobileOpen(false);
-    navigate("/");
-  };
-
   return (
     <header style={styles.header}>
       <style>{css}</style>
@@ -587,17 +564,6 @@ const Navbar: React.FC = () => {
             </Link>
 
             <SavedSearchesMenu />
-
-            <Link
-              to="/publish"
-              className={`nav-publish-cta ${isActive("/publish") ? "active" : ""}`}
-              onClick={() => setMobileOpen(false)}
-            >
-              <span className="nav-publish-icon" aria-hidden="true">
-                <FiPlus size={14} />
-              </span>
-              <span className="nav-publish-label">Добави обява</span>
-            </Link>
           </div>
 
           <div className="nav-group nav-right">
@@ -854,10 +820,17 @@ const Navbar: React.FC = () => {
                   )}
                 </div>
                 <ProfileMenu />
-                <button className="btn-ghost btn-logout" onClick={() => setShowLogoutModal(true)}>
-                  <FiLogOut size={16} />
-                  Изход
-                </button>
+                <Link
+                  to="/publish"
+                  className={`nav-publish-cta ${isActive("/publish") ? "active" : ""}`}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <span className="nav-publish-icon" aria-hidden="true">
+                    <FiPlus size={14} />
+                  </span>
+                  <span className="nav-publish-label">Пусни обява</span>
+                  <BezplatnoBadge className="nav-publish-ribbon" size="xs" />
+                </Link>
               </>
             ) : (
               <Link
@@ -872,37 +845,6 @@ const Navbar: React.FC = () => {
           </div>
         </nav>
       </div>
-
-      {showLogoutModal && (
-        <div style={styles.logoutOverlay} onClick={() => !isLoggingOut && setShowLogoutModal(false)}>
-          <div style={styles.logoutModal} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.logoutIconWrap}>
-              <FiLogOut size={18} />
-            </div>
-            <h3 style={styles.logoutTitle}>Потвърди изход</h3>
-            <p style={styles.logoutText}>Сигурен ли си, че искаш да излезеш от профила си?</p>
-            <div style={styles.logoutActions}>
-              <button
-                style={styles.logoutCancelButton}
-                onClick={() => setShowLogoutModal(false)}
-                disabled={isLoggingOut}
-              >
-                Отказ
-              </button>
-              <button
-                style={{
-                  ...styles.logoutConfirmButton,
-                  ...(isLoggingOut ? styles.logoutConfirmButtonDisabled : {}),
-                }}
-                onClick={handleLogoutConfirm}
-                disabled={isLoggingOut}
-              >
-                {isLoggingOut ? "Излизане..." : "Изход"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </header>
   );
 };
@@ -969,90 +911,9 @@ const styles: Record<string, React.CSSProperties> = {
     marginLeft: "auto",
     flex: 1,
   },
-  logoutOverlay: {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(2, 6, 23, 0.55)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 2000,
-    padding: 16,
-  },
-  logoutModal: {
-    width: "100%",
-    maxWidth: 420,
-    borderRadius: 14,
-    background: "#fff",
-    border: "1px solid #e2e8f0",
-    boxShadow: "0 24px 60px rgba(15, 23, 42, 0.35)",
-    padding: 22,
-  },
-  logoutIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    background: "#ecfdf5",
-    color: "#0f766e",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 14,
-  },
-  logoutTitle: {
-    margin: "0 0 8px 0",
-    fontSize: 19,
-    lineHeight: 1.25,
-    color: "#333",
-    fontWeight: 800,
-  },
-  logoutText: {
-    margin: "0 0 18px 0",
-    fontSize: 14,
-    lineHeight: 1.45,
-    color: "#666",
-  },
-  logoutActions: {
-    display: "flex",
-    gap: 10,
-    justifyContent: "flex-end",
-  },
-  logoutCancelButton: {
-    height: 40,
-    padding: "0 16px",
-    borderRadius: 10,
-    border: "1px solid #ccc",
-    background: "#fff",
-    color: "#333",
-    fontSize: 14,
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-  logoutConfirmButton: {
-    height: 40,
-    padding: "0 16px",
-    borderRadius: 10,
-    border: "1px solid #0f766e",
-    background: "#0f766e",
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: 700,
-    cursor: "pointer",
-    minWidth: 104,
-  },
-  logoutConfirmButtonDisabled: {
-    opacity: 0.7,
-    cursor: "not-allowed",
-  },
 };
 
 const css = `
-@property --publish-cta-angle {
-  syntax: "<angle>";
-  inherits: false;
-  initial-value: 0deg;
-}
-
 .nav {
   font-family: "Manrope", "Segoe UI", -apple-system, system-ui, sans-serif;
 }
@@ -1073,53 +934,60 @@ const css = `
 }
 
 .nav-publish-cta {
-  --publish-cta-angle: 0deg;
   position: relative;
   isolation: isolate;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  height: 42px;
-  padding: 0 18px 0 12px;
-  border-radius: 999px;
-  border: 1px solid #99f6e4;
+  gap: 10px;
+  height: 46px;
+  min-width: 176px;
+  padding: 0 22px 0 14px;
+  border-radius: 16px;
+  border: 1px solid #0f766e;
   text-decoration: none;
   white-space: nowrap;
-  color: #111827;
-  background: #ecfdf5;
-  transition: transform 0.2s ease, box-shadow 0.25s ease, filter 0.25s ease,
-    background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  overflow: visible;
+  color: #ffffff;
+  background: linear-gradient(135deg, #0f766e 0%, #0f766e 58%, #0d9488 100%);
+  background-size: 140% 140%;
+  background-position: 0% 50%;
+  box-shadow: 0 10px 20px rgba(15, 118, 110, 0.33), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  /* 2.8s pulse phase inside a 7s cycle for premium, non-constant attention. */
+  animation: navPublishPulse 7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+    background-position 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .nav-publish-cta::before {
   content: "";
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
+  inset: -14px;
+  border-radius: 28px;
   pointer-events: none;
-  padding: 1.5px;
-  background: conic-gradient(
-    from var(--publish-cta-angle),
-    rgba(106, 207, 143, 0) 0deg,
-    rgba(134, 239, 172, 0) 250deg,
-    rgba(76, 185, 116, 0.78) 300deg,
-    rgba(134, 239, 172, 0) 360deg
+  z-index: -1;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(45, 212, 191, 0.32) 0%,
+    rgba(45, 212, 191, 0.16) 36%,
+    rgba(45, 212, 191, 0.06) 58%,
+    rgba(45, 212, 191, 0) 74%
   );
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask-composite: exclude;
-  animation: navPublishBorderOrbit 2.6s linear infinite;
+  opacity: 0;
+  transform: scale(0.96);
+  filter: blur(10px);
+  animation: navPublishGlow 7s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 .nav-publish-cta::after {
   content: "";
   position: absolute;
   inset: 1px;
-  border-radius: inherit;
-  background: linear-gradient(120deg, rgba(15, 118, 110, 0.1), rgba(15, 118, 110, 0) 45%);
-  opacity: 0.35;
+  border-radius: 12px;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0) 45%);
+  opacity: 0.65;
   pointer-events: none;
   z-index: 0;
 }
@@ -1127,15 +995,25 @@ const css = `
 .nav-publish-cta:hover,
 .nav-publish-cta:focus-visible,
 .nav-publish-cta.active {
-  transform: translateY(-1px) scale(1.03);
-  background: #0f766e;
-  border-color: #0f766e;
+  transform: translateY(-1px) scale(1.015);
+  background-position: 100% 50%;
+  border-color: #0b5f59;
   color: #fff;
-  filter: saturate(1.08);
+  box-shadow: 0 16px 30px rgba(15, 118, 110, 0.4), 0 0 0 1px rgba(153, 246, 228, 0.34);
+  animation: none;
+}
+
+.nav-publish-cta:hover::before,
+.nav-publish-cta:focus-visible::before,
+.nav-publish-cta.active::before {
+  animation: none;
+  opacity: 0;
+  transform: scale(1.14);
 }
 
 .nav-publish-cta:active {
-  transform: scale(1);
+  transform: translateY(0) scale(0.992);
+  box-shadow: 0 8px 16px rgba(15, 118, 110, 0.31);
 }
 
 .nav-publish-icon,
@@ -1145,37 +1023,89 @@ const css = `
 }
 
 .nav-publish-icon {
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
+  width: 24px;
+  height: 24px;
+  border-radius: 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 118, 110, 0.12);
-  color: #111827;
-  box-shadow: inset 0 0 0 1px rgba(15, 118, 110, 0.2);
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.32);
   transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .nav-publish-cta:hover .nav-publish-icon,
 .nav-publish-cta:focus-visible .nav-publish-icon,
 .nav-publish-cta.active .nav-publish-icon {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.3);
   color: #ffffff;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
 }
 
 .nav-publish-label {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 800;
   line-height: 1;
   letter-spacing: 0.01em;
-  transform: translateY(1px);
+  transform: none;
+  text-shadow: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-@keyframes navPublishBorderOrbit {
-  to {
-    --publish-cta-angle: 360deg;
+.nav-publish-ribbon {
+  filter: drop-shadow(0 2px 4px rgba(15, 23, 42, 0.2)) brightness(1) contrast(1.04);
+  transform: none;
+  transition: filter 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-publish-cta:hover .nav-publish-ribbon,
+.nav-publish-cta:focus-visible .nav-publish-ribbon,
+.nav-publish-cta.active .nav-publish-ribbon {
+  filter: drop-shadow(0 3px 6px rgba(15, 23, 42, 0.22)) brightness(1.06) contrast(1.04);
+}
+
+@keyframes navPublishPulse {
+  0%,
+  58%,
+  100% {
+    box-shadow: 0 10px 20px rgba(15, 118, 110, 0.33), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  }
+  14% {
+    box-shadow: 0 12px 24px rgba(15, 118, 110, 0.37), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  }
+  28% {
+    box-shadow: 0 16px 30px rgba(15, 118, 110, 0.43), 0 0 0 2px rgba(94, 234, 212, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  }
+  40% {
+    box-shadow: 0 12px 24px rgba(15, 118, 110, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  }
+}
+
+@keyframes navPublishGlow {
+  0%,
+  58%,
+  100% {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  16% {
+    opacity: 0.2;
+    transform: scale(1.03);
+  }
+  30% {
+    opacity: 0.34;
+    transform: scale(1.11);
+  }
+  40% {
+    opacity: 0.14;
+    transform: scale(1.22);
+  }
+  48% {
+    opacity: 0;
+    transform: scale(1.28);
   }
 }
 
@@ -1184,14 +1114,15 @@ const css = `
 }
 
 .btn-notifications {
-  width: 50px;
-  min-width: 50px;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
   padding: 0;
   justify-content: center;
   position: relative;
-  color: #0f766e;
-  border-color: #99f6e4;
-  background: #ecfdf5;
+  color: #334155;
+  border-color: #d1d5db;
+  background: #ffffff;
 }
 
 .notifications-bell-icon {
@@ -1204,9 +1135,9 @@ const css = `
 }
 
 .btn-notifications.open {
-  background: #ecfdf5;
-  border-color: #99f6e4;
-  color: #0f766e;
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #1f2937;
 }
 
 @keyframes bellGentleSwing {
@@ -1588,34 +1519,36 @@ const css = `
 .nav-link {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   height: 40px;
-  padding: 0 16px;
-  border-radius: 999px;
+  padding: 0 8px;
+  border-radius: 8px;
   text-decoration: none;
   font-size: 14px;
-  font-weight: 600;
-  color: #333;
-  border: 1px solid transparent;
+  font-weight: 650;
+  color: #334155;
+  border: none;
   background: transparent;
-  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease,
-    box-shadow 0.2s ease, transform 0.2s ease;
+  transition: color 0.2s ease, text-decoration-color 0.2s ease;
   white-space: nowrap;
 }
 
 .nav-link:hover {
-  background: #ecfdf5;
-  border-color: #99f6e4;
   color: #0f766e;
   text-decoration: none;
-  transform: translateY(-1px);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 8px;
+  text-decoration-color: rgba(15, 118, 110, 0.55);
 }
 
 .nav-link.active {
-  background: #0f766e;
-  color: #fff;
-  border-color: #0f766e;
-  box-shadow: 0 6px 16px rgba(15, 118, 110, 0.28);
+  color: #0f766e;
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 8px;
+  text-decoration-color: #0f766e;
 }
 
 .nav-link:focus-visible,
@@ -1673,12 +1606,6 @@ const css = `
 .btn-ghost:hover {
   background: #f5f5f5;
   border-color: #bbb;
-}
-
-.btn-logout:hover {
-  background: #fef2f2;
-  border-color: #fecaca;
-  color: #dc2626;
 }
 
 /* BURGER */

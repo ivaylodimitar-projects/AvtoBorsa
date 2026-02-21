@@ -9,7 +9,8 @@ import {
   Plus,
   List,
   X,
-  Camera
+  Camera,
+  LogOut,
 } from "lucide-react";
 import TopUpModal from "./TopUpModal";
 import { useToast } from "../context/ToastContext";
@@ -20,12 +21,13 @@ const STRIPE_SESSION_STORAGE_KEY = "stripe_checkout_session_id";
 const PAYMENT_SYNC_MIN_MS = 650;
 
 const ProfileMenu: React.FC = () => {
-  const { user, updateBalance } = useAuth();
+  const { user, updateBalance, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const { showToast } = useToast();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isTopUpModalOpen, setIsTopUpModalOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [hoveredIcon, setHoveredIcon] = useState(false);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -204,6 +206,16 @@ const ProfileMenu: React.FC = () => {
   const balance = user.balance ?? 0;
 
   const closeDropdown = () => setIsDropdownOpen(false);
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      setIsDropdownOpen(false);
+      navigate("/");
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -259,26 +271,32 @@ const ProfileMenu: React.FC = () => {
       position: "relative",
     },
     profileIcon: {
-      color: "#333",
+      color: "#334155",
       textDecoration: "none",
       fontSize: 14,
-      padding: "0 16px",
+      padding: "0 6px",
       height: 40,
-      borderRadius: 999,
-      fontWeight: 600,
-      transition: "all 0.3s ease",
+      borderRadius: 8,
+      fontWeight: 650,
+      transition: "color 0.2s ease",
       whiteSpace: "nowrap",
       display: "flex",
       alignItems: "center",
-      gap: 8,
-      background: "#ecfdf5",
-      border: "1px solid #99f6e4",
+      gap: 7,
+      background: "transparent",
+      border: "none",
       cursor: "pointer",
     },
     profileIconHover: {
-      background: "#0f766e",
-      color: "#fff",
-      border: "1px solid #0f766e",
+      background: "transparent",
+      color: "#0f766e",
+      border: "none",
+    },
+    profileLabel: {
+      maxWidth: 96,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
     },
     dropdown: {
       position: "absolute",
@@ -379,6 +397,14 @@ const ProfileMenu: React.FC = () => {
       textAlign: "left",
       borderRadius: 8,
     },
+    menuItemDanger: {
+      color: "#b91c1c",
+      fontWeight: 600,
+    },
+    menuItemDangerDisabled: {
+      opacity: 0.7,
+      cursor: "not-allowed",
+    },
     divider: {
       height: 1,
       background: "#f0f0f0",
@@ -455,6 +481,8 @@ const ProfileMenu: React.FC = () => {
     user.email?.charAt(0)?.toUpperCase() ||
     "?";
   const fullName = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
+  const profileTriggerLabel =
+    user.username?.trim() || user.first_name?.trim() || fullName || "Профил";
   const isBusiness = user.userType === "business";
   const createdAtLabel = user.created_at
     ? new Date(user.created_at).toLocaleDateString("bg-BG", {
@@ -484,7 +512,6 @@ const ProfileMenu: React.FC = () => {
             ...styles.profileIcon,
             ...(hoveredIcon || isDropdownOpen ? styles.profileIconHover : {}),
           }}
-          className="nav-link"
           onMouseEnter={() => setHoveredIcon(true)}
           onMouseLeave={() => setHoveredIcon(false)}
           onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -495,7 +522,7 @@ const ProfileMenu: React.FC = () => {
           ) : (
             <User size={18} />
           )}
-          Профил
+          <span style={styles.profileLabel}>{profileTriggerLabel}</span>
         </button>
 
         {/* Dropdown Menu */}
@@ -634,6 +661,7 @@ const ProfileMenu: React.FC = () => {
                 </Link>
 
                 <button
+                  type="button"
                   style={styles.menuItem}
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLElement).style.background = "#ecfdf5";
@@ -650,6 +678,31 @@ const ProfileMenu: React.FC = () => {
                 >
                   <HelpCircle size={18} />
                   <span>Помощ</span>
+                </button>
+
+                <div style={styles.divider} />
+
+                <button
+                  type="button"
+                  style={{
+                    ...styles.menuItem,
+                    ...styles.menuItemDanger,
+                    ...(isLoggingOut ? styles.menuItemDangerDisabled : {}),
+                  }}
+                  onMouseEnter={(e) => {
+                    if (isLoggingOut) return;
+                    (e.currentTarget as HTMLElement).style.background = "#fef2f2";
+                    (e.currentTarget as HTMLElement).style.color = "#b91c1c";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = "none";
+                    (e.currentTarget as HTMLElement).style.color = "#b91c1c";
+                  }}
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                >
+                  <LogOut size={18} />
+                  <span>{isLoggingOut ? "Излизане..." : "Изход"}</span>
                 </button>
               </div>
             </div>
