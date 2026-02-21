@@ -576,6 +576,10 @@ const MyAdsPage: React.FC = () => {
   };
 
   const openQrModal = async (listing: CarListing) => {
+    if (activeTab !== "active" && activeTab !== "top") {
+      return;
+    }
+
     const requestId = qrGenerationRequestRef.current + 1;
     qrGenerationRequestRef.current = requestId;
     const targetUrl = buildListingQrTargetUrl(listing);
@@ -3770,6 +3774,7 @@ const MyAdsPage: React.FC = () => {
                   const categoryBadgeLabel = getListingCategoryBadge(listing);
                   const listingExpiryLabel = getListingExpiryLabel(listing);
                   const hasQrTarget = Boolean(listing.slug && listing.slug.trim());
+                  const showQrTrigger = activeTab === "active" || activeTab === "top";
 
             return (
             <div
@@ -4449,7 +4454,6 @@ const MyAdsPage: React.FC = () => {
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        gap: "4px",
                       }}
                       onMouseEnter={(e) => {
                         if (actionLoading !== listing.id) {
@@ -4483,42 +4487,44 @@ const MyAdsPage: React.FC = () => {
                 </div>
                 {listingExpiryLabel && (
                   <div style={styles.listingExpiryRow}>
-                    <button
-                      type="button"
-                      aria-label={`QR код за ${listingTitle}`}
-                      data-action="QR код"
-                      className="myads-icon-btn"
-                      style={{
-                        ...styles.qrTriggerButton,
-                        ...(hasQrTarget ? {} : styles.qrTriggerButtonDisabled),
-                      }}
-                      disabled={!hasQrTarget}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void openQrModal(listing);
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!hasQrTarget) return;
-                        e.currentTarget.style.transform = "translateY(-1px)";
-                        e.currentTarget.style.borderColor = "#0f766e";
-                        e.currentTarget.style.boxShadow = "0 4px 12px rgba(15, 118, 110, 0.28)";
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!hasQrTarget) return;
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.borderColor = "#cbd5e1";
-                        e.currentTarget.style.boxShadow = "0 2px 10px rgba(15, 23, 42, 0.1)";
-                      }}
-                    >
-                      <span style={styles.qrTriggerIconWrap}>
-                        <Lottie
-                          animationData={karBgQrCodeAnimation}
-                          loop
-                          autoplay
-                          style={styles.qrTriggerIcon}
-                        />
-                      </span>
-                    </button>
+                    {showQrTrigger && (
+                      <button
+                        type="button"
+                        aria-label={`QR код за ${listingTitle}`}
+                        data-action="QR код"
+                        className="myads-icon-btn"
+                        style={{
+                          ...styles.qrTriggerButton,
+                          ...(hasQrTarget ? {} : styles.qrTriggerButtonDisabled),
+                        }}
+                        disabled={!hasQrTarget}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void openQrModal(listing);
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!hasQrTarget) return;
+                          e.currentTarget.style.transform = "translateY(-1px)";
+                          e.currentTarget.style.borderColor = "#0f766e";
+                          e.currentTarget.style.boxShadow = "0 4px 12px rgba(15, 118, 110, 0.28)";
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!hasQrTarget) return;
+                          e.currentTarget.style.transform = "translateY(0)";
+                          e.currentTarget.style.borderColor = "#cbd5e1";
+                          e.currentTarget.style.boxShadow = "0 2px 10px rgba(15, 23, 42, 0.1)";
+                        }}
+                      >
+                        <span style={styles.qrTriggerIconWrap}>
+                          <Lottie
+                            animationData={karBgQrCodeAnimation}
+                            loop
+                            autoplay
+                            style={styles.qrTriggerIcon}
+                          />
+                        </span>
+                      </button>
+                    )}
                     <div style={styles.listingExpiryInfo}>{listingExpiryLabel}</div>
                   </div>
                 )}
