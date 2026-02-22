@@ -13,9 +13,25 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import urlparse
+
+import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in ("1", "true", "yes", "on")
+
+
+def _split_csv_env(name: str) -> list[str]:
+    raw = os.getenv(name, "")
+    return [item.strip() for item in raw.split(",") if item.strip()]
 
 # Load environment variables from backend/.env if present (local dev convenience).
 ENV_FILE = BASE_DIR / ".env"
@@ -37,12 +53,31 @@ if ENV_FILE.exists():
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-k0%c#7_1bgsv=esr@@j05cle+u2n8vuktkp%y3_=tdosq(lk9&'
+_DEFAULT_LOCAL_SECRET_KEY = "django-insecure-k0%c#7_1bgsv=esr@@j05cle+u2n8vuktkp%y3_=tdosq(lk9&"
+SECRET_KEY = os.getenv("SECRET_KEY", _DEFAULT_LOCAL_SECRET_KEY)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+if os.getenv("DEBUG") is None:
+    DEBUG = "RENDER" not in os.environ
+else:
+    DEBUG = _env_flag("DEBUG", default=False)
 
-ALLOWED_HOSTS = []
+if not DEBUG and SECRET_KEY == _DEFAULT_LOCAL_SECRET_KEY:
+    raise ImproperlyConfigured("SECRET_KEY environment variable must be set when DEBUG=False.")
+
+ALLOWED_HOSTS = _split_csv_env("ALLOWED_HOSTS")
+render_external_hostname = os.getenv("RENDER_EXTERNAL_HOSTNAME", "").strip()
+if render_external_hostname:
+    ALLOWED_HOSTS.append(render_external_hostname)
+
+if DEBUG:
+    ALLOWED_HOSTS.extend(["localhost", "127.0.0.1", "[::1]"])
+
+ALLOWED_HOSTS = sorted(set(ALLOWED_HOSTS))
+if not ALLOWED_HOSTS:
+    ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173").rstrip("/")
 
 
 # Application definition
@@ -70,6 +105,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.middleware.gzip.GZipMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -110,12 +146,22 @@ CHANNEL_LAYERS = {
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+if DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=not DEBUG,
+        )
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 
 # Password validation
@@ -152,7 +198,9 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -160,14 +208,42 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS Configuration
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+CORS_ALLOWED_ORIGINS = sorted(
+    set(
+        [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            FRONTEND_BASE_URL,
+        ]
+        + _split_csv_env("CORS_ALLOWED_ORIGINS")
+    )
+)
 
 CORS_ALLOW_CREDENTIALS = True
+
+csrf_origins = _split_csv_env("CSRF_TRUSTED_ORIGINS")
+frontend_origin = urlparse(FRONTEND_BASE_URL)
+if frontend_origin.scheme and frontend_origin.netloc:
+    csrf_origins.append(f"{frontend_origin.scheme}://{frontend_origin.netloc}")
+if render_external_hostname:
+    csrf_origins.append(f"https://{render_external_hostname}")
+if DEBUG:
+    csrf_origins.extend(["http://localhost:5173", "http://127.0.0.1:5173"])
+CSRF_TRUSTED_ORIGINS = sorted(set(csrf_origins))
+
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = _env_flag("SECURE_SSL_REDIRECT", default=True)
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_flag(
+        "SECURE_HSTS_INCLUDE_SUBDOMAINS",
+        default=True,
+    )
+    SECURE_HSTS_PRELOAD = _env_flag("SECURE_HSTS_PRELOAD", default=True)
 
 # REST Framework Configuration
 REST_FRAMEWORK = {
@@ -207,9 +283,6 @@ CACHES = {
 # Media Files Configuration
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-
-# Frontend URL used for Stripe checkout redirects
-FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173").rstrip("/")
 
 # Stripe settings
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
