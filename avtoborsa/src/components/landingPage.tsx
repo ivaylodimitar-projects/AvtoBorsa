@@ -450,9 +450,9 @@ export default function LandingPage() {
         }
 
         const [latestResponse, fallbackResponse] = await Promise.all([
-          fetch("/api/listings/latest/", { signal: controller.signal }),
+          fetch(`${API_BASE_URL}/api/listings/latest/`, { signal: controller.signal }),
           fetch(
-            `http://localhost:8000/api/listings/?page=1&page_size=24&lite=1&sortBy=newest&_ts=${Date.now()}`,
+            `${API_BASE_URL}/api/listings/?page=1&page_size=24&lite=1&sortBy=newest&_ts=${Date.now()}`,
             {
               signal: controller.signal,
             }
