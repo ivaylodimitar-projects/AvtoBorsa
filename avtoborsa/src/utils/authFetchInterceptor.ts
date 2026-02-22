@@ -5,6 +5,12 @@ const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:800
   ""
 );
 const REFRESH_ENDPOINT = `${API_BASE_URL}/api/auth/token/refresh/`;
+const LOCAL_API_ORIGIN_PREFIXES = [
+  "http://localhost:8000",
+  "https://localhost:8000",
+  "http://127.0.0.1:8000",
+  "https://127.0.0.1:8000",
+];
 
 let interceptorInstalled = false;
 let refreshPromise: Promise<string | null> | null = null;
@@ -69,6 +75,19 @@ const parseRefreshResponse = async (response: Response) => {
   }
 };
 
+const normalizeApiUrl = (url: string) => {
+  const trimmedApiBaseUrl = stripTrailingSlashes(API_BASE_URL);
+  if (!trimmedApiBaseUrl) return url;
+
+  for (const prefix of LOCAL_API_ORIGIN_PREFIXES) {
+    if (url.startsWith(prefix)) {
+      return `${trimmedApiBaseUrl}${url.slice(prefix.length)}`;
+    }
+  }
+
+  return url;
+};
+
 const refreshAccessToken = async (rawFetch: typeof window.fetch): Promise<string | null> => {
   if (refreshPromise) {
     return refreshPromise;
@@ -112,7 +131,12 @@ export const installAuthFetchInterceptor = () => {
   const rawFetch = window.fetch.bind(window);
 
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-    const originalRequest = new Request(input, init);
+    const baseRequest = new Request(input, init);
+    const rewrittenUrl = normalizeApiUrl(baseRequest.url);
+    const originalRequest =
+      rewrittenUrl === baseRequest.url
+        ? baseRequest
+        : new Request(rewrittenUrl, baseRequest);
     const response = await rawFetch(originalRequest.clone());
 
     if (!isApiRequest(originalRequest.url)) return response;
