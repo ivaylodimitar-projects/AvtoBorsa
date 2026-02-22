@@ -164,7 +164,7 @@ const POPULAR_CAR_BRANDS = [
       "https://static.classistatic.de/consumer-webapp/static/ford-logo-light.828585c16e15b3d507fe..png",
   },
   {
-    name: "Mercedes-Benz",
+    name: "Mercedes",
     logoUrl:
       "https://static.classistatic.de/consumer-webapp/static/mercedes-logo-light.d41ca6c5e735131c629b..png",
   },
@@ -213,7 +213,7 @@ const BRAND_HERO_IMAGES: Record<string, string> = {
   BMW: bmwThumbnailImage,
   Porsche: porscheThumbnailImage,
   Ford: mustangThumbnailImage,
-  "Mercedes-Benz": mercedesThumbnailImage,
+  Mercedes: mercedesThumbnailImage,
   Opel: opelThumbnailImage,
   Renault: renaultThumbnailImage,
   Skoda: skodaThumbnailImage,
@@ -409,17 +409,15 @@ export default function LandingPage() {
   );
   const [activeBrandIndex, setActiveBrandIndex] = useState(() => {
     const mercedesIndex = POPULAR_CAR_BRANDS.findIndex(
-      (item) => item.name === "Mercedes-Benz"
+      (item) => item.name === "Mercedes"
     );
     return mercedesIndex >= 0 ? mercedesIndex : 0;
   });
-  const [isBrandShowcaseOpen, setIsBrandShowcaseOpen] = useState(true);
   const [brandSlideDirection, setBrandSlideDirection] = useState<"next" | "prev">("next");
-  const [brandMotionKey, setBrandMotionKey] = useState(0);
   const [isPopularBrandsInView, setIsPopularBrandsInView] = useState(false);
-  const [isBrandShowcaseHovered, setIsBrandShowcaseHovered] = useState(false);
+  const [isBrandAutoplayEnabled, setIsBrandAutoplayEnabled] = useState(true);
   const popularBrandsSectionRef = useRef<HTMLElement | null>(null);
-  const lastBrandsManualActionRef = useRef(0);
+  const brandAutoplayResumeTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -576,35 +574,65 @@ export default function LandingPage() {
     );
   };
 
+  const totalPopularBrands = POPULAR_CAR_BRANDS.length;
+  const BRAND_AUTOPLAY_INTERVAL_MS = 4200;
+  const BRAND_AUTOPLAY_IDLE_RESUME_MS = 10000;
+
+  const pauseBrandAutoplayUntilIdle = () => {
+    setIsBrandAutoplayEnabled(false);
+    if (brandAutoplayResumeTimeoutRef.current !== null) {
+      window.clearTimeout(brandAutoplayResumeTimeoutRef.current);
+    }
+    brandAutoplayResumeTimeoutRef.current = window.setTimeout(() => {
+      setIsBrandAutoplayEnabled(true);
+      brandAutoplayResumeTimeoutRef.current = null;
+    }, BRAND_AUTOPLAY_IDLE_RESUME_MS);
+  };
+
   const goToPrevBrand = (source: "manual" | "auto" = "manual") => {
     if (source === "manual") {
-      lastBrandsManualActionRef.current = Date.now();
+      pauseBrandAutoplayUntilIdle();
     }
-    setIsBrandShowcaseOpen(true);
     setBrandSlideDirection("prev");
-    setBrandMotionKey((prev) => prev + 1);
-    setActiveBrandIndex((prev) =>
-      (prev - 1 + POPULAR_CAR_BRANDS.length) % POPULAR_CAR_BRANDS.length
-    );
+    setActiveBrandIndex((prev) => (prev - 1 + totalPopularBrands) % totalPopularBrands);
   };
 
   const goToNextBrand = (source: "manual" | "auto" = "manual") => {
     if (source === "manual") {
-      lastBrandsManualActionRef.current = Date.now();
+      pauseBrandAutoplayUntilIdle();
     }
-    setIsBrandShowcaseOpen(true);
     setBrandSlideDirection("next");
-    setBrandMotionKey((prev) => prev + 1);
-    setActiveBrandIndex((prev) => (prev + 1) % POPULAR_CAR_BRANDS.length);
+    setActiveBrandIndex((prev) => (prev + 1) % totalPopularBrands);
+  };
+
+  const goToBrandByIndex = (targetIndex: number) => {
+    pauseBrandAutoplayUntilIdle();
+    if (targetIndex === activeBrandIndex) return;
+
+    const forwardSteps = (targetIndex - activeBrandIndex + totalPopularBrands) % totalPopularBrands;
+    const backwardSteps = (activeBrandIndex - targetIndex + totalPopularBrands) % totalPopularBrands;
+    setBrandSlideDirection(forwardSteps <= backwardSteps ? "next" : "prev");
+    setActiveBrandIndex(targetIndex);
   };
 
   const activeBrand = POPULAR_CAR_BRANDS[activeBrandIndex];
-  const leftBrand =
-    POPULAR_CAR_BRANDS[
-      (activeBrandIndex - 1 + POPULAR_CAR_BRANDS.length) % POPULAR_CAR_BRANDS.length
-    ];
-  const rightBrand =
-    POPULAR_CAR_BRANDS[(activeBrandIndex + 1) % POPULAR_CAR_BRANDS.length];
+  const visibleBrandCards = POPULAR_CAR_BRANDS.map((brandItem, index) => {
+    const rawDistance = index - activeBrandIndex;
+    const wrappedDistance =
+      rawDistance > totalPopularBrands / 2
+        ? rawDistance - totalPopularBrands
+        : rawDistance < -totalPopularBrands / 2
+          ? rawDistance + totalPopularBrands
+          : rawDistance;
+
+    return {
+      ...brandItem,
+      index,
+      distance: wrappedDistance,
+    };
+  })
+    .filter((card) => Math.abs(card.distance) <= 2)
+    .sort((a, b) => a.distance - b.distance);
 
   useEffect(() => {
     const sectionEl = popularBrandsSectionRef.current;
@@ -622,20 +650,23 @@ export default function LandingPage() {
   }, []);
 
   useEffect(() => {
-    if (!isPopularBrandsInView || isBrandShowcaseHovered) return;
+    return () => {
+      if (brandAutoplayResumeTimeoutRef.current !== null) {
+        window.clearTimeout(brandAutoplayResumeTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isPopularBrandsInView || !isBrandAutoplayEnabled) return;
 
     const intervalId = window.setInterval(() => {
-      const manualPauseMs = 7000;
-      const isManualPauseActive =
-        Date.now() - lastBrandsManualActionRef.current < manualPauseMs;
-
-      if (!isManualPauseActive) {
-        goToNextBrand("auto");
-      }
-    }, 4500);
+      setBrandSlideDirection("next");
+      setActiveBrandIndex((prev) => (prev + 1) % totalPopularBrands);
+    }, BRAND_AUTOPLAY_INTERVAL_MS);
 
     return () => window.clearInterval(intervalId);
-  }, [isPopularBrandsInView, isBrandShowcaseHovered]);
+  }, [isPopularBrandsInView, isBrandAutoplayEnabled, totalPopularBrands, BRAND_AUTOPLAY_INTERVAL_MS]);
 
   const isListingNew = (createdAt?: string) => {
     if (!createdAt) return false;
@@ -1389,330 +1420,439 @@ export default function LandingPage() {
             .view-more-btn:hover {
               box-shadow: 0 4px 14px rgba(15,118,110,0.35);
             }
-            .brand-showcase {
-              margin-top: 6px;
-              border-radius: 16px;
-              border: 1px solid #e2e8f0;
-              background: radial-gradient(circle at 14% 8%, rgba(15, 118, 110, 0.14), transparent 52%),
-                linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-              box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 8px 28px rgba(15, 23, 42, 0.1);
-              padding: 14px;
+            .brand-cinema {
+              margin-top: 8px;
+              border-radius: 20px;
+              border: 1px solid rgba(100, 116, 139, 0.42);
+              background:
+                radial-gradient(circle at 14% 10%, rgba(255, 255, 255, 0.08), transparent 42%),
+                radial-gradient(circle at 88% 16%, rgba(148, 163, 184, 0.18), transparent 42%),
+                linear-gradient(160deg, #090b0f 0%, #11161c 52%, #0b0f14 100%);
+              box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 14px 42px rgba(2, 6, 23, 0.46);
+              padding: 18px 16px 72px;
               position: relative;
-              perspective: 1400px;
               overflow: hidden;
             }
-            .brand-stage {
-              display: grid;
-              grid-template-columns: minmax(0, 1fr) minmax(0, 2.4fr) minmax(0, 1fr);
-              align-items: stretch;
-              gap: 12px;
+            .brand-cinema::before {
+              content: "";
+              position: absolute;
+              inset: 0;
+              background: linear-gradient(120deg, rgba(255,255,255,0.08), transparent 42%);
+              pointer-events: none;
+              mix-blend-mode: soft-light;
+            }
+            .brand-cinema-track {
+              position: relative;
+              height: 408px;
+              perspective: 1600px;
               transform-style: preserve-3d;
+              isolation: isolate;
+              --brand-step: clamp(142px, 16.2vw, 238px);
+              --brand-far-step: calc(var(--brand-step) * 1.9);
             }
-            .brand-stage--next {
-              animation: brandShelfDriftNext 0.68s cubic-bezier(0.22, 0.61, 0.36, 1);
-              transform-origin: right center;
+            .brand-cinema-track--next {
+              animation: brandCinemaShiftNext 680ms cubic-bezier(0.18, 0.78, 0.22, 1);
             }
-            .brand-stage--prev {
-              animation: brandShelfDriftPrev 0.68s cubic-bezier(0.22, 0.61, 0.36, 1);
-              transform-origin: left center;
+            .brand-cinema-track--prev {
+              animation: brandCinemaShiftPrev 680ms cubic-bezier(0.18, 0.78, 0.22, 1);
             }
-            .brand-side-card {
-              border-radius: 14px;
-              border: 1px solid transparent;
-              background: #0b1220;
-              display: flex;
-              justify-content: center;
-              align-items: flex-end;
-              padding: 12px;
-              position: relative;
-              overflow: hidden;
-              opacity: 0.68;
-              transform: scale(0.96);
-              transition: transform 0.4s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.4s ease;
-            }
-            .brand-showcase.is-open .brand-side-card {
-              opacity: 0.86;
-              transform: scale(1);
-            }
-            .brand-stage--next .brand-side-card--left {
-              animation: brandSideOutLeft 0.66s cubic-bezier(0.22, 0.61, 0.36, 1);
-            }
-            .brand-stage--next .brand-side-card--right {
-              animation: brandSideInRight 0.66s cubic-bezier(0.22, 0.61, 0.36, 1);
-            }
-            .brand-stage--prev .brand-side-card--left {
-              animation: brandSideInLeft 0.66s cubic-bezier(0.22, 0.61, 0.36, 1);
-            }
-            .brand-stage--prev .brand-side-card--right {
-              animation: brandSideOutRight 0.66s cubic-bezier(0.22, 0.61, 0.36, 1);
-            }
-            .brand-side-logo {
-              width: 30px;
-              height: 30px;
-              object-fit: contain;
-              margin-bottom: 0;
-              filter: saturate(0.95);
-            }
-            .brand-side-bg {
+            .brand-cinema-card {
               position: absolute;
-              inset: 0;
-              width: 100%;
-              height: 100%;
-              object-fit: cover;
-              transform: scale(1.06);
-              filter: grayscale(0.25) brightness(0.46) contrast(0.94) blur(1.4px);
-              pointer-events: none;
-            }
-            .brand-side-overlay {
-              position: absolute;
-              inset: 0;
-              background: linear-gradient(180deg, rgba(2, 6, 23, 0.35) 0%, rgba(2, 6, 23, 0.82) 100%);
-              pointer-events: none;
-            }
-            .brand-side-meta {
-              position: relative;
-              z-index: 2;
-              display: inline-flex;
-              align-items: center;
-              gap: 8px;
-              background: rgba(2, 6, 23, 0.78);
-              border: 1px solid transparent;
-              border-radius: 999px;
-              padding: 6px 10px;
-              backdrop-filter: blur(1px);
-            }
-            .brand-side-name {
-              font-size: 12px;
-              font-weight: 700;
-              text-align: center;
-              color: #e2e8f0;
-              white-space: nowrap;
-            }
-            .brand-main-card {
-              border: none;
-              border-radius: 14px;
-              background: #0b1220;
+              top: 50%;
+              left: 50%;
+              width: clamp(280px, 47vw, 640px);
+              aspect-ratio: 16 / 9;
+              border: 1px solid rgba(74, 222, 128, 0.24);
+              border-radius: 18px;
               overflow: hidden;
-              position: relative;
-              color: #fff;
-              text-decoration: none;
+              background: #0f172a;
+              padding: 0;
+              margin: 0;
               cursor: pointer;
-              transform: translateY(-2px) scale(1.015);
-              box-shadow: 0 18px 36px rgba(15, 118, 110, 0.26);
-              transition: transform 0.42s cubic-bezier(0.22, 0.61, 0.36, 1), box-shadow 0.42s ease;
+              transition: transform 620ms cubic-bezier(0.2, 0.78, 0.2, 1), opacity 460ms ease, box-shadow 460ms ease;
               transform-style: preserve-3d;
               backface-visibility: hidden;
-              will-change: transform;
+              -webkit-backface-visibility: hidden;
+              will-change: transform, opacity;
             }
-            .brand-main-card--next {
-              animation: brandCardFlipInNext 0.72s cubic-bezier(0.22, 0.61, 0.36, 1);
+            .brand-cinema-card[data-distance="-2"] {
+              transform: translate3d(calc(-50% - var(--brand-far-step)), calc(-50% + 14px), -260px) rotateY(25deg) scale(0.68);
+              opacity: 0.18;
+              filter: none;
+              box-shadow: none;
             }
-            .brand-main-card--prev {
-              animation: brandCardFlipInPrev 0.72s cubic-bezier(0.22, 0.61, 0.36, 1);
+            .brand-cinema-card[data-distance="-1"] {
+              transform: translate3d(calc(-50% - var(--brand-step)), calc(-50% + 9px), -132px) rotateY(16deg) scale(0.84);
+              opacity: 0.62;
+              filter: none;
+              box-shadow: 0 14px 28px rgba(2, 6, 23, 0.34);
             }
-            .brand-main-card:hover {
-              transform: translateY(-4px) scale(1.02);
-              box-shadow: 0 20px 40px rgba(15, 118, 110, 0.32);
-              text-decoration: none;
+            .brand-cinema-card[data-distance="0"] {
+              transform: translate3d(-50%, calc(-50% - 3px), 0) rotateY(0deg) scale(1.02);
+              opacity: 1;
+              filter: none;
+              border-color: rgba(134, 239, 172, 0.72);
+              box-shadow: 0 24px 56px rgba(15, 118, 110, 0.28), 0 0 0 1px rgba(110, 231, 183, 0.22) inset;
+              isolation: isolate;
             }
-            .brand-main-card:focus,
-            .brand-main-card:focus-visible,
+            .brand-cinema-card[data-distance="1"] {
+              transform: translate3d(calc(-50% + var(--brand-step)), calc(-50% + 9px), -132px) rotateY(-16deg) scale(0.84);
+              opacity: 0.62;
+              filter: none;
+              box-shadow: 0 14px 28px rgba(2, 6, 23, 0.34);
+            }
+            .brand-cinema-card[data-distance="2"] {
+              transform: translate3d(calc(-50% + var(--brand-far-step)), calc(-50% + 14px), -260px) rotateY(-25deg) scale(0.68);
+              opacity: 0.18;
+              filter: none;
+              box-shadow: none;
+            }
+            .brand-cinema-card:hover[data-distance="0"] {
+              transform: translate3d(-50%, calc(-50% - 6px), 0) scale(1.04);
+              box-shadow: 0 28px 62px rgba(45, 212, 191, 0.32), 0 0 0 1px rgba(167, 243, 208, 0.34) inset;
+            }
+            .brand-cinema-card:hover[data-distance="0"] .brand-cinema-border-line rect {
+              animation: brandActiveCardLineTrace 980ms linear 1;
+            }
+            .brand-cinema-border-line {
+              position: absolute;
+              inset: 0;
+              border-radius: inherit;
+              pointer-events: none;
+              z-index: 4;
+            }
+            .brand-cinema-border-line svg {
+              width: 100%;
+              height: 100%;
+              display: block;
+            }
+            .brand-cinema-border-line rect {
+              fill: none;
+              stroke: rgba(167, 243, 208, 0);
+              stroke-width: 1.05;
+              vector-effect: non-scaling-stroke;
+              stroke-linecap: round;
+              stroke-linejoin: round;
+              stroke-dasharray: 22 78;
+              stroke-dashoffset: 100;
+              filter: drop-shadow(0 0 5px rgba(110, 231, 183, 0.3));
+            }
+            .brand-cinema-card:focus,
+            .brand-cinema-card:focus-visible,
             .brand-nav:focus,
             .brand-nav:focus-visible {
               outline: none;
             }
-            .brand-main-image-wrap {
-              height: 150px;
-              overflow: hidden;
-              transition: height 0.42s cubic-bezier(0.22, 0.78, 0.14, 1);
-            }
-            .brand-main-image-wrap--next {
-              animation: brandImageParallaxNext 0.72s cubic-bezier(0.22, 0.61, 0.36, 1);
-            }
-            .brand-main-image-wrap--prev {
-              animation: brandImageParallaxPrev 0.72s cubic-bezier(0.22, 0.61, 0.36, 1);
-            }
-            .brand-showcase.is-open .brand-main-image-wrap {
-              height: 300px;
-            }
-            .brand-main-image {
+            .brand-cinema-image {
+              position: absolute;
+              inset: 0;
               width: 100%;
               height: 100%;
               object-fit: cover;
-              transform: scale(1.01);
-              will-change: transform;
-            }
-            .brand-main-overlay {
-              position: absolute;
-              inset: 0;
-              background: linear-gradient(
-                180deg,
-                rgba(2, 6, 23, 0) 0%,
-                rgba(2, 6, 23, 0) 56%,
-                rgba(2, 6, 23, 0.28) 76%,
-                rgba(2, 6, 23, 0.62) 100%
-              );
-              pointer-events: none;
-            }
-            .brand-main-meta {
-              position: absolute;
-              bottom: 16px;
-              left: 16px;
-              right: 16px;
-              z-index: 2;
-              display: flex;
-              align-items: center;
-              gap: 10px;
               transform: translateZ(0);
               backface-visibility: hidden;
+              -webkit-backface-visibility: hidden;
+              will-change: transform;
+              image-rendering: auto;
+              transition: none;
             }
-            .brand-main-logo {
-              width: 44px;
-              height: 44px;
+            .brand-cinema-card[data-distance="0"] .brand-cinema-image {
+              transform: translateZ(0);
+            }
+            .brand-cinema-overlay {
+              position: absolute;
+              inset: 0;
+              background: linear-gradient(180deg, rgba(2, 6, 23, 0.02) 0%, rgba(2, 6, 23, 0.34) 68%, rgba(2, 6, 23, 0.78) 100%);
+            }
+            .brand-cinema-meta {
+              position: absolute;
+              left: 12px;
+              bottom: 12px;
+              z-index: 2;
+              width: fit-content;
+              max-width: calc(100% - 24px);
+              display: inline-flex;
+              flex-direction: column;
+              align-items: flex-start;
+              justify-content: center;
+              gap: 8px;
+              padding: 9px 11px;
+              border-radius: 12px;
+              border: 1px solid rgba(236, 253, 245, 0.24);
+              background: linear-gradient(180deg, rgba(2, 6, 23, 0.56) 0%, rgba(2, 6, 23, 0.76) 100%);
+              backdrop-filter: blur(6px);
+              text-align: left;
+            }
+            .brand-cinema-logo {
+              width: 31px;
+              height: 31px;
+              border-radius: 0;
               object-fit: contain;
-              border-radius: 10px;
-              background: rgba(2,6,23,0.82);
-              border: none;
-              padding: 6px;
+              background: transparent;
+              padding: 0;
+              filter: brightness(0.95) drop-shadow(0 2px 8px rgba(2, 6, 23, 0.66));
               flex-shrink: 0;
             }
-            .brand-main-name {
+            .brand-cinema-name {
               color: #f8fafc;
-              font-size: 28px;
-              line-height: 1.1;
-              font-weight: 800;
-              letter-spacing: 0.01em;
+              font-size: clamp(14px, 1.35vw, 18px);
+              line-height: 1.16;
+              font-weight: 700;
+              letter-spacing: 0.02em;
               font-family: "Space Grotesk", "Manrope", "Segoe UI", sans-serif;
-              text-shadow: 0 4px 16px rgba(2, 6, 23, 0.6);
+              text-shadow: 0 3px 10px rgba(2, 6, 23, 0.55);
+              white-space: nowrap;
             }
-            .brand-main-name-badge {
+            .brand-cinema-state {
               display: inline-flex;
               align-items: center;
-              min-height: 42px;
-              padding: 8px 14px;
-              border-radius: 12px;
-              background: rgba(2, 6, 23, 0.64);
-              border: 1px solid transparent;
-              backdrop-filter: blur(2px);
-              transform: translateZ(0);
+              justify-content: center;
+              gap: 6px;
+              font-size: 11px;
+              letter-spacing: 0;
+              color: #d1fae5;
+              font-weight: 700;
+              padding: 6px 9px;
+              border-radius: 999px;
+              border: 1px solid rgba(110, 231, 183, 0.48);
+              background: rgba(15, 118, 110, 0.34);
+              white-space: nowrap;
+              line-height: 1;
+            }
+            .brand-cinema-state::after {
+              content: ">";
+              font-size: 10px;
+              opacity: 0.92;
+              transform: translateX(0);
+              transition: transform 180ms ease;
+            }
+            .brand-cinema-card:hover[data-distance="0"] .brand-cinema-state::after {
+              transform: translateX(2px);
             }
             .brand-nav {
               position: absolute;
               top: 50%;
               transform: translateY(-50%);
-              width: 52px;
-              height: 52px;
+              width: 56px;
+              height: 56px;
               border-radius: 999px;
-              border: 1.5px solid rgba(255, 255, 255, 0.86);
-              background: rgba(2, 6, 23, 0.78);
+              border: 1.5px solid rgba(236, 253, 245, 0.78);
+              background: linear-gradient(180deg, rgba(15, 23, 42, 0.94) 0%, rgba(2, 6, 23, 0.92) 100%);
               color: #ffffff;
               display: inline-flex;
               align-items: center;
               justify-content: center;
               cursor: pointer;
-              z-index: 5;
-              transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+              z-index: 20;
+              box-shadow: 0 10px 24px rgba(2, 6, 23, 0.55), 0 0 0 2px rgba(15, 118, 110, 0.35);
+              backdrop-filter: blur(6px);
+              transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+              animation: brandNavPulse 2.8s ease-in-out infinite;
+            }
+            .brand-nav::after {
+              content: "";
+              position: absolute;
+              inset: -4px;
+              border-radius: inherit;
+              border: 1px solid rgba(15, 118, 110, 0.44);
+              opacity: 0.75;
+              pointer-events: none;
+            }
+            .brand-nav svg {
+              width: 26px;
+              height: 26px;
+              stroke-width: 3.3;
+              filter: drop-shadow(0 2px 6px rgba(2, 6, 23, 0.8));
             }
             .brand-nav:hover {
-              background: rgba(15, 118, 110, 0.62);
-              border-color: #ffffff;
+              background: linear-gradient(180deg, rgba(15, 118, 110, 0.92) 0%, rgba(13, 83, 79, 0.94) 100%);
+              border-color: #ecfdf5;
+              transform: translateY(-50%) scale(1.1);
+              box-shadow: 0 14px 30px rgba(15, 118, 110, 0.46), 0 0 0 2px rgba(209, 250, 229, 0.36);
+            }
+            .brand-nav:active {
               transform: translateY(-50%) scale(1.04);
             }
-            .brand-nav--left { left: 12px; }
-            .brand-nav--right { right: 12px; }
-            .brand-showcase-hint {
-              margin-top: 10px;
-              text-align: center;
-              color: #0f766e;
-              font-size: 12px;
-              letter-spacing: 0.03em;
+            .brand-nav--left { left: 8px; }
+            .brand-nav--right {
+              right: 8px;
+              animation-delay: 1.4s;
             }
-            @keyframes brandCardFlipInNext {
+            .brand-autoplay-meter {
+              margin-top: 12px;
+              width: 100%;
+              height: 4px;
+              border-radius: 999px;
+              overflow: hidden;
+              background: rgba(148, 163, 184, 0.26);
+            }
+            .brand-autoplay-meter-fill {
+              display: block;
+              width: 100%;
+              height: 100%;
+              transform-origin: left center;
+              background: rgb(15, 118, 110);
+              box-shadow: 0 0 12px rgba(15, 118, 110, 0.42);
+            }
+            .brand-autoplay-meter-fill.is-running {
+              animation: brandAutoplayProgress 4200ms linear forwards;
+            }
+            .brand-autoplay-meter-fill.is-stopped {
+              transform: scaleX(0.2);
+              opacity: 0.54;
+            }
+            .brand-logo-dots {
+              position: absolute;
+              left: 50%;
+              bottom: 14px;
+              transform: translateX(-50%);
+              z-index: 24;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              padding: 0 8px 9px;
+              border: none;
+              background: transparent;
+              box-shadow: none;
+              backdrop-filter: none;
+              max-width: calc(100% - 138px);
+              overflow-x: auto;
+              scrollbar-width: thin;
+            }
+            .brand-logo-dots::after {
+              content: "";
+              position: absolute;
+              left: 8px;
+              right: 8px;
+              bottom: 2px;
+              height: 2px;
+              border-radius: 999px;
+              background: linear-gradient(
+                90deg,
+                rgba(148, 163, 184, 0.12) 0%,
+                rgba(110, 231, 183, 0.84) 50%,
+                rgba(148, 163, 184, 0.12) 100%
+              );
+              box-shadow: 0 0 12px rgba(15, 118, 110, 0.36);
+              pointer-events: none;
+            }
+            .brand-logo-dot {
+              width: 34px;
+              height: 34px;
+              border-radius: 999px;
+              border: 1px solid transparent;
+              background: transparent;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              padding: 5px;
+              flex: 0 0 auto;
+              cursor: pointer;
+              opacity: 0.78;
+              position: relative;
+              z-index: 1;
+              transition: transform 0.2s ease, opacity 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            }
+            .brand-logo-dot:hover {
+              opacity: 0.96;
+              border-color: rgba(167, 243, 208, 0.44);
+            }
+            .brand-logo-dot.is-active {
+              opacity: 1;
+              transform: translateY(-1px) scale(1.08);
+              border-color: rgba(134, 239, 172, 0.96);
+              box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.28), 0 5px 12px rgba(2, 6, 23, 0.36);
+            }
+            .brand-logo-dot img {
+              width: 100%;
+              height: 100%;
+              object-fit: contain;
+              filter: drop-shadow(0 1px 6px rgba(2, 6, 23, 0.66));
+              pointer-events: none;
+            }
+            @keyframes brandCinemaShiftNext {
+              0% { transform: translateX(54px); }
+              66% { transform: translateX(-5px); }
+              100% { transform: translateX(0); }
+            }
+            @keyframes brandCinemaShiftPrev {
+              0% { transform: translateX(-54px); }
+              66% { transform: translateX(5px); }
+              100% { transform: translateX(0); }
+            }
+            @keyframes brandAutoplayProgress {
+              from { transform: scaleX(0); }
+              to { transform: scaleX(1); }
+            }
+            @keyframes brandActiveCardLineTrace {
               0% {
-                opacity: 0.9;
-                transform: translateY(8px) translateX(92px) translateZ(-36px) rotateY(-8deg) scale(0.98);
+                stroke: rgba(167, 243, 208, 0);
+                stroke-dashoffset: 100;
               }
-              68% {
-                opacity: 1;
-                transform: translateY(-2px) translateX(-8px) translateZ(6px) rotateY(1deg) scale(1.02);
+              14% {
+                stroke: rgba(167, 243, 208, 0.78);
               }
               100% {
-                opacity: 1;
-                transform: translateY(-2px) translateX(0) rotateY(0deg) scale(1.015);
+                stroke: rgba(167, 243, 208, 0);
+                stroke-dashoffset: 0;
               }
             }
-            @keyframes brandCardFlipInPrev {
-              0% {
-                opacity: 0.9;
-                transform: translateY(8px) translateX(-92px) translateZ(-36px) rotateY(8deg) scale(0.98);
+            @keyframes brandNavPulse {
+              0%, 100% {
+                box-shadow: 0 10px 24px rgba(2, 6, 23, 0.55), 0 0 0 2px rgba(15, 118, 110, 0.35);
               }
-              68% {
-                opacity: 1;
-                transform: translateY(-2px) translateX(8px) translateZ(6px) rotateY(-1deg) scale(1.02);
+              50% {
+                box-shadow: 0 12px 28px rgba(2, 6, 23, 0.62), 0 0 0 2px rgba(15, 118, 110, 0.58);
               }
-              100% {
-                opacity: 1;
-                transform: translateY(-2px) translateX(0) rotateY(0deg) scale(1.015);
-              }
-            }
-            @keyframes brandImageParallaxNext {
-              0% { transform: scale(1.09) translateX(58px); }
-              100% { transform: scale(1.01) translateX(0); }
-            }
-            @keyframes brandImageParallaxPrev {
-              0% { transform: scale(1.09) translateX(-58px); }
-              100% { transform: scale(1.01) translateX(0); }
-            }
-            @keyframes brandShelfDriftNext {
-              0% { transform: translateX(48px) translateZ(-8px) scale(0.99); opacity: 1; }
-              68% { transform: translateX(-4px) translateZ(0) scale(1.004); opacity: 1; }
-              100% { transform: translateX(0); opacity: 1; }
-            }
-            @keyframes brandShelfDriftPrev {
-              0% { transform: translateX(-48px) translateZ(-8px) scale(0.99); opacity: 1; }
-              68% { transform: translateX(4px) translateZ(0) scale(1.004); opacity: 1; }
-              100% { transform: translateX(0); opacity: 1; }
-            }
-            @keyframes brandSideOutLeft {
-              0% { opacity: 0.72; transform: translateX(40px) scale(0.93); }
-              100% { opacity: 0.86; transform: translateX(0) scale(1); }
-            }
-            @keyframes brandSideInRight {
-              0% { opacity: 0.72; transform: translateX(64px) scale(0.93); }
-              100% { opacity: 0.86; transform: translateX(0) scale(1); }
-            }
-            @keyframes brandSideInLeft {
-              0% { opacity: 0.72; transform: translateX(-64px) scale(0.93); }
-              100% { opacity: 0.86; transform: translateX(0) scale(1); }
-            }
-            @keyframes brandSideOutRight {
-              0% { opacity: 0.72; transform: translateX(-40px) scale(0.93); }
-              100% { opacity: 0.86; transform: translateX(0) scale(1); }
             }
 
             @media (min-width: 1024px) and (max-width: 1200px) {
               .latest-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
-              .brand-main-image-wrap { height: 140px; }
-              .brand-showcase.is-open .brand-main-image-wrap { height: 260px; }
+              .brand-cinema-track { height: 370px; --brand-step: clamp(132px, 17vw, 214px); }
             }
             @media (min-width: 768px) and (max-width: 1023px) {
               .latest-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-              .brand-stage { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); }
-              .brand-main-name { font-size: 22px; }
-              .brand-main-image-wrap { height: 130px; }
-              .brand-showcase.is-open .brand-main-image-wrap { height: 220px; }
+              .brand-cinema-track { height: 332px; --brand-step: clamp(118px, 21vw, 182px); }
+              .brand-cinema-card { width: clamp(268px, 66vw, 540px); }
+              .brand-cinema-meta { width: fit-content; max-width: calc(100% - 20px); padding: 8px 10px; gap: 7px; }
+              .brand-cinema-logo { width: 28px; height: 28px; }
+              .brand-cinema-name { font-size: clamp(13px, 1.9vw, 15px); }
+              .brand-cinema-state { font-size: 10px; padding: 5px 8px; }
+              .brand-logo-dot { width: 31px; height: 31px; padding: 5px; }
             }
             @media (max-width: 767px) {
               .latest-grid { grid-template-columns: 1fr !important; gap: 14px !important; padding-top: 10px !important; }
-              .brand-showcase { padding: 10px; }
-              .brand-stage { grid-template-columns: 1fr; gap: 8px; }
-              .brand-side-card { display: none; }
-              .brand-main-image-wrap { height: 140px; }
-              .brand-showcase.is-open .brand-main-image-wrap { height: 210px; }
-              .brand-main-name { font-size: 18px; }
-              .brand-nav { width: 42px; height: 42px; top: 34%; }
-              .brand-nav--left { left: 8px; }
-              .brand-nav--right { right: 8px; }
+              .brand-cinema { padding: 14px 10px 62px; }
+              .brand-cinema-track { height: 282px; --brand-step: 102px; --brand-far-step: 154px; }
+              .brand-cinema-card { width: min(92vw, 420px); border-radius: 14px; }
+              .brand-cinema-card[data-distance="-2"],
+              .brand-cinema-card[data-distance="2"] {
+                opacity: 0;
+                pointer-events: none;
+              }
+              .brand-cinema-card[data-distance="-1"] {
+                transform: translate3d(calc(-50% - var(--brand-step)), calc(-50% + 8px), -92px) rotateY(14deg) scale(0.84);
+                opacity: 0.34;
+              }
+              .brand-cinema-card[data-distance="1"] {
+                transform: translate3d(calc(-50% + var(--brand-step)), calc(-50% + 8px), -92px) rotateY(-14deg) scale(0.84);
+                opacity: 0.34;
+              }
+              .brand-cinema-meta { left: 8px; bottom: 8px; width: fit-content; max-width: calc(100% - 16px); padding: 8px 8px 7px; gap: 7px; }
+              .brand-cinema-logo { width: 24px; height: 24px; padding: 0; border-radius: 0; }
+              .brand-cinema-name { font-size: 13px; letter-spacing: 0.01em; }
+              .brand-cinema-state { font-size: 9px; padding: 5px 7px; letter-spacing: 0; }
+              .brand-logo-dots {
+                bottom: 10px;
+                padding: 0 6px 8px;
+                max-width: calc(100% - 108px);
+                gap: 6px;
+              }
+              .brand-logo-dot { width: 27px; height: 27px; padding: 4px; }
+              .brand-nav { width: 46px; height: 46px; top: 44%; }
+              .brand-nav svg { width: 22px; height: 22px; }
+              .brand-nav--left { left: 4px; }
+              .brand-nav--right { right: 4px; }
             }
           `}</style>
 
@@ -1961,87 +2101,118 @@ export default function LandingPage() {
             <div style={{ ...styles.sectionHeader, ...styles.containerHeader, marginBottom: 12 }}>
               <h2 style={styles.h2}>Популярни марки</h2>
               <p style={styles.sectionLead}>
-                Навигирай със стрелките и отвори избраната марка.
+                Избери марка и виж всички актуални обяви.
               </p>
             </div>
 
-            <div
-              className={`brand-showcase ${isBrandShowcaseOpen ? "is-open" : ""}`}
-              onMouseEnter={() => setIsBrandShowcaseHovered(true)}
-              onMouseLeave={() => setIsBrandShowcaseHovered(false)}
-            >
+            <div className="brand-cinema">
               <button
                 type="button"
                 className="brand-nav brand-nav--left"
                 aria-label="Предишна марка"
-                onClick={goToPrevBrand}
+                onClick={() => goToPrevBrand()}
               >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="m15 18-6-6 6-6" />
                 </svg>
               </button>
 
               <div
-                key={brandMotionKey}
-                className={`brand-stage ${brandSlideDirection === "next" ? "brand-stage--next" : "brand-stage--prev"}`}
+                className={`brand-cinema-track ${brandSlideDirection === "next" ? "brand-cinema-track--next" : "brand-cinema-track--prev"}`}
               >
-                <div className="brand-side-card brand-side-card--left" aria-hidden="true">
-                  <img src={getBrandHeroImage(leftBrand.name)} alt="" className="brand-side-bg" loading="eager" decoding="async" />
-                  <div className="brand-side-overlay" />
-                  <div className="brand-side-meta">
-                    <img src={leftBrand.logoUrl} alt="" className="brand-side-logo" loading="lazy" decoding="async" />
-                    <div className="brand-side-name">{leftBrand.name}</div>
-                  </div>
-                </div>
+                {visibleBrandCards.map((brandCard) => {
+                  const isCenterCard = brandCard.distance === 0;
+                  const isNearCenterCard = Math.abs(brandCard.distance) <= 1;
+                  const searchPath = `/search?brand=${encodeURIComponent(brandCard.name)}`;
 
-                <a
-                  href={`/search?brand=${encodeURIComponent(activeBrand.name)}`}
-                  className={`brand-main-card ${brandSlideDirection === "next" ? "brand-main-card--next" : "brand-main-card--prev"}`}
-                  aria-label={activeBrand.name}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    navigate(`/search?brand=${encodeURIComponent(activeBrand.name)}`);
-                  }}
-                >
-                  <div className={`brand-main-image-wrap ${brandSlideDirection === "next" ? "brand-main-image-wrap--next" : "brand-main-image-wrap--prev"}`}>
-                    <img
-                      src={getBrandHeroImage(activeBrand.name)}
-                      alt={activeBrand.name}
-                      className="brand-main-image"
-                      loading="eager"
-                      fetchPriority="high"
-                      decoding="async"
-                    />
-                  </div>
-                  <div className="brand-main-overlay" />
-                  <div className="brand-main-meta">
-                    <img src={activeBrand.logoUrl} alt="" className="brand-main-logo" loading="eager" decoding="async" />
-                    <div className="brand-main-name-badge">
-                      <div className="brand-main-name">{activeBrand.name}</div>
-                    </div>
-                  </div>
-                </a>
-
-                <div className="brand-side-card brand-side-card--right" aria-hidden="true">
-                  <img src={getBrandHeroImage(rightBrand.name)} alt="" className="brand-side-bg" loading="eager" decoding="async" />
-                  <div className="brand-side-overlay" />
-                  <div className="brand-side-meta">
-                    <img src={rightBrand.logoUrl} alt="" className="brand-side-logo" loading="lazy" decoding="async" />
-                    <div className="brand-side-name">{rightBrand.name}</div>
-                  </div>
-                </div>
+                  return (
+                    <button
+                      key={brandCard.name}
+                      type="button"
+                      className="brand-cinema-card"
+                      data-distance={brandCard.distance}
+                      style={{ zIndex: 20 - Math.abs(brandCard.distance) }}
+                      aria-label={
+                        isCenterCard
+                          ? `Отвори ${brandCard.name}`
+                          : `Премини към ${brandCard.name}`
+                      }
+                      onClick={() => {
+                        if (isCenterCard) {
+                          pauseBrandAutoplayUntilIdle();
+                          navigate(searchPath);
+                          return;
+                        }
+                        goToBrandByIndex(brandCard.index);
+                      }}
+                    >
+                      <img
+                        src={getBrandHeroImage(brandCard.name)}
+                        alt={brandCard.name}
+                        className="brand-cinema-image"
+                        loading={isNearCenterCard ? "eager" : "lazy"}
+                        fetchPriority={isCenterCard ? "high" : "auto"}
+                        decoding="async"
+                      />
+                      <span className="brand-cinema-border-line" aria-hidden="true">
+                        <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+                          <rect x="1.7" y="1.7" width="96.6" height="96.6" rx="9.8" ry="9.8" pathLength="100" />
+                        </svg>
+                      </span>
+                      <div className="brand-cinema-overlay" />
+                      <div className="brand-cinema-meta">
+                        <img
+                          src={brandCard.logoUrl}
+                          alt=""
+                          className="brand-cinema-logo"
+                          loading={isNearCenterCard ? "eager" : "lazy"}
+                          decoding="async"
+                        />
+                        <div className="brand-cinema-name">{brandCard.name}</div>
+                        <span className="brand-cinema-state">Към обяви</span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
 
               <button
                 type="button"
                 className="brand-nav brand-nav--right"
                 aria-label="Следваща марка"
-                onClick={goToNextBrand}
+                onClick={() => goToNextBrand()}
               >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="m9 18 6-6-6-6" />
                 </svg>
               </button>
+
+              <div className="brand-logo-dots" aria-label="Избери марка">
+                {POPULAR_CAR_BRANDS.map((brandItem, index) => {
+                  const isActiveLogo = index === activeBrandIndex;
+                  return (
+                    <button
+                      key={`brand-dot-${brandItem.name}`}
+                      type="button"
+                      className={`brand-logo-dot ${isActiveLogo ? "is-active" : ""}`}
+                      onClick={() => goToBrandByIndex(index)}
+                      aria-label={`Покажи ${brandItem.name}`}
+                      aria-current={isActiveLogo ? "true" : undefined}
+                    >
+                      <img src={brandItem.logoUrl} alt="" loading="lazy" decoding="async" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="brand-autoplay-meter" aria-hidden="true">
+              <span
+                key={`${activeBrand.name}-${isBrandAutoplayEnabled ? "auto" : "manual"}`}
+                className={`brand-autoplay-meter-fill ${
+                  isBrandAutoplayEnabled ? "is-running" : "is-stopped"
+                }`}
+              />
             </div>
           </div>
         </section>
