@@ -1,20 +1,23 @@
 {
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "https://api.example.com/api/:path*"
+      "source": "/api/(.)",
+      "destination": "http://51.21.180.238:8000/api/$1"
     },
+
     {
-      "source": "/media/:path*",
+      "source": "/media/:path",
       "destination": "https://api.example.com/media/:path*"
     },
+
     {
       "source": "/docs/api",
       "destination": "https://api.example.com/docs/api/"
     },
+
     {
-      "source": "/ws/:path*",
-      "destination": "https://api.example.com/ws/:path*"
+      "source": "/ws/:path",
+      "destination": "https://api.example.com/ws/:path"
     }
   ]
 }
