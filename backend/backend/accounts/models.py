@@ -60,6 +60,77 @@ class UserImportApiKey(models.Model):
         verbose_name_plural = "User Import API Keys"
 
 
+class ImportApiUsageEvent(models.Model):
+    """Audit log for import API requests coming from external clients."""
+
+    SOURCE_EXTENSION = "extension"
+    SOURCE_PUBLIC_API = "public_api"
+    SOURCE_UNKNOWN = "unknown"
+    SOURCE_CHOICES = (
+        (SOURCE_EXTENSION, "Chrome Extension"),
+        (SOURCE_PUBLIC_API, "Public API"),
+        (SOURCE_UNKNOWN, "Unknown"),
+    )
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name="import_api_usage_events",
+        null=True,
+        blank=True,
+    )
+    api_key = models.ForeignKey(
+        UserImportApiKey,
+        on_delete=models.SET_NULL,
+        related_name="usage_events",
+        null=True,
+        blank=True,
+    )
+    imported_listing = models.ForeignKey(
+        "listings.CarListing",
+        on_delete=models.SET_NULL,
+        related_name="import_api_usage_events",
+        null=True,
+        blank=True,
+    )
+    imported_listing_id_snapshot = models.PositiveIntegerField(null=True, blank=True)
+
+    endpoint = models.CharField(max_length=120, default="/api/auth/import/copart/")
+    request_method = models.CharField(max_length=12, default="POST")
+    source = models.CharField(
+        max_length=20,
+        choices=SOURCE_CHOICES,
+        default=SOURCE_EXTENSION,
+    )
+    status_code = models.PositiveSmallIntegerField(default=0, db_index=True)
+    success = models.BooleanField(default=False, db_index=True)
+
+    lot_number = models.CharField(max_length=80, blank=True)
+    source_url = models.URLField(max_length=1000, blank=True)
+    source_host = models.CharField(max_length=255, blank=True, db_index=True)
+    request_ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=512, blank=True)
+    extension_version = models.CharField(max_length=32, blank=True)
+    payload_bytes = models.PositiveIntegerField(null=True, blank=True)
+    duration_ms = models.PositiveIntegerField(null=True, blank=True)
+    error_message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    def __str__(self):
+        owner = self.user.email if self.user else "anonymous"
+        return f"{self.endpoint} {self.status_code} ({owner})"
+
+    class Meta:
+        verbose_name = "Import API Usage Event"
+        verbose_name_plural = "Import API Usage Events"
+        indexes = [
+            models.Index(fields=["user", "created_at"], name="impapi_usr_created_idx"),
+            models.Index(fields=["source", "created_at"], name="impapi_src_created_idx"),
+            models.Index(fields=["success", "created_at"], name="impapi_ok_created_idx"),
+            models.Index(fields=["status_code", "created_at"], name="impapi_st_created_idx"),
+        ]
+
+
 # Signal to create UserProfile when a new User is created
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):

@@ -350,6 +350,65 @@ class CarListingPriceHistory(models.Model):
         return f"Price change for {self.listing_id}: {self.old_price} -> {self.new_price}"
 
 
+class ListingPurchase(models.Model):
+    """Persistent history of balance purchases for TOP/VIP listing actions."""
+
+    LISTING_TYPE_TOP = "top"
+    LISTING_TYPE_VIP = "vip"
+    LISTING_TYPE_CHOICES = [
+        (LISTING_TYPE_TOP, "Top"),
+        (LISTING_TYPE_VIP, "VIP"),
+    ]
+
+    SOURCE_PUBLISH = "publish"
+    SOURCE_REPUBLISH = "republish"
+    SOURCE_PROMOTE = "promote"
+    SOURCE_UNKNOWN = "unknown"
+    SOURCE_CHOICES = [
+        (SOURCE_PUBLISH, "Publish"),
+        (SOURCE_REPUBLISH, "Republish"),
+        (SOURCE_PROMOTE, "Promote"),
+        (SOURCE_UNKNOWN, "Unknown"),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="listing_purchases")
+    listing = models.ForeignKey(
+        CarListing,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="purchase_records",
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    base_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=3, default="EUR")
+    listing_type = models.CharField(max_length=10, choices=LISTING_TYPE_CHOICES)
+    plan = models.CharField(max_length=12)
+    source = models.CharField(max_length=16, choices=SOURCE_CHOICES, default=SOURCE_UNKNOWN)
+    discount_ratio = models.DecimalField(max_digits=6, decimal_places=4, null=True, blank=True)
+    listing_title_snapshot = models.CharField(max_length=200, blank=True)
+    listing_brand_snapshot = models.CharField(max_length=100, blank=True)
+    listing_model_snapshot = models.CharField(max_length=100, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["created_at"], name="lpurch_created_idx"),
+            models.Index(fields=["user", "created_at"], name="lpurch_user_created_idx"),
+            models.Index(fields=["listing_type", "created_at"], name="lpurch_type_created_idx"),
+            models.Index(fields=["source", "created_at"], name="lpurch_source_created_idx"),
+            models.Index(fields=["plan", "created_at"], name="lpurch_plan_created_idx"),
+        ]
+
+    def __str__(self):
+        return (
+            f"ListingPurchase(user={self.user_id}, listing={self.listing_id}, "
+            f"type={self.listing_type}, plan={self.plan}, amount={self.amount})"
+        )
+
+
 class CarsListing(models.Model):
     """Dedicated details model for main_category='1' (Автомобили и Джипове)."""
     listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='cars_details')

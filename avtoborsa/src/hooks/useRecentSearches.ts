@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { getMainCategoryLabel } from "../constants/mobileBgData";
+import { useAuth } from "../context/AuthContext";
 
 export interface RecentSearch {
   id: string;
@@ -8,23 +9,38 @@ export interface RecentSearch {
   displayLabel: string;
 }
 
-const STORAGE_KEY = "recent_searches";
+const STORAGE_KEY_PREFIX = "recent_searches_user_";
+const GUEST_STORAGE_KEY = "recent_searches_guest";
 const MAX_SEARCHES = 5;
 
+const getRecentSearchesStorageKey = (userId?: number | null) => {
+  if (!userId) {
+    return GUEST_STORAGE_KEY;
+  }
+  return `${STORAGE_KEY_PREFIX}${userId}`;
+};
+
 export const useRecentSearches = () => {
+  const { user } = useAuth();
+  const storageKey = useMemo(() => getRecentSearchesStorageKey(user?.id), [user?.id]);
   const [searches, setSearches] = useState<RecentSearch[]>([]);
 
-  // Load searches from localStorage on mount
+  // Load searches from user-scoped localStorage key
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        setSearches(JSON.parse(stored));
-      } catch (e) {
-        console.error("Error loading recent searches:", e);
-      }
+    const stored = localStorage.getItem(storageKey);
+    if (!stored) {
+      setSearches([]);
+      return;
     }
-  }, []);
+
+    try {
+      const parsed = JSON.parse(stored);
+      setSearches(Array.isArray(parsed) ? parsed : []);
+    } catch (e) {
+      console.error("Error loading recent searches:", e);
+      setSearches([]);
+    }
+  }, [storageKey]);
 
   const addSearch = (criteria: Record<string, any>) => {
     const displayLabel = generateSearchLabel(criteria);
@@ -36,25 +52,29 @@ export const useRecentSearches = () => {
       displayLabel,
     };
 
-    // Remove duplicate search if it exists (by criteria)
-    const filtered = searches.filter((s) => JSON.stringify(s.criteria) !== JSON.stringify(criteria));
+    setSearches((prev) => {
+      // Remove duplicate search if it exists (by criteria)
+      const filtered = prev.filter((s) => JSON.stringify(s.criteria) !== JSON.stringify(criteria));
 
-    // Add new search at the beginning and keep only MAX_SEARCHES
-    const updated = [newSearch, ...filtered].slice(0, MAX_SEARCHES);
+      // Add new search at the beginning and keep only MAX_SEARCHES
+      const updated = [newSearch, ...filtered].slice(0, MAX_SEARCHES);
 
-    setSearches(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const removeSearch = (id: string) => {
-    const updated = searches.filter((s) => s.id !== id);
-    setSearches(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    setSearches((prev) => {
+      const updated = prev.filter((s) => s.id !== id);
+      localStorage.setItem(storageKey, JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const clearAllSearches = () => {
     setSearches([]);
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(storageKey);
   };
 
   return {

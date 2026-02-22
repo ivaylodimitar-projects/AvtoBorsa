@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useState } from "react";
-import { BadgePercent, Coins, CreditCard, ShieldCheck, X } from "lucide-react";
+import { BadgePercent, Coins, CreditCard, ShieldCheck } from "lucide-react";
 
 interface TopUpModalProps {
   onClose: () => void;
@@ -117,6 +117,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [isCloseHovered, setIsCloseHovered] = useState(false);
 
   const amountValue = parseAmount(amount) ?? 0;
   const selectedBonus =
@@ -319,14 +320,29 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
       width: 34,
       height: 34,
       borderRadius: 10,
-      border: "1px solid #d1d5db",
-      background: "#ffffff",
-      color: "#64748b",
+      border: "1px solid #a8adb3",
+      background: "#f1f5f9",
+      color: "#1f2937",
       cursor: "pointer",
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
       flexShrink: 0,
+      transition: "color 0.18s ease, background-color 0.18s ease, border-color 0.18s ease",
+    },
+    closeButtonHover: {
+      color: "#dc2626",
+      background: "#fef2f2",
+      borderColor: "#fecaca",
+    },
+    closeButtonGlyph: {
+      fontSize: 22,
+      lineHeight: 1,
+      fontWeight: 700,
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      transform: "translateY(-1px)",
     },
     content: {
       padding: "18px 22px 22px",
@@ -671,11 +687,18 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
             </div>
             <button
               type="button"
-              style={styles.closeButton}
+              style={{
+                ...styles.closeButton,
+                ...(isCloseHovered ? styles.closeButtonHover : {}),
+              }}
               onClick={onClose}
+              onMouseEnter={() => setIsCloseHovered(true)}
+              onMouseLeave={() => setIsCloseHovered(false)}
               aria-label="Затвори"
             >
-              <X size={16} />
+              <span aria-hidden="true" style={styles.closeButtonGlyph}>
+                ×
+              </span>
             </button>
           </div>
         </div>

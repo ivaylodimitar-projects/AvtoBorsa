@@ -11,6 +11,8 @@ urlpatterns = [
     path("users/<int:user_id>/", views.admin_user_update, name="admin_user_update"),
     path("users/<int:user_id>/delete/", views.admin_user_delete, name="admin_user_delete"),
     path("transactions/", views.admin_transactions, name="admin_transactions"),
+    path("site-purchases/", views.admin_site_purchases, name="admin_site_purchases"),
+    path("extension-usage/", views.admin_extension_usage, name="admin_extension_usage"),
     path("reports/", views.admin_reports, name="admin_reports"),
     path("reports/<int:report_id>/delete/", views.admin_report_delete, name="admin_report_delete"),
 ]

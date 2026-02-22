@@ -2,7 +2,7 @@ from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.contrib.auth.models import User
-from django.db.models import Count, Q, Sum, Value
+from django.db.models import Avg, Case, Count, IntegerField, Max, Q, Sum, Value, When
 from django.db.models.functions import Coalesce, TruncDate
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -11,10 +11,11 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
-from backend.accounts.models import BusinessUser, UserProfile
+from backend.accounts.models import BusinessUser, ImportApiUsageEvent, UserProfile
 from backend.listings.models import (
     CarListing,
     Favorite,
+    ListingPurchase,
     ListingAnonymousView,
     ListingView,
     get_expiry_cutoff,
@@ -195,6 +196,10 @@ def admin_overview(request):
     tx_amount_total = tx_succeeded.aggregate(
         total=Coalesce(Sum("amount"), Value(Decimal("0.00")))
     )["total"]
+    site_purchases = ListingPurchase.objects.all()
+    site_purchases_amount_total = site_purchases.aggregate(
+        total=Coalesce(Sum("amount"), Value(Decimal("0.00")))
+    )["total"]
 
     views_total = CarListing.objects.aggregate(total=Coalesce(Sum("view_count"), Value(0)))["total"]
 
@@ -291,6 +296,8 @@ def admin_overview(request):
                 "transactions_total": tx_all.count(),
                 "transactions_succeeded": tx_succeeded.count(),
                 "transactions_amount_total": float(tx_amount_total or Decimal("0.00")),
+                "site_purchases_total": site_purchases.count(),
+                "site_purchases_amount_total": float(site_purchases_amount_total or Decimal("0.00")),
                 "reports_total": ListingReport.objects.count(),
                 "favorites_total": Favorite.objects.count(),
                 "views_total": int(views_total or 0),
@@ -577,12 +584,16 @@ def admin_user_update(request, user_id):
     target = get_object_or_404(User.objects.select_related("profile", "business_profile"), pk=user_id)
     data = request.data
     changed = False
+    user_changed = False
+    profile_changed = False
+    profile = None
 
     if "is_active" in data:
         parsed = _parse_bool(data.get("is_active"))
         if parsed is None:
             return Response({"error": "Invalid is_active value."}, status=status.HTTP_400_BAD_REQUEST)
         target.is_active = parsed
+        user_changed = True
         changed = True
 
     for field in ("is_staff", "is_superuser"):
@@ -607,6 +618,7 @@ def admin_user_update(request, user_id):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
         setattr(target, field, parsed)
+        user_changed = True
         changed = True
 
     if "balance" in data:
@@ -616,16 +628,41 @@ def admin_user_update(request, user_id):
                 {"error": "Invalid balance value."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        profile, _ = UserProfile.objects.get_or_create(user=target)
+        if profile is None:
+            profile, _ = UserProfile.objects.get_or_create(user=target)
         profile.balance = parsed_balance
-        profile.save(update_fields=["balance", "updated_at"])
+        profile_changed = True
+        changed = True
+
+    if "balance_delta" in data or "add_balance" in data:
+        raw_delta = data.get("balance_delta") if "balance_delta" in data else data.get("add_balance")
+        parsed_delta = _to_decimal(raw_delta)
+        if parsed_delta is None:
+            return Response(
+                {"error": "Invalid balance delta value."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if profile is None:
+            profile, _ = UserProfile.objects.get_or_create(user=target)
+        next_balance = profile.balance + parsed_delta
+        if next_balance < 0:
+            return Response(
+                {"error": "Balance cannot be negative."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        profile.balance = next_balance
+        profile_changed = True
         changed = True
 
     if not changed:
         return Response({"error": "No valid fields provided for update."}, status=status.HTTP_400_BAD_REQUEST)
 
-    target.save()
-    target.refresh_from_db()
+    if user_changed:
+        target.save()
+    if profile_changed and profile is not None:
+        profile.save(update_fields=["balance", "updated_at"])
+
+    target = User.objects.select_related("profile", "business_profile").get(pk=target.pk)
     return Response(_serialize_user(target), status=status.HTTP_200_OK)
 
 
@@ -720,6 +757,545 @@ def admin_transactions(request):
                 for tx in items
             ],
             "pagination": pagination,
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def admin_site_purchases(request):
+    queryset = ListingPurchase.objects.select_related("user", "listing")
+
+    search_query = (request.query_params.get("q") or "").strip()
+    if search_query:
+        queryset = queryset.filter(
+            Q(user__email__icontains=search_query)
+            | Q(user__username__icontains=search_query)
+            | Q(user__first_name__icontains=search_query)
+            | Q(user__last_name__icontains=search_query)
+            | Q(listing_title_snapshot__icontains=search_query)
+            | Q(listing_brand_snapshot__icontains=search_query)
+            | Q(listing_model_snapshot__icontains=search_query)
+            | Q(plan__icontains=search_query)
+        )
+
+    listing_type_filter = (request.query_params.get("listing_type") or "").strip().lower()
+    if listing_type_filter in {
+        ListingPurchase.LISTING_TYPE_TOP,
+        ListingPurchase.LISTING_TYPE_VIP,
+    }:
+        queryset = queryset.filter(listing_type=listing_type_filter)
+
+    source_filter = (request.query_params.get("source") or "").strip().lower()
+    allowed_sources = {
+        ListingPurchase.SOURCE_PUBLISH,
+        ListingPurchase.SOURCE_REPUBLISH,
+        ListingPurchase.SOURCE_PROMOTE,
+        ListingPurchase.SOURCE_UNKNOWN,
+    }
+    if source_filter in allowed_sources:
+        queryset = queryset.filter(source=source_filter)
+
+    plan_filter = (request.query_params.get("plan") or "").strip().lower()
+    if plan_filter:
+        queryset = queryset.filter(plan=plan_filter)
+
+    user_id = request.query_params.get("user_id")
+    if user_id:
+        try:
+            queryset = queryset.filter(user_id=int(user_id))
+        except (TypeError, ValueError):
+            return Response({"error": "Invalid user_id value."}, status=status.HTTP_400_BAD_REQUEST)
+
+    sort_mapping = {
+        "newest": "-created_at",
+        "oldest": "created_at",
+        "amount_desc": "-amount",
+        "amount_asc": "amount",
+    }
+    sort_by = (request.query_params.get("sort") or "newest").strip().lower()
+    queryset = queryset.order_by(sort_mapping.get(sort_by, "-created_at"), "-id")
+
+    items, pagination = _paginate_queryset(queryset, request)
+
+    total_amount = queryset.aggregate(
+        total=Coalesce(Sum("amount"), Value(Decimal("0.00")))
+    )["total"] or Decimal("0.00")
+    total_count = queryset.count()
+
+    type_breakdown = [
+        {
+            "listing_type": row["listing_type"],
+            "count": int(row["count"] or 0),
+            "amount": float(row["amount"] or Decimal("0.00")),
+        }
+        for row in queryset.values("listing_type")
+        .annotate(
+            count=Count("id"),
+            amount=Coalesce(Sum("amount"), Value(Decimal("0.00"))),
+        )
+        .order_by("-count", "-amount")
+    ]
+
+    source_breakdown = [
+        {
+            "source": row["source"],
+            "count": int(row["count"] or 0),
+            "amount": float(row["amount"] or Decimal("0.00")),
+        }
+        for row in queryset.values("source")
+        .annotate(
+            count=Count("id"),
+            amount=Coalesce(Sum("amount"), Value(Decimal("0.00"))),
+        )
+        .order_by("-count", "-amount")
+    ]
+
+    plan_breakdown = [
+        {
+            "listing_type": row["listing_type"],
+            "plan": row["plan"],
+            "count": int(row["count"] or 0),
+            "amount": float(row["amount"] or Decimal("0.00")),
+        }
+        for row in queryset.values("listing_type", "plan")
+        .annotate(
+            count=Count("id"),
+            amount=Coalesce(Sum("amount"), Value(Decimal("0.00"))),
+        )
+        .order_by("-count", "-amount", "listing_type", "plan")
+    ]
+
+    top_listings = [
+        {
+            "listing_id": row["listing_id"],
+            "title": row["title"] or "",
+            "brand": row["brand"] or "",
+            "model": row["model"] or "",
+            "count": int(row["count"] or 0),
+            "amount": float(row["amount"] or Decimal("0.00")),
+        }
+        for row in queryset.exclude(listing_id__isnull=True)
+        .values("listing_id")
+        .annotate(
+            count=Count("id"),
+            amount=Coalesce(Sum("amount"), Value(Decimal("0.00"))),
+            title=Max("listing_title_snapshot"),
+            brand=Max("listing_brand_snapshot"),
+            model=Max("listing_model_snapshot"),
+        )
+        .order_by("-count", "-amount", "-listing_id")[:100]
+    ]
+
+    top_users = []
+    top_users_rows = (
+        queryset.values(
+            "user_id",
+            "user__email",
+            "user__username",
+            "user__first_name",
+            "user__last_name",
+        )
+        .annotate(
+            count=Count("id"),
+            amount=Coalesce(Sum("amount"), Value(Decimal("0.00"))),
+        )
+        .order_by("-count", "-amount", "user__email")[:100]
+    )
+    for row in top_users_rows:
+        first_name = str(row.get("user__first_name") or "").strip()
+        last_name = str(row.get("user__last_name") or "").strip()
+        full_name = f"{first_name} {last_name}".strip()
+        top_users.append(
+            {
+                "user_id": row["user_id"],
+                "email": row["user__email"],
+                "name": full_name or row["user__username"] or row["user__email"],
+                "count": int(row["count"] or 0),
+                "amount": float(row["amount"] or Decimal("0.00")),
+            }
+        )
+
+    today = timezone.localdate()
+    start_date = today - timedelta(days=29)
+    day_keys = [start_date + timedelta(days=offset) for offset in range(30)]
+    daily_map = {day: {"count": 0, "amount": Decimal("0.00")} for day in day_keys}
+    daily_rows = (
+        queryset.filter(created_at__date__gte=start_date)
+        .annotate(day=TruncDate("created_at"))
+        .values("day")
+        .annotate(
+            count=Count("id"),
+            amount=Coalesce(Sum("amount"), Value(Decimal("0.00"))),
+        )
+        .order_by("day")
+    )
+    for row in daily_rows:
+        day = row.get("day")
+        if day in daily_map:
+            daily_map[day]["count"] = int(row.get("count") or 0)
+            daily_map[day]["amount"] = row.get("amount") or Decimal("0.00")
+    daily_series = [
+        {
+            "date": day.isoformat(),
+            "count": daily_map[day]["count"],
+            "amount": float(daily_map[day]["amount"]),
+        }
+        for day in day_keys
+    ]
+
+    return Response(
+        {
+            "results": [
+                {
+                    "id": item.id,
+                    "user_id": item.user_id,
+                    "user_email": item.user.email,
+                    "user_name": (
+                        item.user.get_full_name().strip()
+                        or item.user.username
+                        or item.user.email
+                    ),
+                    "listing_id": item.listing_id,
+                    "listing_title": item.listing_title_snapshot
+                    or (item.listing.title if item.listing else ""),
+                    "listing_brand": item.listing_brand_snapshot
+                    or (item.listing.brand if item.listing else ""),
+                    "listing_model": item.listing_model_snapshot
+                    or (item.listing.model if item.listing else ""),
+                    "listing_type": item.listing_type,
+                    "plan": item.plan,
+                    "source": item.source,
+                    "amount": float(item.amount),
+                    "base_amount": float(item.base_amount),
+                    "discount_ratio": (
+                        float(item.discount_ratio) if item.discount_ratio is not None else None
+                    ),
+                    "currency": item.currency,
+                    "created_at": item.created_at,
+                }
+                for item in items
+            ],
+            "pagination": pagination,
+            "summary": {
+                "totals": {
+                    "count": int(total_count or 0),
+                    "amount": float(total_amount),
+                },
+                "breakdown": {
+                    "by_type": type_breakdown,
+                    "by_source": source_breakdown,
+                    "by_plan": plan_breakdown,
+                },
+                "top": {
+                    "listings": top_listings,
+                    "users": top_users,
+                },
+                "series": {
+                    "daily_last_30_days": daily_series,
+                },
+            },
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def admin_extension_usage(request):
+    queryset = ImportApiUsageEvent.objects.select_related(
+        "user",
+        "api_key",
+        "imported_listing",
+    )
+
+    search_query = (request.query_params.get("q") or "").strip()
+    if search_query:
+        queryset = queryset.filter(
+            Q(user__email__icontains=search_query)
+            | Q(user__username__icontains=search_query)
+            | Q(user__first_name__icontains=search_query)
+            | Q(user__last_name__icontains=search_query)
+            | Q(lot_number__icontains=search_query)
+            | Q(source_url__icontains=search_query)
+            | Q(source_host__icontains=search_query)
+            | Q(user_agent__icontains=search_query)
+            | Q(error_message__icontains=search_query)
+            | Q(endpoint__icontains=search_query)
+        )
+
+    success_filter = _parse_bool(request.query_params.get("success"))
+    if success_filter is not None:
+        queryset = queryset.filter(success=success_filter)
+
+    source_filter = (request.query_params.get("source") or "").strip().lower()
+    allowed_sources = {
+        ImportApiUsageEvent.SOURCE_EXTENSION,
+        ImportApiUsageEvent.SOURCE_PUBLIC_API,
+        ImportApiUsageEvent.SOURCE_UNKNOWN,
+    }
+    if source_filter in allowed_sources:
+        queryset = queryset.filter(source=source_filter)
+
+    has_import_filter = _parse_bool(request.query_params.get("has_import"))
+    if has_import_filter is True:
+        queryset = queryset.filter(imported_listing_id_snapshot__isnull=False)
+    elif has_import_filter is False:
+        queryset = queryset.filter(imported_listing_id_snapshot__isnull=True)
+
+    status_code_raw = request.query_params.get("status_code")
+    if status_code_raw is not None and str(status_code_raw).strip() != "":
+        try:
+            queryset = queryset.filter(status_code=int(status_code_raw))
+        except (TypeError, ValueError):
+            return Response({"error": "Invalid status_code value."}, status=status.HTTP_400_BAD_REQUEST)
+
+    user_id_raw = request.query_params.get("user_id")
+    if user_id_raw is not None and str(user_id_raw).strip() != "":
+        try:
+            queryset = queryset.filter(user_id=int(user_id_raw))
+        except (TypeError, ValueError):
+            return Response({"error": "Invalid user_id value."}, status=status.HTTP_400_BAD_REQUEST)
+
+    endpoint_filter = (request.query_params.get("endpoint") or "").strip()
+    if endpoint_filter:
+        queryset = queryset.filter(endpoint__icontains=endpoint_filter)
+
+    sort_mapping = {
+        "newest": "-created_at",
+        "oldest": "created_at",
+        "status_desc": "-status_code",
+        "status_asc": "status_code",
+        "duration_desc": "-duration_ms",
+        "duration_asc": "duration_ms",
+    }
+    sort_by = (request.query_params.get("sort") or "newest").strip().lower()
+    queryset = queryset.order_by(sort_mapping.get(sort_by, "-created_at"), "-id")
+
+    items, pagination = _paginate_queryset(queryset, request)
+
+    total_requests = queryset.count()
+    success_requests = queryset.filter(success=True).count()
+    failed_requests = queryset.filter(success=False).count()
+    unique_users = queryset.exclude(user_id__isnull=True).values("user_id").distinct().count()
+    imported_listings = queryset.filter(imported_listing_id_snapshot__isnull=False).count()
+
+    avg_duration_value = queryset.exclude(duration_ms__isnull=True).aggregate(
+        avg=Avg("duration_ms")
+    )["avg"]
+    avg_duration_ms = int(avg_duration_value) if avg_duration_value is not None else None
+
+    status_breakdown = [
+        {
+            "status_code": int(row["status_code"] or 0),
+            "count": int(row["count"] or 0),
+        }
+        for row in queryset.values("status_code")
+        .annotate(count=Count("id"))
+        .order_by("-count", "status_code")[:50]
+    ]
+
+    source_breakdown = [
+        {
+            "source": row["source"],
+            "count": int(row["count"] or 0),
+        }
+        for row in queryset.values("source")
+        .annotate(count=Count("id"))
+        .order_by("-count", "source")[:20]
+    ]
+
+    host_breakdown = [
+        {
+            "source_host": row["source_host"],
+            "count": int(row["count"] or 0),
+        }
+        for row in queryset.exclude(source_host="")
+        .values("source_host")
+        .annotate(count=Count("id"))
+        .order_by("-count", "source_host")[:100]
+    ]
+
+    top_users = []
+    top_users_rows = (
+        queryset.exclude(user_id__isnull=True)
+        .values(
+            "user_id",
+            "user__email",
+            "user__username",
+            "user__first_name",
+            "user__last_name",
+        )
+        .annotate(
+            count=Count("id"),
+            success_count=Coalesce(
+                Sum(
+                    Case(
+                        When(success=True, then=1),
+                        default=0,
+                        output_field=IntegerField(),
+                    )
+                ),
+                Value(0),
+            ),
+            failed_count=Coalesce(
+                Sum(
+                    Case(
+                        When(success=False, then=1),
+                        default=0,
+                        output_field=IntegerField(),
+                    )
+                ),
+                Value(0),
+            ),
+            imports_count=Coalesce(
+                Sum(
+                    Case(
+                        When(imported_listing_id_snapshot__isnull=False, then=1),
+                        default=0,
+                        output_field=IntegerField(),
+                    )
+                ),
+                Value(0),
+            ),
+            last_used=Max("created_at"),
+        )
+        .order_by("-count", "user__email")[:100]
+    )
+    for row in top_users_rows:
+        first_name = str(row.get("user__first_name") or "").strip()
+        last_name = str(row.get("user__last_name") or "").strip()
+        full_name = f"{first_name} {last_name}".strip()
+        top_users.append(
+            {
+                "user_id": row["user_id"],
+                "email": row["user__email"],
+                "name": full_name or row["user__username"] or row["user__email"],
+                "count": int(row["count"] or 0),
+                "success": int(row["success_count"] or 0),
+                "failed": int(row["failed_count"] or 0),
+                "imports": int(row["imports_count"] or 0),
+                "last_used": row.get("last_used"),
+            }
+        )
+
+    today = timezone.localdate()
+    start_date = today - timedelta(days=29)
+    day_keys = [start_date + timedelta(days=offset) for offset in range(30)]
+    daily_map = {day: {"count": 0, "success": 0, "failed": 0} for day in day_keys}
+    daily_rows = (
+        queryset.filter(created_at__date__gte=start_date)
+        .annotate(day=TruncDate("created_at"))
+        .values("day")
+        .annotate(
+            count=Count("id"),
+            success_count=Coalesce(
+                Sum(
+                    Case(
+                        When(success=True, then=1),
+                        default=0,
+                        output_field=IntegerField(),
+                    )
+                ),
+                Value(0),
+            ),
+            failed_count=Coalesce(
+                Sum(
+                    Case(
+                        When(success=False, then=1),
+                        default=0,
+                        output_field=IntegerField(),
+                    )
+                ),
+                Value(0),
+            ),
+        )
+        .order_by("day")
+    )
+    for row in daily_rows:
+        day = row.get("day")
+        if day in daily_map:
+            daily_map[day]["count"] = int(row.get("count") or 0)
+            daily_map[day]["success"] = int(row.get("success_count") or 0)
+            daily_map[day]["failed"] = int(row.get("failed_count") or 0)
+
+    daily_series = [
+        {
+            "date": day.isoformat(),
+            "count": daily_map[day]["count"],
+            "success": daily_map[day]["success"],
+            "failed": daily_map[day]["failed"],
+        }
+        for day in day_keys
+    ]
+
+    return Response(
+        {
+            "results": [
+                {
+                    "id": item.id,
+                    "created_at": item.created_at,
+                    "user_id": item.user_id,
+                    "user_email": item.user.email if item.user else "",
+                    "user_name": (
+                        item.user.get_full_name().strip() if item.user else ""
+                    )
+                    or (item.user.username if item.user else "")
+                    or (item.user.email if item.user else ""),
+                    "key_prefix": item.api_key.key_prefix if item.api_key else "",
+                    "endpoint": item.endpoint,
+                    "request_method": item.request_method,
+                    "source": item.source,
+                    "source_host": item.source_host,
+                    "status_code": int(item.status_code or 0),
+                    "success": bool(item.success),
+                    "lot_number": item.lot_number,
+                    "source_url": item.source_url,
+                    "imported_listing_id": item.imported_listing_id_snapshot
+                    or item.imported_listing_id,
+                    "imported_listing_slug": (
+                        item.imported_listing.slug if item.imported_listing else ""
+                    ),
+                    "imported_listing_title": (
+                        item.imported_listing.title if item.imported_listing else ""
+                    ),
+                    "request_ip": item.request_ip,
+                    "user_agent": item.user_agent,
+                    "extension_version": item.extension_version,
+                    "payload_bytes": item.payload_bytes,
+                    "duration_ms": item.duration_ms,
+                    "error_message": item.error_message,
+                }
+                for item in items
+            ],
+            "pagination": pagination,
+            "summary": {
+                "totals": {
+                    "requests": int(total_requests or 0),
+                    "success": int(success_requests or 0),
+                    "failed": int(failed_requests or 0),
+                    "success_rate": (
+                        round((success_requests * 100.0) / total_requests, 2)
+                        if total_requests
+                        else 0.0
+                    ),
+                    "unique_users": int(unique_users or 0),
+                    "imports": int(imported_listings or 0),
+                    "avg_duration_ms": avg_duration_ms,
+                },
+                "breakdown": {
+                    "by_status": status_breakdown,
+                    "by_source": source_breakdown,
+                    "by_host": host_breakdown,
+                },
+                "top": {
+                    "users": top_users,
+                },
+                "series": {
+                    "daily_last_30_days": daily_series,
+                },
+            },
         },
         status=status.HTTP_200_OK,
     )

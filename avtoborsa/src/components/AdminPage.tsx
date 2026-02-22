@@ -6,8 +6,9 @@ import { useAuth } from "../context/AuthContext";
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/+$/, "");
 const ACCESS_TOKEN_KEY = "authToken";
 
-type TabKey = "dashboard" | "listings" | "users" | "transactions" | "reports";
+type TabKey = "dashboard" | "listings" | "users" | "transactions" | "extensionApi" | "reports";
 type Tone = "default" | "success" | "warning" | "danger" | "info";
+type TransactionsInnerTab = "topups" | "sitePurchases";
 
 interface Pagination {
   page: number;
@@ -28,6 +29,8 @@ interface Overview {
     views_total: number;
     transactions_total: number;
     transactions_amount_total: number;
+    site_purchases_total?: number;
+    site_purchases_amount_total?: number;
     reports_total: number;
   };
   series: {
@@ -78,6 +81,157 @@ interface AdminTransaction {
   stripe_session_id: string;
 }
 
+interface AdminSitePurchase {
+  id: number;
+  user_id: number;
+  user_email: string;
+  user_name: string;
+  listing_id: number | null;
+  listing_title: string;
+  listing_brand: string;
+  listing_model: string;
+  listing_type: "top" | "vip";
+  plan: string;
+  source: "publish" | "republish" | "promote" | "unknown";
+  amount: number;
+  base_amount: number;
+  discount_ratio: number | null;
+  currency: string;
+  created_at: string;
+}
+
+interface SitePurchaseBreakdownEntry {
+  listing_type?: string;
+  source?: string;
+  plan?: string;
+  count: number;
+  amount: number;
+}
+
+interface SitePurchaseTopListing {
+  listing_id: number;
+  title: string;
+  brand: string;
+  model: string;
+  count: number;
+  amount: number;
+}
+
+interface SitePurchaseTopUser {
+  user_id: number;
+  email: string;
+  name: string;
+  count: number;
+  amount: number;
+}
+
+interface SitePurchaseDailySeries {
+  date: string;
+  count: number;
+  amount: number;
+}
+
+interface SitePurchaseSummary {
+  totals: {
+    count: number;
+    amount: number;
+  };
+  breakdown: {
+    by_type: SitePurchaseBreakdownEntry[];
+    by_source: SitePurchaseBreakdownEntry[];
+    by_plan: SitePurchaseBreakdownEntry[];
+  };
+  top: {
+    listings: SitePurchaseTopListing[];
+    users: SitePurchaseTopUser[];
+  };
+  series: {
+    daily_last_30_days: SitePurchaseDailySeries[];
+  };
+}
+
+interface AdminSitePurchaseResponse extends Paged<AdminSitePurchase> {
+  summary: SitePurchaseSummary;
+}
+
+interface AdminExtensionUsageEvent {
+  id: number;
+  created_at: string;
+  user_id: number | null;
+  user_email: string;
+  user_name: string;
+  key_prefix: string;
+  endpoint: string;
+  request_method: string;
+  source: "extension" | "public_api" | "unknown" | string;
+  source_host: string;
+  status_code: number;
+  success: boolean;
+  lot_number: string;
+  source_url: string;
+  imported_listing_id: number | null;
+  imported_listing_slug: string;
+  imported_listing_title: string;
+  request_ip: string | null;
+  user_agent: string;
+  extension_version: string;
+  payload_bytes: number | null;
+  duration_ms: number | null;
+  error_message: string;
+}
+
+interface ExtensionUsageBreakdownEntry {
+  source?: string;
+  source_host?: string;
+  status_code?: number;
+  count: number;
+}
+
+interface ExtensionUsageTopUser {
+  user_id: number;
+  email: string;
+  name: string;
+  count: number;
+  success: number;
+  failed: number;
+  imports: number;
+  last_used: string | null;
+}
+
+interface ExtensionUsageDailySeries {
+  date: string;
+  count: number;
+  success: number;
+  failed: number;
+}
+
+interface ExtensionUsageSummary {
+  totals: {
+    requests: number;
+    success: number;
+    failed: number;
+    success_rate: number;
+    unique_users: number;
+    imports: number;
+    avg_duration_ms: number | null;
+  };
+  breakdown: {
+    by_status: ExtensionUsageBreakdownEntry[];
+    by_source: ExtensionUsageBreakdownEntry[];
+    by_host: ExtensionUsageBreakdownEntry[];
+  };
+  top: {
+    users: ExtensionUsageTopUser[];
+  };
+  series: {
+    daily_last_30_days: ExtensionUsageDailySeries[];
+  };
+}
+
+interface AdminExtensionUsageResponse extends Paged<AdminExtensionUsageEvent> {
+  summary: ExtensionUsageSummary;
+}
+
 interface AdminReport {
   id: number;
   listing_id: number;
@@ -90,11 +244,39 @@ interface AdminReport {
   created_at: string;
 }
 
+interface AuthUserPayload {
+  id: number;
+  email: string;
+  userType: "private" | "business";
+  username?: string;
+  balance?: number;
+  first_name?: string;
+  last_name?: string;
+  profile_image_url?: string | null;
+  created_at?: string;
+  is_staff?: boolean;
+  is_superuser?: boolean;
+  is_admin?: boolean;
+  isAdmin?: boolean;
+}
+
+interface AdminLoginCodeRequestResponse {
+  challenge_id: string;
+  masked_email: string;
+  expires_in_seconds: number;
+}
+
+interface AdminLoginVerifyResponse {
+  access: string;
+  user: AuthUserPayload;
+}
+
 const tabs: Array<{ key: TabKey; label: string; hint: string }> = [
   { key: "dashboard", label: "Dashboard", hint: "metrics" },
   { key: "listings", label: "Listings", hint: "ads" },
   { key: "users", label: "Users", hint: "accounts" },
   { key: "transactions", label: "Transactions", hint: "payments" },
+  { key: "extensionApi", label: "Extension API", hint: "usage" },
   { key: "reports", label: "Reports", hint: "issues" },
 ];
 
@@ -294,9 +476,50 @@ const txTone = (status: string): Tone => {
   return "default";
 };
 
+const purchaseTypeLabel = (value: string) => {
+  if (value === "top") return "TOP";
+  if (value === "vip") return "VIP";
+  return value || "-";
+};
+
+const purchaseSourceLabel = (value: string) => {
+  if (value === "publish") return "Publish";
+  if (value === "republish") return "Republish";
+  if (value === "promote") return "Promote";
+  return "Unknown";
+};
+
+const purchaseSourceTone = (value: string): Tone => {
+  if (value === "publish") return "info";
+  if (value === "republish") return "warning";
+  if (value === "promote") return "success";
+  return "default";
+};
+
+const extensionSourceLabel = (value: string) => {
+  if (value === "extension") return "Extension";
+  if (value === "public_api") return "Public API";
+  if (value === "unknown") return "Unknown";
+  return value || "-";
+};
+
+const extensionSourceTone = (value: string): Tone => {
+  if (value === "extension") return "info";
+  if (value === "public_api") return "success";
+  if (value === "unknown") return "warning";
+  return "default";
+};
+
+const extensionStatusTone = (statusCode: number, success: boolean): Tone => {
+  if (success) return "success";
+  if (statusCode >= 500) return "danger";
+  if (statusCode >= 400) return "warning";
+  return "default";
+};
+
 const AdminPage: React.FC = () => {
   const navigate = useNavigate();
-  const { user, isLoading, login, logout } = useAuth();
+  const { user, isLoading, logout, setUserFromToken } = useAuth();
 
   const [tab, setTab] = useState<TabKey>("dashboard");
   const [error, setError] = useState("");
@@ -306,22 +529,66 @@ const AdminPage: React.FC = () => {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginBusy, setLoginBusy] = useState(false);
+  const [loginStep, setLoginStep] = useState<"credentials" | "code">("credentials");
+  const [loginChallengeId, setLoginChallengeId] = useState("");
+  const [loginCode, setLoginCode] = useState("");
+  const [loginMaskedEmail, setLoginMaskedEmail] = useState("");
+  const [loginCodeExpiresIn, setLoginCodeExpiresIn] = useState<number | null>(null);
+  const [pendingLoginEmail, setPendingLoginEmail] = useState("");
+  const [pendingLoginPassword, setPendingLoginPassword] = useState("");
 
   const [overview, setOverview] = useState<Overview | null>(null);
   const [listings, setListings] = useState<Paged<AdminListing> | null>(null);
   const [users, setUsers] = useState<Paged<AdminUser> | null>(null);
   const [transactions, setTransactions] = useState<Paged<AdminTransaction> | null>(null);
+  const [sitePurchases, setSitePurchases] = useState<AdminSitePurchaseResponse | null>(null);
+  const [extensionUsage, setExtensionUsage] = useState<AdminExtensionUsageResponse | null>(null);
   const [reports, setReports] = useState<Paged<AdminReport> | null>(null);
+  const [transactionsInnerTab, setTransactionsInnerTab] = useState<TransactionsInnerTab>("topups");
 
   const [listingQ, setListingQ] = useState("");
+  const [listingStatusFilter, setListingStatusFilter] = useState<"all" | "active" | "draft" | "archived" | "expired">("all");
+  const [listingTypeFilter, setListingTypeFilter] = useState<"" | "normal" | "top" | "vip">("");
+  const [listingSellerTypeFilter, setListingSellerTypeFilter] = useState<"" | "private" | "business">("");
+  const [listingSort, setListingSort] = useState<
+    "newest" | "oldest" | "price_asc" | "price_desc" | "views_desc" | "views_asc" | "updated_desc" | "updated_asc"
+  >("newest");
   const [userQ, setUserQ] = useState("");
+  const [userTypeFilter, setUserTypeFilter] = useState<"" | "private" | "business">("");
+  const [userAdminFilter, setUserAdminFilter] = useState<"" | "true" | "false">("");
+  const [userActiveFilter, setUserActiveFilter] = useState<"" | "true" | "false">("");
+  const [userSort, setUserSort] = useState<
+    "newest" | "oldest" | "listings_desc" | "listings_asc" | "views_desc" | "views_asc" | "email_asc" | "email_desc"
+  >("newest");
   const [txQ, setTxQ] = useState("");
+  const [txStatusFilter, setTxStatusFilter] = useState<"" | "pending" | "succeeded" | "failed" | "cancelled">("");
+  const [txCreditedFilter, setTxCreditedFilter] = useState<"" | "true" | "false">("");
+  const [txSort, setTxSort] = useState<"newest" | "oldest" | "amount_desc" | "amount_asc">("newest");
+  const [sitePurchaseQ, setSitePurchaseQ] = useState("");
+  const [sitePurchaseTypeFilter, setSitePurchaseTypeFilter] = useState<"" | "top" | "vip">("");
+  const [sitePurchaseSourceFilter, setSitePurchaseSourceFilter] = useState<
+    "" | "publish" | "republish" | "promote" | "unknown"
+  >("");
+  const [extensionQ, setExtensionQ] = useState("");
+  const [extensionSuccessFilter, setExtensionSuccessFilter] = useState<"" | "true" | "false">("");
+  const [extensionSourceFilter, setExtensionSourceFilter] = useState<"" | "extension" | "public_api" | "unknown">("");
+  const [extensionHasImportFilter, setExtensionHasImportFilter] = useState<"" | "true" | "false">("");
+  const [extensionSort, setExtensionSort] = useState<
+    "newest" | "oldest" | "status_desc" | "status_asc" | "duration_desc" | "duration_asc"
+  >("newest");
   const [reportQ, setReportQ] = useState("");
 
   const [listingPage, setListingPage] = useState(1);
   const [userPage, setUserPage] = useState(1);
   const [txPage, setTxPage] = useState(1);
+  const [sitePurchasePage, setSitePurchasePage] = useState(1);
+  const [extensionPage, setExtensionPage] = useState(1);
   const [reportPage, setReportPage] = useState(1);
+  const [topListingsPage, setTopListingsPage] = useState(1);
+  const [topBuyersPage, setTopBuyersPage] = useState(1);
+  const [plansPage, setPlansPage] = useState(1);
+  const [extensionTopUsersPage, setExtensionTopUsersPage] = useState(1);
+  const [extensionHostsPage, setExtensionHostsPage] = useState(1);
 
   const isAdmin = Boolean(
     user?.is_admin || user?.is_staff || user?.is_superuser || (user as { isAdmin?: boolean } | null)?.isAdmin
@@ -338,22 +605,63 @@ const AdminPage: React.FC = () => {
     if (!isAdmin) return;
     const q = new URLSearchParams({ page: String(listingPage), page_size: "20" });
     if (listingQ.trim()) q.set("q", listingQ.trim());
+    if (listingStatusFilter !== "all") q.set("status", listingStatusFilter);
+    if (listingTypeFilter) q.set("listing_type", listingTypeFilter);
+    if (listingSellerTypeFilter) q.set("seller_type", listingSellerTypeFilter);
+    q.set("sort", listingSort);
     setListings(await request<Paged<AdminListing>>(`/api/admin/listings/?${q.toString()}`));
-  }, [isAdmin, listingPage, listingQ]);
+  }, [isAdmin, listingPage, listingQ, listingStatusFilter, listingTypeFilter, listingSellerTypeFilter, listingSort]);
 
   const loadUsers = useCallback(async () => {
     if (!isAdmin) return;
     const q = new URLSearchParams({ page: String(userPage), page_size: "20" });
     if (userQ.trim()) q.set("q", userQ.trim());
+    if (userTypeFilter) q.set("user_type", userTypeFilter);
+    if (userAdminFilter) q.set("is_admin", userAdminFilter);
+    if (userActiveFilter) q.set("is_active", userActiveFilter);
+    q.set("sort", userSort);
     setUsers(await request<Paged<AdminUser>>(`/api/admin/users/?${q.toString()}`));
-  }, [isAdmin, userPage, userQ]);
+  }, [isAdmin, userPage, userQ, userTypeFilter, userAdminFilter, userActiveFilter, userSort]);
 
   const loadTransactions = useCallback(async () => {
     if (!isAdmin) return;
     const q = new URLSearchParams({ page: String(txPage), page_size: "20" });
     if (txQ.trim()) q.set("q", txQ.trim());
+    if (txStatusFilter) q.set("status", txStatusFilter);
+    if (txCreditedFilter) q.set("credited", txCreditedFilter);
+    q.set("sort", txSort);
     setTransactions(await request<Paged<AdminTransaction>>(`/api/admin/transactions/?${q.toString()}`));
-  }, [isAdmin, txPage, txQ]);
+  }, [isAdmin, txPage, txQ, txStatusFilter, txCreditedFilter, txSort]);
+
+  const loadSitePurchases = useCallback(async () => {
+    if (!isAdmin) return;
+    const q = new URLSearchParams({ page: String(sitePurchasePage), page_size: "20" });
+    if (sitePurchaseQ.trim()) q.set("q", sitePurchaseQ.trim());
+    if (sitePurchaseTypeFilter) q.set("listing_type", sitePurchaseTypeFilter);
+    if (sitePurchaseSourceFilter) q.set("source", sitePurchaseSourceFilter);
+    setSitePurchases(
+      await request<AdminSitePurchaseResponse>(`/api/admin/site-purchases/?${q.toString()}`)
+    );
+  }, [isAdmin, sitePurchasePage, sitePurchaseQ, sitePurchaseTypeFilter, sitePurchaseSourceFilter]);
+
+  const loadExtensionUsage = useCallback(async () => {
+    if (!isAdmin) return;
+    const q = new URLSearchParams({ page: String(extensionPage), page_size: "20" });
+    if (extensionQ.trim()) q.set("q", extensionQ.trim());
+    if (extensionSuccessFilter) q.set("success", extensionSuccessFilter);
+    if (extensionSourceFilter) q.set("source", extensionSourceFilter);
+    if (extensionHasImportFilter) q.set("has_import", extensionHasImportFilter);
+    q.set("sort", extensionSort);
+    setExtensionUsage(await request<AdminExtensionUsageResponse>(`/api/admin/extension-usage/?${q.toString()}`));
+  }, [
+    isAdmin,
+    extensionPage,
+    extensionQ,
+    extensionSuccessFilter,
+    extensionSourceFilter,
+    extensionHasImportFilter,
+    extensionSort,
+  ]);
 
   const loadReports = useCallback(async () => {
     if (!isAdmin) return;
@@ -368,12 +676,15 @@ const AdminPage: React.FC = () => {
       if (tab === "dashboard") await loadOverview();
       if (tab === "listings") await loadListings();
       if (tab === "users") await loadUsers();
-      if (tab === "transactions") await loadTransactions();
+      if (tab === "transactions") {
+        await Promise.all([loadTransactions(), loadSitePurchases()]);
+      }
+      if (tab === "extensionApi") await loadExtensionUsage();
       if (tab === "reports") await loadReports();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Request failed");
     }
-  }, [tab, loadOverview, loadListings, loadUsers, loadTransactions, loadReports]);
+  }, [tab, loadOverview, loadListings, loadUsers, loadTransactions, loadSitePurchases, loadExtensionUsage, loadReports]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -385,22 +696,117 @@ const AdminPage: React.FC = () => {
     void loadByTab();
   }, [isAdmin, loadByTab]);
 
-  const handleLogin = async (event: React.FormEvent) => {
-    event.preventDefault();
+  useEffect(() => {
+    if (tab !== "transactions") return;
+    setTransactionsInnerTab("topups");
+  }, [tab]);
+
+  useEffect(() => {
+    setTopListingsPage(1);
+    setTopBuyersPage(1);
+    setPlansPage(1);
+  }, [sitePurchases?.summary.top.listings.length, sitePurchases?.summary.top.users.length, sitePurchases?.summary.breakdown.by_plan.length]);
+
+  useEffect(() => {
+    setExtensionTopUsersPage(1);
+    setExtensionHostsPage(1);
+  }, [extensionUsage?.summary.top.users.length, extensionUsage?.summary.breakdown.by_host.length]);
+
+  const requestAdminLoginCode = async (rawEmail: string, rawPassword: string) => {
     setLoginError("");
     setLoginBusy(true);
     try {
-      await login(email.trim(), password);
-      const me = await request<Record<string, unknown>>("/api/auth/me/");
-      if (!(me.is_admin || me.is_staff || me.is_superuser || me.isAdmin)) {
-        await logout();
-        setLoginError("This account has no admin role.");
+      const payload = await request<AdminLoginCodeRequestResponse>("/api/auth/admin-login/request-code/", {
+        method: "POST",
+        body: JSON.stringify({
+          email: rawEmail.trim(),
+          password: rawPassword,
+        }),
+      });
+
+      if (!payload?.challenge_id) {
+        throw new Error("Missing login challenge.");
       }
+
+      setLoginStep("code");
+      setLoginChallengeId(payload.challenge_id);
+      setLoginMaskedEmail(payload.masked_email || rawEmail.trim());
+      setLoginCodeExpiresIn(payload.expires_in_seconds || null);
+      setPendingLoginEmail(rawEmail.trim());
+      setPendingLoginPassword(rawPassword);
+      setLoginCode("");
+      setPassword("");
     } catch (err) {
       setLoginError(err instanceof Error ? err.message : "Login failed");
     } finally {
       setLoginBusy(false);
     }
+  };
+
+  const handleLogin = async (event: React.FormEvent) => {
+    event.preventDefault();
+    await requestAdminLoginCode(email, password);
+  };
+
+  const handleVerifyLoginCode = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const normalizedCode = loginCode.trim();
+    if (!normalizedCode) {
+      setLoginError("Enter the email code.");
+      return;
+    }
+    if (!loginChallengeId) {
+      setLoginError("Missing login challenge. Request a new code.");
+      return;
+    }
+
+    setLoginError("");
+    setLoginBusy(true);
+    try {
+      const payload = await request<AdminLoginVerifyResponse>("/api/auth/admin-login/verify-code/", {
+        method: "POST",
+        body: JSON.stringify({
+          challenge_id: loginChallengeId,
+          code: normalizedCode,
+        }),
+      });
+
+      if (!payload?.access || !payload?.user) {
+        throw new Error("Invalid login response.");
+      }
+
+      setUserFromToken(payload.user, payload.access);
+      setLoginStep("credentials");
+      setLoginChallengeId("");
+      setLoginCode("");
+      setLoginMaskedEmail("");
+      setLoginCodeExpiresIn(null);
+      setPendingLoginEmail("");
+      setPendingLoginPassword("");
+      setPassword("");
+    } catch (err) {
+      setLoginError(err instanceof Error ? err.message : "Code verification failed");
+    } finally {
+      setLoginBusy(false);
+    }
+  };
+
+  const handleResendLoginCode = async () => {
+    if (!pendingLoginEmail || !pendingLoginPassword) {
+      setLoginStep("credentials");
+      setLoginError("Re-enter your credentials to request a new code.");
+      return;
+    }
+    await requestAdminLoginCode(pendingLoginEmail, pendingLoginPassword);
+  };
+
+  const handleBackToCredentials = () => {
+    setLoginStep("credentials");
+    setLoginChallengeId("");
+    setLoginCode("");
+    setLoginMaskedEmail("");
+    setLoginCodeExpiresIn(null);
+    setLoginError("");
   };
 
   const cards = useMemo(
@@ -412,6 +818,8 @@ const AdminPage: React.FC = () => {
             ["Views", overview.totals.views_total],
             ["Transactions", overview.totals.transactions_total],
             ["Paid amount", `${fmtMoney(overview.totals.transactions_amount_total)} EUR`],
+            ["Site purchases", overview.totals.site_purchases_total || 0],
+            ["Site spend", `${fmtMoney(overview.totals.site_purchases_amount_total || 0)} EUR`],
             ["Reports", overview.totals.reports_total],
           ]
         : [],
@@ -430,19 +838,96 @@ const AdminPage: React.FC = () => {
     }
   }, []);
 
+  const statsPageSize = 5;
+  const topListings = sitePurchases?.summary.top.listings || [];
+  const topBuyers = sitePurchases?.summary.top.users || [];
+  const planBreakdown = sitePurchases?.summary.breakdown.by_plan || [];
+  const typeBreakdown = sitePurchases?.summary.breakdown.by_type || [];
+  const sourceBreakdown = sitePurchases?.summary.breakdown.by_source || [];
+  const dailySeries = sitePurchases?.summary.series.daily_last_30_days || [];
+  const dailySeriesTotalCount = dailySeries.reduce((sum, item) => sum + item.count, 0);
+  const dailySeriesTotalAmount = dailySeries.reduce((sum, item) => sum + item.amount, 0);
+  const typeMaxCount = Math.max(1, ...typeBreakdown.map((item) => item.count));
+  const sourceMaxCount = Math.max(1, ...sourceBreakdown.map((item) => item.count));
+
+  const topListingsTotalPages = Math.max(1, Math.ceil(topListings.length / statsPageSize));
+  const topBuyersTotalPages = Math.max(1, Math.ceil(topBuyers.length / statsPageSize));
+  const plansTotalPages = Math.max(1, Math.ceil(planBreakdown.length / statsPageSize));
+
+  const visibleTopListings = topListings.slice((topListingsPage - 1) * statsPageSize, topListingsPage * statsPageSize);
+  const visibleTopBuyers = topBuyers.slice((topBuyersPage - 1) * statsPageSize, topBuyersPage * statsPageSize);
+  const visiblePlans = planBreakdown.slice((plansPage - 1) * statsPageSize, plansPage * statsPageSize);
+
+  const extensionTopUsers = extensionUsage?.summary.top.users || [];
+  const extensionStatusBreakdown = extensionUsage?.summary.breakdown.by_status || [];
+  const extensionSourceBreakdown = extensionUsage?.summary.breakdown.by_source || [];
+  const extensionHostBreakdown = extensionUsage?.summary.breakdown.by_host || [];
+  const extensionDailySeries = extensionUsage?.summary.series.daily_last_30_days || [];
+  const extensionDailyTotal = extensionDailySeries.reduce((sum, item) => sum + item.count, 0);
+  const extensionDailySuccess = extensionDailySeries.reduce((sum, item) => sum + item.success, 0);
+  const extensionDailyFailed = extensionDailySeries.reduce((sum, item) => sum + item.failed, 0);
+  const extensionStatusMaxCount = Math.max(1, ...extensionStatusBreakdown.map((item) => item.count));
+  const extensionSourceMaxCount = Math.max(1, ...extensionSourceBreakdown.map((item) => item.count));
+  const extensionTopUsersTotalPages = Math.max(1, Math.ceil(extensionTopUsers.length / statsPageSize));
+  const extensionHostsTotalPages = Math.max(1, Math.ceil(extensionHostBreakdown.length / statsPageSize));
+  const visibleExtensionTopUsers = extensionTopUsers.slice(
+    (extensionTopUsersPage - 1) * statsPageSize,
+    extensionTopUsersPage * statsPageSize
+  );
+  const visibleExtensionHosts = extensionHostBreakdown.slice(
+    (extensionHostsPage - 1) * statsPageSize,
+    extensionHostsPage * statsPageSize
+  );
+
   if (isLoading) return <div style={{ padding: 24 }}>Loading session...</div>;
 
   if (!user) {
     return (
       <section style={{ maxWidth: 430, margin: "40px auto", padding: 20, border: `1px solid ${color.border}`, borderRadius: 12, background: "#fff" }}>
         <h1 style={{ marginTop: 0 }}>Admin Login</h1>
-        <p style={{ color: color.muted }}>Use staff/superuser account.</p>
-        <form onSubmit={handleLogin} style={{ display: "grid", gap: 10 }}>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" required style={inputStyle} />
-          <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" required style={inputStyle} />
-          {loginError && <div style={{ color: color.danger, fontSize: 13 }}>{loginError}</div>}
-          <button disabled={loginBusy} type="submit" style={buttonStyle("primary")}>{loginBusy ? "Signing..." : "Login /admin"}</button>
-        </form>
+        <p style={{ color: color.muted }}>
+          Use staff/superuser account. After password check you will receive a code by email.
+        </p>
+
+        {loginStep === "credentials" ? (
+          <form onSubmit={handleLogin} style={{ display: "grid", gap: 10 }}>
+            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email" required style={inputStyle} />
+            <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" type="password" required style={inputStyle} />
+            {loginError && <div style={{ color: color.danger, fontSize: 13 }}>{loginError}</div>}
+            <button disabled={loginBusy} type="submit" style={buttonStyle("primary")}>
+              {loginBusy ? "Sending code..." : "Send login code"}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleVerifyLoginCode} style={{ display: "grid", gap: 10 }}>
+            <div style={{ fontSize: 13, color: color.muted }}>
+              Code sent to <strong>{loginMaskedEmail || pendingLoginEmail || email}</strong>
+              {loginCodeExpiresIn ? ` (valid for ${Math.round(loginCodeExpiresIn / 60)} min)` : ""}.
+            </div>
+            <input
+              value={loginCode}
+              onChange={(e) => setLoginCode(e.target.value)}
+              placeholder="6-digit code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              required
+              style={inputStyle}
+            />
+            {loginError && <div style={{ color: color.danger, fontSize: 13 }}>{loginError}</div>}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button disabled={loginBusy} type="submit" style={buttonStyle("primary")}>
+                {loginBusy ? "Verifying..." : "Verify and login"}
+              </button>
+              <button disabled={loginBusy} type="button" onClick={() => void handleResendLoginCode()} style={buttonStyle("neutral")}>
+                Resend code
+              </button>
+              <button disabled={loginBusy} type="button" onClick={handleBackToCredentials} style={buttonStyle("neutral")}>
+                Back
+              </button>
+            </div>
+          </form>
+        )}
       </section>
     );
   }
@@ -465,7 +950,7 @@ const AdminPage: React.FC = () => {
       <div style={{ maxWidth: 1420, margin: "0 auto", display: "grid", gap: 14 }}>
         <header style={{ ...panelStyle, display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
           <div>
-            <div style={{ fontSize: 12, color: color.muted }}>AVTOBORSA</div>
+            <div style={{ fontSize: 12, color: color.muted }}>KAR.BG</div>
             <h2 style={{ margin: "6px 0", fontSize: 24 }}>Admin Control Panel</h2>
             <div style={{ fontSize: 13, color: color.muted }}>Manage listings, users, purchases and reports.</div>
             <div style={{ fontSize: 12, color: color.muted, marginTop: 4 }}>Signed in as {user.email}</div>
@@ -525,7 +1010,76 @@ const AdminPage: React.FC = () => {
             </div>
             <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
               <input value={listingQ} onChange={(e) => setListingQ(e.target.value)} placeholder="Search listings" style={inputStyle} />
+              <select
+                value={listingStatusFilter}
+                onChange={(e) => setListingStatusFilter(e.target.value as "all" | "active" | "draft" | "archived" | "expired")}
+                style={{ ...inputStyle, minWidth: 130 }}
+              >
+                <option value="all">All status</option>
+                <option value="active">Active</option>
+                <option value="draft">Draft</option>
+                <option value="archived">Archived</option>
+                <option value="expired">Expired</option>
+              </select>
+              <select
+                value={listingTypeFilter}
+                onChange={(e) => setListingTypeFilter(e.target.value as "" | "normal" | "top" | "vip")}
+                style={{ ...inputStyle, minWidth: 120 }}
+              >
+                <option value="">All types</option>
+                <option value="normal">Normal</option>
+                <option value="top">Top</option>
+                <option value="vip">VIP</option>
+              </select>
+              <select
+                value={listingSellerTypeFilter}
+                onChange={(e) => setListingSellerTypeFilter(e.target.value as "" | "private" | "business")}
+                style={{ ...inputStyle, minWidth: 130 }}
+              >
+                <option value="">All sellers</option>
+                <option value="private">Private</option>
+                <option value="business">Business</option>
+              </select>
+              <select
+                value={listingSort}
+                onChange={(e) =>
+                  setListingSort(
+                    e.target.value as
+                      | "newest"
+                      | "oldest"
+                      | "price_asc"
+                      | "price_desc"
+                      | "views_desc"
+                      | "views_asc"
+                      | "updated_desc"
+                      | "updated_asc"
+                  )
+                }
+                style={{ ...inputStyle, minWidth: 150 }}
+              >
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+                <option value="price_desc">Price desc</option>
+                <option value="price_asc">Price asc</option>
+                <option value="views_desc">Views desc</option>
+                <option value="views_asc">Views asc</option>
+                <option value="updated_desc">Updated desc</option>
+                <option value="updated_asc">Updated asc</option>
+              </select>
               <button onClick={() => { setListingPage(1); void loadListings(); }} style={buttonStyle("primary")}>Search</button>
+              <button
+                onClick={() => {
+                  setListingQ("");
+                  setListingStatusFilter("all");
+                  setListingTypeFilter("");
+                  setListingSellerTypeFilter("");
+                  setListingSort("newest");
+                  setListingPage(1);
+                }}
+                style={buttonStyle("neutral")}
+              >
+                Reset
+              </button>
             </div>
             <div style={tableWrap}>
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1120 }}>
@@ -608,7 +1162,73 @@ const AdminPage: React.FC = () => {
             </div>
             <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
               <input value={userQ} onChange={(e) => setUserQ(e.target.value)} placeholder="Search users" style={inputStyle} />
+              <select
+                value={userTypeFilter}
+                onChange={(e) => setUserTypeFilter(e.target.value as "" | "private" | "business")}
+                style={{ ...inputStyle, minWidth: 130 }}
+              >
+                <option value="">All types</option>
+                <option value="private">Private</option>
+                <option value="business">Business</option>
+              </select>
+              <select
+                value={userAdminFilter}
+                onChange={(e) => setUserAdminFilter(e.target.value as "" | "true" | "false")}
+                style={{ ...inputStyle, minWidth: 130 }}
+              >
+                <option value="">All roles</option>
+                <option value="true">Only admin</option>
+                <option value="false">Only users</option>
+              </select>
+              <select
+                value={userActiveFilter}
+                onChange={(e) => setUserActiveFilter(e.target.value as "" | "true" | "false")}
+                style={{ ...inputStyle, minWidth: 130 }}
+              >
+                <option value="">All activity</option>
+                <option value="true">Active</option>
+                <option value="false">Inactive</option>
+              </select>
+              <select
+                value={userSort}
+                onChange={(e) =>
+                  setUserSort(
+                    e.target.value as
+                      | "newest"
+                      | "oldest"
+                      | "listings_desc"
+                      | "listings_asc"
+                      | "views_desc"
+                      | "views_asc"
+                      | "email_asc"
+                      | "email_desc"
+                  )
+                }
+                style={{ ...inputStyle, minWidth: 150 }}
+              >
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+                <option value="listings_desc">Listings desc</option>
+                <option value="listings_asc">Listings asc</option>
+                <option value="views_desc">Views desc</option>
+                <option value="views_asc">Views asc</option>
+                <option value="email_asc">Email A-Z</option>
+                <option value="email_desc">Email Z-A</option>
+              </select>
               <button onClick={() => { setUserPage(1); void loadUsers(); }} style={buttonStyle("primary")}>Search</button>
+              <button
+                onClick={() => {
+                  setUserQ("");
+                  setUserTypeFilter("");
+                  setUserAdminFilter("");
+                  setUserActiveFilter("");
+                  setUserSort("newest");
+                  setUserPage(1);
+                }}
+                style={buttonStyle("neutral")}
+              >
+                Reset
+              </button>
             </div>
             <div style={tableWrap}>
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1120 }}>
@@ -660,18 +1280,39 @@ const AdminPage: React.FC = () => {
                               {item.is_staff ? "Remove admin" : "Make admin"}
                             </button>
                             <button
+                              disabled={busyId === item.id || !isSuperuser}
+                              onClick={async () => {
+                                await runBusyAction(item.id, async () => {
+                                  await request(`/api/admin/users/${item.id}/`, {
+                                    method: "PATCH",
+                                    body: JSON.stringify({ is_superuser: !item.is_superuser }),
+                                  });
+                                  await Promise.all([loadUsers(), loadOverview()]);
+                                }, "Update failed");
+                              }}
+                              title={isSuperuser ? "Toggle superuser role" : "Only superusers can change superuser role"}
+                              style={buttonStyle("neutral")}
+                            >
+                              {item.is_superuser ? "Remove superuser" : "Make superuser"}
+                            </button>
+                            <button
                               disabled={busyId === item.id}
                               onClick={async () => {
-                                const value = window.prompt("New balance:", item.balance.toFixed(2));
+                                const value = window.prompt("Amount to add/subtract (example: 25 or -10):", "0");
                                 if (value === null) return;
+                                const normalizedValue = value.trim().replace(",", ".");
+                                if (!normalizedValue) return;
                                 await runBusyAction(item.id, async () => {
-                                  await request(`/api/admin/users/${item.id}/`, { method: "PATCH", body: JSON.stringify({ balance: value }) });
+                                  await request(`/api/admin/users/${item.id}/`, {
+                                    method: "PATCH",
+                                    body: JSON.stringify({ balance_delta: normalizedValue }),
+                                  });
                                   await Promise.all([loadUsers(), loadOverview()]);
                                 }, "Update failed");
                               }}
                               style={buttonStyle("neutral")}
                             >
-                              Set balance
+                              Add balance
                             </button>
                             <button
                               disabled={busyId === item.id || !canDelete}
@@ -718,35 +1359,734 @@ const AdminPage: React.FC = () => {
           <section style={panelStyle}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8, flexWrap: "wrap" }}>
               <h3 style={{ margin: 0 }}>Transactions</h3>
-              <span style={{ fontSize: 13, color: color.muted }}>{pageLabel(transactions?.pagination)}</span>
+              <span style={{ fontSize: 13, color: color.muted }}>
+                {transactionsInnerTab === "topups"
+                  ? pageLabel(transactions?.pagination)
+                  : pageLabel(sitePurchases?.pagination)}
+              </span>
             </div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+              <button
+                style={{
+                  ...buttonStyle(transactionsInnerTab === "topups" ? "primary" : "neutral"),
+                  minWidth: 140,
+                }}
+                onClick={() => setTransactionsInnerTab("topups")}
+              >
+                Balance top-ups
+              </button>
+              <button
+                style={{
+                  ...buttonStyle(transactionsInnerTab === "sitePurchases" ? "primary" : "neutral"),
+                  minWidth: 140,
+                }}
+                onClick={() => setTransactionsInnerTab("sitePurchases")}
+              >
+                Site purchases
+              </button>
+            </div>
+
+            {transactionsInnerTab === "topups" && (
+              <>
+                <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+                  <input value={txQ} onChange={(e) => setTxQ(e.target.value)} placeholder="Search transactions" style={inputStyle} />
+                  <select
+                    value={txStatusFilter}
+                    onChange={(e) => setTxStatusFilter(e.target.value as "" | "pending" | "succeeded" | "failed" | "cancelled")}
+                    style={{ ...inputStyle, minWidth: 130 }}
+                  >
+                    <option value="">All status</option>
+                    <option value="pending">Pending</option>
+                    <option value="succeeded">Succeeded</option>
+                    <option value="failed">Failed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                  <select
+                    value={txCreditedFilter}
+                    onChange={(e) => setTxCreditedFilter(e.target.value as "" | "true" | "false")}
+                    style={{ ...inputStyle, minWidth: 130 }}
+                  >
+                    <option value="">All credited</option>
+                    <option value="true">Credited</option>
+                    <option value="false">Not credited</option>
+                  </select>
+                  <select
+                    value={txSort}
+                    onChange={(e) => setTxSort(e.target.value as "newest" | "oldest" | "amount_desc" | "amount_asc")}
+                    style={{ ...inputStyle, minWidth: 140 }}
+                  >
+                    <option value="newest">Newest</option>
+                    <option value="oldest">Oldest</option>
+                    <option value="amount_desc">Amount desc</option>
+                    <option value="amount_asc">Amount asc</option>
+                  </select>
+                  <button onClick={() => { setTxPage(1); void loadTransactions(); }} style={buttonStyle("primary")}>Search</button>
+                  <button
+                    onClick={() => {
+                      setTxQ("");
+                      setTxStatusFilter("");
+                      setTxCreditedFilter("");
+                      setTxSort("newest");
+                      setTxPage(1);
+                    }}
+                    style={buttonStyle("neutral")}
+                  >
+                    Reset
+                  </button>
+                </div>
+                <div style={tableWrap}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 960 }}>
+                    <thead><tr><th style={thStyle}>ID</th><th style={thStyle}>User</th><th style={thStyle}>Amount</th><th style={thStyle}>Status</th><th style={thStyle}>Credited</th><th style={thStyle}>Created</th><th style={thStyle}>Session</th></tr></thead>
+                    <tbody>
+                      {(transactions?.results || []).map((item) => (
+                        <tr key={item.id}>
+                          <td style={tdStyle}>#{item.id}</td>
+                          <td style={tdStyle}>{item.user_email}</td>
+                          <td style={tdStyle}>{fmtMoney(item.amount)} {item.currency}</td>
+                          <td style={tdStyle}><span style={badgeStyle(txTone(item.status))}>{item.status}</span></td>
+                          <td style={tdStyle}><span style={badgeStyle(item.credited ? "success" : "warning")}>{item.credited ? "Yes" : "No"}</span></td>
+                          <td style={tdStyle}>{fmtDateTime(item.created_at)}</td>
+                          <td style={tdStyle}>{item.stripe_session_id || "-"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 13, color: color.muted }}>{pageLabel(transactions?.pagination)}</span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button disabled={!transactions || transactions.pagination.page <= 1} onClick={() => setTxPage((v) => Math.max(1, v - 1))} style={buttonStyle("neutral")}>Prev</button>
+                    <button disabled={!transactions || transactions.pagination.page >= transactions.pagination.total_pages} onClick={() => setTxPage((v) => v + 1)} style={buttonStyle("neutral")}>Next</button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {transactionsInnerTab === "sitePurchases" && (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 12 }}>
+                  <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                    <div style={{ fontSize: 12, color: color.muted }}>Total purchases</div>
+                    <strong style={{ fontSize: 22 }}>{sitePurchases?.summary.totals.count || 0}</strong>
+                  </article>
+                  <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                    <div style={{ fontSize: 12, color: color.muted }}>Total spend</div>
+                    <strong style={{ fontSize: 22 }}>{fmtMoney(sitePurchases?.summary.totals.amount || 0)} EUR</strong>
+                  </article>
+                  <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                    <div style={{ fontSize: 12, color: color.muted }}>Last 30d count</div>
+                    <strong style={{ fontSize: 22 }}>{dailySeriesTotalCount}</strong>
+                  </article>
+                  <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                    <div style={{ fontSize: 12, color: color.muted }}>Last 30d amount</div>
+                    <strong style={{ fontSize: 22 }}>{fmtMoney(dailySeriesTotalAmount)} EUR</strong>
+                  </article>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 10, marginBottom: 12 }}>
+                  <div style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                    <div style={{ fontWeight: 700, marginBottom: 8 }}>By type</div>
+                    {(typeBreakdown.length === 0) && <div style={{ fontSize: 13, color: color.muted }}>No data.</div>}
+                    {typeBreakdown.map((row) => (
+                      <div key={`type-${row.listing_type}`} style={{ marginBottom: 8 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                          <span>{purchaseTypeLabel(row.listing_type || "")}</span>
+                          <span>{row.count} | {fmtMoney(row.amount)} EUR</span>
+                        </div>
+                        <div style={{ height: 7, borderRadius: 999, background: "#e2e8f0", overflow: "hidden", marginTop: 4 }}>
+                          <div style={{ height: "100%", width: `${(row.count / typeMaxCount) * 100}%`, background: "#0d6dbb" }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                    <div style={{ fontWeight: 700, marginBottom: 8 }}>By source</div>
+                    {(sourceBreakdown.length === 0) && <div style={{ fontSize: 13, color: color.muted }}>No data.</div>}
+                    {sourceBreakdown.map((row) => (
+                      <div key={`source-${row.source}`} style={{ marginBottom: 8 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                          <span>{purchaseSourceLabel(row.source || "")}</span>
+                          <span>{row.count} | {fmtMoney(row.amount)} EUR</span>
+                        </div>
+                        <div style={{ height: 7, borderRadius: 999, background: "#e2e8f0", overflow: "hidden", marginTop: 4 }}>
+                          <div style={{ height: "100%", width: `${(row.count / sourceMaxCount) * 100}%`, background: "#0d6dbb" }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <div style={{ fontWeight: 700 }}>By plan</div>
+                      <div style={{ fontSize: 12, color: color.muted }}>
+                        Page {plansPage}/{plansTotalPages}
+                      </div>
+                    </div>
+                    {(visiblePlans.length === 0) && <div style={{ fontSize: 13, color: color.muted }}>No data.</div>}
+                    {visiblePlans.map((row, index) => (
+                      <div key={`plan-${row.listing_type}-${row.plan}-${index}`} style={{ fontSize: 13, padding: "4px 0", borderBottom: `1px solid ${color.border}` }}>
+                        <strong>{purchaseTypeLabel(row.listing_type || "")}</strong> {String(row.plan || "-").toUpperCase()} | {row.count} | {fmtMoney(row.amount)} EUR
+                      </div>
+                    ))}
+                    <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+                      <button disabled={plansPage <= 1} onClick={() => setPlansPage((v) => Math.max(1, v - 1))} style={buttonStyle("neutral")}>Prev</button>
+                      <button disabled={plansPage >= plansTotalPages} onClick={() => setPlansPage((v) => Math.min(plansTotalPages, v + 1))} style={buttonStyle("neutral")}>Next</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))", gap: 10, marginBottom: 12 }}>
+                  <div style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <div style={{ fontWeight: 700 }}>Top bought listings</div>
+                      <div style={{ fontSize: 12, color: color.muted }}>
+                        Page {topListingsPage}/{topListingsTotalPages}
+                      </div>
+                    </div>
+                    {visibleTopListings.length === 0 ? (
+                      <div style={{ fontSize: 13, color: color.muted }}>No listing purchase data.</div>
+                    ) : (
+                      <div style={tableWrap}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 500 }}>
+                          <thead>
+                            <tr>
+                              <th style={thStyle}>Listing</th>
+                              <th style={thStyle}>Count</th>
+                              <th style={thStyle}>Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {visibleTopListings.map((row) => (
+                              <tr key={`top-list-${row.listing_id}`}>
+                                <td style={tdStyle}>
+                                  {(row.brand || row.model) ? `${row.brand} ${row.model}`.trim() : row.title || `Listing #${row.listing_id}`}
+                                  <div style={{ fontSize: 12, color: color.muted }}>#{row.listing_id}</div>
+                                </td>
+                                <td style={tdStyle}>{row.count}</td>
+                                <td style={tdStyle}>{fmtMoney(row.amount)} EUR</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                    <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+                      <button disabled={topListingsPage <= 1} onClick={() => setTopListingsPage((v) => Math.max(1, v - 1))} style={buttonStyle("neutral")}>Prev</button>
+                      <button disabled={topListingsPage >= topListingsTotalPages} onClick={() => setTopListingsPage((v) => Math.min(topListingsTotalPages, v + 1))} style={buttonStyle("neutral")}>Next</button>
+                    </div>
+                  </div>
+
+                  <div style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <div style={{ fontWeight: 700 }}>Top buyers</div>
+                      <div style={{ fontSize: 12, color: color.muted }}>
+                        Page {topBuyersPage}/{topBuyersTotalPages}
+                      </div>
+                    </div>
+                    {visibleTopBuyers.length === 0 ? (
+                      <div style={{ fontSize: 13, color: color.muted }}>No buyer data.</div>
+                    ) : (
+                      <div style={tableWrap}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 500 }}>
+                          <thead>
+                            <tr>
+                              <th style={thStyle}>User</th>
+                              <th style={thStyle}>Count</th>
+                              <th style={thStyle}>Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {visibleTopBuyers.map((row) => (
+                              <tr key={`top-user-${row.user_id}`}>
+                                <td style={tdStyle}>
+                                  {row.name}
+                                  <div style={{ fontSize: 12, color: color.muted }}>{row.email}</div>
+                                </td>
+                                <td style={tdStyle}>{row.count}</td>
+                                <td style={tdStyle}>{fmtMoney(row.amount)} EUR</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                    <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+                      <button disabled={topBuyersPage <= 1} onClick={() => setTopBuyersPage((v) => Math.max(1, v - 1))} style={buttonStyle("neutral")}>Prev</button>
+                      <button disabled={topBuyersPage >= topBuyersTotalPages} onClick={() => setTopBuyersPage((v) => Math.min(topBuyersTotalPages, v + 1))} style={buttonStyle("neutral")}>Next</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+                  <input value={sitePurchaseQ} onChange={(e) => setSitePurchaseQ(e.target.value)} placeholder="Search site purchases" style={inputStyle} />
+                  <select
+                    value={sitePurchaseTypeFilter}
+                    onChange={(e) => setSitePurchaseTypeFilter(e.target.value as "" | "top" | "vip")}
+                    style={{ ...inputStyle, minWidth: 140 }}
+                  >
+                    <option value="">All types</option>
+                    <option value="top">TOP</option>
+                    <option value="vip">VIP</option>
+                  </select>
+                  <select
+                    value={sitePurchaseSourceFilter}
+                    onChange={(e) => setSitePurchaseSourceFilter(e.target.value as "" | "publish" | "republish" | "promote" | "unknown")}
+                    style={{ ...inputStyle, minWidth: 160 }}
+                  >
+                    <option value="">All sources</option>
+                    <option value="publish">Publish</option>
+                    <option value="republish">Republish</option>
+                    <option value="promote">Promote</option>
+                    <option value="unknown">Unknown</option>
+                  </select>
+                  <button
+                    onClick={() => {
+                      setSitePurchasePage(1);
+                      void loadSitePurchases();
+                    }}
+                    style={buttonStyle("primary")}
+                  >
+                    Search
+                  </button>
+                </div>
+                <div style={tableWrap}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1180 }}>
+                    <thead>
+                      <tr>
+                        <th style={thStyle}>ID</th>
+                        <th style={thStyle}>User</th>
+                        <th style={thStyle}>Listing</th>
+                        <th style={thStyle}>Type/Plan</th>
+                        <th style={thStyle}>Source</th>
+                        <th style={thStyle}>Amount</th>
+                        <th style={thStyle}>Discount</th>
+                        <th style={thStyle}>Created</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(sitePurchases?.results || []).map((item) => (
+                        <tr key={item.id}>
+                          <td style={tdStyle}>#{item.id}</td>
+                          <td style={tdStyle}>
+                            {item.user_name}
+                            <div style={{ fontSize: 12, color: color.muted }}>{item.user_email}</div>
+                          </td>
+                          <td style={tdStyle}>
+                            {item.listing_id ? (
+                              <>
+                                {(item.listing_brand || item.listing_model)
+                                  ? `${item.listing_brand} ${item.listing_model}`.trim()
+                                  : item.listing_title || `Listing #${item.listing_id}`}
+                                <div style={{ fontSize: 12, color: color.muted }}>
+                                  #{item.listing_id}{item.listing_title ? ` | ${item.listing_title}` : ""}
+                                </div>
+                              </>
+                            ) : (
+                              <span style={{ color: color.muted }}>No listing linked</span>
+                            )}
+                          </td>
+                          <td style={tdStyle}>
+                            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                              <span style={badgeStyle(item.listing_type === "top" ? "info" : "success")}>
+                                {purchaseTypeLabel(item.listing_type)}
+                              </span>
+                              <span style={badgeStyle("default")}>{String(item.plan || "-").toUpperCase()}</span>
+                            </div>
+                          </td>
+                          <td style={tdStyle}>
+                            <span style={badgeStyle(purchaseSourceTone(item.source))}>
+                              {purchaseSourceLabel(item.source)}
+                            </span>
+                          </td>
+                          <td style={tdStyle}>
+                            {fmtMoney(item.amount)} {item.currency}
+                            {item.base_amount > item.amount && (
+                              <div style={{ fontSize: 12, color: color.muted }}>
+                                base: {fmtMoney(item.base_amount)} {item.currency}
+                              </div>
+                            )}
+                          </td>
+                          <td style={tdStyle}>
+                            {item.discount_ratio !== null && item.discount_ratio < 1
+                              ? `${Math.round((1 - item.discount_ratio) * 100)}%`
+                              : "-"}
+                          </td>
+                          <td style={tdStyle}>{fmtDateTime(item.created_at)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 13, color: color.muted }}>{pageLabel(sitePurchases?.pagination)}</span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      disabled={!sitePurchases || sitePurchases.pagination.page <= 1}
+                      onClick={() => setSitePurchasePage((v) => Math.max(1, v - 1))}
+                      style={buttonStyle("neutral")}
+                    >
+                      Prev
+                    </button>
+                    <button
+                      disabled={!sitePurchases || sitePurchases.pagination.page >= sitePurchases.pagination.total_pages}
+                      onClick={() => setSitePurchasePage((v) => v + 1)}
+                      style={buttonStyle("neutral")}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </section>
+        )}
+
+        {tab === "extensionApi" && (
+          <section style={panelStyle}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8, flexWrap: "wrap" }}>
+              <h3 style={{ margin: 0 }}>Extension API usage</h3>
+              <span style={{ fontSize: 13, color: color.muted }}>{pageLabel(extensionUsage?.pagination)}</span>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10, marginBottom: 12 }}>
+              <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                <div style={{ fontSize: 12, color: color.muted }}>Requests</div>
+                <strong style={{ fontSize: 20 }}>{extensionUsage?.summary.totals.requests || 0}</strong>
+              </article>
+              <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                <div style={{ fontSize: 12, color: color.muted }}>Success</div>
+                <strong style={{ fontSize: 20 }}>{extensionUsage?.summary.totals.success || 0}</strong>
+              </article>
+              <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                <div style={{ fontSize: 12, color: color.muted }}>Failed</div>
+                <strong style={{ fontSize: 20 }}>{extensionUsage?.summary.totals.failed || 0}</strong>
+              </article>
+              <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                <div style={{ fontSize: 12, color: color.muted }}>Success rate</div>
+                <strong style={{ fontSize: 20 }}>{(extensionUsage?.summary.totals.success_rate ?? 0).toFixed(2)}%</strong>
+              </article>
+              <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                <div style={{ fontSize: 12, color: color.muted }}>Users</div>
+                <strong style={{ fontSize: 20 }}>{extensionUsage?.summary.totals.unique_users || 0}</strong>
+              </article>
+              <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                <div style={{ fontSize: 12, color: color.muted }}>Imported listings</div>
+                <strong style={{ fontSize: 20 }}>{extensionUsage?.summary.totals.imports || 0}</strong>
+              </article>
+              <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                <div style={{ fontSize: 12, color: color.muted }}>Avg duration</div>
+                <strong style={{ fontSize: 20 }}>
+                  {extensionUsage?.summary.totals.avg_duration_ms !== null && extensionUsage?.summary.totals.avg_duration_ms !== undefined
+                    ? `${extensionUsage?.summary.totals.avg_duration_ms} ms`
+                    : "-"}
+                </strong>
+              </article>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 10, marginBottom: 12 }}>
+              <div style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>By HTTP status</div>
+                {extensionStatusBreakdown.length === 0 && <div style={{ fontSize: 13, color: color.muted }}>No data.</div>}
+                {extensionStatusBreakdown.map((row) => (
+                  <div key={`ext-status-${row.status_code}`} style={{ marginBottom: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                      <span>{row.status_code || 0}</span>
+                      <span>{row.count}</span>
+                    </div>
+                    <div style={{ height: 7, borderRadius: 999, background: "#e2e8f0", overflow: "hidden", marginTop: 4 }}>
+                      <div style={{ height: "100%", width: `${(row.count / extensionStatusMaxCount) * 100}%`, background: "#0d6dbb" }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>By source</div>
+                {extensionSourceBreakdown.length === 0 && <div style={{ fontSize: 13, color: color.muted }}>No data.</div>}
+                {extensionSourceBreakdown.map((row) => (
+                  <div key={`ext-source-${row.source}`} style={{ marginBottom: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                      <span>{extensionSourceLabel(row.source || "")}</span>
+                      <span>{row.count}</span>
+                    </div>
+                    <div style={{ height: 7, borderRadius: 999, background: "#e2e8f0", overflow: "hidden", marginTop: 4 }}>
+                      <div style={{ height: "100%", width: `${(row.count / extensionSourceMaxCount) * 100}%`, background: "#0d6dbb" }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>30d totals</div>
+                <div style={{ display: "grid", gap: 6 }}>
+                  <div style={{ fontSize: 13 }}>
+                    Requests: <strong>{extensionDailyTotal}</strong>
+                  </div>
+                  <div style={{ fontSize: 13 }}>
+                    Success: <strong>{extensionDailySuccess}</strong>
+                  </div>
+                  <div style={{ fontSize: 13 }}>
+                    Failed: <strong>{extensionDailyFailed}</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))", gap: 10, marginBottom: 12 }}>
+              <div style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div style={{ fontWeight: 700 }}>Top users by requests</div>
+                  <div style={{ fontSize: 12, color: color.muted }}>
+                    Page {extensionTopUsersPage}/{extensionTopUsersTotalPages}
+                  </div>
+                </div>
+                {visibleExtensionTopUsers.length === 0 ? (
+                  <div style={{ fontSize: 13, color: color.muted }}>No user usage data.</div>
+                ) : (
+                  <div style={tableWrap}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 520 }}>
+                      <thead>
+                        <tr>
+                          <th style={thStyle}>User</th>
+                          <th style={thStyle}>Req</th>
+                          <th style={thStyle}>OK</th>
+                          <th style={thStyle}>Fail</th>
+                          <th style={thStyle}>Imports</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visibleExtensionTopUsers.map((row) => (
+                          <tr key={`ext-top-user-${row.user_id}`}>
+                            <td style={tdStyle}>
+                              {row.name}
+                              <div style={{ fontSize: 12, color: color.muted }}>{row.email}</div>
+                            </td>
+                            <td style={tdStyle}>{row.count}</td>
+                            <td style={tdStyle}>{row.success}</td>
+                            <td style={tdStyle}>{row.failed}</td>
+                            <td style={tdStyle}>{row.imports}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+                  <button disabled={extensionTopUsersPage <= 1} onClick={() => setExtensionTopUsersPage((v) => Math.max(1, v - 1))} style={buttonStyle("neutral")}>Prev</button>
+                  <button disabled={extensionTopUsersPage >= extensionTopUsersTotalPages} onClick={() => setExtensionTopUsersPage((v) => Math.min(extensionTopUsersTotalPages, v + 1))} style={buttonStyle("neutral")}>Next</button>
+                </div>
+              </div>
+
+              <div style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div style={{ fontWeight: 700 }}>Top source hosts</div>
+                  <div style={{ fontSize: 12, color: color.muted }}>
+                    Page {extensionHostsPage}/{extensionHostsTotalPages}
+                  </div>
+                </div>
+                {visibleExtensionHosts.length === 0 ? (
+                  <div style={{ fontSize: 13, color: color.muted }}>No host data.</div>
+                ) : (
+                  <div style={tableWrap}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 420 }}>
+                      <thead>
+                        <tr>
+                          <th style={thStyle}>Host</th>
+                          <th style={thStyle}>Count</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visibleExtensionHosts.map((row, index) => (
+                          <tr key={`ext-host-${row.source_host}-${index}`}>
+                            <td style={tdStyle}>{row.source_host || "-"}</td>
+                            <td style={tdStyle}>{row.count}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+                  <button disabled={extensionHostsPage <= 1} onClick={() => setExtensionHostsPage((v) => Math.max(1, v - 1))} style={buttonStyle("neutral")}>Prev</button>
+                  <button disabled={extensionHostsPage >= extensionHostsTotalPages} onClick={() => setExtensionHostsPage((v) => Math.min(extensionHostsTotalPages, v + 1))} style={buttonStyle("neutral")}>Next</button>
+                </div>
+              </div>
+            </div>
+
             <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-              <input value={txQ} onChange={(e) => setTxQ(e.target.value)} placeholder="Search transactions" style={inputStyle} />
-              <button onClick={() => { setTxPage(1); void loadTransactions(); }} style={buttonStyle("primary")}>Search</button>
+              <input value={extensionQ} onChange={(e) => setExtensionQ(e.target.value)} placeholder="Search usage logs" style={inputStyle} />
+              <select
+                value={extensionSuccessFilter}
+                onChange={(e) => setExtensionSuccessFilter(e.target.value as "" | "true" | "false")}
+                style={{ ...inputStyle, minWidth: 130 }}
+              >
+                <option value="">All results</option>
+                <option value="true">Success only</option>
+                <option value="false">Failed only</option>
+              </select>
+              <select
+                value={extensionSourceFilter}
+                onChange={(e) => setExtensionSourceFilter(e.target.value as "" | "extension" | "public_api" | "unknown")}
+                style={{ ...inputStyle, minWidth: 130 }}
+              >
+                <option value="">All sources</option>
+                <option value="extension">Extension</option>
+                <option value="public_api">Public API</option>
+                <option value="unknown">Unknown</option>
+              </select>
+              <select
+                value={extensionHasImportFilter}
+                onChange={(e) => setExtensionHasImportFilter(e.target.value as "" | "true" | "false")}
+                style={{ ...inputStyle, minWidth: 130 }}
+              >
+                <option value="">All imports</option>
+                <option value="true">Imported listing</option>
+                <option value="false">No import</option>
+              </select>
+              <select
+                value={extensionSort}
+                onChange={(e) =>
+                  setExtensionSort(
+                    e.target.value as "newest" | "oldest" | "status_desc" | "status_asc" | "duration_desc" | "duration_asc"
+                  )
+                }
+                style={{ ...inputStyle, minWidth: 150 }}
+              >
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+                <option value="status_desc">Status desc</option>
+                <option value="status_asc">Status asc</option>
+                <option value="duration_desc">Duration desc</option>
+                <option value="duration_asc">Duration asc</option>
+              </select>
+              <button
+                onClick={() => {
+                  setExtensionPage(1);
+                  void loadExtensionUsage();
+                }}
+                style={buttonStyle("primary")}
+              >
+                Search
+              </button>
+              <button
+                onClick={() => {
+                  setExtensionQ("");
+                  setExtensionSuccessFilter("");
+                  setExtensionSourceFilter("");
+                  setExtensionHasImportFilter("");
+                  setExtensionSort("newest");
+                  setExtensionPage(1);
+                }}
+                style={buttonStyle("neutral")}
+              >
+                Reset
+              </button>
             </div>
+
             <div style={tableWrap}>
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 960 }}>
-                <thead><tr><th style={thStyle}>ID</th><th style={thStyle}>User</th><th style={thStyle}>Amount</th><th style={thStyle}>Status</th><th style={thStyle}>Credited</th><th style={thStyle}>Created</th><th style={thStyle}>Session</th></tr></thead>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1560 }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>ID/Time</th>
+                    <th style={thStyle}>User</th>
+                    <th style={thStyle}>Source</th>
+                    <th style={thStyle}>Request</th>
+                    <th style={thStyle}>Result</th>
+                    <th style={thStyle}>Import</th>
+                    <th style={thStyle}>Client</th>
+                    <th style={thStyle}>Error</th>
+                  </tr>
+                </thead>
                 <tbody>
-                  {(transactions?.results || []).map((item) => (
+                  {(extensionUsage?.results || []).map((item) => (
                     <tr key={item.id}>
-                      <td style={tdStyle}>#{item.id}</td>
-                      <td style={tdStyle}>{item.user_email}</td>
-                      <td style={tdStyle}>{fmtMoney(item.amount)} {item.currency}</td>
-                      <td style={tdStyle}><span style={badgeStyle(txTone(item.status))}>{item.status}</span></td>
-                      <td style={tdStyle}><span style={badgeStyle(item.credited ? "success" : "warning")}>{item.credited ? "Yes" : "No"}</span></td>
-                      <td style={tdStyle}>{fmtDateTime(item.created_at)}</td>
-                      <td style={tdStyle}>{item.stripe_session_id || "-"}</td>
+                      <td style={tdStyle}>
+                        #{item.id}
+                        <div style={{ fontSize: 12, color: color.muted }}>{fmtDateTime(item.created_at)}</div>
+                      </td>
+                      <td style={tdStyle}>
+                        {item.user_name || item.user_email || "Unknown"}
+                        <div style={{ fontSize: 12, color: color.muted }}>
+                          {item.user_email || "-"}{item.key_prefix ? ` | ${item.key_prefix}...` : ""}
+                        </div>
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={badgeStyle(extensionSourceTone(item.source))}>
+                          {extensionSourceLabel(item.source)}
+                        </span>
+                        <div style={{ fontSize: 12, color: color.muted, marginTop: 4 }}>
+                          {item.source_host || "-"}
+                        </div>
+                        {item.lot_number && (
+                          <div style={{ fontSize: 12, color: color.muted }}>Lot: {item.lot_number}</div>
+                        )}
+                      </td>
+                      <td style={tdStyle}>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <span style={badgeStyle("default")}>{item.request_method}</span>
+                        </div>
+                        <div style={{ fontSize: 12, color: color.muted, marginTop: 4 }}>{item.endpoint}</div>
+                        <div style={{ fontSize: 12, color: color.muted }}>
+                          payload: {item.payload_bytes ?? "-"} bytes
+                        </div>
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={badgeStyle(extensionStatusTone(item.status_code, item.success))}>
+                          {item.status_code} {item.success ? "OK" : "FAIL"}
+                        </span>
+                        <div style={{ fontSize: 12, color: color.muted, marginTop: 4 }}>
+                          {item.duration_ms !== null && item.duration_ms !== undefined ? `${item.duration_ms} ms` : "-"}
+                        </div>
+                      </td>
+                      <td style={tdStyle}>
+                        {item.imported_listing_id ? (
+                          <>
+                            #{item.imported_listing_id}
+                            <div style={{ fontSize: 12, color: color.muted }}>
+                              {item.imported_listing_title || item.imported_listing_slug || "-"}
+                            </div>
+                          </>
+                        ) : (
+                          <span style={{ color: color.muted }}>No listing</span>
+                        )}
+                      </td>
+                      <td style={tdStyle}>
+                        <div style={{ fontSize: 12, color: color.muted }}>IP: {item.request_ip || "-"}</div>
+                        <div style={{ fontSize: 12, color: color.muted }}>v: {item.extension_version || "-"}</div>
+                        <div style={{ fontSize: 12, color: color.muted }}>
+                          {item.user_agent
+                            ? `${item.user_agent.slice(0, 84)}${item.user_agent.length > 84 ? "..." : ""}`
+                            : "-"}
+                        </div>
+                      </td>
+                      <td style={tdStyle}>
+                        {item.error_message
+                          ? `${item.error_message.slice(0, 140)}${item.error_message.length > 140 ? "..." : ""}`
+                          : "-"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
             <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 13, color: color.muted }}>{pageLabel(transactions?.pagination)}</span>
+              <span style={{ fontSize: 13, color: color.muted }}>{pageLabel(extensionUsage?.pagination)}</span>
               <div style={{ display: "flex", gap: 8 }}>
-                <button disabled={!transactions || transactions.pagination.page <= 1} onClick={() => setTxPage((v) => Math.max(1, v - 1))} style={buttonStyle("neutral")}>Prev</button>
-                <button disabled={!transactions || transactions.pagination.page >= transactions.pagination.total_pages} onClick={() => setTxPage((v) => v + 1)} style={buttonStyle("neutral")}>Next</button>
+                <button
+                  disabled={!extensionUsage || extensionUsage.pagination.page <= 1}
+                  onClick={() => setExtensionPage((v) => Math.max(1, v - 1))}
+                  style={buttonStyle("neutral")}
+                >
+                  Prev
+                </button>
+                <button
+                  disabled={!extensionUsage || extensionUsage.pagination.page >= extensionUsage.pagination.total_pages}
+                  onClick={() => setExtensionPage((v) => v + 1)}
+                  style={buttonStyle("neutral")}
+                >
+                  Next
+                </button>
               </div>
             </div>
           </section>

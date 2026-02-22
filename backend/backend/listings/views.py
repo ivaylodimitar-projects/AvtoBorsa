@@ -25,6 +25,7 @@ from .models import (
     ListingAnonymousView,
     Favorite,
     CarListingPriceHistory,
+    ListingPurchase,
     get_expiry_cutoff,
     get_top_expiry,
     get_listing_expiry,
@@ -134,19 +135,6 @@ def _normalize_top_plan(raw_plan):
     return normalized
 
 
-def _charge_top_listing_fee(user, top_plan, discount_ratio=None):
-    """Charge the top listing fee from the user's wallet."""
-    base_price = TOP_LISTING_PRICE_7D_EUR if top_plan == TOP_PLAN_7D else TOP_LISTING_PRICE_1D_EUR
-    price = _apply_price_discount(base_price, discount_ratio)
-    with db_transaction.atomic():
-        profile, _ = UserProfile.objects.select_for_update().get_or_create(user=user)
-        if profile.balance < price:
-            raise ValidationError("Недостатъчни средства")
-        profile.balance -= price
-        profile.save(update_fields=["balance"])
-        return profile
-
-
 def _apply_price_discount(price, discount_ratio):
     if discount_ratio is None:
         return price
@@ -155,8 +143,134 @@ def _apply_price_discount(price, discount_ratio):
     return (price * discount_ratio).quantize(Decimal("0.01"))
 
 
-def _charge_vip_listing_fee(user, vip_plan, discount_ratio=None):
-    """Charge the VIP listing fee from the user's wallet."""
+def _normalize_purchase_source(raw_source):
+    value = str(raw_source or "").strip().lower()
+    allowed = {
+        ListingPurchase.SOURCE_PUBLISH,
+        ListingPurchase.SOURCE_REPUBLISH,
+        ListingPurchase.SOURCE_PROMOTE,
+        ListingPurchase.SOURCE_UNKNOWN,
+    }
+    return value if value in allowed else ListingPurchase.SOURCE_UNKNOWN
+
+
+def _sanitize_purchase_metadata(raw_metadata):
+    if isinstance(raw_metadata, dict):
+        return raw_metadata
+    return {}
+
+
+def _resolve_listing_snapshot(listing=None, listing_snapshot=None):
+    if listing is not None:
+        return (
+            str(listing.title or "").strip()[:200],
+            str(listing.brand or "").strip()[:100],
+            str(listing.model or "").strip()[:100],
+        )
+    if isinstance(listing_snapshot, dict):
+        return (
+            str(listing_snapshot.get("title") or "").strip()[:200],
+            str(listing_snapshot.get("brand") or "").strip()[:100],
+            str(listing_snapshot.get("model") or "").strip()[:100],
+        )
+    return "", "", ""
+
+
+def _record_listing_purchase(
+    *,
+    user,
+    listing_type,
+    plan,
+    amount,
+    base_amount,
+    discount_ratio=None,
+    listing=None,
+    source=ListingPurchase.SOURCE_UNKNOWN,
+    listing_snapshot=None,
+    metadata=None,
+):
+    title_snapshot, brand_snapshot, model_snapshot = _resolve_listing_snapshot(
+        listing=listing,
+        listing_snapshot=listing_snapshot,
+    )
+    return ListingPurchase.objects.create(
+        user=user,
+        listing=listing,
+        amount=amount,
+        base_amount=base_amount,
+        currency="EUR",
+        listing_type=listing_type,
+        plan=str(plan or "").strip().lower(),
+        source=_normalize_purchase_source(source),
+        discount_ratio=discount_ratio,
+        listing_title_snapshot=title_snapshot,
+        listing_brand_snapshot=brand_snapshot,
+        listing_model_snapshot=model_snapshot,
+        metadata=_sanitize_purchase_metadata(metadata),
+    )
+
+
+def _attach_purchase_record_to_listing(purchase_record, listing):
+    if not purchase_record or not listing:
+        return
+    purchase_record.listing = listing
+    purchase_record.listing_title_snapshot = str(listing.title or "").strip()[:200]
+    purchase_record.listing_brand_snapshot = str(listing.brand or "").strip()[:100]
+    purchase_record.listing_model_snapshot = str(listing.model or "").strip()[:100]
+    purchase_record.save(
+        update_fields=[
+            "listing",
+            "listing_title_snapshot",
+            "listing_brand_snapshot",
+            "listing_model_snapshot",
+        ]
+    )
+
+
+def _charge_top_listing_fee(
+    user,
+    top_plan,
+    discount_ratio=None,
+    *,
+    listing=None,
+    source=ListingPurchase.SOURCE_UNKNOWN,
+    listing_snapshot=None,
+    metadata=None,
+):
+    """Charge TOP fee and persist a purchase record."""
+    base_price = TOP_LISTING_PRICE_7D_EUR if top_plan == TOP_PLAN_7D else TOP_LISTING_PRICE_1D_EUR
+    price = _apply_price_discount(base_price, discount_ratio)
+    with db_transaction.atomic():
+        profile, _ = UserProfile.objects.select_for_update().get_or_create(user=user)
+        if profile.balance < price:
+            raise ValidationError("Недостатъчни средства")
+        profile.balance -= price
+        profile.save(update_fields=["balance"])
+        return _record_listing_purchase(
+            user=user,
+            listing_type=ListingPurchase.LISTING_TYPE_TOP,
+            plan=top_plan,
+            amount=price,
+            base_amount=base_price,
+            discount_ratio=discount_ratio,
+            listing=listing,
+            source=source,
+            listing_snapshot=listing_snapshot,
+            metadata=metadata,
+        )
+
+
+def _charge_vip_listing_fee(
+    user,
+    vip_plan,
+    discount_ratio=None,
+    *,
+    listing=None,
+    source=ListingPurchase.SOURCE_UNKNOWN,
+    listing_snapshot=None,
+    metadata=None,
+):
+    """Charge VIP fee and persist a purchase record."""
     base_price = VIP_LISTING_PRICE_LIFETIME_EUR if vip_plan == VIP_PLAN_LIFETIME else VIP_LISTING_PRICE_7D_EUR
     price = _apply_price_discount(base_price, discount_ratio)
     with db_transaction.atomic():
@@ -165,7 +279,18 @@ def _charge_vip_listing_fee(user, vip_plan, discount_ratio=None):
             raise ValidationError("Недостатъчни средства")
         profile.balance -= price
         profile.save(update_fields=["balance"])
-        return profile
+        return _record_listing_purchase(
+            user=user,
+            listing_type=ListingPurchase.LISTING_TYPE_VIP,
+            plan=vip_plan,
+            amount=price,
+            base_amount=base_price,
+            discount_ratio=discount_ratio,
+            listing=listing,
+            source=source,
+            listing_snapshot=listing_snapshot,
+            metadata=metadata,
+        )
 
 
 def _clear_vip_listing_window(listing):
@@ -266,6 +391,29 @@ def _parse_optional_boolean(raw_value):
     if normalized in {"0", "false", "no", "off"}:
         return False
     raise ValidationError("Невалидна стойност за булево поле")
+
+
+def _build_listing_snapshot_from_validated_data(validated_data, current_listing=None):
+    title_value = validated_data.get("title")
+    brand_value = validated_data.get("brand")
+    model_value = validated_data.get("model")
+    return {
+        "title": str(
+            title_value
+            if title_value is not None
+            else getattr(current_listing, "title", "") or ""
+        ).strip()[:200],
+        "brand": str(
+            brand_value
+            if brand_value is not None
+            else getattr(current_listing, "brand", "") or ""
+        ).strip()[:100],
+        "model": str(
+            model_value
+            if model_value is not None
+            else getattr(current_listing, "model", "") or ""
+        ).strip()[:100],
+    }
 
 
 def _set_public_cache_headers(response, max_age=LISTINGS_PUBLIC_CACHE_SECONDS):
@@ -1013,17 +1161,33 @@ class CarListingViewSet(viewsets.ModelViewSet):
             else None
         )
         now = timezone.now()
+        purchase_snapshot = _build_listing_snapshot_from_validated_data(serializer.validated_data)
         with db_transaction.atomic():
+            purchase_record = None
             if listing_type == "top":
-                _charge_top_listing_fee(self.request.user, top_plan)
+                purchase_record = _charge_top_listing_fee(
+                    self.request.user,
+                    top_plan,
+                    listing_snapshot=purchase_snapshot,
+                    source=ListingPurchase.SOURCE_PUBLISH,
+                    metadata={"flow": "carlisting_create"},
+                )
             elif listing_type == "vip":
-                _charge_vip_listing_fee(self.request.user, vip_plan)
+                purchase_record = _charge_vip_listing_fee(
+                    self.request.user,
+                    vip_plan,
+                    listing_snapshot=purchase_snapshot,
+                    source=ListingPurchase.SOURCE_PUBLISH,
+                    metadata={"flow": "carlisting_create"},
+                )
 
             listing = serializer.save(
                 user=self.request.user,
                 top_plan=top_plan if listing_type == "top" else None,
                 vip_plan=vip_plan if listing_type == "vip" else None,
             )
+            if purchase_record and purchase_record.listing_id is None:
+                _attach_purchase_record_to_listing(purchase_record, listing)
 
             if listing_type == "top":
                 _apply_top_listing_window(listing, top_plan=top_plan, now=now)
@@ -1061,6 +1225,12 @@ class CarListingViewSet(viewsets.ModelViewSet):
             raise PermissionError("You can only edit your own listings")
         listing_type = serializer.validated_data.get("listing_type")
         was_draft = bool(listing.is_draft)
+        target_is_draft = bool(serializer.validated_data.get("is_draft", listing.is_draft))
+        purchase_source = (
+            ListingPurchase.SOURCE_PUBLISH
+            if was_draft and not target_is_draft
+            else ListingPurchase.SOURCE_PROMOTE
+        )
         now = timezone.now()
 
         with db_transaction.atomic():
@@ -1076,7 +1246,13 @@ class CarListingViewSet(viewsets.ModelViewSet):
                     and listing.top_expires_at > now
                 )
                 if not is_current_top:
-                    _charge_top_listing_fee(self.request.user, top_plan)
+                    _charge_top_listing_fee(
+                        self.request.user,
+                        top_plan,
+                        listing=listing,
+                        source=purchase_source,
+                        metadata={"flow": "carlisting_update"},
+                    )
                     _apply_top_listing_window(listing, top_plan=top_plan, now=now)
             elif listing_type == "vip":
                 vip_plan = _normalize_vip_plan(
@@ -1090,7 +1266,13 @@ class CarListingViewSet(viewsets.ModelViewSet):
                     and listing.vip_expires_at > now
                 )
                 if not is_current_vip:
-                    _charge_vip_listing_fee(self.request.user, vip_plan)
+                    _charge_vip_listing_fee(
+                        self.request.user,
+                        vip_plan,
+                        listing=listing,
+                        source=purchase_source,
+                        metadata={"flow": "carlisting_update"},
+                    )
                     _apply_vip_listing_window(listing, vip_plan=vip_plan, now=now)
 
             updated = serializer.save()
@@ -1291,10 +1473,22 @@ def republish_listing(request, listing_id):
         listing.created_at = now
 
         if listing_type == "top":
-            _charge_top_listing_fee(request.user, top_plan)
+            _charge_top_listing_fee(
+                request.user,
+                top_plan,
+                listing=listing,
+                source=ListingPurchase.SOURCE_REPUBLISH,
+                metadata={"flow": "listing_republish"},
+            )
             _apply_top_listing_window(listing, top_plan=top_plan, now=now)
         elif listing_type == "vip":
-            _charge_vip_listing_fee(request.user, vip_plan)
+            _charge_vip_listing_fee(
+                request.user,
+                vip_plan,
+                listing=listing,
+                source=ListingPurchase.SOURCE_REPUBLISH,
+                metadata={"flow": "listing_republish"},
+            )
             _apply_vip_listing_window(listing, vip_plan=vip_plan, now=now)
         else:
             listing.listing_type = "normal"
@@ -1344,7 +1538,14 @@ def update_listing_type(request, listing_id):
                 and listing.top_expires_at > now
             )
             top_discount_ratio = TOP_RENEWAL_DISCOUNT_RATIO if is_current_top_active else None
-            _charge_top_listing_fee(request.user, top_plan, discount_ratio=top_discount_ratio)
+            _charge_top_listing_fee(
+                request.user,
+                top_plan,
+                discount_ratio=top_discount_ratio,
+                listing=listing,
+                source=ListingPurchase.SOURCE_PROMOTE,
+                metadata={"flow": "listing_type_update"},
+            )
             _extend_top_listing_window(listing, top_plan=top_plan, now=now)
         elif listing_type == "vip":
             is_current_vip_active = (
@@ -1377,7 +1578,14 @@ def update_listing_type(request, listing_id):
             else:
                 vip_discount_ratio = None
 
-            _charge_vip_listing_fee(request.user, vip_plan, discount_ratio=vip_discount_ratio)
+            _charge_vip_listing_fee(
+                request.user,
+                vip_plan,
+                discount_ratio=vip_discount_ratio,
+                listing=listing,
+                source=ListingPurchase.SOURCE_PROMOTE,
+                metadata={"flow": "listing_type_update"},
+            )
             _extend_vip_listing_window(listing, vip_plan=vip_plan, now=now)
         else:
             listing.listing_type = "normal"

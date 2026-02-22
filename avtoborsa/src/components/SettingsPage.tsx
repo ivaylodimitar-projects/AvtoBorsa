@@ -52,6 +52,7 @@ type TransactionsInnerTab = "topups" | "sitePurchases";
 const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, isLoading, logout, setUserFromToken } = useAuth();
+  const canUseImportApi = user?.userType === "business";
   const [activeTab, setActiveTab] = useState<TabKey>("password");
   const [activeTransactionsInnerTab, setActiveTransactionsInnerTab] =
     useState<TransactionsInnerTab>("topups");
@@ -223,10 +224,27 @@ const SettingsPage: React.FC = () => {
 
   useEffect(() => {
     if (!user) return;
+    if (!canUseImportApi) {
+      setImportApiKeyStatus(null);
+      setImportApiKeyError(null);
+      setImportApiKeyActionStatus(null);
+      setGeneratedApiKey(null);
+      return;
+    }
     fetchImportApiKeyStatus();
-  }, [user, fetchImportApiKeyStatus]);
+  }, [user, canUseImportApi, fetchImportApiKeyStatus]);
+
+  useEffect(() => {
+    if (activeTab === "api" && !canUseImportApi) {
+      setActiveTab("password");
+    }
+  }, [activeTab, canUseImportApi]);
 
   const handleGenerateImportApiKey = async () => {
+    if (!canUseImportApi) {
+      setImportApiKeyError("API ключът е достъпен само за бизнес акаунти.");
+      return;
+    }
     setImportApiKeyError(null);
     setImportApiKeyActionStatus(null);
     setGeneratedApiKey(null);
@@ -274,6 +292,10 @@ const SettingsPage: React.FC = () => {
   };
 
   const handleRevokeImportApiKey = async () => {
+    if (!canUseImportApi) {
+      setImportApiKeyError("API ключът е достъпен само за бизнес акаунти.");
+      return;
+    }
     setImportApiKeyError(null);
     setImportApiKeyActionStatus(null);
 
@@ -1117,17 +1139,19 @@ const SettingsPage: React.FC = () => {
               <Wallet size={16} />
               Транзакции
             </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === "api"}
-              className="settings-tab"
-              style={{ ...styles.tab, ...(activeTab === "api" ? styles.tabActive : {}) }}
-              onClick={() => setActiveTab("api")}
-            >
-              <KeyRound size={16} />
-              API ключ
-            </button>
+            {canUseImportApi && (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "api"}
+                className="settings-tab"
+                style={{ ...styles.tab, ...(activeTab === "api" ? styles.tabActive : {}) }}
+                onClick={() => setActiveTab("api")}
+              >
+                <KeyRound size={16} />
+                API ключ
+              </button>
+            )}
             <button
               type="button"
               role="tab"
@@ -1506,7 +1530,7 @@ const SettingsPage: React.FC = () => {
           </div>
         )}
 
-        {activeTab === "api" && (
+        {canUseImportApi && activeTab === "api" && (
           <div style={styles.section}>
             <div style={styles.sectionHeader}>
               <div>

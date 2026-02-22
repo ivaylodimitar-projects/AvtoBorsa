@@ -1,4 +1,7 @@
+import hashlib
 import re
+import secrets
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -27,7 +30,13 @@ from .serializers import (
     PrivateUserSerializer, BusinessUserSerializer, UserProfileSerializer,
     UserBalanceSerializer, DealerListSerializer, DealerDetailSerializer
 )
-from .models import PrivateUser, BusinessUser, UserProfile, UserImportApiKey
+from .models import (
+    PrivateUser,
+    BusinessUser,
+    UserProfile,
+    UserImportApiKey,
+    ImportApiUsageEvent,
+)
 
 
 def _refresh_cookie_max_age_seconds() -> int:
@@ -55,6 +64,73 @@ def _clear_refresh_cookie(response: Response) -> None:
         key=settings.JWT_REFRESH_COOKIE_NAME,
         path=settings.JWT_REFRESH_COOKIE_PATH,
     )
+
+
+ADMIN_LOGIN_CODE_LENGTH = 6
+ADMIN_LOGIN_CODE_TTL_SECONDS = 10 * 60
+ADMIN_LOGIN_SEND_COOLDOWN_SECONDS = 45
+ADMIN_LOGIN_MAX_ATTEMPTS = 5
+
+
+def _build_authenticated_user_payload(request, user: User) -> dict:
+    user_type = 'private'
+    user_data = {
+        'id': user.id,
+        'email': user.email,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'created_at': user.date_joined,
+        'is_staff': user.is_staff,
+        'is_superuser': user.is_superuser,
+        'is_admin': bool(user.is_staff or user.is_superuser),
+    }
+
+    if hasattr(user, 'business_profile'):
+        user_type = 'business'
+        user_data['username'] = user.business_profile.username
+        if user.business_profile.profile_image:
+            user_data['profile_image_url'] = request.build_absolute_uri(
+                user.business_profile.profile_image.url
+            )
+
+    try:
+        profile = UserProfile.objects.get(user=user)
+        balance = float(profile.balance)
+    except UserProfile.DoesNotExist:
+        balance = 0.0
+
+    user_data['balance'] = balance
+    user_data['userType'] = user_type
+    return user_data
+
+
+def _build_auth_success_response(request, user: User) -> Response:
+    refresh = RefreshToken.for_user(user)
+    response = Response(
+        {
+            'access': str(refresh.access_token),
+            'user': _build_authenticated_user_payload(request, user),
+        },
+        status=status.HTTP_200_OK,
+    )
+    _set_refresh_cookie(response, str(refresh))
+    return response
+
+
+def _mask_email(email: str) -> str:
+    normalized = _normalize_email(email)
+    if '@' not in normalized:
+        return '***'
+    local, domain = normalized.split('@', 1)
+    if not local:
+        return f"***@{domain}"
+    if len(local) == 1:
+        masked_local = '*'
+    elif len(local) == 2:
+        masked_local = f"{local[0]}*"
+    else:
+        masked_local = f"{local[0]}{'*' * (len(local) - 2)}{local[-1]}"
+    return f"{masked_local}@{domain}"
 
 
 def send_verification_email(user: User) -> None:
@@ -85,6 +161,133 @@ def _extract_import_api_key(request) -> str:
 
     fallback = request.headers.get('X-Karbg-Api-Key') or request.headers.get('X-Api-Key')
     return str(fallback or '').strip()
+
+
+def _has_business_profile(user) -> bool:
+    try:
+        user.business_profile
+        return True
+    except BusinessUser.DoesNotExist:
+        return False
+
+
+def _extract_client_ip(request) -> str:
+    forwarded_for = str(request.META.get('HTTP_X_FORWARDED_FOR') or '').strip()
+    if forwarded_for:
+        return forwarded_for.split(',')[0].strip()
+
+    real_ip = str(request.META.get('HTTP_X_REAL_IP') or '').strip()
+    if real_ip:
+        return real_ip
+
+    return str(request.META.get('REMOTE_ADDR') or '').strip()
+
+
+def _detect_import_source(request) -> str:
+    client_hint = str(
+        request.headers.get('X-Karbg-Client')
+        or request.headers.get('X-Client-App')
+        or ''
+    ).strip().lower()
+    if 'public' in client_hint:
+        return ImportApiUsageEvent.SOURCE_PUBLIC_API
+    if 'extension' in client_hint or 'chrome' in client_hint:
+        return ImportApiUsageEvent.SOURCE_EXTENSION
+    # This endpoint is dedicated for the extension integration by default.
+    return ImportApiUsageEvent.SOURCE_EXTENSION
+
+
+def _safe_status_code(status_code):
+    try:
+        parsed = int(status_code)
+    except (TypeError, ValueError):
+        return 0
+    if parsed < 0:
+        return 0
+    if parsed > 999:
+        return 999
+    return parsed
+
+
+def _estimate_payload_bytes(request) -> int | None:
+    try:
+        body = request.body
+    except Exception:
+        return None
+    if isinstance(body, (bytes, bytearray)):
+        return len(body)
+    if body is None:
+        return None
+    try:
+        return len(str(body).encode('utf-8'))
+    except Exception:
+        return None
+
+
+def _log_import_api_usage(
+    request,
+    *,
+    api_key=None,
+    user=None,
+    listing=None,
+    status_code=0,
+    success=False,
+    error_message='',
+    duration_ms=None,
+):
+    payload = request.data if hasattr(request, 'data') else {}
+    source_url = _safe_str(payload.get('source_url') or payload.get('url'), 1000)
+    lot_number = _safe_str(payload.get('lot_number') or payload.get('lotNumber'), 80)
+    source_host = ''
+    if source_url:
+        try:
+            source_host = urllib.parse.urlparse(source_url).hostname or ''
+        except Exception:
+            source_host = ''
+
+    payload_bytes = _estimate_payload_bytes(request)
+
+    safe_duration_ms = None
+    if duration_ms is not None:
+        try:
+            parsed_duration = int(duration_ms)
+        except (TypeError, ValueError):
+            parsed_duration = None
+        if parsed_duration is not None and parsed_duration >= 0:
+            safe_duration_ms = parsed_duration
+
+    imported_listing_id_snapshot = None
+    if listing is not None:
+        imported_listing_id_snapshot = getattr(listing, 'id', None)
+
+    try:
+        ImportApiUsageEvent.objects.create(
+            user=user,
+            api_key=api_key,
+            imported_listing=listing,
+            imported_listing_id_snapshot=imported_listing_id_snapshot,
+            endpoint=_safe_str(request.path, 120) or '/api/auth/import/copart/',
+            request_method=_safe_str(request.method, 12) or 'POST',
+            source=_detect_import_source(request),
+            status_code=_safe_status_code(status_code),
+            success=bool(success),
+            lot_number=lot_number,
+            source_url=source_url,
+            source_host=_safe_str(source_host, 255),
+            request_ip=_safe_str(_extract_client_ip(request), 64) or None,
+            user_agent=_safe_str(request.headers.get('User-Agent'), 512),
+            extension_version=_safe_str(
+                request.headers.get('X-Karbg-Extension-Version')
+                or request.headers.get('X-Extension-Version'),
+                32,
+            ),
+            payload_bytes=payload_bytes,
+            duration_ms=safe_duration_ms,
+            error_message=_safe_str(error_message, 4000),
+        )
+    except Exception:
+        # Logging should never break the import flow.
+        return
 
 
 def _safe_int(value, default=0):
@@ -684,48 +887,196 @@ def login(request):
             {'error': 'Invalid email or password'},
             status=status.HTTP_401_UNAUTHORIZED
         )
+    return _build_auth_success_response(request, user)
 
-    refresh = RefreshToken.for_user(user)
 
-    # Determine user type
-    user_type = 'private'
-    user_data = {
-        'id': user.id,
-        'email': user.email,
-        'first_name': user.first_name,
-        'last_name': user.last_name,
-        'created_at': user.date_joined,
-        'is_staff': user.is_staff,
-        'is_superuser': user.is_superuser,
-        'is_admin': bool(user.is_staff or user.is_superuser),
-    }
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def admin_login_request_code(request):
+    """Start admin login by validating credentials and emailing an OTP code."""
+    identifier = request.data.get('email')
+    password = request.data.get('password')
+    normalized_email = _normalize_email(identifier)
 
-    if hasattr(user, 'business_profile'):
-        user_type = 'business'
-        user_data['username'] = user.business_profile.username
-        if user.business_profile.profile_image:
-            user_data['profile_image_url'] = request.build_absolute_uri(
-                user.business_profile.profile_image.url
+    if not normalized_email or not password:
+        return Response(
+            {'error': 'Email and password are required.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    candidate_users = list(User.objects.filter(email__iexact=normalized_email).order_by('id'))
+    if not candidate_users:
+        candidate_users = list(
+            User.objects.filter(username__iexact=str(identifier).strip()).order_by('id')
+        )
+
+    user = None
+    for user_obj in candidate_users:
+        if not user_obj.check_password(password):
+            continue
+        if not user_obj.is_active:
+            return Response(
+                {'error': 'Account is not verified.'},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
-    # Get user balance
+        user = authenticate(username=user_obj.username, password=password)
+        if user is not None:
+            break
+
+    if user is None:
+        return Response(
+            {'error': 'Invalid email or password.'},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    if not (user.is_staff or user.is_superuser):
+        return Response(
+            {'error': 'Admin role required.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    cooldown_key = f"admin-login-cooldown:{user.id}"
+    if cache.get(cooldown_key):
+        return Response(
+            {
+                'error': 'Please wait before requesting a new code.',
+                'retry_after': ADMIN_LOGIN_SEND_COOLDOWN_SECONDS,
+            },
+            status=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+
+    challenge_id = secrets.token_urlsafe(24)
+    one_time_code = f"{secrets.randbelow(10 ** ADMIN_LOGIN_CODE_LENGTH):0{ADMIN_LOGIN_CODE_LENGTH}d}"
+    code_hash = hashlib.sha256(f"{challenge_id}:{one_time_code}".encode("utf-8")).hexdigest()
+    expires_at = int(time.time()) + ADMIN_LOGIN_CODE_TTL_SECONDS
+    challenge_key = f"admin-login-challenge:{challenge_id}"
+    cache.set(
+        challenge_key,
+        {
+            'user_id': user.id,
+            'code_hash': code_hash,
+            'attempts_left': ADMIN_LOGIN_MAX_ATTEMPTS,
+            'expires_at': expires_at,
+        },
+        timeout=ADMIN_LOGIN_CODE_TTL_SECONDS,
+    )
+
     try:
-        profile = UserProfile.objects.get(user=user)
-        balance = float(profile.balance)
-    except UserProfile.DoesNotExist:
-        balance = 0.0
+        send_mail(
+            "Kar.bg admin login code",
+            (
+                "Your one-time admin login code is:\n\n"
+                f"{one_time_code}\n\n"
+                f"It expires in {ADMIN_LOGIN_CODE_TTL_SECONDS // 60} minutes.\n"
+                "If you did not request this code, ignore this email."
+            ),
+            settings.DEFAULT_FROM_EMAIL,
+            [user.email],
+            fail_silently=False,
+        )
+    except Exception:
+        cache.delete(challenge_key)
+        return Response(
+            {'error': 'Failed to send the login code email.'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
-    user_data['balance'] = balance
+    cache.set(cooldown_key, True, timeout=ADMIN_LOGIN_SEND_COOLDOWN_SECONDS)
+    return Response(
+        {
+            'challenge_id': challenge_id,
+            'masked_email': _mask_email(user.email),
+            'expires_in_seconds': ADMIN_LOGIN_CODE_TTL_SECONDS,
+        },
+        status=status.HTTP_200_OK,
+    )
 
-    response = Response({
-        'access': str(refresh.access_token),
-        'user': {
-            **user_data,
-            'userType': user_type
-        }
-    }, status=status.HTTP_200_OK)
-    _set_refresh_cookie(response, str(refresh))
-    return response
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def admin_login_verify_code(request):
+    """Verify admin OTP code and issue auth tokens."""
+    challenge_id = str(request.data.get('challenge_id') or '').strip()
+    code = str(request.data.get('code') or '').strip()
+
+    if not challenge_id or not code:
+        return Response(
+            {'error': 'challenge_id and code are required.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if not code.isdigit() or len(code) != ADMIN_LOGIN_CODE_LENGTH:
+        return Response(
+            {'error': 'Invalid code format.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    challenge_key = f"admin-login-challenge:{challenge_id}"
+    challenge = cache.get(challenge_key)
+    if not challenge:
+        return Response(
+            {'error': 'Code expired or invalid challenge.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    now_ts = int(time.time())
+    expires_at = int(challenge.get('expires_at') or 0)
+    if expires_at and now_ts >= expires_at:
+        cache.delete(challenge_key)
+        return Response(
+            {'error': 'Code expired. Request a new one.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    attempts_left = int(challenge.get('attempts_left') or 0)
+    if attempts_left <= 0:
+        cache.delete(challenge_key)
+        return Response(
+            {'error': 'Too many invalid attempts. Request a new code.'},
+            status=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+
+    expected_hash = str(challenge.get('code_hash') or '')
+    provided_hash = hashlib.sha256(f"{challenge_id}:{code}".encode("utf-8")).hexdigest()
+    if not secrets.compare_digest(expected_hash, provided_hash):
+        attempts_left -= 1
+        if attempts_left <= 0:
+            cache.delete(challenge_key)
+            return Response(
+                {'error': 'Too many invalid attempts. Request a new code.'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
+        remaining_seconds = max(1, expires_at - now_ts) if expires_at else ADMIN_LOGIN_CODE_TTL_SECONDS
+        challenge['attempts_left'] = attempts_left
+        cache.set(challenge_key, challenge, timeout=remaining_seconds)
+        return Response(
+            {
+                'error': 'Invalid code.',
+                'attempts_left': attempts_left,
+            },
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    user_id = challenge.get('user_id')
+    user = User.objects.filter(pk=user_id).first()
+    if not user or not user.is_active:
+        cache.delete(challenge_key)
+        return Response(
+            {'error': 'User account is invalid or inactive.'},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    if not (user.is_staff or user.is_superuser):
+        cache.delete(challenge_key)
+        return Response(
+            {'error': 'Admin role required.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    cache.delete(challenge_key)
+    return _build_auth_success_response(request, user)
 
 
 @api_view(['POST'])
@@ -1021,14 +1372,25 @@ def delete_account(request):
 @permission_classes([IsAuthenticated])
 def get_import_api_key_status(request):
     """Get metadata for the current user's import API key."""
+    if not _has_business_profile(request.user):
+        return Response(
+            {
+                'has_key': False,
+                'allowed': False,
+                'reason': 'Only business accounts can use the import API.',
+            },
+            status=status.HTTP_200_OK,
+        )
+
     api_key = UserImportApiKey.objects.filter(user=request.user).first()
     if not api_key:
-        return Response({'has_key': False}, status=status.HTTP_200_OK)
+        return Response({'has_key': False, 'allowed': True}, status=status.HTTP_200_OK)
 
     masked_suffix = '...' if api_key.key_prefix else ''
     return Response(
         {
             'has_key': True,
+            'allowed': True,
             'key_prefix': api_key.key_prefix,
             'masked_key': f"{api_key.key_prefix}{masked_suffix}" if api_key.key_prefix else None,
             'created_at': api_key.created_at,
@@ -1042,6 +1404,12 @@ def get_import_api_key_status(request):
 @permission_classes([IsAuthenticated])
 def generate_import_api_key(request):
     """Generate or rotate import API key for the current user."""
+    if not _has_business_profile(request.user):
+        return Response(
+            {'error': 'Only business accounts can use the import API.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
     max_attempts = 8
     for _ in range(max_attempts):
         raw_key = UserImportApiKey.generate_raw_key()
@@ -1086,50 +1454,95 @@ def revoke_import_api_key(request):
 @permission_classes([AllowAny])
 def import_copart_listing(request):
     """Import Copart listing into draft ad by using an API key."""
-    raw_key = _extract_import_api_key(request)
-    if not raw_key:
-        return Response(
-            {'error': 'API key is missing.'},
-            status=status.HTTP_401_UNAUTHORIZED,
-        )
+    started_at = time.perf_counter()
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    success = False
+    error_message = ''
+    api_key = None
+    listing = None
+    event_user = None
 
-    api_key = UserImportApiKey.objects.select_related('user').filter(
-        key_hash=UserImportApiKey.hash_key(raw_key)
-    ).first()
-    if not api_key or not api_key.user.is_active:
-        return Response(
-            {'error': 'API key is invalid.'},
-            status=status.HTTP_401_UNAUTHORIZED,
-        )
-
-    from backend.listings.models import CarListing
-
-    draft_payload = _build_copart_draft_payload(request.data, api_key.user)
     try:
-        listing = CarListing.objects.create(
-            user=api_key.user,
-            **draft_payload,
+        raw_key = _extract_import_api_key(request)
+        if not raw_key:
+            status_code = status.HTTP_401_UNAUTHORIZED
+            error_message = 'API key is missing.'
+            return Response(
+                {'error': 'API key is missing.'},
+                status=status_code,
+            )
+
+        api_key = UserImportApiKey.objects.select_related('user').filter(
+            key_hash=UserImportApiKey.hash_key(raw_key)
+        ).first()
+        if not api_key or not api_key.user.is_active:
+            status_code = status.HTTP_401_UNAUTHORIZED
+            error_message = 'API key is invalid.'
+            return Response(
+                {'error': 'API key is invalid.'},
+                status=status_code,
+            )
+
+        event_user = api_key.user
+        if not _has_business_profile(api_key.user):
+            status_code = status.HTTP_403_FORBIDDEN
+            error_message = 'Only business accounts can use the import API.'
+            return Response(
+                {'error': 'Only business accounts can use the import API.'},
+                status=status_code,
+            )
+
+        from backend.listings.models import CarListing
+
+        draft_payload = _build_copart_draft_payload(request.data, api_key.user)
+        try:
+            listing = CarListing.objects.create(
+                user=api_key.user,
+                **draft_payload,
+            )
+        except Exception as exc:
+            status_code = status.HTTP_400_BAD_REQUEST
+            error_message = str(exc)
+            return Response(
+                {'error': 'Could not import listing.', 'details': str(exc)},
+                status=status_code,
+            )
+
+        uploaded_images = _attach_copart_images_to_listing(listing, request.data)
+        api_key.mark_used()
+
+        status_code = status.HTTP_201_CREATED
+        success = True
+        return Response(
+            {
+                'id': listing.id,
+                'slug': listing.slug,
+                'title': listing.title,
+                'is_draft': listing.is_draft,
+                'images_uploaded': uploaded_images,
+                'message': 'Listing imported as draft.',
+            },
+            status=status_code,
         )
     except Exception as exc:
+        status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        error_message = str(exc)
         return Response(
-            {'error': 'Could not import listing.', 'details': str(exc)},
-            status=status.HTTP_400_BAD_REQUEST,
+            {'error': 'Unexpected import error.', 'details': str(exc)},
+            status=status_code,
         )
-
-    uploaded_images = _attach_copart_images_to_listing(listing, request.data)
-    api_key.mark_used()
-
-    return Response(
-        {
-            'id': listing.id,
-            'slug': listing.slug,
-            'title': listing.title,
-            'is_draft': listing.is_draft,
-            'images_uploaded': uploaded_images,
-            'message': 'Listing imported as draft.',
-        },
-        status=status.HTTP_201_CREATED,
-    )
+    finally:
+        duration_ms = int((time.perf_counter() - started_at) * 1000)
+        _log_import_api_usage(
+            request,
+            api_key=api_key,
+            user=event_user,
+            listing=listing,
+            status_code=status_code,
+            success=success,
+            error_message=error_message,
+            duration_ms=duration_ms,
+        )
 
 
 @api_view(['POST'])

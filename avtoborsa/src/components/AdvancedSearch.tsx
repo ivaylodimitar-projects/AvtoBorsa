@@ -839,19 +839,25 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       return;
     }
 
+    const getMaxScrollLeft = () =>
+      Math.max(0, scrollContainer.scrollWidth - scrollContainer.clientWidth);
+
     const syncHintVisibility = () => {
-      const maxScrollLeft = scrollContainer.scrollWidth - scrollContainer.clientWidth;
-      const hasOverflow = maxScrollLeft > 4;
+      const maxScrollLeft = getMaxScrollLeft();
+      const hasOverflow = maxScrollLeft > 16;
       const reachedRightEdge = scrollContainer.scrollLeft >= maxScrollLeft - 8;
       setShowRecentScrollHint(hasOverflow && !reachedRightEdge);
     };
 
-    const frameId = window.requestAnimationFrame(syncHintVisibility);
-    const delayedSyncId = window.setTimeout(syncHintVisibility, 380);
+    // Avoid flash during panel open animation; measure once layout settles.
+    setShowRecentScrollHint(false);
+    const delayedSyncId = window.setTimeout(syncHintVisibility, 460);
+    const secondarySyncId = window.setTimeout(syncHintVisibility, 760);
     let nudgeBackId: number | null = null;
     const nudgeId = window.setTimeout(() => {
-      const maxScrollLeft = scrollContainer.scrollWidth - scrollContainer.clientWidth;
-      if (maxScrollLeft <= 12 || scrollContainer.scrollLeft > 2) return;
+      if (scrollContainer.clientWidth < 280) return;
+      const maxScrollLeft = getMaxScrollLeft();
+      if (maxScrollLeft <= 16 || scrollContainer.scrollLeft > 2) return;
 
       scrollContainer.scrollTo({ left: Math.min(40, maxScrollLeft), behavior: "smooth" });
       nudgeBackId = window.setTimeout(() => {
@@ -859,22 +865,28 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
           scrollContainer.scrollTo({ left: 0, behavior: "smooth" });
         }
       }, 520);
-    }, 520);
+    }, 780);
 
     scrollContainer.addEventListener("scroll", syncHintVisibility, { passive: true });
     window.addEventListener("resize", syncHintVisibility);
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => syncHintVisibility())
+        : null;
+    resizeObserver?.observe(scrollContainer);
 
     return () => {
-      window.cancelAnimationFrame(frameId);
       window.clearTimeout(delayedSyncId);
+      window.clearTimeout(secondarySyncId);
       window.clearTimeout(nudgeId);
       if (nudgeBackId !== null) {
         window.clearTimeout(nudgeBackId);
       }
       scrollContainer.removeEventListener("scroll", syncHintVisibility);
       window.removeEventListener("resize", syncHintVisibility);
+      resizeObserver?.disconnect();
     };
-  }, [showRecentSearches, hasRecentSearches]);
+  }, [showRecentSearches, hasRecentSearches, recentSearches.length]);
 
   React.useEffect(() => {
     if (!hasRecentSearches) {
@@ -2392,16 +2404,15 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               className={`adv-recent-dropdown-panel ${showRecentSearches ? "is-open" : ""}`}
               aria-hidden={!showRecentSearches}
             >
-              <div
-                className={`adv-recent-scroll-hint ${showRecentSearches && showRecentScrollHint ? "is-visible" : ""}`}
-                aria-hidden="true"
-              >
-                <span className="adv-recent-scroll-hint__arrows">
-                  <span className="adv-recent-scroll-hint__arrow">›</span>
-                  <span className="adv-recent-scroll-hint__arrow">›</span>
-                  <span className="adv-recent-scroll-hint__arrow">›</span>
-                </span>
-              </div>
+              {showRecentSearches && showRecentScrollHint && (
+                <div className="adv-recent-scroll-hint is-visible" aria-hidden="true">
+                  <span className="adv-recent-scroll-hint__arrows">
+                    <span className="adv-recent-scroll-hint__arrow">›</span>
+                    <span className="adv-recent-scroll-hint__arrow">›</span>
+                    <span className="adv-recent-scroll-hint__arrow">›</span>
+                  </span>
+                </div>
+              )}
               <div
                 className="adv-recent-searches"
                 ref={recentSearchesRef}

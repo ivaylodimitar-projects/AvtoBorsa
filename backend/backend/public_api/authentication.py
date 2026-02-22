@@ -1,6 +1,6 @@
 from rest_framework import authentication, exceptions
 
-from backend.accounts.models import UserImportApiKey
+from backend.accounts.models import BusinessUser, UserImportApiKey
 
 
 def _extract_api_key(request) -> str:
@@ -25,6 +25,13 @@ class PublicApiKeyAuthentication(authentication.BaseAuthentication):
         ).first()
         if not api_key or not api_key.user.is_active:
             raise exceptions.AuthenticationFailed("API key is invalid.")
+
+        try:
+            api_key.user.business_profile
+        except BusinessUser.DoesNotExist:
+            raise exceptions.AuthenticationFailed(
+                "API key is allowed only for business accounts."
+            )
 
         api_key.mark_used()
         return (api_key.user, api_key)

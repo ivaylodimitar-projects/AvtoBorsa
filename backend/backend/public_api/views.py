@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from backend.accounts.models import UserProfile
-from backend.listings.models import CarListing
+from backend.listings.models import CarListing, ListingPurchase
 from backend.listings.serializers import CarListingSerializer
 from backend.listings.views import (
     TOP_LISTING_PRICE_1D_EUR,
@@ -25,6 +25,8 @@ from backend.listings.views import (
     _clear_top_listing_window,
     _clear_vip_listing_window,
     _invalidate_latest_listings_cache,
+    _attach_purchase_record_to_listing,
+    _build_listing_snapshot_from_validated_data,
     _normalize_top_plan,
     _normalize_vip_plan,
 )
@@ -299,13 +301,27 @@ class PublicCategoryListingCreateView(APIView):
             allow_promotions=not is_draft,
         )
         now = timezone.now()
+        purchase_snapshot = _build_listing_snapshot_from_validated_data(serializer.validated_data)
 
         with db_transaction.atomic():
+            purchase_record = None
             if not is_draft:
                 if listing_type == "top":
-                    _charge_top_listing_fee(request.user, top_plan)
+                    purchase_record = _charge_top_listing_fee(
+                        request.user,
+                        top_plan,
+                        source=ListingPurchase.SOURCE_PUBLISH,
+                        listing_snapshot=purchase_snapshot,
+                        metadata={"flow": "public_api_create"},
+                    )
                 elif listing_type == "vip":
-                    _charge_vip_listing_fee(request.user, vip_plan)
+                    purchase_record = _charge_vip_listing_fee(
+                        request.user,
+                        vip_plan,
+                        source=ListingPurchase.SOURCE_PUBLISH,
+                        listing_snapshot=purchase_snapshot,
+                        metadata={"flow": "public_api_create"},
+                    )
 
             listing = serializer.save(
                 user=request.user,
@@ -313,6 +329,8 @@ class PublicCategoryListingCreateView(APIView):
                 top_plan=top_plan if listing_type == "top" else None,
                 vip_plan=vip_plan if listing_type == "vip" else None,
             )
+            if purchase_record and purchase_record.listing_id is None:
+                _attach_purchase_record_to_listing(purchase_record, listing)
 
             if not is_draft:
                 _apply_promotion_window(
@@ -392,9 +410,21 @@ class PublicDraftPublishView(APIView):
 
         with db_transaction.atomic():
             if listing_type == "top":
-                _charge_top_listing_fee(request.user, top_plan)
+                _charge_top_listing_fee(
+                    request.user,
+                    top_plan,
+                    listing=listing,
+                    source=ListingPurchase.SOURCE_PUBLISH,
+                    metadata={"flow": "public_api_publish_draft"},
+                )
             elif listing_type == "vip":
-                _charge_vip_listing_fee(request.user, vip_plan)
+                _charge_vip_listing_fee(
+                    request.user,
+                    vip_plan,
+                    listing=listing,
+                    source=ListingPurchase.SOURCE_PUBLISH,
+                    metadata={"flow": "public_api_publish_draft"},
+                )
 
             updated = serializer.save()
             updated.is_draft = False
