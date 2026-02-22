@@ -2347,8 +2347,30 @@ export default function LandingPage() {
 
           <div style={styles.footerCol}>
             <div style={styles.footerTitle}>Бърз достъп</div>
+            <button
+              type="button"
+              style={{ ...styles.footerLinkButton, ...styles.footerLinkButtonReset }}
+              onClick={() => navigate("/")}
+            >
+              Начало
+            </button>
             <a href="#search" style={styles.footerLink}>Търсене</a>
-            <a href="#about" style={styles.footerLink}>За Kar.bg</a>
+            <a href="#latest" style={styles.footerLink}>Последни обяви</a>
+            <a href="#about" style={styles.footerLink}>За нас</a>
+            <button
+              type="button"
+              style={{ ...styles.footerLinkButton, ...styles.footerLinkButtonReset }}
+              onClick={() => navigate("/dealers")}
+            >
+              Дилъри
+            </button>
+            <button
+              type="button"
+              style={{ ...styles.footerLinkButton, ...styles.footerLinkButtonReset }}
+              onClick={() => navigate("/publish")}
+            >
+              Публикуване
+            </button>
             <button
               type="button"
               style={{ ...styles.footerLinkButton, ...styles.footerLinkButtonReset }}
@@ -2377,9 +2399,6 @@ export default function LandingPage() {
           </div>
         </div>
 
-        <div style={styles.footerBottom}>
-          © {new Date().getFullYear()} Kar.bg · API модулът е достъпен само за верифицирани дилърски акаунти.
-        </div>
       </footer>
     </div>
   );
@@ -3057,14 +3076,6 @@ const styles: Record<string, React.CSSProperties> = {
     width: "fit-content",
     boxShadow: "0 6px 14px rgba(15, 118, 110, 0.2)",
     transition: "transform 0.2s ease, filter 0.2s ease",
-  },
-  footerBottom: {
-    maxWidth: 1200,
-    margin: "0 auto",
-    padding: "16px 20px",
-    color: "#999",
-    fontSize: 12,
-    borderTop: "1px solid #f0f0f0",
   },
 };
 
