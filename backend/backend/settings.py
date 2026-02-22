@@ -210,17 +210,17 @@ if DEBUG:
 CSRF_TRUSTED_ORIGINS = sorted(set(csrf_origins))
 
 
-if not DEBUG:
-    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-    SECURE_SSL_REDIRECT = _env_flag("SECURE_SSL_REDIRECT", default=True)
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000"))
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_flag(
-        "SECURE_HSTS_INCLUDE_SUBDOMAINS",
-        default=True,
-    )
-    SECURE_HSTS_PRELOAD = _env_flag("SECURE_HSTS_PRELOAD", default=True)
+#if not DEBUG:
+#    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+ #   SECURE_SSL_REDIRECT = _env_flag("SECURE_SSL_REDIRECT", default=True)
+ #   SESSION_COOKIE_SECURE = True
+ #   CSRF_COOKIE_SECURE = True
+ #   SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000"))
+ #   SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_flag(
+ #       "SECURE_HSTS_INCLUDE_SUBDOMAINS",
+ #       default=True,
+ #   )
+ #   SECURE_HSTS_PRELOAD = _env_flag("SECURE_HSTS_PRELOAD", default=True)
 
 
 REST_FRAMEWORK = {

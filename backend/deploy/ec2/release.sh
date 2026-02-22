@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT="${PROJECT_ROOT:-/opt/avtoborsa}"
-VENV_PATH="${VENV_PATH:-$PROJECT_ROOT/.venv}"
+PROJECT_ROOT="${PROJECT_ROOT:-/var/www/AvtoBorsa}"
+VENV_PATH="${VENV_PATH:-$PROJECT_ROOT/venv}"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 
 cd "$PROJECT_ROOT/backend"
