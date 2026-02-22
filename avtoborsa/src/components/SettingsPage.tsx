@@ -27,7 +27,7 @@ import {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 const PUBLIC_API_DOCS_URL = `${API_BASE_URL}/api/public/docs/`;
 const TRANSACTIONS_PER_PAGE = 5;
-const SITE_PURCHASES_PER_PAGE = 5;
+const SITE_PURCHASES_PER_PAGE = TRANSACTIONS_PER_PAGE;
 
 type PaymentTransaction = {
   id: number;
@@ -169,6 +169,15 @@ const SettingsPage: React.FC = () => {
     setSitePurchasesPage(1);
     setActiveTransactionsInnerTab("topups");
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== "transactions") return;
+    if (activeTransactionsInnerTab === "topups") {
+      setTransactionsPage(1);
+      return;
+    }
+    setSitePurchasesPage(1);
+  }, [activeTab, activeTransactionsInnerTab]);
 
   useEffect(() => {
     const totalPages = Math.max(1, Math.ceil(transactions.length / TRANSACTIONS_PER_PAGE));
@@ -1247,7 +1256,7 @@ const SettingsPage: React.FC = () => {
               <div>
                 <h2 style={styles.sectionTitle}>Транзакции</h2>
                 <div style={styles.sectionDescription}>
-                  История на добавените средства и отделно на покупките в сайта.
+                  История на добавените средства и покупките в сайта.
                 </div>
               </div>
               <div style={styles.sectionBadge}>
@@ -1411,7 +1420,7 @@ const SettingsPage: React.FC = () => {
                     Покупки в сайта
                   </div>
                   <div style={styles.transactionSectionHint}>
-                    Последни до 50 използвания на баланс
+                    Последни до 50 използвания на баланс • 5 на страница
                   </div>
                 </div>
 

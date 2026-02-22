@@ -916,6 +916,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   const isAccessoriesCategory = mainCategory === "v";
   const isBuyCategory = mainCategory === "y";
   const isServicesCategory = mainCategory === "z";
+  const isCarsCategory = mainCategory === "1";
   const isBuyOrServicesCategory = isBuyCategory || isServicesCategory;
   const isHeavyCategory = isBusesCategory || isTrucksCategory || isMotoCategory;
   const isCategoryBasedBrandModel = isAgroCategory || isBoatsCategory || isTrailersCategory;
@@ -3468,7 +3469,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                     marginRight: 4,
                   }}
                 />
-                {usesCompactMainCategoryForm ? "Още критерии за търсене" : "Детайлно търсене"}
+                {usesCompactMainCategoryForm || isCarsCategory ? "Още критерии за търсене" : "Детайлно търсене"}
               </button>
             )}
 
@@ -3588,8 +3589,8 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                     <>
                       {showsWheelTireFilters && (
                         <>
-                          <div className="adv-field" style={{ gridColumn: "1 / -1", borderBottom: "1px solid #bbf7d0", paddingBottom: 6 }}>
-                            <label className="adv-label" style={{ color: "#16a34a", fontWeight: 800 }}>ИНФОРМАЦИЯ ЗА ГУМИ</label>
+                          <div className="adv-field" style={{ gridColumn: "1 / -1", borderBottom: "1px solid rgb(15, 118, 110)", paddingBottom: 6 }}>
+                            <label className="adv-label" style={{ color: "rgb(15, 118, 110)", fontWeight: 800 }}>ИНФОРМАЦИЯ ЗА ГУМИ</label>
                           </div>
                           <div className="adv-field">
                             <label className="adv-label">МАРКА ГУМИ</label>
@@ -3715,8 +3716,8 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
 
                       {showsWheelRimFilters && (
                         <>
-                          <div className="adv-field" style={{ gridColumn: "1 / -1", borderBottom: "1px solid #bbf7d0", paddingBottom: 6 }}>
-                            <label className="adv-label" style={{ color: "#16a34a", fontWeight: 800 }}>ИНФОРМАЦИЯ ЗА ДЖАНТИ</label>
+                          <div className="adv-field" style={{ gridColumn: "1 / -1", borderBottom: "1px solid rgb(15, 118, 110)", paddingBottom: 6 }}>
+                            <label className="adv-label" style={{ color: "rgb(15, 118, 110)", fontWeight: 800 }}>ИНФОРМАЦИЯ ЗА ДЖАНТИ</label>
                           </div>
                           <div className="adv-field">
                             <label className="adv-label">МАРКА (АВТОМОБИЛ)</label>
