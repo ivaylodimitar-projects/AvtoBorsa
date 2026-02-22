@@ -82,6 +82,15 @@
             color: #1e3a8a;
             margin-top: 10px;
         }
+        .dealer-only {
+            background: #fff7ed;
+            border: 1px solid #fdba74;
+            border-left: 4px solid #ea580c;
+            border-radius: 8px;
+            padding: 12px 14px;
+            color: #7c2d12;
+            margin: 12px 0 14px;
+        }
         .category-buttons {
             display: flex;
             flex-wrap: wrap;
@@ -137,6 +146,9 @@
 <body>
 <div class="wrap">
     <h1>Public Listing Upload API</h1>
+    <div class="dealer-only">
+        <strong>Dealer-only access:</strong> API keys and API upload access are available only for dealer/business profiles.
+    </div>
     <p>
         Тези API endpoints позволяват външни системи да създават и публикуват обяви чрез API ключ на потребителя.
         Обявата винаги се създава към акаунта, който притежава ключа.

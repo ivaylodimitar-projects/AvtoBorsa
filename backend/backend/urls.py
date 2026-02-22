@@ -3,6 +3,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import HttpResponseRedirect
+from backend.public_api.views import public_api_docs
 
 
 def redirect_to_frontend_admin(request, path=""):
@@ -16,6 +17,7 @@ urlpatterns = [
     path('admin/', redirect_to_frontend_admin),
     path('admin/<path:path>/', redirect_to_frontend_admin),
     path('django-admin/', admin.site.urls),
+    path('docs/api/', public_api_docs, name='public_api_docs_alias'),
     path('api/auth/', include('backend.accounts.urls')),
     path('api/admin/', include('backend.adminpanel.urls')),
     path('api/payments/', include('backend.payments.urls')),

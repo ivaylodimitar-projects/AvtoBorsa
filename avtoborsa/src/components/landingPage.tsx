@@ -43,6 +43,9 @@ import { APP_MAIN_CATEGORY_OPTIONS, getMainCategoryLabel } from "../constants/mo
 import { formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 import { resolvePriceBadgeState } from "../utils/priceChangeBadge";
 
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/+$/, "");
+const PUBLIC_API_DOCS_URL = `${API_BASE_URL}/docs/api/`;
+
 type CarListing = {
   id: number;
   slug: string;
@@ -749,6 +752,49 @@ export default function LandingPage() {
   const selectedCategoryLabel =
     CATEGORIES.find((mainCategory) => mainCategory.value === category)?.label || "";
 
+  const renderMainCategoryIcon = (
+    categoryValue: string,
+    options: { isActive: boolean; compact?: boolean }
+  ) => {
+    const { isActive, compact = false } = options;
+    const isCarCategory = categoryValue === "1";
+    const isServicesCategory = categoryValue === "z";
+    const Icon = CATEGORY_ICONS[categoryValue] || CATEGORY_ICONS["1"];
+
+    const baseWidth = compact
+      ? isCarCategory
+        ? 28
+        : isServicesCategory
+          ? 22
+          : 24
+      : isCarCategory
+        ? CAR_CATEGORY_ICON_WIDTH
+        : isServicesCategory
+          ? SERVICES_CATEGORY_ICON_WIDTH
+          : CATEGORY_ICON_WIDTH;
+
+    const baseHeight = compact
+      ? isCarCategory
+        ? 28
+        : isServicesCategory
+          ? 22
+          : 24
+      : isCarCategory
+        ? CAR_CATEGORY_ICON_HEIGHT
+        : isServicesCategory
+          ? SERVICES_CATEGORY_ICON_HEIGHT
+          : CATEGORY_ICON_HEIGHT;
+
+    return (
+      <Icon
+        width={baseWidth}
+        height={baseHeight}
+        fill={isActive ? 1 : 0}
+        weight={isActive ? 650 : 500}
+      />
+    );
+  };
+
   return (
     <div style={styles.page}>
       <link
@@ -992,6 +1038,9 @@ export default function LandingPage() {
             onMainCategoryChange={setCategory}
             recentSearches={searches}
             hideMainCategoryField
+            renderCategoryIcon={(categoryValue, options) =>
+              renderMainCategoryIcon(categoryValue, options)
+            }
             topContent={
               <div style={styles.mainCategoryWrap}>
                 <div style={styles.mainCategoryHeader}>
@@ -1005,9 +1054,6 @@ export default function LandingPage() {
                 >
                   {CATEGORIES.map((mainCategory) => {
                     const isActive = category === mainCategory.value;
-                    const isCarCategory = mainCategory.value === "1";
-                    const isServicesCategory = mainCategory.value === "z";
-                    const Icon = CATEGORY_ICONS[mainCategory.value] || CATEGORY_ICONS["1"];
 
                     return (
                       <button
@@ -1035,24 +1081,7 @@ export default function LandingPage() {
                               : {}),
                           }}
                         >
-                          <Icon
-                            width={
-                              isCarCategory
-                                ? CAR_CATEGORY_ICON_WIDTH
-                                : isServicesCategory
-                                  ? SERVICES_CATEGORY_ICON_WIDTH
-                                  : CATEGORY_ICON_WIDTH
-                            }
-                            height={
-                              isCarCategory
-                                ? CAR_CATEGORY_ICON_HEIGHT
-                                : isServicesCategory
-                                  ? SERVICES_CATEGORY_ICON_HEIGHT
-                                  : CATEGORY_ICON_HEIGHT
-                            }
-                            fill={isActive ? 1 : 0}
-                            weight={isActive ? 650 : 500}
-                          />
+                          {renderMainCategoryIcon(mainCategory.value, { isActive })}
                         </span>
                       </button>
                     );
@@ -2221,68 +2250,137 @@ export default function LandingPage() {
         <section id="about" style={styles.section}>
           <div style={styles.infoContainer}>
             <div style={{ ...styles.sectionHeader, ...styles.containerHeader }}>
+              <div style={styles.aboutBadge}>По-малко шум. Повече сделки.</div>
               <h2 style={styles.h2}>За Kar.bg</h2>
-              <p style={styles.sectionLead}>
-                Ясна платформа за купувачи и продавачи — бързо търсене, честни обяви и лесен контакт.
+              <p style={styles.aboutLead}>
+                Ако в познатите големи портали губиш време в безкраен скрол и повтарящи се обяви,
+                <span style={styles.infoHighlight}> Kar.bg </span>
+                е свежата алтернатива: по-ясни резултати, по-бърз избор и директен контакт.
               </p>
+            </div>
+
+            <div style={styles.aboutTagRow} className="about-tag-row">
+              <div style={styles.aboutTag} className="about-tag">Без излишни кликове</div>
+              <div style={styles.aboutTag} className="about-tag">По-чист интерфейс</div>
+              <div style={styles.aboutTag} className="about-tag">Фокус върху актуалните обяви</div>
+              <div style={styles.aboutTag} className="about-tag">По-бърз контакт с продавача</div>
             </div>
 
             <div style={styles.infoGrid} className="info-grid">
               <div style={styles.infoCard} className="info-card">
-                <div style={styles.infoTitle}>Какво представлява</div>
+                <div style={styles.infoTitle}>Защо Kar.bg е различен</div>
                 <p style={styles.infoText}>
-                  Kar.bg е{" "}
-                  <span style={styles.infoHighlight}>специализирана платформа</span> за покупко‑продажба на
-                  автомобили с{" "}
-                  <span style={styles.infoHighlight}>умно търсене</span>, ясни параметри и
-                  <span style={styles.infoHighlight}> реални снимки</span>.
+                  Не сме просто още един „листинг“ сайт. Платформата е подредена така, че да стигаш до правилната кола
+                  за минути, а не за часове.
                 </p>
-                <p style={styles.infoText}>
-                  Събираме оферти от частни лица и автокъщи на едно място, за да спестим време и да дадем
-                  <span style={styles.infoHighlight}> прозрачност</span> във всеки избор.
+                <p style={{ ...styles.infoText, marginBottom: 0 }}>
+                  <span style={styles.infoHighlight}>Ясни филтри, чисти карти, реална информация</span> за офертата.
                 </p>
               </div>
 
               <div style={styles.infoCard} className="info-card">
-                <div style={styles.infoTitle}>С какво сме по‑добри</div>
+                <div style={styles.infoTitle}>С какво печелиш пред „старите“ портали</div>
                 <ul style={styles.infoList}>
                   <li style={styles.infoListItem}>
-                    <span style={styles.infoHighlight}>Бързо търсене</span> по марка, модел, цена и регион.
+                    <span style={styles.infoHighlight}>По-малко дублирани резултати</span> и по-ясно сравнение.
                   </li>
                   <li style={styles.infoListItem}>
-                    <span style={styles.infoHighlight}>Чист дизайн</span> — без излишен шум, само важното.
+                    <span style={styles.infoHighlight}>По-четим дизайн</span> без визуален шум.
                   </li>
                   <li style={styles.infoListItem}>
-                    <span style={styles.infoHighlight}>По‑лесна комуникация</span> между купувач и продавач.
+                    <span style={styles.infoHighlight}>Скоростно търсене</span> по марка, модел, цена, регион и още.
                   </li>
                   <li style={styles.infoListItem}>
-                    <span style={styles.infoHighlight}>Свежи обяви</span> с приоритет на актуалните оферти.
+                    <span style={styles.infoHighlight}>Бърз контакт</span> с продавача, когато вече си избрал.
                   </li>
                 </ul>
               </div>
 
               <div style={styles.infoCard} className="info-card">
-                <div style={styles.infoTitle}>Свържете се с нас</div>
+                <div style={styles.infoTitle}>За продавачи и автокъщи</div>
                 <p style={styles.infoText}>
-                  Имате въпрос или нужда от съдействие? Пишете ни през{" "}
-                  <span style={styles.infoHighlight}>контактната форма</span> или използвайте{" "}
-                  <span style={styles.infoHighlight}>чат в сайта</span>.
+                  Качваш обява бързо и я позиционираш точно пред хората, които реално търсят твоя тип автомобил.
                 </p>
                 <p style={{ ...styles.infoText, marginBottom: 0 }}>
-                  Работим бързо и отговаряме в рамките на{" "}
-                  <span style={styles.infoHighlight}>работния ден</span>.
+                  <span style={styles.infoHighlight}>TOP/VIP опции, гъвкави планове и бърза поддръжка</span> за по-добра видимост.
                 </p>
                 <div style={styles.infoContactRow}>
                   <div style={styles.infoContactPill}>Поддръжка</div>
-                  <div style={styles.infoContactText}>Пон‑Пет · 09:00–18:00</div>
+                  <div style={styles.infoContactText}>Пон‑Пет · 09:00–18:00 · бърз отговор</div>
                 </div>
               </div>
+            </div>
+
+            <div style={styles.apiInfoBanner}>
+              <div>
+                <div style={styles.apiInfoTitle}>Kar.bg API за автокъщи</div>
+                <p style={styles.apiInfoText}>
+                  Автоматизирай качването и управлението на обяви директно от твоята система.
+                  <span style={styles.apiInfoHighlight}> API достъпът е активен само за дилърски акаунти.</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                className="about-api-btn"
+                style={styles.apiInfoButton}
+                onClick={() => {
+                  window.location.assign(PUBLIC_API_DOCS_URL);
+                }}
+              >
+                Научи повече за API
+              </button>
             </div>
           </div>
         </section>
 
         {/* CTA */}
       </main>
+
+      <footer style={styles.footer}>
+        <div style={styles.footerInner} className="footer-grid">
+          <div style={styles.footerCol}>
+            <div style={styles.footerBrand}>Kar.bg</div>
+            <p style={styles.footerText}>
+              Платформа за бърза покупко-продажба на автомобили, части и услуги с фокус върху ясни резултати и реални сделки.
+            </p>
+          </div>
+
+          <div style={styles.footerCol}>
+            <div style={styles.footerTitle}>Бърз достъп</div>
+            <a href="#search" style={styles.footerLink}>Търсене</a>
+            <a href="#about" style={styles.footerLink}>За Kar.bg</a>
+            <button
+              type="button"
+              style={{ ...styles.footerLinkButton, ...styles.footerLinkButtonReset }}
+              onClick={() => navigate("/search")}
+            >
+              Всички обяви
+            </button>
+          </div>
+
+          <div style={styles.footerCol} id="api-footer">
+            <div style={styles.footerTitle}>Kar.bg API</div>
+            <p style={styles.footerText}>
+              Връзка за автоматичен импорт на обяви, обновяване на наличности и по-бързо управление на инвентар.
+            </p>
+            <div style={styles.footerApiDealerBadge}>API само за дилъри</div>
+            <button
+              type="button"
+              className="footer-api-btn"
+              style={styles.footerApiButton}
+              onClick={() => {
+                window.location.assign(PUBLIC_API_DOCS_URL);
+              }}
+            >
+              Заяви API достъп
+            </button>
+          </div>
+        </div>
+
+        <div style={styles.footerBottom}>
+          © {new Date().getFullYear()} Kar.bg · API модулът е достъпен само за верифицирани дилърски акаунти.
+        </div>
+      </footer>
     </div>
   );
 }
@@ -2739,11 +2837,92 @@ const styles: Record<string, React.CSSProperties> = {
   emptyText: { color: "#666", margin: "8px 0 16px", fontSize: 15 },
 
   infoContainer: {
-    background: "#fff",
-    border: "1px solid #e5e7eb",
+    background: "radial-gradient(circle at top right, #ecfeff 0%, #ffffff 42%, #f8fafc 100%)",
+    border: "1px solid #dbeafe",
+    borderRadius: 14,
+    padding: 24,
+    boxShadow: "0 10px 28px rgba(15, 118, 110, 0.08)",
+  },
+  aboutBadge: {
+    alignSelf: "center",
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "8px 14px",
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: 700,
+    letterSpacing: 0.3,
+    textTransform: "uppercase",
+    background: "linear-gradient(90deg, #ecfdf5 0%, #ccfbf1 100%)",
+    color: "#0f766e",
+    border: "1px solid #99f6e4",
+    boxShadow: "0 4px 12px rgba(15, 118, 110, 0.15)",
+    marginBottom: 10,
+  },
+  aboutLead: {
+    margin: "0 auto",
+    maxWidth: 820,
+    color: "#334155",
+    fontSize: 16,
+    lineHeight: 1.75,
+  },
+  aboutTagRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 10,
+    margin: "18px 0 20px",
+  },
+  aboutTag: {
+    fontSize: 13,
+    fontWeight: 700,
+    color: "#0f766e",
+    border: "1px solid #99f6e4",
+    background: "#f0fdfa",
+    borderRadius: 999,
+    padding: "7px 14px",
+    transition: "transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease",
+  },
+  apiInfoBanner: {
+    marginTop: 10,
+    borderRadius: 12,
+    border: "1px solid #99f6e4",
+    background: "linear-gradient(90deg, #f0fdfa 0%, #ecfeff 55%, #f8fafc 100%)",
+    padding: "16px 18px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 14,
+    flexWrap: "wrap",
+  },
+  apiInfoTitle: {
+    fontSize: 16,
+    fontWeight: 700,
+    color: "#115e59",
+    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+  },
+  apiInfoText: {
+    margin: "6px 0 0",
+    fontSize: 14,
+    lineHeight: 1.65,
+    color: "#334155",
+  },
+  apiInfoHighlight: {
+    color: "#0f766e",
+    fontWeight: 700,
+  },
+  apiInfoButton: {
+    border: "none",
     borderRadius: 10,
-    padding: 20,
-    boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
+    background: "#0f766e",
+    color: "#ffffff",
+    fontWeight: 700,
+    fontSize: 13,
+    padding: "10px 14px",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+    boxShadow: "0 6px 14px rgba(15, 118, 110, 0.2)",
+    transition: "transform 0.2s ease, filter 0.2s ease",
   },
   infoGrid: {
     display: "grid",
@@ -2841,6 +3020,44 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 14,
     padding: "4px 0",
   },
+  footerLinkButtonReset: {
+    border: "none",
+    background: "transparent",
+    textAlign: "left",
+    cursor: "pointer",
+  },
+  footerLinkButton: {
+    color: "#666",
+    fontSize: 14,
+    padding: "4px 0",
+    fontFamily: "inherit",
+  },
+  footerApiDealerBadge: {
+    display: "inline-flex",
+    alignItems: "center",
+    width: "fit-content",
+    padding: "6px 10px",
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: 700,
+    color: "#0f766e",
+    background: "#ecfdf5",
+    border: "1px solid #99f6e4",
+  },
+  footerApiButton: {
+    marginTop: 8,
+    border: "none",
+    borderRadius: 8,
+    background: "linear-gradient(90deg, #0f766e 0%, #0d9488 100%)",
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: 700,
+    padding: "10px 14px",
+    cursor: "pointer",
+    width: "fit-content",
+    boxShadow: "0 6px 14px rgba(15, 118, 110, 0.2)",
+    transition: "transform 0.2s ease, filter 0.2s ease",
+  },
   footerBottom: {
     maxWidth: 1200,
     margin: "0 auto",
@@ -2868,6 +3085,16 @@ const globalCss = `
   .info-card:hover {
     box-shadow: 0 6px 16px rgba(0,0,0,0.12) !important;
     transform: translateY(-2px);
+  }
+  .about-tag:hover {
+    transform: translateY(-1px);
+    background: #ecfdf5 !important;
+    box-shadow: 0 6px 14px rgba(15, 118, 110, 0.15);
+  }
+  .about-api-btn:hover,
+  .footer-api-btn:hover {
+    filter: brightness(1.06);
+    transform: translateY(-1px);
   }
   [role="button"]:focus-visible { outline: 2px solid #0f766e; outline-offset: 2px; }
 
@@ -2907,6 +3134,8 @@ const globalCss = `
     .cards-grid { grid-template-columns: 1fr !important; }
     .info-grid { grid-template-columns: 1fr !important; }
     .footer-grid { grid-template-columns: 1fr !important; }
+    .about-tag-row { justify-content: flex-start !important; }
+    .about-api-btn, .footer-api-btn { width: 100%; }
   }
 
   /* Mobile Small (< 640px) */
@@ -2917,6 +3146,8 @@ const globalCss = `
     .cards-grid { grid-template-columns: 1fr !important; }
     .info-grid { grid-template-columns: 1fr !important; }
     .footer-grid { grid-template-columns: 1fr !important; }
+    .about-tag-row { justify-content: flex-start !important; }
+    .about-api-btn, .footer-api-btn { width: 100%; }
     .form-bottom {
       flex-direction: column;
       align-items: stretch !important;

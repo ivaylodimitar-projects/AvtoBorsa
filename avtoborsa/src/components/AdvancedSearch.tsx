@@ -136,6 +136,10 @@ interface AdvancedSearchProps {
   recentSearches?: RecentSearch[];
   hideMainCategoryField?: boolean;
   topContent?: React.ReactNode;
+  renderCategoryIcon?: (
+    categoryValue: string,
+    options: { isActive: boolean; compact: boolean }
+  ) => React.ReactNode;
 }
 
 const FUEL_OPTIONS = ["Бензин", "Дизел", "Газ/Бензин", "Хибрид", "Електро"];
@@ -707,6 +711,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   recentSearches = [],
   hideMainCategoryField = false,
   topContent,
+  renderCategoryIcon,
 }) => {
   const navigate = useNavigate();
   const { addSearch } = useRecentSearches();
@@ -718,7 +723,9 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   const [searchName, setSearchName] = useState("");
   const recentSearchesRef = React.useRef<HTMLDivElement | null>(null);
   const actionRowRef = React.useRef<HTMLDivElement | null>(null);
+  const stickyCategoryMenuRef = React.useRef<HTMLDivElement | null>(null);
   const [showStickySearchBar, setShowStickySearchBar] = useState(false);
+  const [showStickyCategoryMenu, setShowStickyCategoryMenu] = useState(false);
   const [liveResultCount, setLiveResultCount] = useState<number | null>(null);
   const [isLiveCountLoading, setIsLiveCountLoading] = useState(false);
   const hasRecentSearches = recentSearches.length > 0;
@@ -951,6 +958,10 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     : "Търси обяви";
   const stickyMainCategoryLabel = useMemo(
     () => categories.find((option) => option.value === mainCategory)?.label || "Всички категории",
+    [categories, mainCategory]
+  );
+  const stickyMainCategoryValue = useMemo(
+    () => categories.find((option) => option.value === mainCategory)?.value || "",
     [categories, mainCategory]
   );
 
@@ -1432,13 +1443,24 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
 
   React.useEffect(() => {
     const syncStickyBar = () => {
+      const footerNodes = Array.from(document.querySelectorAll("footer")).filter(
+        (node): node is HTMLElement => node instanceof HTMLElement && node.offsetHeight > 0
+      );
       const actionRow = actionRowRef.current;
       if (!actionRow || showSaveModal) {
         setShowStickySearchBar(false);
         return;
       }
+
       const rect = actionRow.getBoundingClientRect();
-      const shouldShow = rect.bottom < -14 && window.scrollY > 200;
+      const hasScrolledPastActionRow = rect.bottom < -14 && window.scrollY > 200;
+
+      const isFooterNearViewport = footerNodes.some((footerNode) => {
+        const footerRect = footerNode.getBoundingClientRect();
+        return footerRect.top <= window.innerHeight + 28 && footerRect.bottom >= -12;
+      });
+
+      const shouldShow = hasScrolledPastActionRow && !isFooterNearViewport;
       setShowStickySearchBar((prev) => (prev === shouldShow ? prev : shouldShow));
     };
 
@@ -1450,6 +1472,40 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       window.removeEventListener("resize", syncStickyBar);
     };
   }, [showSaveModal]);
+
+  React.useEffect(() => {
+    if (!showStickySearchBar && showStickyCategoryMenu) {
+      setShowStickyCategoryMenu(false);
+    }
+  }, [showStickySearchBar, showStickyCategoryMenu]);
+
+  React.useEffect(() => {
+    if (!showStickyCategoryMenu) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (stickyCategoryMenuRef.current?.contains(target)) return;
+      setShowStickyCategoryMenu(false);
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowStickyCategoryMenu(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [showStickyCategoryMenu]);
+
+  React.useEffect(() => {
+    setShowStickyCategoryMenu(false);
+  }, [mainCategory]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -2041,6 +2097,137 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       transform: translate(-50%, 0);
       pointer-events: auto;
     }
+    .adv-sticky-category-panel {
+      position: relative;
+      min-width: 220px;
+      max-width: 340px;
+      flex: 1 1 240px;
+    }
+    .adv-sticky-category-trigger {
+      width: 100%;
+      height: 42px;
+      border-radius: 10px;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      color: #0f172a;
+      padding: 0 10px 0 11px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+    }
+    .adv-sticky-category-trigger:hover {
+      border-color: #14b8a6;
+      background: #f0fdfa;
+    }
+    .adv-sticky-category-trigger.is-open {
+      border-color: #0f766e;
+      background: #ecfdf5;
+      box-shadow: 0 8px 18px rgba(15, 118, 110, 0.2);
+    }
+    .adv-sticky-category-trigger-icon {
+      width: 24px;
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+    }
+    .adv-sticky-category-trigger-label {
+      min-width: 0;
+      flex: 1;
+      text-align: left;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .adv-sticky-category-trigger-chevron {
+      flex: 0 0 auto;
+      transition: transform 0.2s ease;
+    }
+    .adv-sticky-category-trigger.is-open .adv-sticky-category-trigger-chevron {
+      transform: rotate(180deg);
+    }
+    .adv-sticky-category-dropdown {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: calc(100% + 8px);
+      z-index: 1300;
+      max-height: min(340px, calc(100vh - 140px));
+      overflow-y: auto;
+      overflow-x: hidden;
+      border: 1px solid #cbd5e1;
+      border-radius: 11px;
+      background: #ffffff;
+      box-shadow: 0 14px 30px rgba(15, 23, 42, 0.2);
+      padding: 6px;
+      opacity: 0;
+      transform: translateY(6px);
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    .adv-sticky-category-dropdown.is-open {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    .adv-sticky-category-option {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      color: #1e293b;
+      padding: 6px 9px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    }
+    .adv-sticky-category-option:hover {
+      background: #f0fdfa;
+      border-color: #99f6e4;
+    }
+    .adv-sticky-category-option.is-active {
+      background: #ecfdf5;
+      border-color: #99f6e4;
+      color: #0f766e;
+      font-weight: 700;
+    }
+    .adv-sticky-category-option:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .adv-sticky-category-option-icon {
+      width: 22px;
+      height: 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      line-height: 1;
+    }
+    .adv-sticky-category-option-label {
+      min-width: 0;
+      flex: 1;
+      font-size: 13px;
+      line-height: 1.25;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .adv-sticky-category-fallback {
+      font-size: 12px;
+      font-weight: 800;
+      color: currentColor;
+    }
     .adv-sticky-submit-results {
       display: inline-flex;
       align-items: center;
@@ -2338,10 +2525,33 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         bottom: 12px;
         width: auto;
         max-width: none;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
         transform: translateY(18px);
       }
       .adv-sticky-submit-bar.is-visible {
         transform: translateY(0);
+      }
+      .adv-sticky-category-panel {
+        min-width: 0;
+        max-width: none;
+      }
+      .adv-sticky-category-trigger {
+        height: 40px;
+      }
+      .adv-sticky-category-trigger-label {
+        font-size: 11px;
+      }
+      .adv-sticky-category-dropdown {
+        max-height: min(320px, calc(100vh - 124px));
+      }
+      .adv-sticky-category-option {
+        min-height: 36px;
+        padding: 6px 8px;
+      }
+      .adv-sticky-category-option-label {
+        font-size: 12px;
       }
       .adv-sticky-submit-results {
         min-width: 138px;
@@ -4928,9 +5138,70 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         )}
 
         <div className={`adv-sticky-submit-bar ${showStickySearchBar ? "is-visible" : ""}`}>
-          <span className="adv-sticky-submit-results">
-            {stickyMainCategoryLabel}
-          </span>
+          <div className="adv-sticky-category-panel" ref={stickyCategoryMenuRef}>
+            <button
+              type="button"
+              className={`adv-sticky-category-trigger ${showStickyCategoryMenu ? "is-open" : ""}`}
+              onClick={(event) => {
+                event.preventDefault();
+                setShowStickyCategoryMenu((prev) => !prev);
+              }}
+              aria-label={`Избрана категория ${stickyMainCategoryLabel}`}
+              aria-expanded={showStickyCategoryMenu}
+              aria-controls="adv-sticky-category-dropdown"
+              disabled={!onMainCategoryChange}
+            >
+              <span className="adv-sticky-category-trigger-icon">
+                {renderCategoryIcon ? (
+                  renderCategoryIcon(stickyMainCategoryValue, { isActive: true, compact: true })
+                ) : (
+                  <span className="adv-sticky-category-fallback">
+                    {stickyMainCategoryLabel.charAt(0).toUpperCase()}
+                  </span>
+                )}
+              </span>
+              <span className="adv-sticky-category-trigger-label">{stickyMainCategoryLabel}</span>
+              <ChevronDown size={15} className="adv-sticky-category-trigger-chevron" />
+            </button>
+
+            <div
+              id="adv-sticky-category-dropdown"
+              className={`adv-sticky-category-dropdown ${showStickyCategoryMenu ? "is-open" : ""}`}
+              role="listbox"
+              aria-hidden={!showStickyCategoryMenu}
+            >
+              {categories.map((option) => {
+                const isActive = option.value === mainCategory;
+                return (
+                  <button
+                    key={`sticky-cat-${option.value}`}
+                    type="button"
+                    className={`adv-sticky-category-option ${isActive ? "is-active" : ""}`}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      onMainCategoryChange?.(option.value);
+                      setShowStickyCategoryMenu(false);
+                    }}
+                    aria-label={`Категория ${option.label}`}
+                    aria-selected={isActive}
+                    title={option.label}
+                    disabled={!onMainCategoryChange}
+                  >
+                    <span className="adv-sticky-category-option-icon">
+                      {renderCategoryIcon ? (
+                        renderCategoryIcon(option.value, { isActive, compact: true })
+                      ) : (
+                        <span className="adv-sticky-category-fallback">
+                          {option.label.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </span>
+                    <span className="adv-sticky-category-option-label">{option.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <button type="submit" className="adv-sticky-submit-btn">
             <Search size={17} style={{ marginRight: 8 }} />
             <span>{searchActionLabel}</span>
