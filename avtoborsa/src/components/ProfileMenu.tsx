@@ -19,6 +19,11 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000
 const STRIPE_SESSION_STORAGE_KEY = "stripe_checkout_session_id";
 const PAYMENT_SYNC_MIN_MS = 650;
 
+type DealerProfile = {
+  email: string;
+  profile_image_url?: string | null;
+};
+
 const ProfileMenu: React.FC = () => {
   const { user, updateBalance, logout } = useAuth();
   const location = useLocation();
