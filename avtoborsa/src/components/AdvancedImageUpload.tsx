@@ -11,7 +11,7 @@ interface ExistingImageItem {
   id?: number;
   image: string;
   thumbnail?: string | null;
-  isCover?: boolean;
+  isCover: boolean;
 }
 
 interface AdvancedImageUploadProps {

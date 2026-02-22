@@ -15,9 +15,17 @@ import TopUpModal from "./TopUpModal";
 import { useToast } from "../context/ToastContext";
 import { addDepositNotification } from "../utils/notifications";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(
+  /\/+$/,
+  ""
+);
 const STRIPE_SESSION_STORAGE_KEY = "stripe_checkout_session_id";
 const PAYMENT_SYNC_MIN_MS = 650;
+
+type DealerProfile = {
+  email?: string;
+  profile_image_url?: string | null;
+};
 
 const ProfileMenu: React.FC = () => {
   const { user, updateBalance, logout } = useAuth();
@@ -226,7 +234,7 @@ const ProfileMenu: React.FC = () => {
       const formData = new FormData();
       formData.append("image", file);
 
-      const response = await fetch("http://localhost:8000/api/auth/profile/upload-photo/", {
+      const response = await fetch(`${API_BASE_URL}/api/auth/profile/upload-photo/`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
@@ -239,7 +247,7 @@ const ProfileMenu: React.FC = () => {
         // Also refetch from dealers API to ensure persistence
         setTimeout(async () => {
           try {
-            const dealersRes = await fetch("http://localhost:8000/api/auth/dealers/", {
+            const dealersRes = await fetch(`${API_BASE_URL}/api/auth/dealers/`, {
               headers: { Authorization: `Bearer ${token}` },
             });
             if (dealersRes.ok) {

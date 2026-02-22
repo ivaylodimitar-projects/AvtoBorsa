@@ -40,6 +40,10 @@ import {
 const DEALER_LISTINGS_SYNC_COOLDOWN_MS = 15_000;
 const DEALER_NOTIFICATIONS_STACK_WINDOW_MS = 60 * 60 * 1000;
 const DEALER_NOTIFICATIONS_WS_RECONNECT_MS = 5_000;
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
+).replace(/\/+$/, "");
+const WS_BASE_URL = (import.meta.env.VITE_WS_BASE_URL || "").replace(/\/+$/, "");
 
 type NotificationRenderItem =
   | {
@@ -136,6 +140,31 @@ const areFollowedDealersEqual = (
   }
 
   return true;
+};
+
+const normalizeWsUrl = (rawValue: string) => {
+  if (!rawValue) return "";
+  try {
+    const parsed = new URL(rawValue);
+    const protocol = parsed.protocol === "https:" ? "wss:" : parsed.protocol === "http:" ? "ws:" : parsed.protocol;
+    return `${protocol}//${parsed.host}`;
+  } catch {
+    return "";
+  }
+};
+
+const getNotificationsWebSocketUrl = () => {
+  const preferredWsBase = normalizeWsUrl(WS_BASE_URL);
+  if (preferredWsBase) return `${preferredWsBase}/ws/notifications/`;
+
+  try {
+    const apiUrl = new URL(API_BASE_URL);
+    const wsProtocol = apiUrl.protocol === "https:" ? "wss:" : "ws:";
+    return `${wsProtocol}//${apiUrl.host}/ws/notifications/`;
+  } catch {
+    const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+    return `${wsProtocol}://${window.location.host}/ws/notifications/`;
+  }
 };
 
 const Navbar: React.FC = () => {
@@ -314,11 +343,6 @@ const Navbar: React.FC = () => {
     let socket: WebSocket | null = null;
     let reconnectTimerId: number | null = null;
 
-    const getWebSocketUrl = () => {
-      const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-      return `${protocol}://localhost:8000/ws/notifications/`;
-    };
-
     const clearReconnectTimer = () => {
       if (reconnectTimerId !== null) {
         window.clearTimeout(reconnectTimerId);
@@ -337,7 +361,7 @@ const Navbar: React.FC = () => {
     const connect = () => {
       if (isDisposed) return;
       try {
-        socket = new WebSocket(getWebSocketUrl());
+        socket = new WebSocket(getNotificationsWebSocketUrl());
       } catch {
         scheduleReconnect();
         return;

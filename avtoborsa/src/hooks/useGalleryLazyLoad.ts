@@ -6,6 +6,18 @@ interface LazyImage {
   loaded?: boolean;
 }
 
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+).replace(/\/+$/, '');
+
+const API_ORIGIN = (() => {
+  try {
+    return new URL(API_BASE_URL).origin;
+  } catch {
+    return 'http://localhost:8000';
+  }
+})();
+
 /**
  * Hook to manage lazy loading of images
  * Only loads the current, previous, and next images
@@ -68,12 +80,12 @@ export const useImageUrl = () => {
       return imagePath;
     }
     if (imagePath.startsWith('/')) {
-      return `http://localhost:8000${imagePath}`;
+      return `${API_ORIGIN}${imagePath}`;
     }
     if (imagePath.startsWith('media/')) {
-      return `http://localhost:8000/${imagePath}`;
+      return `${API_ORIGIN}/${imagePath}`;
     }
-    return `http://localhost:8000/media/${imagePath}`;
+    return `${API_ORIGIN}/media/${imagePath}`;
   }, []);
 };
 
