@@ -19,7 +19,7 @@ import { requestDealerListingsSync } from "../utils/dealerSubscriptions";
 import { addBalanceUsageRecord } from "../utils/balanceUsageHistory";
 import { BULGARIAN_CITIES_BY_REGION } from "../constants/bulgarianCities";
 import ListingFormStepper from "./ListingFormStepper";
-import AdvancedImageUpload from "./AdvancedImageUpload";
+import AdvancedImageUpload, { type ExistingImageItem } from "./AdvancedImageUpload";
 import FormFieldWithTooltip from "./FormFieldWithTooltip";
 import ListingPreview from "./ListingPreview";
 import ListingQualityIndicator from "./ListingQualityIndicator";
@@ -1590,13 +1590,6 @@ const createInitialFormData = (): PublishFormData => ({
 interface ImageItem {
   file: File;
   preview: string;
-  isCover: boolean;
-}
-
-interface ExistingImageItem {
-  id?: number;
-  image: string;
-  thumbnail?: string | null;
   isCover: boolean;
 }
 

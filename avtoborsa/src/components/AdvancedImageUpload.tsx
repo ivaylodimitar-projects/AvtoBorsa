@@ -7,7 +7,7 @@ interface ImageItem {
   isCover: boolean;
 }
 
-interface ExistingImageItem {
+export interface ExistingImageItem {
   id?: number;
   image: string;
   thumbnail?: string | null;
