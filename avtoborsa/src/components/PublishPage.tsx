@@ -1597,7 +1597,7 @@ interface ExistingImageItem {
   id?: number;
   image: string;
   thumbnail?: string | null;
-  isCover?: boolean;
+  isCover: boolean;
 }
 
 const normalizeExistingImageUrl = (value: unknown): string => String(value ?? "").trim();
