@@ -1,12 +1,12 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { BadgePercent, Coins, CreditCard, ShieldCheck } from "lucide-react";
+import { API_BASE_URL } from "../config/api";
 
 interface TopUpModalProps {
   onClose: () => void;
   onSuccess: () => void;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 const STRIPE_CHECKOUT_ENDPOINT =
   import.meta.env.VITE_STRIPE_CHECKOUT_ENDPOINT ||
   `${API_BASE_URL}/api/payments/create-checkout-session/`;
@@ -255,7 +255,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
     modal: {
       width: "min(660px, 96vw)",
       background: "#ffffff",
-      borderRadius: 18,
+      borderRadius: 16,
       border: "1px solid #d1fae5",
       boxShadow: "0 24px 60px rgba(15, 23, 42, 0.22)",
       maxHeight: "92vh",
@@ -319,7 +319,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
     closeButton: {
       width: 34,
       height: 34,
-      borderRadius: 10,
+      borderRadius: 16,
       border: "1px solid #a8adb3",
       background: "#f1f5f9",
       color: "#1f2937",
@@ -359,7 +359,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
       background: "#ecfdf5",
       border: "1px solid #a7f3d0",
       color: "#065f46",
-      borderRadius: 10,
+      borderRadius: 16,
       padding: "10px 12px",
       fontSize: 13,
       fontWeight: 600,
@@ -368,7 +368,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
       background: "#fef2f2",
       border: "1px solid #fecaca",
       color: "#b91c1c",
-      borderRadius: 10,
+      borderRadius: 16,
       padding: "10px 12px",
       fontSize: 13,
       fontWeight: 600,
@@ -380,7 +380,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
     },
     sectionCard: {
       background: "#ffffff",
-      borderRadius: 14,
+      borderRadius: 16,
       border: "1px solid #e5e7eb",
       padding: 14,
       boxShadow: "0 1px 2px rgba(15, 23, 42, 0.04)",
@@ -406,7 +406,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
     },
     amountButton: {
       border: "1px solid #e5e7eb",
-      borderRadius: 11,
+      borderRadius: 16,
       padding: "12px",
       background: "#ffffff",
       cursor: "pointer",
@@ -457,7 +457,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
       display: "flex",
       alignItems: "center",
       gap: 8,
-      borderRadius: 11,
+      borderRadius: 16,
       border: "1px solid #d1d5db",
       background: "#ffffff",
       padding: "10px 12px",
@@ -489,7 +489,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
     },
     bonusCard: {
       border: "1px solid #e5e7eb",
-      borderRadius: 12,
+      borderRadius: 16,
       padding: "13px",
       background: "#ffffff",
       display: "flex",
@@ -553,7 +553,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
     },
     bonusHint: {
       marginTop: 12,
-      borderRadius: 10,
+      borderRadius: 16,
       border: "1px solid #a7f3d0",
       background: "#ecfdf5",
       color: "#065f46",
@@ -562,7 +562,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
       padding: "8px 10px",
     },
     summaryCard: {
-      borderRadius: 12,
+      borderRadius: 16,
       border: "1px solid #d1fae5",
       background: "#ffffff",
       padding: 14,
@@ -599,7 +599,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
       display: "flex",
       justifyContent: "space-between",
       alignItems: "center",
-      borderRadius: 10,
+      borderRadius: 16,
       background: "#ecfdf5",
       border: "1px solid #a7f3d0",
       padding: "10px 11px",
@@ -619,7 +619,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
       display: "flex",
       alignItems: "center",
       gap: 8,
-      borderRadius: 10,
+      borderRadius: 16,
       border: "1px solid #a7f3d0",
       background: "#ecfdf5",
       color: "#065f46",
@@ -634,7 +634,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
     },
     cancelButton: {
       flex: 1,
-      borderRadius: 10,
+      borderRadius: 16,
       border: "1px solid #d1d5db",
       background: "#ffffff",
       color: "#334155",
@@ -647,7 +647,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
     },
     submitButton: {
       flex: 1,
-      borderRadius: 10,
+      borderRadius: 16,
       border: "1px solid #0f766e",
       background: "#0f766e",
       color: "#ffffff",

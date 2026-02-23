@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 
 interface SkeletonLoaderProps {
   isMobile: boolean;
@@ -29,7 +29,7 @@ const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({ isMobile }) => {
     navbarSkeleton: {
       height: 20,
       background: '#e0e0e0',
-      borderRadius: 4,
+      borderRadius: 16,
       flex: 1,
       animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
     },
@@ -49,7 +49,7 @@ const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({ isMobile }) => {
       minWidth: 0,
     },
     galleryContainer: {
-      borderRadius: 8,
+      borderRadius: 16,
       overflow: 'hidden',
       boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
       aspectRatio: isMobile ? '1' : undefined,
@@ -68,21 +68,21 @@ const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({ isMobile }) => {
     thumbnail: {
       width: isMobile ? 60 : 80,
       height: isMobile ? 60 : 80,
-      borderRadius: 4,
+      borderRadius: 16,
       background: '#e0e0e0',
       flexShrink: 0,
       animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
     },
     section: {
       background: '#fff',
-      borderRadius: 8,
+      borderRadius: 16,
       padding: isMobile ? 16 : 20,
       boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
     },
     sectionTitle: {
       height: 20,
       background: '#e0e0e0',
-      borderRadius: 4,
+      borderRadius: 16,
       marginBottom: 16,
       width: '30%',
       animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
@@ -95,7 +95,7 @@ const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({ isMobile }) => {
     specItem: {
       height: 80,
       background: '#e0e0e0',
-      borderRadius: 4,
+      borderRadius: 16,
       animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
     },
     sidebar: {
@@ -105,7 +105,7 @@ const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({ isMobile }) => {
     },
     sidebarItem: {
       background: '#fff',
-      borderRadius: 8,
+      borderRadius: 16,
       padding: 20,
       boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
       height: 200,
@@ -124,7 +124,7 @@ const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({ isMobile }) => {
 
       <div style={styles.navbar}>
         <div style={styles.navbarContent}>
-          <div style={{ width: 24, height: 24, background: '#e0e0e0', borderRadius: 4 }} />
+          <div style={{ width: 24, height: 24, background: '#e0e0e0', borderRadius: 16 }} />
           <div style={{ ...styles.navbarSkeleton, width: '60%' }} />
         </div>
       </div>
@@ -135,7 +135,7 @@ const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({ isMobile }) => {
           <div style={styles.galleryContainer} />
 
           {/* Thumbnails Skeleton */}
-          <div style={{ background: '#fff', borderRadius: 8, overflow: 'hidden' }}>
+          <div style={{ background: '#fff', borderRadius: 16, overflow: 'hidden' }}>
             <div style={styles.thumbnailContainer}>
               {[...Array(5)].map((_, i) => (
                 <div key={i} style={styles.thumbnail} />
@@ -146,7 +146,7 @@ const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({ isMobile }) => {
           {/* Title Section Skeleton */}
           <div style={styles.section}>
             <div style={{ ...styles.sectionTitle, width: '50%' }} />
-            <div style={{ height: 16, background: '#e0e0e0', borderRadius: 4, width: '30%', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
+            <div style={{ height: 16, background: '#e0e0e0', borderRadius: 16, width: '30%', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
           </div>
 
           {/* Specs Grid Skeleton */}
@@ -164,7 +164,7 @@ const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({ isMobile }) => {
             <div style={styles.sectionTitle} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {[...Array(3)].map((_, i) => (
-                <div key={i} style={{ height: 16, background: '#e0e0e0', borderRadius: 4, animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
+                <div key={i} style={{ height: 16, background: '#e0e0e0', borderRadius: 16, animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
               ))}
             </div>
           </div>

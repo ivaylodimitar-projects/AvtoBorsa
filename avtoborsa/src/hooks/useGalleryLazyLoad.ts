@@ -1,22 +1,11 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { API_ORIGIN } from "../config/api";
 
 interface LazyImage {
   id: number;
   image: string;
   loaded?: boolean;
 }
-
-const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
-).replace(/\/+$/, '');
-
-const API_ORIGIN = (() => {
-  try {
-    return new URL(API_BASE_URL).origin;
-  } catch {
-    return 'http://localhost:8000';
-  }
-})();
 
 /**
  * Hook to manage lazy loading of images

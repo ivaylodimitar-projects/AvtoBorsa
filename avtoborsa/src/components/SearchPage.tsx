@@ -31,6 +31,7 @@ import { useSavedSearches } from "../hooks/useSavedSearches";
 import { resolvePriceBadgeState } from "../utils/priceChangeBadge";
 import ListingPromoBadge from "./ListingPromoBadge";
 import KapariranoBadge from "./KapariranoBadge";
+import { API_BASE_URL } from "../config/api";
 
 type CarListing = {
   id: number;
@@ -350,7 +351,7 @@ const SearchPage: React.FC = () => {
       params.set("page", String(page));
       params.set("page_size", String(PAGE_SIZE));
       params.set("compact", "1");
-      return `http://localhost:8000/api/listings/?${params.toString()}`;
+      return `${API_BASE_URL}/api/listings/?${params.toString()}`;
     },
     [baseQueryString]
   );
@@ -525,7 +526,7 @@ const SearchPage: React.FC = () => {
     try {
       const token = localStorage.getItem("authToken");
       const endpoint = isFavorited ? "unfavorite" : "favorite";
-      const response = await fetch(`http://localhost:8000/api/listings/${listingId}/${endpoint}/`, {
+      const response = await fetch(`${API_BASE_URL}/api/listings/${listingId}/${endpoint}/`, {
         method: isFavorited ? "DELETE" : "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -1241,7 +1242,7 @@ const SearchPage: React.FC = () => {
   const styles: Record<string, React.CSSProperties> = {
     page: { minHeight: "100vh", background: "#f4f6f9", width: "100%", paddingTop: 20, paddingBottom: 40 },
     container: { width: "100%", maxWidth: 1200, margin: "0 auto", padding: "0 20px" },
-    header: { marginBottom: 24, background: "#fff", padding: 24, borderRadius: 10, boxShadow: "0 6px 18px rgba(15, 23, 42, 0.08)" },
+    header: { marginBottom: 24, background: "#fff", padding: 24, borderRadius: 16, boxShadow: "0 6px 18px rgba(15, 23, 42, 0.08)" },
     headerTop: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" },
     title: {
       fontSize: "clamp(2rem, 2.4vw, 2.55rem)",
@@ -1273,8 +1274,7 @@ const SearchPage: React.FC = () => {
       alignItems: "center",
       background: "#d97706",
       border: "1.5px solid #d97706",
-      borderRadius: 10,
-      color: "#fff",
+      borderRadius: 16, color: "#fff",
       fontSize: 13,
       padding: "8px 20px",
       cursor: "pointer",
@@ -1289,12 +1289,11 @@ const SearchPage: React.FC = () => {
       fontSize: 13,
     },
     criteria: { display: "flex", flexWrap: "wrap", gap: 12, marginTop: 16 },
-    criteriaTag: { background: "#f1f5f9", padding: "8px 14px", borderRadius: 20, fontSize: 13, color: "#475569", fontWeight: 600 },
+    criteriaTag: { background: "#f1f5f9", padding: "8px 14px", borderRadius: 16, fontSize: 13, color: "#475569", fontWeight: 600 },
     results: { display: "flex", flexDirection: "column", gap: 16 },
     item: {
       background: "#fff",
-      borderRadius: 6,
-      overflow: "visible",
+      borderRadius: 16, overflow: "visible",
       border: "1px solid #e0e0e0",
       boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
       display: "flex",
@@ -1320,7 +1319,7 @@ const SearchPage: React.FC = () => {
     favoriteButton: { background: "rgba(255,255,255,0.95)", border: "none", borderRadius: "50%", width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", transition: "all 0.2s", padding: 0, boxShadow: "0 6px 14px rgba(15, 23, 42, 0.18)" },
     photoPlaceholder: { width: "100%", height: "100%", display: "flex", flexDirection: "column" as const, alignItems: "center", justifyContent: "center", gap: 6, color: "#94a3b8", fontSize: 13, fontWeight: 600 },
     thumbStrip: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, padding: "10px", background: "#fff", borderTop: "1px solid #e2e8f0" },
-    thumb: { width: "100%", aspectRatio: "4 / 3", borderRadius: 10, overflow: "hidden", border: "1px solid #e2e8f0", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center" },
+    thumb: { width: "100%", aspectRatio: "4 / 3", borderRadius: 16, overflow: "hidden", border: "1px solid #e2e8f0", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center" },
     thumbImage: { width: "100%", height: "100%", objectFit: "cover" },
     thumbPlaceholder: { color: "#94a3b8" },
     thumbMore: { background: "#e2e8f0", color: "#334155", fontSize: 12, fontWeight: 700 },
@@ -1401,8 +1400,7 @@ const SearchPage: React.FC = () => {
       background: "#f8fafc",
       border: "1px solid #e2e8f0",
       padding: "10px 12px",
-      borderRadius: 10,
-      fontWeight: 500,
+      borderRadius: 16, fontWeight: 500,
       fontFamily: "inherit",
     },
     itemSide: { width: 240, padding: 16, background: "linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)", borderLeft: "1px solid #e2e8f0", display: "flex", flexDirection: "column" as const, gap: 12 },
@@ -1426,7 +1424,7 @@ const SearchPage: React.FC = () => {
     metaRow: { display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#334155", fontWeight: 600 },
     metaIcon: { color: "#64748b" },
     metaMuted: { color: "#94a3b8", fontWeight: 600 },
-    empty: { textAlign: "center", padding: 60, background: "#fff", borderRadius: 10, boxShadow: "0 2px 4px rgba(0,0,0,0.08)" },
+    empty: { textAlign: "center", padding: 60, background: "#fff", borderRadius: 16, boxShadow: "0 2px 4px rgba(0,0,0,0.08)" },
     emptyTitle: {
       fontSize: 24,
       fontWeight: 800,
@@ -1443,17 +1441,16 @@ const SearchPage: React.FC = () => {
       lineHeight: 1.6,
       fontWeight: 500,
     },
-    loading: { textAlign: "center", padding: 60, background: "#fff", borderRadius: 10, boxShadow: "0 2px 4px rgba(0,0,0,0.08)" },
+    loading: { textAlign: "center", padding: 60, background: "#fff", borderRadius: 16, boxShadow: "0 2px 4px rgba(0,0,0,0.08)" },
     pagination: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 24, flexWrap: "wrap" },
-    paginationButton: { minWidth: 36, height: 36, borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#1f2937", fontWeight: 600, cursor: "pointer", padding: "0 10px" },
+    paginationButton: { minWidth: 36, height: 36, borderRadius: 16, border: "1px solid #e2e8f0", background: "#fff", color: "#1f2937", fontWeight: 600, cursor: "pointer", padding: "0 10px" },
     paginationButtonActive: { background: "#0f766e", borderColor: "#0f766e", color: "#fff" },
     paginationButtonDisabled: { opacity: 0.5, cursor: "not-allowed" },
     paginationEllipsis: { color: "#94a3b8", fontWeight: 600, padding: "0 4px" },
     paginationInfo: { fontSize: 13, color: "#64748b", fontWeight: 600 },
     skeletonCard: {
       background: "#fff",
-      borderRadius: 10,
-      overflow: "hidden",
+      borderRadius: 16, overflow: "hidden",
       border: "none",
       boxShadow: "0 2px 8px rgba(15, 23, 42, 0.06)",
       display: "flex",
@@ -1461,14 +1458,14 @@ const SearchPage: React.FC = () => {
     },
     skeletonPhoto: { width: 280, flexShrink: 0, display: "flex", flexDirection: "column" as const },
     skeletonImage: { width: "100%", height: 194, ...skeletonBase },
-    skeletonThumb: { width: "100%", aspectRatio: "4 / 3", borderRadius: 10, ...skeletonBase },
+    skeletonThumb: { width: "100%", aspectRatio: "4 / 3", borderRadius: 16, ...skeletonBase },
     skeletonMain: { flex: 1, padding: 20, display: "flex", flexDirection: "column" as const, gap: 12 },
     skeletonSide: { width: 240, padding: 16, borderLeft: "1px solid #e2e8f0", background: "#f8fafc", display: "flex", flexDirection: "column" as const, gap: 10 },
-    skeletonTitle: { height: 22, width: "60%", borderRadius: 8, ...skeletonBase },
-    skeletonPrice: { height: 26, width: "40%", borderRadius: 8, ...skeletonBase },
+    skeletonTitle: { height: 22, width: "60%", borderRadius: 16, ...skeletonBase },
+    skeletonPrice: { height: 26, width: "40%", borderRadius: 16, ...skeletonBase },
     skeletonChip: { height: 28, width: 90, borderRadius: 999, ...skeletonBase },
-    skeletonDesc: { height: 14, width: "100%", borderRadius: 8, ...skeletonBase },
-    skeletonSideLine: { height: 14, width: "80%", borderRadius: 8, ...skeletonBase },
+    skeletonDesc: { height: 14, width: "100%", borderRadius: 16, ...skeletonBase },
+    skeletonSideLine: { height: 14, width: "80%", borderRadius: 16, ...skeletonBase },
     modalOverlay: {
       position: "fixed",
       top: 0,
@@ -1484,8 +1481,7 @@ const SearchPage: React.FC = () => {
     },
     modalCard: {
       background: "#fff",
-      borderRadius: 12,
-      padding: 24,
+      borderRadius: 16, padding: 24,
       maxWidth: 400,
       width: "100%",
       boxSizing: "border-box",
@@ -1503,8 +1499,7 @@ const SearchPage: React.FC = () => {
       width: "100%",
       padding: "10px 12px",
       border: "1.5px solid #e5e7eb",
-      borderRadius: 8,
-      fontSize: 14,
+      borderRadius: 16, fontSize: 14,
       marginBottom: 16,
       outline: "none",
       fontFamily: "inherit",
@@ -1513,8 +1508,7 @@ const SearchPage: React.FC = () => {
     modalActions: { display: "flex", gap: 12, justifyContent: "flex-end" },
     modalButtonCancel: {
       padding: "10px 20px",
-      borderRadius: 8,
-      fontSize: 14,
+      borderRadius: 16, fontSize: 14,
       fontWeight: 600,
       cursor: "pointer",
       background: "#f3f4f6",
@@ -1523,8 +1517,7 @@ const SearchPage: React.FC = () => {
     },
     modalButtonSave: {
       padding: "10px 20px",
-      borderRadius: 8,
-      fontSize: 14,
+      borderRadius: 16, fontSize: 14,
       fontWeight: 600,
       cursor: "pointer",
       background: "#d97706",

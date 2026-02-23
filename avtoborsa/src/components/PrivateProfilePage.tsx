@@ -1,5 +1,14 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { API_BASE_URL } from "../config/api";
+
+const PASSWORD_POLICY_MESSAGE =
+  "Паролата трябва да е поне 8 символа, с поне 1 главна буква и 1 цифра";
+const EMAIL_CONFIRMATION_MESSAGE =
+  "Ще изпратим линк за потвърждение на този имейл.";
+
+const isPasswordValid = (password: string) =>
+  password.length >= 8 && /\p{Lu}/u.test(password) && /\d/.test(password);
 
 const PrivateProfilePage: React.FC = () => {
   const navigate = useNavigate();
@@ -32,8 +41,8 @@ const PrivateProfilePage: React.FC = () => {
 
     if (!formData.password.trim()) {
       newErrors.password = "Паролата е задължителна";
-    } else if (formData.password.length < 6) {
-      newErrors.password = "Паролата трябва да е поне 6 символа";
+    } else if (!isPasswordValid(formData.password)) {
+      newErrors.password = PASSWORD_POLICY_MESSAGE;
     }
 
     if (!formData.confirmPassword.trim()) {
@@ -51,7 +60,7 @@ const PrivateProfilePage: React.FC = () => {
     if (validateForm()) {
       setLoading(true);
       try {
-        const response = await fetch("http://localhost:8000/api/auth/register/private/", {
+        const response = await fetch(`${API_BASE_URL}/api/auth/register/private/`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -226,6 +235,7 @@ const PrivateProfilePage: React.FC = () => {
                 onChange={handleChange}
               />
               {errors.email && <span style={styles.errorText}>{errors.email}</span>}
+              <p style={styles.hint}>{EMAIL_CONFIRMATION_MESSAGE}</p>
             </div>
           </div>
 
@@ -275,7 +285,7 @@ const PrivateProfilePage: React.FC = () => {
               </div>
             </div>
 
-            <p style={styles.hint}>Паролата трябва да е поне 6 символа</p>
+            <p style={styles.hint}>{PASSWORD_POLICY_MESSAGE}</p>
           </div>
 
           {/* Actions */}
@@ -345,7 +355,7 @@ const styles: Record<string, React.CSSProperties> = {
   // Hero
   hero: {
     background: "linear-gradient(135deg, #0f766e 0%, #0b5f58 55%, #0f766e 100%)",
-    borderRadius: 18,
+    borderRadius: 16,
     padding: "28px",
     marginBottom: 24,
     boxShadow: "0 20px 40px rgba(15,118,110,0.18)",
@@ -363,7 +373,7 @@ const styles: Record<string, React.CSSProperties> = {
   heroIcon: {
     width: 52,
     height: 52,
-    borderRadius: 12,
+    borderRadius: 16,
     background: "rgba(255,255,255,0.18)",
     display: "flex",
     alignItems: "center",
@@ -388,7 +398,7 @@ const styles: Record<string, React.CSSProperties> = {
   // Form card
   formCard: {
     background: "#fff",
-    borderRadius: 18,
+    borderRadius: 16,
     padding: 32,
     boxShadow: "0 16px 40px rgba(15,23,42,0.08)",
     border: "1px solid #e5e7eb",
@@ -420,7 +430,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "12px 14px",
     background: "#fef2f2",
     border: "1px solid #fecaca",
-    borderRadius: 10,
+    borderRadius: 16,
     fontSize: 13,
     color: "#991b1b",
     marginBottom: 18,
@@ -441,7 +451,7 @@ const styles: Record<string, React.CSSProperties> = {
   input: {
     padding: "12px 14px",
     border: "1px solid #e2e8f0",
-    borderRadius: 10,
+    borderRadius: 16,
     fontSize: 14,
     fontFamily: "inherit",
     width: "100%",
@@ -483,7 +493,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#0f766e",
     color: "#fff",
     border: "none",
-    borderRadius: 12,
+    borderRadius: 16,
     fontSize: 15,
     fontWeight: 700,
     cursor: "pointer",
@@ -497,7 +507,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "12px 22px",
     background: "transparent",
     border: "1px solid #cbd5f5",
-    borderRadius: 12,
+    borderRadius: 16,
     fontSize: 14,
     fontWeight: 600,
     cursor: "pointer",
@@ -532,7 +542,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "12px 14px",
     background: "#ecfdf5",
     border: "1px solid #bbf7d0",
-    borderRadius: 12,
+    borderRadius: 16,
     fontSize: 13,
     color: "#0f766e",
     marginBottom: 18,
@@ -540,7 +550,7 @@ const styles: Record<string, React.CSSProperties> = {
   successIcon: {
     width: 30,
     height: 30,
-    borderRadius: 10,
+    borderRadius: 16,
     background: "rgba(16,185,129,0.2)",
     display: "flex",
     alignItems: "center",
@@ -563,7 +573,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#0f766e",
     color: "#fff",
     border: "none",
-    borderRadius: 10,
+    borderRadius: 16,
     padding: "8px 14px",
     fontSize: 12,
     fontWeight: 700,

@@ -1,5 +1,14 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { API_BASE_URL } from "../config/api";
+
+const PASSWORD_POLICY_MESSAGE =
+  "Паролата трябва да е поне 8 символа, с поне 1 главна буква и 1 цифра";
+const EMAIL_CONFIRMATION_MESSAGE =
+  "Ще изпратим линк за потвърждение на този имейл.";
+
+const isPasswordValid = (password: string) =>
+  password.length >= 8 && /\p{Lu}/u.test(password) && /\d/.test(password);
 
 const CITIES = [
   "София", "Пловдив", "Варна", "Бургас", "Русе", "Стара Загора", "Плевен",
@@ -74,8 +83,8 @@ const BusinessProfilePage: React.FC = () => {
     }
     if (!formData.password.trim()) {
       newErrors.password = "Паролата е задължителна";
-    } else if (formData.password.length < 6) {
-      newErrors.password = "Паролата трябва да е поне 6 символа";
+    } else if (!isPasswordValid(formData.password)) {
+      newErrors.password = PASSWORD_POLICY_MESSAGE;
     }
     if (!formData.confirmPassword.trim()) {
       newErrors.confirmPassword = "Потвърждението на паролата е задължително";
@@ -138,7 +147,7 @@ const BusinessProfilePage: React.FC = () => {
           payloadData.website = formData.website.trim();
         }
 
-        const response = await fetch("http://localhost:8000/api/auth/register/business/", {
+        const response = await fetch(`${API_BASE_URL}/api/auth/register/business/`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -193,7 +202,7 @@ const BusinessProfilePage: React.FC = () => {
     header: {
       background: "linear-gradient(135deg, #0f766e 0%, #0b5f58 55%, #0f766e 100%)",
       padding: "28px",
-      borderRadius: 18,
+      borderRadius: 16,
       marginBottom: 28,
       color: "#fff",
       boxShadow: "0 20px 40px rgba(15,118,110,0.18)",
@@ -207,19 +216,19 @@ const BusinessProfilePage: React.FC = () => {
     headerLeft: { display: "flex", gap: 16, alignItems: "center" },
     headerTitle: { fontSize: 26, fontWeight: 800, margin: 0, fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif" },
     headerSubtitle: { fontSize: 14, margin: 0, opacity: 0.95 },
-    formCard: { width: "100%", background: "#fff", borderRadius: 18, padding: 24, boxShadow: "0 16px 40px rgba(15,23,42,0.08)", boxSizing: "border-box", border: "1px solid #e5e7eb" },
+    formCard: { width: "100%", background: "#fff", borderRadius: 16, padding: 24, boxShadow: "0 16px 40px rgba(15,23,42,0.08)", boxSizing: "border-box", border: "1px solid #e5e7eb" },
     section: { marginBottom: 20, paddingBottom: 18, borderBottom: "1px solid #e2e8f0" },
     sectionTitle: { fontSize: 15, fontWeight: 700, color: "#0f766e", marginBottom: 12, fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif" },
     grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 },
     gridResponsive: { display: "grid", gridTemplateColumns: "1fr", gap: 12 },
     formRow: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 },
     label: { fontSize: 13, fontWeight: 600, color: "#334155" },
-    input: { padding: "12px 14px", border: "1px solid #e2e8f0", borderRadius: 10, fontSize: 14, width: "100%", boxSizing: "border-box", outline: "none", transition: "box-shadow 0.15s, border-color 0.15s", background: "#fff", color: "#111827" },
+    input: { padding: "12px 14px", border: "1px solid #e2e8f0", borderRadius: 16, fontSize: 14, width: "100%", boxSizing: "border-box", outline: "none", transition: "box-shadow 0.15s, border-color 0.15s", background: "#fff", color: "#111827" },
     errorText: { fontSize: 12, color: "#ef4444", marginTop: 6 },
     footNote: { fontSize: 12, color: "#64748b", marginTop: 10 },
     submitRow: { display: "flex", gap: 12, marginTop: 14, alignItems: "center", flexWrap: "wrap" },
-    primaryButton: { padding: "12px 22px", background: "#0f766e", color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 700, cursor: "pointer", boxShadow: "0 8px 24px rgba(15,118,110,0.24)" },
-    ghostButton: { padding: "10px 18px", background: "transparent", border: "1px solid #cbd5f5", borderRadius: 12, fontSize: 14, cursor: "pointer", color: "#0f766e" },
+    primaryButton: { padding: "12px 22px", background: "#0f766e", color: "#fff", border: "none", borderRadius: 16, fontSize: 15, fontWeight: 700, cursor: "pointer", boxShadow: "0 8px 24px rgba(15,118,110,0.24)" },
+    ghostButton: { padding: "10px 18px", background: "transparent", border: "1px solid #cbd5f5", borderRadius: 16, fontSize: 14, cursor: "pointer", color: "#0f766e" },
     smallNote: { fontSize: 12, color: "#ff0000" },
     errorBanner: {
       display: "flex",
@@ -228,7 +237,7 @@ const BusinessProfilePage: React.FC = () => {
       padding: "12px 14px",
       background: "#fef2f2",
       border: "1px solid #fecaca",
-      borderRadius: 12,
+      borderRadius: 16,
       fontSize: 13,
       color: "#991b1b",
       marginBottom: 18,
@@ -240,7 +249,7 @@ const BusinessProfilePage: React.FC = () => {
       padding: "12px 14px",
       background: "#ecfdf5",
       border: "1px solid #bbf7d0",
-      borderRadius: 12,
+      borderRadius: 16,
       fontSize: 13,
       color: "#0f766e",
       marginBottom: 18,
@@ -248,7 +257,7 @@ const BusinessProfilePage: React.FC = () => {
     successIcon: {
       width: 30,
       height: 30,
-      borderRadius: 10,
+      borderRadius: 16,
       background: "rgba(16,185,129,0.2)",
       display: "flex",
       alignItems: "center",
@@ -262,7 +271,7 @@ const BusinessProfilePage: React.FC = () => {
       background: "#0f766e",
       color: "#fff",
       border: "none",
-      borderRadius: 10,
+      borderRadius: 16,
       padding: "8px 14px",
       fontSize: 12,
       fontWeight: 700,
@@ -291,7 +300,7 @@ const BusinessProfilePage: React.FC = () => {
       <div style={styles.container} className="business-container">
         <div style={styles.header} className="business-header">
           <div style={styles.headerLeft}>
-            <div style={{ width: 56, height: 56, borderRadius: 12, background: "rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 22 }}>Б</div>
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: "rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 22 }}>Б</div>
             <div>
               <h1 style={styles.headerTitle}>Бизнес профил</h1>
               <p style={styles.headerSubtitle}>Попълни информацията на твоя бизнес. Ще получиш имейл за потвърждение на акаунта.</p>
@@ -401,6 +410,7 @@ const BusinessProfilePage: React.FC = () => {
                   onChange={handleChange}
                 />
                 {errors.email && <span style={styles.errorText}>{errors.email}</span>}
+                <p style={styles.footNote}>{EMAIL_CONFIRMATION_MESSAGE}</p>
               </div>
             </div>
 
@@ -457,6 +467,7 @@ const BusinessProfilePage: React.FC = () => {
                 {errors.confirmPassword && <span style={styles.errorText}>{errors.confirmPassword}</span>}
               </div>
             </div>
+            <p style={styles.footNote}>{PASSWORD_POLICY_MESSAGE}</p>
           </div>
 
           {/* Фирмени данни */}

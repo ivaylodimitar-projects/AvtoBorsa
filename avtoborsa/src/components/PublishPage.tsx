@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import {
   FiArrowLeft,
@@ -50,6 +50,7 @@ import {
   getWheelPcdOptions,
   type AppMainCategory,
 } from "../constants/mobileBgData";
+import { API_BASE_URL } from "../config/api";
 
 const BULGARIA_REGIONS = [
   { value: "Благоевград", label: "обл. Благоевград" },
@@ -1784,6 +1785,19 @@ const PublishPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [toast]);
 
+  useEffect(() => {
+    const previousHtmlOverflowX = document.documentElement.style.overflowX;
+    const previousBodyOverflowX = document.body.style.overflowX;
+
+    document.documentElement.style.overflowX = "hidden";
+    document.body.style.overflowX = "hidden";
+
+    return () => {
+      document.documentElement.style.overflowX = previousHtmlOverflowX;
+      document.body.style.overflowX = previousBodyOverflowX;
+    };
+  }, []);
+
   const [formData, setFormData] = useState<PublishFormData>(createInitialFormData());
   const defaultClassifiedTopmenu = getTopmenuFromMainCategory("1") || "1";
   const brandModelMainCategory = useMemo(() => {
@@ -2518,7 +2532,7 @@ const PublishPage: React.FC = () => {
     if (!accessToken) return null;
 
     try {
-      const probeResponse = await fetch("http://localhost:8000/api/auth/me/", {
+      const probeResponse = await fetch(`${API_BASE_URL}/api/auth/me/`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
@@ -2977,7 +2991,7 @@ const PublishPage: React.FC = () => {
           return;
         }
 
-        const response = await fetch(`http://localhost:8000/api/listings/${editId}/`, {
+        const response = await fetch(`${API_BASE_URL}/api/listings/${editId}/`, {
           headers: {
             Authorization: `Bearer ${token}`,
             Accept: "application/json",
@@ -3018,7 +3032,7 @@ const PublishPage: React.FC = () => {
   }, [searchParams, authLoading, isAuthenticated, navigate, location.state]);
 
   const syncEditedListingImages = async (listingId: number, token: string) => {
-    const listingResponse = await fetch(`http://localhost:8000/api/listings/${listingId}/`, {
+    const listingResponse = await fetch(`${API_BASE_URL}/api/listings/${listingId}/`, {
       headers: {
         Authorization: `Bearer ${token}`,
         Accept: "application/json",
@@ -3100,7 +3114,7 @@ const PublishPage: React.FC = () => {
     };
 
     const updateResponse = await fetch(
-      `http://localhost:8000/api/listings/${listingId}/update-images/`,
+      `${API_BASE_URL}/api/listings/${listingId}/update-images/`,
       {
         method: "PATCH",
         headers: {
@@ -3405,8 +3419,8 @@ const PublishPage: React.FC = () => {
 
       const response = await fetch(
         isEditMode && editingListingId
-          ? `http://localhost:8000/api/listings/${editingListingId}/`
-          : "http://localhost:8000/api/listings/",
+          ? `${API_BASE_URL}/api/listings/${editingListingId}/`
+          : `${API_BASE_URL}/api/listings/`,
         {
           method: isEditMode ? "PATCH" : "POST",
           headers: {
@@ -3472,7 +3486,7 @@ const PublishPage: React.FC = () => {
         try {
           const meToken = localStorage.getItem("authToken");
           if (meToken) {
-            const meRes = await fetch("http://localhost:8000/api/auth/me/", {
+            const meRes = await fetch(`${API_BASE_URL}/api/auth/me/`, {
               headers: { Authorization: `Bearer ${meToken}`, Accept: "application/json" },
             });
             if (meRes.ok) {
@@ -3638,15 +3652,22 @@ const PublishPage: React.FC = () => {
       minHeight: "100vh",
       background: "#f5f5f5",
       width: "100%",
-      overflow: "visible",
+      overflowX: "hidden",
+      overflowY: "visible",
       textAlign: "left",
       color: "#333",
     },
-    container: { width: "100%" },
+    container: {
+      width: "100%",
+      maxWidth: 1200,
+      margin: "0 auto",
+      padding: "20px 20px 60px",
+      boxSizing: "border-box",
+    },
     form: {
       width: "100%",
       background: "#ffffff",
-      borderRadius: 8,
+      borderRadius: 16,
       padding: 24,
       border: "1px solid #e0e0e0",
       boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
@@ -3663,7 +3684,7 @@ const PublishPage: React.FC = () => {
     section: {
       marginBottom: 20,
       padding: 16,
-      borderRadius: 8,
+      borderRadius: 16,
       border: "1px solid #e0e0e0",
       background: "#fafafa",
     },
@@ -3680,7 +3701,7 @@ const PublishPage: React.FC = () => {
     input: {
       padding: "10px 14px",
       border: "1px solid #e0e0e0",
-      borderRadius: 4,
+      borderRadius: 16,
       fontSize: 14,
       fontFamily: "inherit",
       width: "100%",
@@ -3691,7 +3712,7 @@ const PublishPage: React.FC = () => {
     textarea: {
       padding: "10px 14px",
       border: "1px solid #e0e0e0",
-      borderRadius: 4,
+      borderRadius: 16,
       fontSize: 14,
       fontFamily: "inherit",
       minHeight: 120,
@@ -3714,7 +3735,7 @@ const PublishPage: React.FC = () => {
     },
     confirmModal: {
       background: "#fff",
-      borderRadius: 14,
+      borderRadius: 16,
       border: "1px solid #e0e0e0",
       boxShadow: "0 24px 60px rgba(15, 23, 42, 0.35)",
       padding: 22,
@@ -3742,7 +3763,7 @@ const PublishPage: React.FC = () => {
     confirmButtonGhost: {
       height: 40,
       padding: "0 16px",
-      borderRadius: 10,
+      borderRadius: 16,
       border: "1px solid #e0e0e0",
       background: "#fff",
       color: "#333",
@@ -3753,7 +3774,7 @@ const PublishPage: React.FC = () => {
     confirmButtonPrimary: {
       height: 40,
       padding: "0 16px",
-      borderRadius: 10,
+      borderRadius: 16,
       border: "1px solid #0f766e",
       background: "#0f766e",
       color: "#fff",
@@ -3776,12 +3797,15 @@ const PublishPage: React.FC = () => {
       font-family: "Manrope", "Segoe UI", -apple-system, system-ui, sans-serif;
       color: var(--text);
       text-align: left;
+      overflow-x: hidden;
     }
 
     .publish-container {
+      width: 100%;
       max-width: 1200px;
       margin: 0 auto;
       padding: 20px 20px 60px;
+      box-sizing: border-box;
     }
 
     .publish-layout {
@@ -3789,17 +3813,24 @@ const PublishPage: React.FC = () => {
       grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
       gap: 28px;
       align-items: start;
+      width: 100%;
+      max-width: 100%;
+    }
+
+    .publish-layout > * {
+      min-width: 0;
     }
 
     .publish-card {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 16px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
 
     .publish-form {
       padding: 24px;
+      min-width: 0;
     }
 
     .publish-heading {
@@ -3819,7 +3850,7 @@ const PublishPage: React.FC = () => {
       justify-content: space-between;
       gap: 12px;
       padding: 12px 14px;
-      border-radius: 12px;
+      border-radius: 16px;
       border: 1px solid rgba(220, 38, 38, 0.35);
       background: rgba(254, 242, 242, 0.95);
       box-shadow: 0 8px 18px rgba(220, 38, 38, 0.18);
@@ -3837,7 +3868,7 @@ const PublishPage: React.FC = () => {
       height: 38px;
       padding: 0 18px;
       font-size: 13px;
-      border-radius: 10px;
+      border-radius: 16px;
       white-space: nowrap;
       background: #dc2626;
       border-color: #dc2626;
@@ -3890,7 +3921,7 @@ const PublishPage: React.FC = () => {
     }
 
     .feature-group {
-      border-radius: 14px;
+      border-radius: 16px;
       border: 1px solid var(--border);
       background: #ffffff;
       padding: 14px;
@@ -3941,7 +3972,7 @@ const PublishPage: React.FC = () => {
       align-items: center;
       gap: 10px;
       padding: 10px 12px;
-      border-radius: 12px;
+      border-radius: 16px;
       border: 1px solid var(--border);
       background: #fafafa;
       cursor: pointer;
@@ -3970,7 +4001,7 @@ const PublishPage: React.FC = () => {
     .feature-check {
       width: 20px;
       height: 20px;
-      border-radius: 6px;
+      border-radius: 16px;
       border: 1px solid #e0e0e0;
       background: #ffffff;
       display: grid;
@@ -4017,7 +4048,7 @@ const PublishPage: React.FC = () => {
       display: grid;
       gap: 8px;
       align-content: start;
-      border-radius: 14px;
+      border-radius: 16px;
       border: 1px solid var(--border);
       padding: 16px;
       background: #fff;
@@ -4072,7 +4103,7 @@ const PublishPage: React.FC = () => {
       display: grid;
       gap: 10px;
       padding: 12px;
-      border-radius: 12px;
+      border-radius: 16px;
       border: 1px solid #e2e8f0;
       background: #f8fafc;
     }
@@ -4096,7 +4127,7 @@ const PublishPage: React.FC = () => {
       align-items: center;
       gap: 10px;
       padding: 10px 12px;
-      border-radius: 10px;
+      border-radius: 16px;
       border: 1px solid #e2e8f0;
       background: #fff;
       cursor: pointer;
@@ -4132,7 +4163,7 @@ const PublishPage: React.FC = () => {
     .publish-form textarea {
       width: 100%;
       padding: 10px 14px;
-      border-radius: 4px;
+      border-radius: 16px;
       border: 1px solid var(--border);
       background: #fff;
       color: var(--text);
@@ -4181,7 +4212,7 @@ const PublishPage: React.FC = () => {
     .price-summary {
       margin-top: 8px;
       padding: 8px 10px;
-      border-radius: 10px;
+      border-radius: 16px;
       border: 1px dashed #99f6e4;
       background: #ecfdf5;
       font-size: 12px;
@@ -4213,7 +4244,7 @@ const PublishPage: React.FC = () => {
     .publish-btn {
       height: 42px;
       padding: 0 20px;
-      border-radius: 4px;
+      border-radius: 16px;
       border: 1px solid transparent;
       font-size: 14px;
       font-weight: 700;
@@ -4254,7 +4285,7 @@ const PublishPage: React.FC = () => {
     }
 
     .publish-alert {
-      border-radius: 12px;
+      border-radius: 16px;
       padding: 12px 14px;
       font-size: 13px;
       margin-bottom: 16px;
@@ -4284,7 +4315,7 @@ const PublishPage: React.FC = () => {
       top: 20px;
       right: 20px;
       padding: 12px 18px;
-      border-radius: 10px;
+      border-radius: 16px;
       background: #0f766e;
       color: #fff;
       font-size: 13px;
@@ -4373,7 +4404,7 @@ const PublishPage: React.FC = () => {
             maxWidth: 420,
             background: "#ffffff",
             border: "1px solid #e2e8f0",
-            borderRadius: 14,
+            borderRadius: 16,
             boxShadow: "0 16px 32px rgba(15, 23, 42, 0.12)",
             padding: "28px 24px",
             textAlign: "center",

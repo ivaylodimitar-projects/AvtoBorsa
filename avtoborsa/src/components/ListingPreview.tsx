@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { FiCheckCircle, FiHome, FiImage } from "react-icons/fi";
 import { formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 import ListingPromoBadge from "./ListingPromoBadge";
@@ -122,7 +122,7 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
       width: "100%",
       height: isCompact ? 150 : 220,
       background: "#f1f5f9",
-      borderRadius: 12,
+      borderRadius: 16,
       overflow: "visible",
       marginBottom: 16,
       display: "flex",
@@ -135,7 +135,7 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
       width: "100%",
       height: "100%",
       objectFit: "cover" as const,
-      borderRadius: 12,
+      borderRadius: 16,
     },
     noImage: {
       color: "#94a3b8",
@@ -154,7 +154,7 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
     spec: {
       padding: "10px 12px",
       background: "#f8fafc",
-      borderRadius: 10,
+      borderRadius: 16,
       border: "1px solid #e2e8f0",
     },
     specLabel: {
@@ -176,7 +176,7 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
       marginBottom: 10,
       padding: "12px 14px",
       background: "linear-gradient(135deg, #0f766e 0%, #0ea5a3 100%)",
-      borderRadius: 12,
+      borderRadius: 16,
       textAlign: "center" as const,
     },
     priceMeta: {
@@ -186,7 +186,7 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
       gap: 10,
       padding: "8px 10px",
       marginBottom: 14,
-      borderRadius: 10,
+      borderRadius: 16,
       border: "1px solid #e2e8f0",
       background: "#f8fafc",
       fontSize: 12,
@@ -204,7 +204,7 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
       lineHeight: 1.5,
       padding: "12px",
       background: "#f8fafc",
-      borderRadius: 10,
+      borderRadius: 16,
       maxHeight: isCompact ? 90 : 140,
       overflow: "hidden",
       textOverflow: "ellipsis",

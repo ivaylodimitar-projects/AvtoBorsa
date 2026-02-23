@@ -1,4 +1,4 @@
-﻿import React, { memo, useEffect, useRef, useMemo, useState } from 'react';
+import React, { memo, useEffect, useRef, useMemo, useState } from 'react';
 import { Image } from 'lucide-react';
 
 interface Image {
@@ -93,7 +93,7 @@ const ThumbnailStrip = memo<ThumbnailStripProps>(
         thumbnail: {
           width: isMobile ? 60 : 80,
           height: isMobile ? 60 : 80,
-          borderRadius: 4,
+          borderRadius: 16,
           border: '2px solid transparent',
           background: '#0f172a',
           cursor: 'pointer',
@@ -108,7 +108,7 @@ const ThumbnailStrip = memo<ThumbnailStripProps>(
         placeholder: {
           width: isMobile ? 60 : 80,
           height: isMobile ? 60 : 80,
-          borderRadius: 4,
+          borderRadius: 16,
           border: '1px dashed #d1d5db',
           background: '#f8fafc',
           display: 'flex',

@@ -1,9 +1,7 @@
+import { API_BASE_URL, API_ORIGIN } from "../config/api";
+
 const ACCESS_TOKEN_KEY = "authToken";
 const LEGACY_REFRESH_TOKEN_KEY = "refreshToken";
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(
-  /\/+$/,
-  ""
-);
 const REFRESH_ENDPOINT = `${API_BASE_URL}/api/auth/token/refresh/`;
 const LOCAL_API_ORIGIN_PREFIXES = [
   "http://localhost:8000",
@@ -16,14 +14,6 @@ let interceptorInstalled = false;
 let refreshPromise: Promise<string | null> | null = null;
 
 const stripTrailingSlashes = (value: string) => value.replace(/\/+$/, "");
-
-const API_ORIGIN = (() => {
-  try {
-    return new URL(API_BASE_URL).origin;
-  } catch {
-    return "";
-  }
-})();
 
 const REFRESH_PATH = (() => {
   try {

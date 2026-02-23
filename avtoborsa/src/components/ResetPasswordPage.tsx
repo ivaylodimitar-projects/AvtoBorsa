@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import karBgLogo from "../assets/karbglogo.jpg";
+import { API_BASE_URL } from "../config/api";
 
 const ResetPasswordPage: React.FC = () => {
   const location = useLocation();
@@ -32,7 +34,7 @@ const ResetPasswordPage: React.FC = () => {
     }
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:8000/api/auth/password-reset/confirm/", {
+      const response = await fetch(`${API_BASE_URL}/api/auth/password-reset/confirm/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ uid, token, new_password: password }),
@@ -55,7 +57,7 @@ const ResetPasswordPage: React.FC = () => {
       <div style={styles.container}>
         <div style={styles.card}>
           <div style={styles.header}>
-            <div style={styles.badge}>Kar.bg</div>
+            <img src={karBgLogo} alt="Kar.bg logo" style={styles.badge} />
             <h1 style={styles.title}>Смяна на парола</h1>
             <p style={styles.subtitle}>Въведи нова парола за акаунта си.</p>
           </div>
@@ -106,25 +108,18 @@ const styles: Record<string, React.CSSProperties> = {
   container: { maxWidth: 520, margin: "0 auto", padding: "40px 20px" },
   card: {
     background: "#fff",
-    borderRadius: 12,
-    border: "1px solid #e5e7eb",
+    borderRadius: 16, border: "1px solid #e5e7eb",
     boxShadow: "0 12px 30px rgba(15,23,42,0.08)",
     padding: 28,
   },
   header: { marginBottom: 20, paddingBottom: 18, borderBottom: "1px solid #e2e8f0" },
   badge: {
-    display: "inline-flex",
-    alignItems: "center",
-    padding: "4px 10px",
-    borderRadius: 999,
-    fontSize: 11,
-    fontWeight: 700,
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
-    color: "#0f766e",
-    background: "#ecfdf5",
-    border: "1px solid #bbf7d0",
+    display: "block",
+    width: 92,
+    height: 42,
+    borderRadius: 16, objectFit: "cover",
     marginBottom: 10,
+    boxShadow: "0 6px 14px rgba(15, 118, 110, 0.18)",
   },
   title: {
     fontSize: 24,
@@ -139,8 +134,7 @@ const styles: Record<string, React.CSSProperties> = {
   input: {
     padding: "12px 14px",
     border: "1px solid #e2e8f0",
-    borderRadius: 10,
-    fontSize: 14,
+    borderRadius: 16, fontSize: 14,
     fontFamily: "inherit",
     width: "100%",
     boxSizing: "border-box",
@@ -148,8 +142,7 @@ const styles: Record<string, React.CSSProperties> = {
   primaryBtn: {
     width: "100%",
     padding: "12px 16px",
-    borderRadius: 12,
-    border: "none",
+    borderRadius: 16, border: "none",
     background: "#0f766e",
     color: "#fff",
     fontWeight: 700,
@@ -160,8 +153,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: "100%",
     background: "transparent",
     border: "1px solid #cbd5f5",
-    borderRadius: 12,
-    padding: "10px 14px",
+    borderRadius: 16, padding: "10px 14px",
     color: "#0f766e",
     fontWeight: 600,
     cursor: "pointer",
@@ -170,8 +162,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#fef2f2",
     color: "#991b1b",
     border: "1px solid #fecaca",
-    borderRadius: 10,
-    padding: "10px 12px",
+    borderRadius: 16, padding: "10px 12px",
     marginBottom: 14,
     fontSize: 13,
   },
@@ -179,8 +170,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#ecfdf5",
     color: "#0f766e",
     border: "1px solid #bbf7d0",
-    borderRadius: 10,
-    padding: "10px 12px",
+    borderRadius: 16, padding: "10px 12px",
     marginBottom: 14,
     fontSize: 13,
   },

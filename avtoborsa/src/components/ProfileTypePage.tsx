@@ -106,7 +106,7 @@ const ProfileTypePage: React.FC = () => {
               <div style={styles.featuresList}>
                 <div style={styles.featureItem} className="profile-feature-item">
                   <span style={{ ...styles.featureCheck, color: "#0f766e" }}>&#10003;</span>
-                  Публикувай до 5 обяви
+                  Публикувай до 3 обяви
                 </div>
                 <div style={styles.featureItem} className="profile-feature-item">
                   <span style={{ ...styles.featureCheck, color: "#0f766e" }}>&#10003;</span>
@@ -220,8 +220,7 @@ const styles: Record<string, React.CSSProperties> = {
   // Hero
   hero: {
     background: "linear-gradient(135deg, #0f766e 0%, #0b5f58 55%, #0f766e 100%)",
-    borderRadius: 18,
-    padding: "28px",
+    borderRadius: 16, padding: "28px",
     marginBottom: 28,
     boxShadow: "0 20px 40px rgba(15,118,110,0.18)",
     position: "relative",
@@ -238,8 +237,7 @@ const styles: Record<string, React.CSSProperties> = {
   heroIcon: {
     width: 52,
     height: 52,
-    borderRadius: 12,
-    background: "rgba(255,255,255,0.18)",
+    borderRadius: 16, background: "rgba(255,255,255,0.18)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -283,8 +281,7 @@ const styles: Record<string, React.CSSProperties> = {
   cardIconWrap: {
     width: 60,
     height: 60,
-    borderRadius: 14,
-    display: "flex",
+    borderRadius: 16, display: "flex",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 20,
@@ -331,8 +328,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#0f766e",
     color: "#fff",
     border: "none",
-    borderRadius: 12,
-    fontSize: 15,
+    borderRadius: 16, fontSize: 15,
     fontWeight: 700,
     cursor: "pointer",
     marginTop: "auto",
@@ -347,8 +343,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: "linear-gradient(135deg, #0f766e 0%, #0b5f58 100%)",
     color: "#fff",
     border: "none",
-    borderRadius: 12,
-    fontSize: 15,
+    borderRadius: 16, fontSize: 15,
     fontWeight: 700,
     cursor: "pointer",
     marginTop: "auto",

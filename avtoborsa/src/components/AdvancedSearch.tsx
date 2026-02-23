@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronDown, ChevronLeft, Circle, Search, Bookmark, Lock } from "lucide-react";
 import { BrandSelector } from "./BrandSelector";
@@ -19,6 +19,7 @@ import {
   MOTO_COOLING_TYPE_OPTIONS,
   MOTO_ENGINE_KIND_OPTIONS,
 } from "../constants/motoData";
+import { API_BASE_URL } from "../config/api";
 
 interface SearchCriteria {
   mainCategory?: string;
@@ -1407,7 +1408,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         params.set("page", "1");
         params.set("page_size", "1");
         params.set("compact", "1");
-        const response = await fetch(`http://localhost:8000/api/listings/?${params.toString()}`, {
+        const response = await fetch(`${API_BASE_URL}/api/listings/?${params.toString()}`, {
           signal: controller.signal,
         });
         if (!response.ok) throw new Error("Failed to fetch listings count");
@@ -1698,7 +1699,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       margin: 0 0 10px;
       padding: 6px 6px 4px;
       border-bottom: none;
-      border-radius: 12px;
+      border-radius: 16px;
       background: linear-gradient(180deg, rgba(255,255,255,0.82) 0%, rgba(241,250,248,0.9) 100%);
     }
     .adv-search-form {
@@ -1731,7 +1732,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       height: 42px;
       padding: 0 12px;
       border: 1.5px solid #e2e8f0;
-      border-radius: 10px;
+      border-radius: 16px;
       background: #f5f7fb;
       font-size: 14px;
       color: #1f2937;
@@ -1792,7 +1793,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     }
     .adv-feature-group {
       border: 1px solid #e2e8f0;
-      border-radius: 12px;
+      border-radius: 16px;
       padding: 10px;
       background: #f8fafc;
     }
@@ -1808,7 +1809,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       display: inline-flex;
       align-items: center;
       padding: 6px 16px;
-      border-radius: 20px;
+      border-radius: 16px;
       border: 1.5px solid #d9e2f1;
       background: #ffffff;
       font-size: 13px;
@@ -1900,7 +1901,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       min-width: 0;
       padding: 0;
       border: 1px solid transparent;
-      border-radius: 12px;
+      border-radius: 16px;
       background: #ffffff;
       overflow: hidden;
       opacity: 0;
@@ -1933,7 +1934,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       justify-content: flex-end;
       gap: 10px;
       padding: 0 12px 0 28px;
-      border-radius: 10px;
+      border-radius: 16px;
       background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(13, 148, 136, 0.24) 42%, rgba(15, 118, 110, 0.88) 100%);
       box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.18);
       backdrop-filter: blur(1px);
@@ -2028,7 +2029,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       padding: 0 32px;
       height: 48px;
       border: none;
-      border-radius: 14px;
+      border-radius: 16px;
       background: rgb(15, 118, 110);
       color: #fff;
       font-size: 16px;
@@ -2082,7 +2083,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       padding: 10px 12px;
       width: fit-content;
       max-width: min(860px, calc(100vw - 24px));
-      border-radius: 14px;
+      border-radius: 16px;
       border: 1px solid rgba(15, 118, 110, 0.2);
       background: rgba(255, 255, 255, 0.94);
       box-shadow: 0 14px 30px rgba(15, 23, 42, 0.18);
@@ -2106,7 +2107,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     .adv-sticky-category-trigger {
       width: 100%;
       height: 42px;
-      border-radius: 10px;
+      border-radius: 16px;
       border: 1px solid #cbd5e1;
       background: #f8fafc;
       color: #0f172a;
@@ -2162,7 +2163,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       overflow-y: auto;
       overflow-x: hidden;
       border: 1px solid #cbd5e1;
-      border-radius: 11px;
+      border-radius: 16px;
       background: #ffffff;
       box-shadow: 0 14px 30px rgba(15, 23, 42, 0.2);
       padding: 6px;
@@ -2180,7 +2181,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       width: 100%;
       min-height: 38px;
       border: 1px solid transparent;
-      border-radius: 8px;
+      border-radius: 16px;
       background: transparent;
       color: #1e293b;
       padding: 6px 9px;
@@ -2236,7 +2237,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       max-width: 360px;
       height: 42px;
       padding: 0 12px;
-      border-radius: 10px;
+      border-radius: 16px;
       background: #f8fafc;
       border: 1px solid #cbd5e1;
       color: #0f172a;
@@ -2252,7 +2253,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       justify-content: center;
       height: 42px;
       border: none;
-      border-radius: 11px;
+      border-radius: 16px;
       background: #0f766e;
       color: #fff;
       font-size: 14px;
@@ -2301,7 +2302,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       align-items: center;
       background: rgba(220, 38, 38, 0.12);
       border: 1.5px solid rgba(220, 38, 38, 0.35);
-      border-radius: 10px;
+      border-radius: 16px;
       color: #b91c1c;
       font-size: 13px;
       padding: 8px 20px;
@@ -2373,7 +2374,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       align-items: center;
       background: #d97706;
       border: 1.5px solid #d97706;
-      border-radius: 10px;
+      border-radius: 16px;
       color: #fff;
       font-size: 13px;
       padding: 8px 20px;
@@ -2399,7 +2400,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     }
     .adv-modal {
       background: #fff;
-      border-radius: 12px;
+      border-radius: 16px;
       padding: 24px;
       max-width: 400px;
       width: 90%;
@@ -2415,7 +2416,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       width: 100%;
       padding: 10px 12px;
       border: 1.5px solid #e5e7eb;
-      border-radius: 8px;
+      border-radius: 16px;
       font-size: 14px;
       margin-bottom: 16px;
       outline: none;
@@ -2431,7 +2432,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     }
     .adv-modal-btn {
       padding: 10px 20px;
-      border-radius: 8px;
+      border-radius: 16px;
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
@@ -2458,7 +2459,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     @media (max-width: 768px) {
       .adv-search-root {
         padding: 20px 16px 18px;
-        border-radius: 12px;
+        border-radius: 16px;
       }
       .adv-top-content {
         margin-bottom: 8px;

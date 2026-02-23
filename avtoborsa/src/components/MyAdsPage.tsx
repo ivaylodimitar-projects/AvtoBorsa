@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Archive,
@@ -53,6 +53,7 @@ import { addBalanceUsageRecord } from "../utils/balanceUsageHistory";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 import ListingPromoBadge from "./ListingPromoBadge";
 import KapariranoBadge from "./KapariranoBadge";
+import { API_BASE_URL } from "../config/api";
 import karBgQrCodeAnimation from "../assets/karbgqrcode.json";
 import topBadgeImage from "../assets/top_badge.png";
 import vipBadgeImage from "../assets/vip_badge.jpg";
@@ -267,7 +268,7 @@ const globalCss = `
     transform: translate(-50%, 6px);
     background: rgba(15, 23, 42, 0.96);
     color: #fff;
-    border-radius: 8px;
+    border-radius: 16px;
     padding: 6px 9px;
     font-size: 11px;
     font-weight: 700;
@@ -403,11 +404,11 @@ const MyAdsPage: React.FC = () => {
         };
 
         const [activeRes, archivedRes, draftsRes, expiredRes, favoritesRes] = await Promise.allSettled([
-          fetchList("http://localhost:8000/api/my-listings/"),
-          fetchList("http://localhost:8000/api/my-archived/"),
-          fetchList("http://localhost:8000/api/my-drafts/"),
-          fetchList("http://localhost:8000/api/my-expired/"),
-          fetchList("http://localhost:8000/api/my-favorites/"),
+          fetchList(`${API_BASE_URL}/api/my-listings/`),
+          fetchList(`${API_BASE_URL}/api/my-archived/`),
+          fetchList(`${API_BASE_URL}/api/my-drafts/`),
+          fetchList(`${API_BASE_URL}/api/my-expired/`),
+          fetchList(`${API_BASE_URL}/api/my-favorites/`),
         ]);
 
         const allResults = [activeRes, archivedRes, draftsRes, expiredRes, favoritesRes];
@@ -523,7 +524,7 @@ const MyAdsPage: React.FC = () => {
     try {
       const token = localStorage.getItem("authToken");
       if (!token) return null;
-      const response = await fetch("http://localhost:8000/api/auth/me/", {
+      const response = await fetch(`${API_BASE_URL}/api/auth/me/`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) return null;
@@ -1096,7 +1097,7 @@ const MyAdsPage: React.FC = () => {
       const token = localStorage.getItem("authToken");
       if (!token) throw new Error("Не сте логнати. Моля, влезте отново.");
 
-      const response = await fetch(`http://localhost:8000/api/listings/${listingId}/republish/`, {
+      const response = await fetch(`${API_BASE_URL}/api/listings/${listingId}/republish/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1190,7 +1191,7 @@ const MyAdsPage: React.FC = () => {
       const token = localStorage.getItem("authToken");
       if (!token) throw new Error("Не сте логнати. Моля, влезте отново.");
 
-      const response = await fetch(`http://localhost:8000/api/listings/${listingId}/listing-type/`, {
+      const response = await fetch(`${API_BASE_URL}/api/listings/${listingId}/listing-type/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1266,7 +1267,7 @@ const MyAdsPage: React.FC = () => {
       const token = localStorage.getItem("authToken");
       if (!token) throw new Error("Не сте логнати. Моля, влезте отново.");
 
-      const response = await fetch(`http://localhost:8000/api/listings/${listing.id}/kaparirano/`, {
+      const response = await fetch(`${API_BASE_URL}/api/listings/${listing.id}/kaparirano/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1352,7 +1353,7 @@ const MyAdsPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem("authToken");
-      const response = await fetch(`http://localhost:8000/api/listings/${listingId}/archive/`, {
+      const response = await fetch(`${API_BASE_URL}/api/listings/${listingId}/archive/`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -1381,7 +1382,7 @@ const MyAdsPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem("authToken");
-      const response = await fetch(`http://localhost:8000/api/listings/${listingId}/unarchive/`, {
+      const response = await fetch(`${API_BASE_URL}/api/listings/${listingId}/unarchive/`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -1425,7 +1426,7 @@ const MyAdsPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem("authToken");
-      const response = await fetch(`http://localhost:8000/api/listings/${listingId}/delete/`, {
+      const response = await fetch(`${API_BASE_URL}/api/listings/${listingId}/delete/`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -1455,7 +1456,7 @@ const MyAdsPage: React.FC = () => {
 
     try {
       const token = localStorage.getItem("authToken");
-      const response = await fetch(`http://localhost:8000/api/listings/${listingId}/unfavorite/`, {
+      const response = await fetch(`${API_BASE_URL}/api/listings/${listingId}/unfavorite/`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -1773,7 +1774,7 @@ const MyAdsPage: React.FC = () => {
   header: {
     background: "#fff",
     padding: "24px",
-    borderRadius: 8,
+    borderRadius: 16,
     marginBottom: 24,
     border: "1px solid #e0e0e0",
     boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
@@ -1810,7 +1811,7 @@ const MyAdsPage: React.FC = () => {
   emptyState: {
     background: "#fff",
     padding: "64px 32px",
-    borderRadius: 8,
+    borderRadius: 16,
     textAlign: "center",
     border: "1px solid #e0e0e0",
     boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
@@ -1846,7 +1847,7 @@ const MyAdsPage: React.FC = () => {
     background: "#0f766e",
     color: "#fff",
     border: "none",
-    borderRadius: 4,
+    borderRadius: 16,
     fontSize: 15,
     fontWeight: 700,
     cursor: "pointer",
@@ -1862,7 +1863,7 @@ const MyAdsPage: React.FC = () => {
     background: "#0f766e",
     color: "#fff",
     border: "none",
-    borderRadius: 4,
+    borderRadius: 16,
     fontSize: 14,
     fontWeight: 700,
     cursor: "pointer",
@@ -1891,7 +1892,7 @@ const MyAdsPage: React.FC = () => {
     background: "#fff",
     color: "#333",
     border: "1px solid #e0e0e0",
-    borderRadius: 6,
+    borderRadius: 16,
     fontSize: 14,
     fontWeight: 600,
     cursor: "pointer",
@@ -1918,7 +1919,7 @@ const MyAdsPage: React.FC = () => {
     background: "rgba(255, 255, 255, 0.3)",
     color: "#fff",
     padding: "2px 8px",
-    borderRadius: 10,
+    borderRadius: 16,
     fontSize: 12,
     fontWeight: 700,
   },
@@ -1926,7 +1927,7 @@ const MyAdsPage: React.FC = () => {
     background: "#f5f5f5",
     color: "#666",
     padding: "2px 8px",
-    borderRadius: 10,
+    borderRadius: 16,
     fontSize: 12,
     fontWeight: 700,
   },
@@ -1945,7 +1946,7 @@ const MyAdsPage: React.FC = () => {
     flexWrap: "wrap",
     padding: "12px 16px",
     marginBottom: 24,
-    borderRadius: 10,
+    borderRadius: 16,
     border: "1px solid rgb(15, 118, 110)",
     background: "rgb(15, 118, 110)",
   },
@@ -1964,7 +1965,7 @@ const MyAdsPage: React.FC = () => {
     height: 38,
     minWidth: 180,
     padding: "0 12px",
-    borderRadius: 8,
+    borderRadius: 16,
     border: "1px solid rgba(0,0,0,0.24)",
     background: "#ffffff",
     color: "#000",
@@ -1981,7 +1982,7 @@ const MyAdsPage: React.FC = () => {
     padding: "24px 20px",
     background: "#fff",
     border: "1px solid #bbf7d0",
-    borderRadius: 8,
+    borderRadius: 16,
     textAlign: "center",
     color: "#0f766e",
     fontWeight: 600,
@@ -2009,7 +2010,7 @@ const MyAdsPage: React.FC = () => {
   confirmModal: {
     width: "min(420px, 92vw)",
     background: "#fff",
-    borderRadius: 14,
+    borderRadius: 16,
     padding: "22px",
     border: "1px solid #e0e0e0",
     boxShadow: "0 24px 60px rgba(15, 23, 42, 0.35)",
@@ -2035,7 +2036,7 @@ const MyAdsPage: React.FC = () => {
   confirmButtonGhost: {
     height: 40,
     padding: "0 16px",
-    borderRadius: 10,
+    borderRadius: 16,
     border: "1px solid #e0e0e0",
     background: "#fff",
     color: "#333",
@@ -2046,7 +2047,7 @@ const MyAdsPage: React.FC = () => {
   confirmButtonPrimary: {
     height: 40,
     padding: "0 16px",
-    borderRadius: 10,
+    borderRadius: 16,
     border: "1px solid #0f766e",
     background: "#0f766e",
     color: "#fff",
@@ -2057,7 +2058,7 @@ const MyAdsPage: React.FC = () => {
   modal: {
     width: "min(860px, 96vw)",
     background: "#fff",
-    borderRadius: 18,
+    borderRadius: 16,
     padding: "22px",
     boxShadow: "0 30px 60px rgba(15, 23, 42, 0.35)",
     display: "flex",
@@ -2093,7 +2094,7 @@ const MyAdsPage: React.FC = () => {
   qrModal: {
     width: "min(460px, 96vw)",
     background: "#fff",
-    borderRadius: 18,
+    borderRadius: 16,
     padding: "20px",
     boxShadow: "0 30px 60px rgba(15, 23, 42, 0.35)",
     display: "flex",
@@ -2120,7 +2121,7 @@ const MyAdsPage: React.FC = () => {
     lineHeight: 1.45,
   },
   qrModalBody: {
-    borderRadius: 14,
+    borderRadius: 16,
     border: "1px solid #e2e8f0",
     background: "#f8fafc",
     padding: "14px 14px 12px",
@@ -2144,7 +2145,7 @@ const MyAdsPage: React.FC = () => {
     textAlign: "center",
   },
   qrCodeCard: {
-    borderRadius: 14,
+    borderRadius: 16,
     border: "1px solid #cbd5e1",
     background: "#fff",
     padding: 10,
@@ -2186,7 +2187,7 @@ const MyAdsPage: React.FC = () => {
     alignItems: "center",
     gap: 8,
     padding: "10px 14px",
-    borderRadius: 10,
+    borderRadius: 16,
     border: "1px solid #0f766e",
     background: "#0f766e",
     color: "#fff",
@@ -2203,7 +2204,7 @@ const MyAdsPage: React.FC = () => {
     alignItems: "center",
     justifyContent: "center",
     padding: "10px 14px",
-    borderRadius: 10,
+    borderRadius: 16,
     border: "1px solid #cbd5e1",
     background: "#fff",
     color: "#334155",
@@ -2234,7 +2235,7 @@ const MyAdsPage: React.FC = () => {
   },
   listingTypeCard: {
     position: "relative" as const,
-    borderRadius: 14,
+    borderRadius: 16,
     border: "1px solid #e0e0e0",
     padding: "16px",
     background: "#fff",
@@ -2272,7 +2273,7 @@ const MyAdsPage: React.FC = () => {
     gap: 10,
   },
   vipPlanCard: {
-    borderRadius: 12,
+    borderRadius: 16,
     border: "1px solid #e0e0e0",
     background: "#fff",
     padding: "12px",
@@ -2303,7 +2304,7 @@ const MyAdsPage: React.FC = () => {
   },
   modalButton: {
     padding: "10px 16px",
-    borderRadius: 10,
+    borderRadius: 16,
     fontSize: 13,
     fontWeight: 700,
     border: "1px solid transparent",
@@ -2328,7 +2329,7 @@ const MyAdsPage: React.FC = () => {
   promoDetailsBox: {
     border: "1px solid #fecaca",
     background: "#fff1f2",
-    borderRadius: 10,
+    borderRadius: 16,
     padding: "10px 12px",
     display: "flex",
     flexDirection: "column",
@@ -2342,7 +2343,7 @@ const MyAdsPage: React.FC = () => {
     lineHeight: 1.35,
   },
   listingTypePreviewCard: {
-    borderRadius: 14,
+    borderRadius: 16,
     border: "1px solid #e2e8f0",
     overflow: "visible",
     background: "#fff",
@@ -2403,7 +2404,7 @@ const MyAdsPage: React.FC = () => {
     justifyContent: "center",
     minHeight: 32,
     padding: "0 10px",
-    borderRadius: 10,
+    borderRadius: 16,
     background: "linear-gradient(135deg, #0f766e 0%, #0ea5a3 100%)",
     color: "#fff",
     fontWeight: 800,
@@ -2425,7 +2426,7 @@ const MyAdsPage: React.FC = () => {
   previewModal: {
     width: "min(980px, 96vw)",
     background: "#fff",
-    borderRadius: 18,
+    borderRadius: 16,
     padding: "22px",
     boxShadow: "0 30px 60px rgba(15, 23, 42, 0.35)",
     display: "flex",
@@ -2477,7 +2478,7 @@ const MyAdsPage: React.FC = () => {
   },
   previewMedia: {
     position: "relative" as const,
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: "hidden",
     background: "#f0f0f0",
     minHeight: 260,
@@ -2508,7 +2509,7 @@ const MyAdsPage: React.FC = () => {
   previewThumbButton: {
     width: 64,
     height: 48,
-    borderRadius: 8,
+    borderRadius: 16,
     border: "1px solid #e0e0e0",
     background: "#fff",
     padding: 0,
@@ -2537,7 +2538,7 @@ const MyAdsPage: React.FC = () => {
     fontWeight: 800,
     color: "#fff",
     background: "#0f766e",
-    borderRadius: 10,
+    borderRadius: 16,
     padding: "10px 12px",
     textAlign: "center" as const,
   },
@@ -2571,7 +2572,7 @@ const MyAdsPage: React.FC = () => {
   previewSpec: {
     padding: "10px 12px",
     background: "#ecfdf5",
-    borderRadius: 10,
+    borderRadius: 16,
     border: "1px solid #bbf7d0",
   },
   previewSpecHeader: {
@@ -2601,7 +2602,7 @@ const MyAdsPage: React.FC = () => {
     lineHeight: 1.6,
     padding: "12px",
     background: "#fafafa",
-    borderRadius: 10,
+    borderRadius: 16,
     border: "1px solid #e0e0e0",
     maxHeight: 160,
     overflow: "auto",
@@ -2635,7 +2636,7 @@ const MyAdsPage: React.FC = () => {
   paginationButton: {
     minWidth: 36,
     height: 36,
-    borderRadius: 8,
+    borderRadius: 16,
     border: "1px solid #e2e8f0",
     background: "#fff",
     color: "#1f2937",
@@ -2664,7 +2665,7 @@ const MyAdsPage: React.FC = () => {
   },
     listingCard: {
       background: "#fff",
-      borderRadius: 6,
+      borderRadius: 16,
       overflow: "visible",
       border: "1px solid #e0e0e0",
       boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
@@ -2880,7 +2881,7 @@ const MyAdsPage: React.FC = () => {
     background: "#ecfdf5",
     border: "1px solid #bbf7d0",
     padding: "4px 8px",
-    borderRadius: 3,
+    borderRadius: 16,
     fontWeight: 600,
     display: "inline-flex",
     alignItems: "center",
@@ -2930,7 +2931,7 @@ const MyAdsPage: React.FC = () => {
     padding: "8px 12px",
     background: "#ffebee",
     border: "1px solid #ffcdd2",
-    borderRadius: 8,
+    borderRadius: 16,
     fontSize: 12,
     color: "#d32f2f",
   },
@@ -2996,7 +2997,7 @@ const MyAdsPage: React.FC = () => {
     width: 58,
     height: 58,
     minWidth: 58,
-    borderRadius: 12,
+    borderRadius: 16,
     border: "1px solid #cbd5e1",
     background: "#fff",
     color: "#0f766e",
@@ -3028,7 +3029,7 @@ const MyAdsPage: React.FC = () => {
     height: 42,
     padding: 0,
     border: "none",
-    borderRadius: 11,
+    borderRadius: 16,
     fontSize: 0,
     fontWeight: 700,
     cursor: "pointer",
@@ -3053,14 +3054,14 @@ const MyAdsPage: React.FC = () => {
   loadingState: {
     background: "#fff",
     padding: "40px 20px",
-    borderRadius: 8,
+    borderRadius: 16,
     textAlign: "center",
     boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
   },
   errorState: {
     background: "#fff",
     padding: "20px",
-    borderRadius: 8,
+    borderRadius: 16,
     border: "1px solid #d32f2f",
     color: "#d32f2f",
     boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
@@ -3514,7 +3515,7 @@ const MyAdsPage: React.FC = () => {
             padding: "12px 20px",
             background: toast.type === "success" ? "#4caf50" : "#f44336",
             color: "#fff",
-            borderRadius: "4px",
+            borderRadius: "16px",
             boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
             zIndex: 1000,
             animation: "slideIn 0.3s ease-in-out",

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -23,8 +23,7 @@ import {
   getUserBalanceUsageHistory,
   type BalanceUsageRecord,
 } from "../utils/balanceUsageHistory";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+import { API_BASE_URL } from "../config/api";
 const PUBLIC_API_DOCS_URL = `${API_BASE_URL}/api/public/docs/`;
 const TRANSACTIONS_PER_PAGE = 5;
 const SITE_PURCHASES_PER_PAGE = TRANSACTIONS_PER_PAGE;
@@ -654,7 +653,7 @@ const SettingsPage: React.FC = () => {
     hero: {
       position: "relative",
       background: "linear-gradient(145deg, #ffffff 0%, #f8fffd 100%)",
-      borderRadius: 18,
+      borderRadius: 16,
       border: "1px solid #dbeafe",
       padding: "24px",
       boxShadow: "0 18px 36px rgba(15,23,42,0.08)",
@@ -701,7 +700,7 @@ const SettingsPage: React.FC = () => {
     },
     tab: {
       padding: "12px 14px",
-      borderRadius: 12,
+      borderRadius: 16,
       border: "1px solid #dbe4ef",
       borderStyle: "solid",
       borderWidth: 1,
@@ -727,7 +726,7 @@ const SettingsPage: React.FC = () => {
     section: {
       marginTop: 22,
       background: "#fff",
-      borderRadius: 18,
+      borderRadius: 16,
       border: "1px solid #e2e8f0",
       padding: "22px",
       boxShadow: "0 14px 32px rgba(15,23,42,0.06)",
@@ -772,7 +771,7 @@ const SettingsPage: React.FC = () => {
     input: {
       width: "100%",
       padding: "13px 14px",
-      borderRadius: 12,
+      borderRadius: 16,
       border: "1px solid #dbe3ed",
       fontSize: 14,
       outline: "none",
@@ -782,7 +781,7 @@ const SettingsPage: React.FC = () => {
     },
     button: {
       padding: "12px 18px",
-      borderRadius: 12,
+      borderRadius: 16,
       border: "none",
       background: "linear-gradient(145deg, #0f766e 0%, #0d9488 100%)",
       color: "#fff",
@@ -796,7 +795,7 @@ const SettingsPage: React.FC = () => {
     },
     buttonGhost: {
       padding: "11px 16px",
-      borderRadius: 12,
+      borderRadius: 16,
       border: "1px solid #dbe3ed",
       background: "#f8fafc",
       color: "#334155",
@@ -805,7 +804,7 @@ const SettingsPage: React.FC = () => {
     },
     error: {
       padding: "10px 12px",
-      borderRadius: 12,
+      borderRadius: 16,
       background: "#fef2f2",
       border: "1px solid #fecaca",
       color: "#b91c1c",
@@ -814,7 +813,7 @@ const SettingsPage: React.FC = () => {
     },
     success: {
       padding: "10px 12px",
-      borderRadius: 12,
+      borderRadius: 16,
       background: "#ecfeff",
       border: "1px solid #99f6e4",
       color: "#0f766e",
@@ -827,7 +826,7 @@ const SettingsPage: React.FC = () => {
     codeBox: {
       width: "100%",
       padding: "11px 12px",
-      borderRadius: 12,
+      borderRadius: 16,
       border: "1px solid #dbeafe",
       background: "#f8fafc",
       fontFamily: "\"JetBrains Mono\", \"Fira Code\", monospace",
@@ -844,7 +843,7 @@ const SettingsPage: React.FC = () => {
     },
     metaItem: {
       border: "1px solid #dbeafe",
-      borderRadius: 12,
+      borderRadius: 16,
       background: "#f8fafc",
       padding: "10px 12px",
     },
@@ -866,7 +865,7 @@ const SettingsPage: React.FC = () => {
       border: "1px dashed #99f6e4",
       background: "#f0fdfa",
       color: "#0f766e",
-      borderRadius: 12,
+      borderRadius: 16,
       padding: "10px 12px",
       fontSize: 13,
       lineHeight: 1.5,
@@ -877,7 +876,7 @@ const SettingsPage: React.FC = () => {
       display: "inline-flex",
       gap: 6,
       padding: 4,
-      borderRadius: 12,
+      borderRadius: 16,
       border: "1px solid #dbeafe",
       background: "#f8fafc",
     },
@@ -885,7 +884,7 @@ const SettingsPage: React.FC = () => {
       border: "1px solid transparent",
       background: "transparent",
       color: "#475569",
-      borderRadius: 9,
+      borderRadius: 16,
       padding: "8px 12px",
       fontSize: 12,
       fontWeight: 800,
@@ -934,14 +933,14 @@ const SettingsPage: React.FC = () => {
       gap: 14,
       padding: "14px 15px",
       background: "#ffffff",
-      borderRadius: 14,
+      borderRadius: 16,
       border: "1px solid #e2e8f0",
     },
     transactionLeft: { display: "flex", alignItems: "center", gap: 12, minWidth: 0 },
     transactionIconWrap: {
       width: 36,
       height: 36,
-      borderRadius: 10,
+      borderRadius: 16,
       background: "#f0fdfa",
       border: "1px solid #99f6e4",
       display: "grid",
@@ -952,7 +951,7 @@ const SettingsPage: React.FC = () => {
     spendIconWrap: {
       width: 36,
       height: 36,
-      borderRadius: 10,
+      borderRadius: 16,
       background: "#fff7ed",
       border: "1px solid #fdba74",
       display: "grid",
@@ -1000,7 +999,7 @@ const SettingsPage: React.FC = () => {
       border: "1px solid #dbe3ed",
       background: "#ffffff",
       color: "#334155",
-      borderRadius: 10,
+      borderRadius: 16,
       padding: "6px 10px",
       fontSize: 12,
       fontWeight: 700,
@@ -1018,7 +1017,7 @@ const SettingsPage: React.FC = () => {
     dangerBox: {
       border: "1px solid #fecaca",
       background: "#fff1f2",
-      borderRadius: 14,
+      borderRadius: 16,
       padding: 16,
       marginTop: 16,
     },

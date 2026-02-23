@@ -12,6 +12,7 @@ import {
   unfollowDealer,
 } from "../utils/dealerSubscriptions";
 import ListingPromoBadge from "./ListingPromoBadge";
+import { API_BASE_URL } from "../config/api";
 
 type CarListing = {
   id: number;
@@ -124,7 +125,7 @@ const DealerDetailPage: React.FC = () => {
   useEffect(() => {
     const fetchDealer = async () => {
       try {
-        const res = await fetch(`http://localhost:8000/api/auth/dealers/${id}/`, {
+        const res = await fetch(`${API_BASE_URL}/api/auth/dealers/${id}/`, {
           cache: "no-store",
         });
         if (res.ok) {
@@ -217,7 +218,7 @@ const DealerDetailPage: React.FC = () => {
     setSavingAbout(true);
     try {
       const token = localStorage.getItem("authToken");
-      const res = await fetch("http://localhost:8000/api/auth/profile/update-about/", {
+      const res = await fetch(`${API_BASE_URL}/api/auth/profile/update-about/`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -424,7 +425,7 @@ const DealerDetailPage: React.FC = () => {
         <div style={{ fontSize: 20, fontWeight: 600, color: "#374151" }}>Дилърът не е намерен</div>
         <button
           onClick={() => navigate("/dealers")}
-          style={{ padding: "10px 24px", background: "#0066cc", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer" }}
+          style={{ padding: "10px 24px", background: "#0066cc", color: "#fff", border: "none", borderRadius: 16, fontSize: 14, fontWeight: 600, cursor: "pointer" }}
         >
           Обратно към дилъри
         </button>
@@ -456,8 +457,7 @@ const DealerDetailPage: React.FC = () => {
       flexWrap: "wrap",
       background: "#fff",
       padding: "24px",
-      borderRadius: 8,
-      border: "1px solid #e0e0e0",
+      borderRadius: 16, border: "1px solid #e0e0e0",
       boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
     },
     heroAvatar: {
@@ -526,8 +526,7 @@ const DealerDetailPage: React.FC = () => {
     followBtn: {
       height: 44,
       padding: "0 16px",
-      borderRadius: 6,
-      border: "1px solid #99f6e4",
+      borderRadius: 16, border: "1px solid #99f6e4",
       background: "#ecfdf5",
       color: "#0f766e",
       fontSize: 14,
@@ -549,8 +548,7 @@ const DealerDetailPage: React.FC = () => {
       background: "#0f766e",
       color: "#fff",
       border: "none",
-      borderRadius: 4,
-      fontSize: 14,
+      borderRadius: 16, fontSize: 14,
       fontWeight: 700,
       cursor: "pointer",
       display: "flex",
@@ -578,8 +576,7 @@ const DealerDetailPage: React.FC = () => {
       background: "#fff",
       color: "#333",
       border: "1px solid #e0e0e0",
-      borderRadius: 6,
-      fontSize: 15,
+      borderRadius: 16, fontSize: 15,
       fontWeight: 600,
       cursor: "pointer",
       transition: "all 0.2s",
@@ -616,8 +613,7 @@ const DealerDetailPage: React.FC = () => {
     paginationButton: {
       minWidth: 36,
       height: 36,
-      borderRadius: 8,
-      border: "1px solid #e2e8f0",
+      borderRadius: 16, border: "1px solid #e2e8f0",
       background: "#fff",
       color: "#1f2937",
       fontWeight: 600,
@@ -651,8 +647,7 @@ const DealerDetailPage: React.FC = () => {
       flexWrap: "wrap",
       padding: "12px 16px",
       marginBottom: 24,
-      borderRadius: 10,
-      border: "1px solid rgb(15, 118, 110)",
+      borderRadius: 16, border: "1px solid rgb(15, 118, 110)",
       background: "rgb(15, 118, 110)",
     },
     filterLabel: {
@@ -670,8 +665,7 @@ const DealerDetailPage: React.FC = () => {
       height: 38,
       minWidth: 180,
       padding: "0 12px",
-      borderRadius: 8,
-      border: "1px solid rgba(0,0,0,0.24)",
+      borderRadius: 16, border: "1px solid rgba(0,0,0,0.24)",
       background: "#ffffff",
       color: "#000",
       fontSize: 14,
@@ -685,8 +679,7 @@ const DealerDetailPage: React.FC = () => {
     },
     listingCard: {
       background: "#fff",
-      borderRadius: 6,
-      overflow: "visible",
+      borderRadius: 16, overflow: "visible",
       border: "1px solid #e0e0e0",
       boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
       transition: "box-shadow 0.2s",
@@ -838,8 +831,7 @@ const DealerDetailPage: React.FC = () => {
       background: "#ecfdf5",
       border: "1px solid #bbf7d0",
       padding: "4px 8px",
-      borderRadius: 3,
-      fontWeight: 600,
+      borderRadius: 16, fontWeight: 600,
       display: "inline-flex",
       alignItems: "center",
       gap: 6,
@@ -850,8 +842,7 @@ const DealerDetailPage: React.FC = () => {
     // About tab
     aboutCard: {
       background: "#fff",
-      borderRadius: 6,
-      border: "1px solid #e0e0e0",
+      borderRadius: 16, border: "1px solid #e0e0e0",
       padding: 24,
       boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
       maxWidth: 800,
@@ -882,8 +873,7 @@ const DealerDetailPage: React.FC = () => {
       minHeight: 160,
       padding: 16,
       border: "1px solid #e5e7eb",
-      borderRadius: 10,
-      fontSize: 15,
+      borderRadius: 16, fontSize: 15,
       lineHeight: 1.7,
       color: "#374151",
       resize: "vertical",
@@ -900,8 +890,7 @@ const DealerDetailPage: React.FC = () => {
       background: "#0f766e",
       color: "#fff",
       border: "none",
-      borderRadius: 8,
-      fontSize: 14,
+      borderRadius: 16, fontSize: 14,
       fontWeight: 600,
       cursor: "pointer",
     },
@@ -910,8 +899,7 @@ const DealerDetailPage: React.FC = () => {
       background: "#f3f4f6",
       color: "#374151",
       border: "none",
-      borderRadius: 8,
-      fontSize: 14,
+      borderRadius: 16, fontSize: 14,
       fontWeight: 600,
       cursor: "pointer",
     },
@@ -920,8 +908,7 @@ const DealerDetailPage: React.FC = () => {
       background: "#ecfdf5",
       color: "#0f766e",
       border: "1px solid #99f6e4",
-      borderRadius: 8,
-      fontSize: 13,
+      borderRadius: 16, fontSize: 13,
       fontWeight: 600,
       cursor: "pointer",
     },
@@ -934,8 +921,7 @@ const DealerDetailPage: React.FC = () => {
     },
     contactCard: {
       background: "#fff",
-      borderRadius: 6,
-      border: "1px solid #e0e0e0",
+      borderRadius: 16, border: "1px solid #e0e0e0",
       padding: 24,
       boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
     },
@@ -975,8 +961,7 @@ const DealerDetailPage: React.FC = () => {
     },
     mapCard: {
       background: "#fff",
-      borderRadius: 6,
-      border: "1px solid #e0e0e0",
+      borderRadius: 16, border: "1px solid #e0e0e0",
       overflow: "hidden",
       gridColumn: "1 / -1",
       boxShadow: "0 2px 6px rgba(0,0,0,0.08)",
@@ -1014,8 +999,7 @@ const DealerDetailPage: React.FC = () => {
       textAlign: "center",
       padding: 60,
       background: "#fff",
-      borderRadius: 8,
-      border: "1px solid #e0e0e0",
+      borderRadius: 16, border: "1px solid #e0e0e0",
       boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
     },
   };

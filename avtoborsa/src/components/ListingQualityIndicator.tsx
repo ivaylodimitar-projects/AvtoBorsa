@@ -38,8 +38,7 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
   const styles: Record<string, React.CSSProperties> = {
     container: {
       background: "#fff",
-      borderRadius: 14,
-      padding: "18px",
+      borderRadius: 16, padding: "18px",
       border: "1px solid #e2e8f0",
       boxShadow: "0 10px 24px rgba(15, 23, 42, 0.08)",
     },
@@ -114,8 +113,7 @@ const ListingQualityIndicator: React.FC<ListingQualityIndicatorProps> = ({
     },
     metricCard: {
       border: "1px solid #e2e8f0",
-      borderRadius: 10,
-      padding: "10px 8px",
+      borderRadius: 16, padding: "10px 8px",
       background: "#f8fafc",
       textAlign: "center" as const,
     },

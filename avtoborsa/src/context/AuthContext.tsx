@@ -1,5 +1,7 @@
 ﻿import React, { createContext, useContext, useState, useEffect } from "react";
 
+import { API_BASE_URL } from "../config/api";
+
 interface User {
   id: number;
   email: string;
@@ -51,7 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
         if (accessToken) {
-          const response = await fetch("http://localhost:8000/api/auth/me/", {
+          const response = await fetch(`${API_BASE_URL}/api/auth/me/`, {
             headers: {
               Authorization: `Bearer ${accessToken}`,
             },
@@ -85,7 +87,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const normalizedEmail = email.trim().toLowerCase();
 
     try {
-      const response = await fetch("http://localhost:8000/api/auth/login/", {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -110,7 +112,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(data.user);
 
       try {
-        const meRes = await fetch("http://localhost:8000/api/auth/me/", {
+        const meRes = await fetch(`${API_BASE_URL}/api/auth/me/`, {
           headers: { Authorization: `Bearer ${data.access}` },
         });
         if (meRes.ok) {
@@ -145,7 +147,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const token = localStorage.getItem(ACCESS_TOKEN_KEY);
       if (token) {
-        await fetch("http://localhost:8000/api/auth/logout/", {
+        await fetch(`${API_BASE_URL}/api/auth/logout/`, {
           method: "POST",
           credentials: "include",
           headers: {
