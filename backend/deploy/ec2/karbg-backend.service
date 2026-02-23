@@ -1,20 +1,137 @@
-[Unit]
-Description=Kar.bg Django ASGI (Daphne)
-After=network.target
-Wants=network-online.target
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    "" close;
+}
 
-[Service]
-Type=simple
-User=ubuntu
-Group=ubuntu
-WorkingDirectory=/opt/avtoborsa/backend
-EnvironmentFile=/opt/avtoborsa/backend/.env
-Environment=DJANGO_SETTINGS_MODULE=backend.settings
-ExecStart=/opt/avtoborsa/.venv/bin/daphne -b 127.0.0.1 -p 8000 backend.asgi:application
-Restart=always
-RestartSec=5
-TimeoutStopSec=30
-KillSignal=SIGINT
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name api.bwraap.com;
 
-[Install]
-WantedBy=multi-user.target
+    client_max_body_size 32m;
+
+    location /static/ {
+        alias /var/www/AvtoBorsa/backend/staticfiles/;
+        expires 30d;
+        access_log off;
+        add_header Cache-Control "public, max-age=2592000, immutable";
+    }
+
+    location /media/ {
+        alias /var/www/AvtoBorsa/backend/media/;
+        expires 7d;
+        add_header Cache-Control "public, max-age=604800";
+    }
+
+    # Admin (frontend on Vercel)
+    location ^~ /admin/ {
+        proxy_pass https://bwraap.com/admin/;
+        proxy_set_header Host bwraap.com;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+    # ако някой отвори точно /admin (без /)
+    location = /admin {
+        return 301 /admin/;
+    }
+
+    location /ws/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+ location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+    }
+}
+
+
+server {
+    server_name api.bwraap.com; # managed by Certbot
+
+    client_max_body_size 32m;
+
+    location /static/ {
+        alias /var/www/AvtoBorsa/backend/staticfiles/;
+        expires 30d;
+        access_log off;
+        add_header Cache-Control "public, max-age=2592000, immutable";
+    }
+
+    location /media/ {
+        alias /var/www/AvtoBorsa/backend/media/;
+        expires 7d;
+        add_header Cache-Control "public, max-age=604800";
+    }
+    # Admin (frontend on Vercel)
+    location ^~ /admin/ {
+        proxy_pass https://bwraap.com/admin/;
+        proxy_set_header Host bwraap.com;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+    # ако някой отвори точно /admin (без /)
+    location = /admin {
+        return 301 /admin/;
+    }
+
+    location /ws/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host $host;
+ proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 300s;
+    }
+
+
+    listen [::]:443 ssl ipv6only=on; # managed by Certbot
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/api.bwraap.com/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/api.bwraap.com/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+
+}
+
+server {
+    if ($host = api.bwraap.com) {
+        return 301 https://$host$request_uri;
+
+    } # managed by Certbot
+
+
+    listen 80 ;
+    listen [::]:80 ;
+    server_name api.bwraap.com;
+    return 404; # managed by Certbot
+
+
+}
