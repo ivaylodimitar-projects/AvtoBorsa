@@ -5,6 +5,7 @@ import {
   FiCheck,
   FiBell,
   FiBriefcase,
+  FiChevronLeft,
   FiChevronDown,
   FiChevronUp,
   FiExternalLink,
@@ -172,6 +173,12 @@ const Navbar: React.FC = () => {
   const { isAuthenticated, user } = useAuth();
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [showNotificationsMenu, setShowNotificationsMenu] = React.useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = React.useState(false);
+  const [isTopUpModalOpen, setIsTopUpModalOpen] = React.useState(false);
+  const [profileMenuCloseRequestKey, setProfileMenuCloseRequestKey] =
+    React.useState(0);
+  const [topUpModalCloseRequestKey, setTopUpModalCloseRequestKey] =
+    React.useState(0);
   const [notificationsTab, setNotificationsTab] = React.useState<
     "notifications" | "subscriptions"
   >("notifications");
@@ -184,6 +191,46 @@ const Navbar: React.FC = () => {
   const notificationsRef = React.useRef<HTMLDivElement | null>(null);
 
   const isActive = (path: string) => location.pathname === path;
+
+  React.useEffect(() => {
+    setMobileOpen(false);
+    setShowNotificationsMenu(false);
+    setIsProfileMenuOpen(false);
+    setIsTopUpModalOpen(false);
+    setProfileMenuCloseRequestKey((prev) => prev + 1);
+    setTopUpModalCloseRequestKey((prev) => prev + 1);
+  }, [location.pathname, location.search, location.hash]);
+
+  React.useEffect(() => {
+    if (!mobileOpen) {
+      setShowNotificationsMenu(false);
+      setIsProfileMenuOpen(false);
+      setIsTopUpModalOpen(false);
+      setProfileMenuCloseRequestKey((prev) => prev + 1);
+      setTopUpModalCloseRequestKey((prev) => prev + 1);
+    }
+  }, [mobileOpen]);
+
+  React.useEffect(() => {
+    if (!isProfileMenuOpen) return;
+    setShowNotificationsMenu(false);
+  }, [isProfileMenuOpen]);
+
+  React.useEffect(() => {
+    if (!isTopUpModalOpen) return;
+    setShowNotificationsMenu(false);
+    setIsProfileMenuOpen(false);
+    setProfileMenuCloseRequestKey((prev) => prev + 1);
+  }, [isTopUpModalOpen]);
+
+  React.useEffect(() => {
+    if (!mobileOpen || window.innerWidth > 960) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mobileOpen]);
 
   React.useEffect(() => {
     if (!user?.id) {
@@ -405,7 +452,7 @@ const Navbar: React.FC = () => {
   React.useEffect(() => {
     if (!showNotificationsMenu) return;
 
-    const handleClickOutside = (event: MouseEvent) => {
+    const handlePointerDownOutside = (event: PointerEvent) => {
       if (
         notificationsRef.current &&
         !notificationsRef.current.contains(event.target as Node)
@@ -420,11 +467,11 @@ const Navbar: React.FC = () => {
       }
     };
 
-    window.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("pointerdown", handlePointerDownOutside);
     window.addEventListener("keydown", handleEsc);
 
     return () => {
-      window.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("pointerdown", handlePointerDownOutside);
       window.removeEventListener("keydown", handleEsc);
     };
   }, [showNotificationsMenu]);
@@ -534,6 +581,8 @@ const Navbar: React.FC = () => {
     const nextOpen = !showNotificationsMenu;
     setShowNotificationsMenu(nextOpen);
     if (nextOpen) {
+      setProfileMenuCloseRequestKey((prev) => prev + 1);
+      setIsProfileMenuOpen(false);
       setNotificationsTab("notifications");
       setExpandedNotificationGroups({});
       setNotificationsNowMs(Date.now());
@@ -589,27 +638,90 @@ const Navbar: React.FC = () => {
     unfollowDealer(user.id, dealerId);
   };
 
+  const hasMobileFocusPanel =
+    mobileOpen && (showNotificationsMenu || isProfileMenuOpen || isTopUpModalOpen);
+  const mobileFocusClass = isTopUpModalOpen
+    ? "focus-topup"
+    : showNotificationsMenu
+      ? "focus-notifications"
+      : isProfileMenuOpen
+        ? "focus-profile"
+        : "";
+  const mobilePanelTitle = isTopUpModalOpen
+    ? "Зареди баланс"
+    : showNotificationsMenu
+      ? "Известия"
+      : isProfileMenuOpen
+        ? (user?.username?.trim() || user?.first_name?.trim() || "Профил")
+        : "";
+
+  const handleCloseMobileFocusPanel = () => {
+    setShowNotificationsMenu(false);
+    if (isTopUpModalOpen) {
+      setTopUpModalCloseRequestKey((prev) => prev + 1);
+      setIsTopUpModalOpen(false);
+    }
+    if (isProfileMenuOpen) {
+      setProfileMenuCloseRequestKey((prev) => prev + 1);
+      setIsProfileMenuOpen(false);
+    }
+  };
+
   return (
-    <header style={styles.header}>
+    <header
+      style={styles.header}
+      className={`site-nav-header ${hasMobileFocusPanel ? "mobile-sheet-open" : ""}`}
+    >
       <style>{css}</style>
 
       <div style={styles.inner} className="nav-inner">
         {/* Brand */}
-        <Link to="/" style={styles.brand} aria-label="Kar.bg">
+        <Link to="/" style={styles.brand} className="nav-brand-link" aria-label="Kar.bg">
           <img src={karBgLogo} alt="Kar.bg logo" style={styles.logoImage} className="nav-logo-image" />
         </Link>
 
         {/* Mobile burger */}
         <button
+          type="button"
           className="burger"
           onClick={() => setMobileOpen((v) => !v)}
+          aria-expanded={mobileOpen}
+          aria-controls="site-main-nav"
           aria-label="Toggle menu"
         >
           <FiMenu size={18} />
         </button>
 
+        <div className="mobile-panel-header" aria-live="polite">
+          <button
+            type="button"
+            className="mobile-panel-back-btn"
+            onClick={handleCloseMobileFocusPanel}
+            aria-label="Назад към менюто"
+          >
+            <FiChevronLeft size={18} />
+          </button>
+          <div className="mobile-panel-title">{mobilePanelTitle}</div>
+          <span className="mobile-panel-spacer" aria-hidden="true" />
+        </div>
+
+        {mobileOpen && (
+          <button
+            type="button"
+            className="nav-mobile-backdrop"
+            onClick={() => {
+              setShowNotificationsMenu(false);
+              setMobileOpen(false);
+            }}
+            aria-label="Затвори менюто"
+          />
+        )}
+
         {/* Nav */}
-        <nav className={`nav ${mobileOpen ? "open" : ""}`} style={styles.nav}>
+        <nav
+          id="site-main-nav"
+          className={`nav ${mobileOpen ? "open" : ""} ${mobileFocusClass}`.trim()}
+        >
           <div className="nav-group nav-left">
             <Link
               to="/"
@@ -644,16 +756,30 @@ const Navbar: React.FC = () => {
                     aria-expanded={showNotificationsMenu}
                     title="Известия"
                   >
-                    <FiBell size={25} className="notifications-bell-icon" />
-                    {hasUnreadNotifications && (
-                      <span className="notification-count-badge">
-                        {unreadNotificationsCount > 99 ? "99+" : unreadNotificationsCount}
-                      </span>
-                    )}
+                    <span className="notifications-icon-wrap">
+                      <FiBell size={25} className="notifications-bell-icon" />
+                      {hasUnreadNotifications && (
+                        <span className="notification-count-badge">
+                          {unreadNotificationsCount > 99 ? "99+" : unreadNotificationsCount}
+                        </span>
+                      )}
+                    </span>
+                    <span className="notifications-mobile-label">Известия</span>
                   </button>
 
                   {showNotificationsMenu && (
                     <div className="notifications-menu" role="menu" aria-label="Списък с известия">
+                      <button
+                        type="button"
+                        className="notifications-mobile-back-btn"
+                        onClick={() => setShowNotificationsMenu(false)}
+                        aria-label="Назад към менюто"
+                      >
+                        <span className="notifications-mobile-back-icon" aria-hidden="true">
+                          <FiChevronLeft size={14} />
+                        </span>
+                        <span>Към менюто</span>
+                      </button>
                       <div className="notifications-title">Център за известия</div>
                       <div className="notifications-tabs" role="tablist" aria-label="Раздели за известия">
                         <button
@@ -935,7 +1061,12 @@ const Navbar: React.FC = () => {
                     </div>
                   )}
                 </div>
-                <ProfileMenu />
+                <ProfileMenu
+                  onDropdownOpenChange={setIsProfileMenuOpen}
+                  onTopUpModalOpenChange={setIsTopUpModalOpen}
+                  closeRequestKey={profileMenuCloseRequestKey}
+                  topUpModalCloseRequestKey={topUpModalCloseRequestKey}
+                />
                 <Link
                   to="/publish"
                   className={`nav-publish-cta ${isActive("/publish") ? "active" : ""}`}
@@ -1024,23 +1155,64 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: 0.2,
     fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
   },
-  nav: {
-    display: "flex",
-    alignItems: "center",
-    gap: 16,
-    marginLeft: "auto",
-    flex: 1,
-  },
 };
 
 const css = `
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
 
 .nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-left: auto;
+  flex: 1;
   font-family: "Manrope", "Segoe UI", -apple-system, system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.2;
   min-width: 0;
+}
+
+.nav-inner {
+  position: relative;
+}
+
+.mobile-panel-header {
+  display: none;
+}
+
+.mobile-panel-back-btn {
+  border: 1px solid rgba(148, 163, 184, 0.42);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  color: #0f766e;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 7px 14px rgba(15, 23, 42, 0.14);
+  cursor: pointer;
+  padding: 0;
+}
+
+.mobile-panel-back-btn:hover {
+  border-color: rgba(45, 212, 191, 0.62);
+  background: linear-gradient(180deg, #ffffff 0%, #ecfeff 100%);
+}
+
+.mobile-panel-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobile-panel-spacer {
+  width: 42px;
+  height: 42px;
 }
 
 .nav-logo-image {
@@ -1061,6 +1233,10 @@ const css = `
 .nav-group > * {
   display: inline-flex;
   align-items: center;
+}
+
+.nav-group > style {
+  display: none !important;
 }
 
 .nav-publish-cta {
@@ -1236,6 +1412,17 @@ const css = `
   box-shadow: 0 8px 18px rgba(15, 118, 110, 0.18);
 }
 
+.notifications-icon-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notifications-mobile-label {
+  display: none;
+}
+
 .btn-notifications:hover {
   color: #0b5f59;
   border-color: #5eead4;
@@ -1283,8 +1470,8 @@ const css = `
 
 .notification-count-badge {
   position: absolute;
-  top: -3px;
-  right: -3px;
+  top: -5px;
+  right: -7px;
   min-width: 18px;
   height: 18px;
   padding: 0 4px;
@@ -1319,6 +1506,10 @@ const css = `
   font-weight: 800;
   color: #0f172a;
   margin-bottom: 8px;
+}
+
+.notifications-mobile-back-btn {
+  display: none;
 }
 
 .notifications-tabs {
@@ -1808,67 +1999,352 @@ const css = `
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.2);
 }
 
+.nav-mobile-backdrop {
+  display: none;
+}
+
 /* MOBILE */
 @media (max-width: 960px) {
+  .site-nav-header {
+    border-bottom-color: #dbeafe;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+    z-index: 280 !important;
+    transition: box-shadow 0.24s ease;
+  }
+
+  .nav-inner {
+    min-height: 60px !important;
+    padding: 8px 14px !important;
+    gap: 10px !important;
+    transition: min-height 0.22s ease, padding 0.22s ease;
+  }
+
+  .site-nav-header.mobile-sheet-open {
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  }
+
+  .site-nav-header.mobile-sheet-open .nav-inner {
+    min-height: 78px !important;
+    padding-top: 14px !important;
+    padding-bottom: 14px !important;
+  }
+
+  .site-nav-header.mobile-sheet-open .nav-brand-link,
+  .site-nav-header.mobile-sheet-open .burger {
+    display: none !important;
+  }
+
+  .site-nav-header.mobile-sheet-open .mobile-panel-header {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) 42px;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .site-nav-header.mobile-sheet-open .mobile-panel-title {
+    text-align: center;
+  }
+
+  .site-nav-header.mobile-sheet-open .nav {
+    padding: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    max-height: none;
+    overflow: visible;
+    backdrop-filter: none;
+  }
+
+  .site-nav-header.mobile-sheet-open .nav-left {
+    display: none !important;
+  }
+
+  .site-nav-header.mobile-sheet-open .nav-right {
+    width: 100%;
+  }
+
+  .site-nav-header.mobile-sheet-open .nav-right > * {
+    display: none !important;
+  }
+
+  .site-nav-header.mobile-sheet-open .nav.focus-notifications .nav-right > .notifications-wrap {
+    display: block !important;
+    width: 100%;
+  }
+
+  .site-nav-header.mobile-sheet-open .nav.focus-profile .nav-right > .profile-menu-root {
+    display: block !important;
+    width: 100%;
+  }
+
+  .site-nav-header.mobile-sheet-open .nav.focus-topup .nav-right > .topup-modal-overlay {
+    display: flex !important;
+    width: 100%;
+  }
+
+  .site-nav-header.mobile-sheet-open .nav.focus-notifications .btn-notifications {
+    display: none !important;
+  }
+
+  .site-nav-header.mobile-sheet-open .nav.focus-profile .profile-menu-trigger {
+    display: none !important;
+  }
+
+  .site-nav-header.mobile-sheet-open .nav.focus-topup .profile-menu-trigger {
+    display: none !important;
+  }
+
+  .site-nav-header.mobile-sheet-open .nav.focus-topup .topup-modal-overlay {
+    top: calc(82px + env(safe-area-inset-top, 0px) + 8px) !important;
+    left: 10px !important;
+    right: 10px !important;
+    bottom: 0 !important;
+    align-items: flex-start !important;
+    justify-content: stretch !important;
+    padding: 0 !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    z-index: 360 !important;
+  }
+
+  .site-nav-header.mobile-sheet-open .nav.focus-topup .topup-modal-card {
+    width: auto !important;
+    max-width: none !important;
+    max-height: calc(100dvh - 102px) !important;
+    border-radius: 18px !important;
+  }
+
+  .site-nav-header.mobile-sheet-open .nav.focus-topup .topup-modal-close-btn {
+    display: none !important;
+  }
+
   .nav-logo-image {
     width: 7rem;
-    height: 3.5rem;
+    height: 3rem;
+    border-radius: 14px;
+    box-shadow: 0 5px 12px rgba(15, 118, 110, 0.2);
   }
 
   .burger {
-    display: block;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    margin-left: auto;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.22);
   }
 
   .nav {
     display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: #ffffff;
-    border-top: 1px solid #e0e0e0;
-    padding: 14px 16px 18px;
+    position: fixed;
+    top: calc(64px + env(safe-area-inset-top, 0px) + 6px);
+    left: 10px;
+    right: 10px;
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid #dbeafe;
+    border-radius: 18px;
+    padding: 12px;
     flex-direction: column;
-    gap: 14px;
-    box-shadow: 0 12px 24px rgba(0,0,0,0.1);
+    gap: 10px;
+    box-shadow: 0 16px 34px rgba(15, 23, 42, 0.18);
+    backdrop-filter: blur(8px);
+    max-height: calc(100dvh - 84px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    z-index: 320;
   }
 
   .nav.open {
     display: flex;
   }
 
+  .nav-mobile-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    top: calc(60px + env(safe-area-inset-top, 0px));
+    border: none;
+    padding: 0;
+    background: rgba(15, 23, 42, 0.18);
+    z-index: 300;
+  }
+
+  .site-nav-header.mobile-sheet-open .nav-mobile-backdrop {
+    top: calc(78px + env(safe-area-inset-top, 0px));
+  }
+
   .nav-group {
     width: 100%;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
   }
 
   .nav-right {
     margin-left: 0;
   }
 
+  .nav-group > * {
+    width: 100%;
+  }
+
+  .nav-group > .nav-link,
+  .nav-group > .btn-primary,
+  .nav-group > .nav-publish-cta {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .nav-group > div > .nav-link,
+  .nav-group > div > a,
+  .nav-group > div > button {
+    width: 100%;
+    justify-content: flex-start !important;
+  }
+
+  .nav .nav-link {
+    height: 44px !important;
+    padding: 0 14px !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 14px !important;
+    background: #fff !important;
+    text-decoration: none !important;
+  }
+
+  .nav .nav-link:hover,
+  .nav .nav-link.active {
+    background: #ecfdf5 !important;
+    border-color: #99f6e4 !important;
+    text-decoration: none !important;
+  }
+
   .notifications-wrap {
     width: 100%;
+    position: static;
   }
 
   .btn-notifications {
     width: 100%;
     min-width: 0;
+    min-height: 44px;
+    border-radius: 14px;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 0 14px;
+  }
+
+  .notifications-mobile-label {
+    display: inline-flex;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f766e;
   }
 
   .notifications-menu {
-    position: static;
-    width: 100%;
-    margin-top: 8px;
+    position: fixed;
+    top: calc(64px + env(safe-area-inset-top, 0px) + 8px);
+    left: 10px;
+    right: 10px;
+    width: auto;
+    margin-top: 0;
+    border-radius: 18px;
+    box-shadow: 0 18px 38px rgba(15, 23, 42, 0.22);
+    padding: 12px;
+    max-height: calc(100dvh - 84px);
+    overflow: hidden;
+    z-index: 360;
+  }
+
+  .site-nav-header.mobile-sheet-open .nav {
+    top: calc(82px + env(safe-area-inset-top, 0px) + 6px);
+    max-height: calc(100dvh - 102px);
+  }
+
+  .site-nav-header.mobile-sheet-open .notifications-menu {
+    top: calc(82px + env(safe-area-inset-top, 0px) + 8px);
+    max-height: calc(100dvh - 102px);
+  }
+
+  .notifications-mobile-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 38px;
+    padding: 0 14px 0 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.48);
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    color: #0f172a;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    margin-bottom: 10px;
+    cursor: pointer;
+    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  .site-nav-header.mobile-sheet-open .notifications-mobile-back-btn {
+    display: none;
+  }
+
+  .notifications-mobile-back-btn:hover {
+    border-color: rgba(45, 212, 191, 0.62);
+    background: linear-gradient(180deg, #ffffff 0%, #ecfeff 100%);
+  }
+
+  .notifications-mobile-back-btn:active {
+    transform: translateY(1px);
+  }
+
+  .notifications-mobile-back-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #0f766e;
+    background: #ccfbf1;
+    border: 1px solid #99f6e4;
   }
 
   .notifications-tabs {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .notifications-list,
+  .subscriptions-list {
+    max-height: min(52vh, 420px);
   }
 
   .notification-item-main {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .notification-item-top {
+    align-items: flex-start;
+  }
+
+  .notification-item-time {
+    white-space: normal;
+    text-align: left;
+  }
+
+  .notification-item-type,
+  .notification-item-text,
+  .subscription-name,
+  .subscription-meta {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .notification-item-text {
@@ -1877,6 +2353,7 @@ const css = `
 
   .notification-item-actions {
     justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .notification-group-row {
@@ -1889,17 +2366,113 @@ const css = `
     flex-wrap: wrap;
   }
 
-  .nav a,
-  .nav button {
+  .nav .nav-publish-cta {
     width: 100%;
+    min-width: 0;
+    max-width: none;
+    flex: 1 1 auto;
+    height: 46px;
+    border-radius: 14px;
+    padding: 0 14px;
+    justify-content: flex-start;
+  }
+
+  .nav .nav-publish-label {
+    font-size: 14px;
+  }
+
+  .nav .btn-primary {
+    min-height: 44px;
+    border-radius: 14px;
     justify-content: center;
   }
 }
 
 @media (max-width: 640px) {
+  .nav-inner {
+    min-height: 56px !important;
+    padding: 6px 10px !important;
+  }
+
+  .site-nav-header.mobile-sheet-open .nav-inner {
+    min-height: 70px !important;
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+  }
+
+  .site-nav-header.mobile-sheet-open .mobile-panel-back-btn,
+  .site-nav-header.mobile-sheet-open .mobile-panel-spacer {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+
+  .site-nav-header.mobile-sheet-open .mobile-panel-title {
+    font-size: 14px;
+  }
+
   .nav-logo-image {
-    width: 6.25rem;
-    height: 3.125rem;
+    width: 6.1rem;
+    height: 2.7rem;
+    border-radius: 12px;
+  }
+
+  .burger {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+
+  .nav {
+    top: calc(58px + env(safe-area-inset-top, 0px) + 6px);
+    left: 8px;
+    right: 8px;
+    padding: 10px;
+    border-radius: 16px;
+    max-height: calc(100dvh - 74px);
+  }
+
+  .nav-mobile-backdrop {
+    top: calc(56px + env(safe-area-inset-top, 0px));
+  }
+
+  .site-nav-header.mobile-sheet-open .nav-mobile-backdrop {
+    top: calc(70px + env(safe-area-inset-top, 0px));
+  }
+
+  .nav .nav-link,
+  .nav .btn-primary,
+  .nav .btn-notifications,
+  .nav .nav-publish-cta {
+    min-height: 42px;
+  }
+
+  .notifications-menu {
+    top: calc(58px + env(safe-area-inset-top, 0px) + 8px);
+    left: 8px;
+    right: 8px;
+    padding: 10px;
+    border-radius: 16px;
+    max-height: calc(100dvh - 74px);
+  }
+
+  .site-nav-header.mobile-sheet-open .nav {
+    top: calc(72px + env(safe-area-inset-top, 0px) + 6px);
+    max-height: calc(100dvh - 88px);
+  }
+
+  .site-nav-header.mobile-sheet-open .notifications-menu {
+    top: calc(72px + env(safe-area-inset-top, 0px) + 8px);
+    max-height: calc(100dvh - 88px);
+  }
+
+  .site-nav-header.mobile-sheet-open .nav.focus-topup .topup-modal-overlay {
+    top: calc(72px + env(safe-area-inset-top, 0px) + 8px) !important;
+  }
+
+  .site-nav-header.mobile-sheet-open .nav.focus-topup .topup-modal-card {
+    max-height: calc(100dvh - 88px) !important;
+    border-radius: 16px !important;
   }
 }
 

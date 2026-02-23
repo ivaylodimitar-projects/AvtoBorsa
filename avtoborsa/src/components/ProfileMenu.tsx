@@ -8,6 +8,7 @@ import {
   Plus,
   List,
   X,
+  ChevronLeft,
   Camera,
   LogOut,
 } from "lucide-react";
@@ -23,7 +24,19 @@ type DealerProfile = {
   profile_image_url?: string | null;
 };
 
-const ProfileMenu: React.FC = () => {
+type ProfileMenuProps = {
+  onDropdownOpenChange?: (isOpen: boolean) => void;
+  onTopUpModalOpenChange?: (isOpen: boolean) => void;
+  closeRequestKey?: number;
+  topUpModalCloseRequestKey?: number;
+};
+
+const ProfileMenu: React.FC<ProfileMenuProps> = ({
+  onDropdownOpenChange,
+  onTopUpModalOpenChange,
+  closeRequestKey,
+  topUpModalCloseRequestKey,
+}) => {
   const { user, updateBalance, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -37,6 +50,30 @@ const ProfileMenu: React.FC = () => {
   const [isPaymentSyncing, setIsPaymentSyncing] = useState(false);
   const processedPaymentKeyRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    onDropdownOpenChange?.(isDropdownOpen);
+    return () => {
+      onDropdownOpenChange?.(false);
+    };
+  }, [isDropdownOpen, onDropdownOpenChange]);
+
+  useEffect(() => {
+    if (closeRequestKey === undefined) return;
+    setIsDropdownOpen(false);
+  }, [closeRequestKey]);
+
+  useEffect(() => {
+    onTopUpModalOpenChange?.(isTopUpModalOpen);
+    return () => {
+      onTopUpModalOpenChange?.(false);
+    };
+  }, [isTopUpModalOpen, onTopUpModalOpenChange]);
+
+  useEffect(() => {
+    if (topUpModalCloseRequestKey === undefined) return;
+    setIsTopUpModalOpen(false);
+  }, [topUpModalCloseRequestKey]);
 
   useEffect(() => {
     if (!user) return;
@@ -309,7 +346,8 @@ const ProfileMenu: React.FC = () => {
       borderRadius: 16,
       border: "1px solid #e0e0e0",
       boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-      minWidth: 320,
+      width: "min(92vw, 360px)",
+      minWidth: "min(320px, 92vw)",
       marginTop: 12,
       zIndex: 1000,
       overflow: "hidden",
@@ -497,7 +535,96 @@ const ProfileMenu: React.FC = () => {
 
   return (
     <>
-      <div style={styles.profileContainer}>
+      <div style={styles.profileContainer} className="profile-menu-root">
+        <style>{`
+          .profile-menu-backdrop {
+            z-index: 999;
+          }
+          .profile-menu-mobile-back {
+            display: none;
+          }
+          @media (max-width: 960px) {
+            .profile-menu-trigger {
+              width: 100% !important;
+              min-height: 44px !important;
+              justify-content: flex-start !important;
+              border: 1px solid #e2e8f0 !important;
+              border-radius: 14px !important;
+              background: #fff !important;
+              padding: 0 14px !important;
+            }
+            .profile-menu-dropdown {
+              position: fixed !important;
+              top: calc(64px + env(safe-area-inset-top, 0px) + 8px) !important;
+              left: 10px !important;
+              right: 10px !important;
+              width: auto !important;
+              min-width: 0 !important;
+              margin-top: 0 !important;
+              border-radius: 18px !important;
+              box-shadow: 0 18px 38px rgba(15, 23, 42, 0.22) !important;
+              z-index: 370 !important;
+              max-height: calc(100dvh - 84px) !important;
+              overflow-y: auto !important;
+            }
+            .site-nav-header.mobile-sheet-open .profile-menu-dropdown {
+              top: calc(82px + env(safe-area-inset-top, 0px) + 8px) !important;
+              max-height: calc(100dvh - 102px) !important;
+            }
+            .profile-menu-mobile-back {
+              width: calc(100% - 16px) !important;
+              margin: 8px 8px 6px !important;
+              display: inline-flex !important;
+              align-items: center !important;
+              gap: 8px !important;
+              height: 38px !important;
+              padding: 0 14px 0 8px !important;
+              border-radius: 999px !important;
+              border: 1px solid rgba(148, 163, 184, 0.48) !important;
+              background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+              color: #0f172a !important;
+              font-size: 12px !important;
+              font-weight: 700 !important;
+              letter-spacing: 0.01em !important;
+              cursor: pointer !important;
+              box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08) !important;
+            }
+            .site-nav-header.mobile-sheet-open .profile-menu-mobile-back {
+              display: none !important;
+            }
+            .profile-menu-mobile-back-icon {
+              width: 22px !important;
+              height: 22px !important;
+              border-radius: 999px !important;
+              display: inline-flex !important;
+              align-items: center !important;
+              justify-content: center !important;
+              color: #0f766e !important;
+              background: #ccfbf1 !important;
+              border: 1px solid #99f6e4 !important;
+            }
+            .profile-menu-mobile-back:active {
+              transform: translateY(1px) !important;
+            }
+            .profile-menu-backdrop {
+              z-index: 360 !important;
+              background: rgba(15, 23, 42, 0.2) !important;
+            }
+          }
+          @media (max-width: 640px) {
+            .profile-menu-dropdown {
+              top: calc(58px + env(safe-area-inset-top, 0px) + 8px) !important;
+              left: 8px !important;
+              right: 8px !important;
+              border-radius: 16px !important;
+              max-height: calc(100dvh - 74px) !important;
+            }
+            .site-nav-header.mobile-sheet-open .profile-menu-dropdown {
+              top: calc(72px + env(safe-area-inset-top, 0px) + 8px) !important;
+              max-height: calc(100dvh - 88px) !important;
+            }
+          }
+        `}</style>
         {/* Hidden file input */}
         {isBusiness && (
           <input
@@ -511,6 +638,7 @@ const ProfileMenu: React.FC = () => {
 
         {/* Profile Icon */}
         <button
+          className="profile-menu-trigger"
           style={{
             ...styles.profileIcon,
             ...(hoveredIcon || isDropdownOpen ? styles.profileIconHover : {}),
@@ -533,6 +661,7 @@ const ProfileMenu: React.FC = () => {
           <>
             {/* Backdrop */}
             <div
+              className="profile-menu-backdrop"
               style={{
                 position: "fixed",
                 top: 0,
@@ -544,7 +673,19 @@ const ProfileMenu: React.FC = () => {
               onClick={closeDropdown}
             />
 
-            <div style={styles.dropdown}>
+            <div style={styles.dropdown} className="profile-menu-dropdown">
+              <button
+                type="button"
+                className="profile-menu-mobile-back"
+                onClick={closeDropdown}
+                aria-label="Назад към менюто"
+              >
+                <span className="profile-menu-mobile-back-icon" aria-hidden="true">
+                  <ChevronLeft size={14} />
+                </span>
+                <span>Към менюто</span>
+              </button>
+
               {/* Profile photo + name section */}
               <div style={styles.photoSection}>
                 <div

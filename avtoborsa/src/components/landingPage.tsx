@@ -1018,11 +1018,27 @@ export default function LandingPage() {
         .main-category-grid {
           scrollbar-width: none;
           -ms-overflow-style: none;
+          -webkit-overflow-scrolling: touch;
+          overscroll-behavior-x: contain;
+          scroll-padding-inline: 12px;
         }
         .main-category-grid::-webkit-scrollbar {
           display: none;
           width: 0;
           height: 0;
+        }
+        .main-category-grid .category-pill-btn:first-child {
+          margin-left: 2px;
+        }
+        .main-category-grid .category-pill-btn:last-child {
+          margin-right: 2px;
+        }
+        @media (max-width: 768px) {
+          .main-category-grid {
+            justify-content: flex-start !important;
+            padding-left: max(12px, env(safe-area-inset-left, 0px)) !important;
+            padding-right: max(12px, env(safe-area-inset-right, 0px)) !important;
+          }
         }
       `}</style>
 
@@ -1850,37 +1866,95 @@ export default function LandingPage() {
             }
             @media (max-width: 767px) {
               .latest-grid { grid-template-columns: 1fr !important; gap: 14px !important; padding-top: 10px !important; }
-              .brand-cinema { padding: 14px 10px 62px; }
-              .brand-cinema-track { height: 282px; --brand-step: 102px; --brand-far-step: 154px; }
-              .brand-cinema-card { width: min(92vw, 420px); border-radius: 16px; }
-              .brand-cinema-card[data-distance="-2"],
-              .brand-cinema-card[data-distance="2"] {
+
+              .popular-brands-shell {
+                padding: 14px !important;
+                border-radius: 14px !important;
+              }
+              .popular-brands-header { margin-bottom: 10px !important; }
+              .popular-brands-title {
+                font-size: clamp(21px, 6vw, 25px) !important;
+                line-height: 1.14;
+              }
+              .popular-brands-lead {
+                font-size: 14px !important;
+                line-height: 1.48 !important;
+              }
+
+              #popular-brands .brand-cinema { padding: 12px 8px 64px; border-radius: 14px; }
+              #popular-brands .brand-cinema-track {
+                height: clamp(248px, 65vw, 286px);
+                --brand-step: clamp(74px, 18vw, 100px);
+                --brand-far-step: calc(var(--brand-step) * 1.55);
+              }
+              #popular-brands .brand-cinema-card { width: min(88vw, 410px); border-radius: 14px; }
+              #popular-brands .brand-cinema-card[data-distance="-2"],
+              #popular-brands .brand-cinema-card[data-distance="2"] {
                 opacity: 0;
                 pointer-events: none;
               }
-              .brand-cinema-card[data-distance="-1"] {
-                transform: translate3d(calc(-50% - var(--brand-step)), calc(-50% + 8px), -92px) rotateY(14deg) scale(0.84);
-                opacity: 0.34;
+              #popular-brands .brand-cinema-card[data-distance="-1"] {
+                transform: translate3d(calc(-50% - var(--brand-step)), calc(-50% + 7px), -90px) rotateY(13deg) scale(0.84);
+                opacity: 0.28;
               }
-              .brand-cinema-card[data-distance="1"] {
-                transform: translate3d(calc(-50% + var(--brand-step)), calc(-50% + 8px), -92px) rotateY(-14deg) scale(0.84);
-                opacity: 0.34;
+              #popular-brands .brand-cinema-card[data-distance="1"] {
+                transform: translate3d(calc(-50% + var(--brand-step)), calc(-50% + 7px), -90px) rotateY(-13deg) scale(0.84);
+                opacity: 0.28;
               }
-              .brand-cinema-meta { left: 8px; bottom: 8px; width: fit-content; max-width: calc(100% - 16px); padding: 8px 8px 7px; gap: 7px; }
-              .brand-cinema-logo { width: 24px; height: 24px; padding: 0; border-radius: 0; }
-              .brand-cinema-name { font-size: 13px; letter-spacing: 0.01em; }
-              .brand-cinema-state { font-size: 9px; padding: 5px 7px; letter-spacing: 0; }
-              .brand-logo-dots {
-                bottom: 10px;
-                padding: 0 6px 8px;
-                max-width: calc(100% - 108px);
+              #popular-brands .brand-cinema-meta {
+                left: 7px;
+                bottom: 7px;
+                width: fit-content;
+                max-width: calc(100% - 14px);
+                padding: 7px 8px;
                 gap: 6px;
+                border-radius: 12px;
               }
-              .brand-logo-dot { width: 27px; height: 27px; padding: 4px; }
-              .brand-nav { width: 46px; height: 46px; top: 44%; }
-              .brand-nav svg { width: 22px; height: 22px; }
-              .brand-nav--left { left: 4px; }
-              .brand-nav--right { right: 4px; }
+              #popular-brands .brand-cinema-logo { width: 22px; height: 22px; padding: 0; border-radius: 0; }
+              #popular-brands .brand-cinema-name { font-size: 12px; letter-spacing: 0.01em; }
+              #popular-brands .brand-cinema-state { font-size: 9px; padding: 4px 7px; letter-spacing: 0; }
+              #popular-brands .brand-logo-dots {
+                left: 0;
+                right: 0;
+                transform: none;
+                bottom: 8px;
+                padding: 8px 48px 7px;
+                max-width: none;
+                gap: 6px;
+                justify-content: flex-start;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+              }
+              #popular-brands .brand-logo-dots::-webkit-scrollbar { display: none; }
+              #popular-brands .brand-logo-dot { width: 26px; height: 26px; padding: 4px; }
+              #popular-brands .brand-nav { width: 42px; height: 42px; top: 43%; }
+              #popular-brands .brand-nav::after { inset: -2px; }
+              #popular-brands .brand-nav svg { width: 19px; height: 19px; }
+              #popular-brands .brand-nav--left { left: 4px; }
+              #popular-brands .brand-nav--right { right: 4px; }
+              #popular-brands .brand-autoplay-meter { margin-top: 10px; height: 3px; }
+            }
+            @media (max-width: 480px) {
+              #popular-brands .brand-cinema { padding: 10px 6px 60px; }
+              #popular-brands .brand-cinema-track {
+                height: 238px;
+                --brand-step: 62px;
+                --brand-far-step: 96px;
+              }
+              #popular-brands .brand-cinema-card { width: min(84vw, 330px); }
+              #popular-brands .brand-cinema-card[data-distance="-1"],
+              #popular-brands .brand-cinema-card[data-distance="1"] {
+                opacity: 0;
+                pointer-events: none;
+              }
+              #popular-brands .brand-cinema-meta { padding: 6px 7px; gap: 5px; }
+              #popular-brands .brand-cinema-logo { width: 20px; height: 20px; }
+              #popular-brands .brand-cinema-name { font-size: 11px; }
+              #popular-brands .brand-cinema-state { display: none; }
+              #popular-brands .brand-logo-dots { padding: 8px 42px 6px; gap: 5px; }
+              #popular-brands .brand-logo-dot { width: 24px; height: 24px; padding: 3px; }
+              #popular-brands .brand-nav { width: 38px; height: 38px; }
+              #popular-brands .brand-nav svg { width: 17px; height: 17px; }
             }
           `}</style>
 
@@ -2125,10 +2199,10 @@ export default function LandingPage() {
           ref={popularBrandsSectionRef}
           style={{ ...styles.section, ...styles.popularBrandsSection }}
         >
-          <div style={styles.popularBrandsContainer}>
-            <div style={{ ...styles.sectionHeader, ...styles.containerHeader, marginBottom: 12 }}>
-              <h2 style={styles.h2}>Популярни марки</h2>
-              <p style={styles.sectionLead}>
+          <div style={styles.popularBrandsContainer} className="popular-brands-shell">
+            <div className="popular-brands-header" style={{ ...styles.sectionHeader, ...styles.containerHeader, marginBottom: 12 }}>
+              <h2 style={styles.h2} className="popular-brands-title">Популярни марки</h2>
+              <p style={styles.sectionLead} className="popular-brands-lead">
                 Избери марка и виж всички актуални обяви.
               </p>
             </div>

@@ -668,8 +668,8 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
   };
 
   return (
-    <div style={styles.overlay} onClick={onClose}>
-      <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+    <div className="topup-modal-overlay" style={styles.overlay} onClick={onClose}>
+      <div className="topup-modal-card" style={styles.modal} onClick={(e) => e.stopPropagation()}>
         <div style={styles.header}>
           <div style={styles.headerTop}>
             <div>
@@ -687,6 +687,7 @@ const TopUpModal: React.FC<TopUpModalProps> = ({ onClose, onSuccess }) => {
             </div>
             <button
               type="button"
+              className="topup-modal-close-btn"
               style={{
                 ...styles.closeButton,
                 ...(isCloseHovered ? styles.closeButtonHover : {}),

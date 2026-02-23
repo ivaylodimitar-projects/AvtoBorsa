@@ -112,6 +112,9 @@ const PrivateProfilePage: React.FC = () => {
         .priv-submit-btn:hover:not(:disabled) {
           box-shadow: 0 10px 24px rgba(15,118,110,0.28);
         }
+        .priv-submit-btn:active:not(:disabled) {
+          transform: translateY(1px);
+        }
         .priv-submit-btn:disabled {
           opacity: 0.6;
           cursor: not-allowed;
@@ -130,22 +133,32 @@ const PrivateProfilePage: React.FC = () => {
           .priv-hero { padding: 24px !important; }
           .priv-hero-title { font-size: 24px !important; }
           .priv-password-grid { grid-template-columns: 1fr 1fr !important; }
+          .priv-success-banner { flex-wrap: wrap !important; }
+          .priv-success-banner button { margin-left: auto !important; }
         }
 
         /* Mobile Large (640px - 767px) */
         @media (min-width: 640px) and (max-width: 767px) {
           .priv-outer { padding: 20px 12px !important; }
           .priv-hero { padding: 22px 18px !important; margin-bottom: 20px !important; }
+          .priv-hero-content { align-items: flex-start !important; }
           .priv-hero-title { font-size: 22px !important; }
           .priv-hero-subtitle { font-size: 13px !important; }
           .priv-form-card { padding: 24px !important; }
           .priv-password-grid { grid-template-columns: 1fr !important; }
+          .priv-success-banner { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
+          .priv-success-main { width: 100% !important; }
+          .priv-success-banner button { width: 100% !important; }
+          .priv-actions { flex-direction: column !important; }
+          .priv-actions button { width: 100% !important; }
         }
 
         /* Mobile Small (< 640px) */
         @media (max-width: 639px) {
           .priv-outer { padding: 16px 8px !important; }
           .priv-hero { padding: 20px 16px !important; margin-bottom: 18px !important; }
+          .priv-hero-content { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
+          .priv-hero-copy { width: 100% !important; }
           .priv-hero-title { font-size: 20px !important; }
           .priv-hero-subtitle { font-size: 12px !important; }
           .priv-hero-icon { width: 44px !important; height: 44px !important; }
@@ -156,22 +169,33 @@ const PrivateProfilePage: React.FC = () => {
           .priv-input { font-size: 13px !important; padding: 10px 12px !important; }
           .priv-submit-btn { font-size: 14px !important; padding: 11px 20px !important; }
           .priv-password-grid { grid-template-columns: 1fr !important; }
+          .priv-success-banner { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
+          .priv-success-main { width: 100% !important; }
+          .priv-success-banner button { width: 100% !important; }
           .priv-actions { flex-direction: column !important; }
           .priv-actions button { width: 100% !important; }
+          .priv-footer-note { margin-top: 20px !important; padding-top: 16px !important; font-size: 13px !important; }
+        }
+
+        @media (hover: none) {
+          .priv-submit-btn:hover:not(:disabled),
+          .priv-ghost-btn:hover {
+            box-shadow: none !important;
+          }
         }
       `}</style>
 
       <div style={styles.outer} className="priv-outer">
         {/* Hero Header */}
         <div style={styles.hero} className="priv-hero">
-          <div style={styles.heroContent}>
+          <div style={styles.heroContent} className="priv-hero-content">
             <div style={styles.heroIcon} className="priv-hero-icon">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                 <circle cx="12" cy="7" r="4" />
               </svg>
             </div>
-            <div>
+            <div className="priv-hero-copy">
               <h1 style={styles.heroTitle} className="priv-hero-title">Частен профил</h1>
               <p style={styles.heroSubtitle} className="priv-hero-subtitle">
                 Създай акаунт, за да публикуваш и управляваш обяви
@@ -204,13 +228,13 @@ const PrivateProfilePage: React.FC = () => {
             )}
 
             {successMessage && (
-              <div style={styles.successBanner}>
+              <div style={styles.successBanner} className="priv-success-banner">
                 <div style={styles.successIcon}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M20 6 9 17l-5-5" />
                   </svg>
                 </div>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1 }} className="priv-success-main">
                   <div style={styles.successTitle}>Провери пощата си</div>
                   <div style={styles.successText}>{successMessage}</div>
                 </div>
@@ -320,7 +344,7 @@ const PrivateProfilePage: React.FC = () => {
           <p style={styles.requiredNote}>* Задължителни полета</p>
 
           {/* Login link */}
-          <div style={styles.footerNote}>
+          <div style={styles.footerNote} className="priv-footer-note">
             <span style={{ color: "#6b7280" }}>Вече имаш акаунт?</span>{" "}
             <span
               style={styles.loginLink}

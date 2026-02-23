@@ -286,6 +286,68 @@ const globalCss = `
     opacity: 1;
     transform: translate(-50%, 0);
   }
+  .myads-filter-toggle {
+    display: none;
+  }
+  .myads-filter-toggle-icon {
+    display: inline-flex;
+    transition: transform 0.2s ease;
+  }
+  .myads-filter-collapse {
+    display: block;
+  }
+
+  @media (max-width: 639px) {
+    .myads-filter-label {
+      display: none !important;
+    }
+    .myads-filter-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-height: 36px;
+      padding: 0 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      background: rgba(255, 255, 255, 0.14);
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+      cursor: pointer;
+    }
+    .myads-filter-toggle.is-open .myads-filter-toggle-icon {
+      transform: rotate(180deg);
+    }
+    .myads-filter-count {
+      order: 2;
+      margin-left: auto;
+      text-align: right !important;
+      white-space: nowrap;
+      font-size: 12px !important;
+    }
+    .myads-filter-collapse {
+      order: 3;
+      display: none;
+      width: 100%;
+    }
+    .myads-filter-collapse.is-open {
+      display: block;
+    }
+    .myads-filter-toggle {
+      order: 1;
+    }
+    .myads-filter-controls {
+      flex-direction: column !important;
+      align-items: stretch !important;
+      width: 100%;
+      margin-top: 8px;
+    }
+    .myads-filter-select {
+      width: 100% !important;
+    }
+  }
 `;
 
 const MyAdsPage: React.FC = () => {
@@ -308,6 +370,7 @@ const MyAdsPage: React.FC = () => {
   const [brandFilter, setBrandFilter] = useState<string>("all");
   const [modelFilter, setModelFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -3246,6 +3309,7 @@ const MyAdsPage: React.FC = () => {
       : brandScopedListings.filter((listing) => (listing.model || "").trim() === selectedModel);
 
   const showListingFilters = currentListings.length > 10;
+
   const hasFilteredListings = filteredListings.length > 0;
   const totalPages = Math.ceil(filteredListings.length / PAGE_SIZE);
   const safePage = totalPages > 0 ? Math.min(currentPage, totalPages) : 1;
@@ -4044,6 +4108,7 @@ const MyAdsPage: React.FC = () => {
                 onClick={() => {
                   setActiveTab(tab.id as TabType);
                   setCurrentPage(1);
+                  setMobileFiltersOpen(false);
                   setModelFilter("all");
                 }}
                 style={{
@@ -4086,59 +4151,78 @@ const MyAdsPage: React.FC = () => {
         </div>
 
         {showListingFilters && (
-          <div style={styles.filterRow}>
-            <div style={styles.filterLabel}>Филтри</div>
-            <div style={styles.filterControls}>
-              <select
-                value={selectedCategory}
-                onChange={(e) => {
-                  setCategoryFilter(e.target.value);
-                  setBrandFilter("all");
-                  setModelFilter("all");
-                  setCurrentPage(1);
-                }}
-                style={styles.filterSelect}
-              >
-                <option value="all">Всички категории</option>
-                {categoryOptions.map((categoryOption) => (
-                  <option key={categoryOption.value} value={categoryOption.value}>
-                    {categoryOption.label}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={selectedBrand}
-                onChange={(e) => {
-                  setBrandFilter(e.target.value);
-                  setModelFilter("all");
-                  setCurrentPage(1);
-                }}
-                style={styles.filterSelect}
-              >
-                <option value="all">Всички марки</option>
-                {brandOptions.map((brand) => (
-                  <option key={brand} value={brand}>
-                    {brand}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={selectedModel}
-                onChange={(e) => {
-                  setModelFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                style={styles.filterSelect}
-              >
-                <option value="all">Всички модели</option>
-                {modelOptions.map((model) => (
-                  <option key={model} value={model}>
-                    {model}
-                  </option>
-                ))}
-              </select>
+          <div className="myads-filter-row" style={styles.filterRow}>
+            <div className="myads-filter-label" style={styles.filterLabel}>
+              Филтри
             </div>
-            <div style={styles.filterCount}>
+            <button
+              type="button"
+              className={`myads-filter-toggle${mobileFiltersOpen ? " is-open" : ""}`}
+              onClick={() => setMobileFiltersOpen((prev) => !prev)}
+              aria-expanded={mobileFiltersOpen}
+              aria-label={mobileFiltersOpen ? "Скрий филтри" : "Покажи филтри"}
+            >
+              <span>Филтри</span>
+              <span className="myads-filter-toggle-icon" aria-hidden="true">
+                &#9662;
+              </span>
+            </button>
+            <div className={`myads-filter-collapse${mobileFiltersOpen ? " is-open" : ""}`}>
+              <div className="myads-filter-controls" style={styles.filterControls}>
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => {
+                    setCategoryFilter(e.target.value);
+                    setBrandFilter("all");
+                    setModelFilter("all");
+                    setCurrentPage(1);
+                  }}
+                  className="myads-filter-select"
+                  style={styles.filterSelect}
+                >
+                  <option value="all">Всички категории</option>
+                  {categoryOptions.map((categoryOption) => (
+                    <option key={categoryOption.value} value={categoryOption.value}>
+                      {categoryOption.label}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={selectedBrand}
+                  onChange={(e) => {
+                    setBrandFilter(e.target.value);
+                    setModelFilter("all");
+                    setCurrentPage(1);
+                  }}
+                  className="myads-filter-select"
+                  style={styles.filterSelect}
+                >
+                  <option value="all">Всички марки</option>
+                  {brandOptions.map((brand) => (
+                    <option key={brand} value={brand}>
+                      {brand}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={selectedModel}
+                  onChange={(e) => {
+                    setModelFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="myads-filter-select"
+                  style={styles.filterSelect}
+                >
+                  <option value="all">Всички модели</option>
+                  {modelOptions.map((model) => (
+                    <option key={model} value={model}>
+                      {model}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="myads-filter-count" style={styles.filterCount}>
               Показва {filteredListings.length} от {currentListings.length}
             </div>
           </div>
@@ -5144,5 +5228,3 @@ const MyAdsPage: React.FC = () => {
 };
 
 export default MyAdsPage;
-
-

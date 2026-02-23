@@ -289,28 +289,140 @@ const BusinessProfilePage: React.FC = () => {
           border-color: #0f766e !important;
           box-shadow: 0 0 0 3px rgba(15,118,110,0.12);
         }
+        .business-primary-btn,
+        .business-ghost-btn,
+        .business-success-btn {
+          transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+        .business-primary-btn:hover {
+          box-shadow: 0 10px 24px rgba(15,118,110,0.28) !important;
+        }
+        .business-ghost-btn:hover {
+          border-color: #0f766e !important;
+        }
+        .business-success-btn:hover {
+          filter: brightness(1.05);
+        }
 
-        @media (max-width: 768px) {
-          .business-grid-2 { grid-template-columns: 1fr !important; }
-          .business-header { padding: 20px !important; }
+        @media (min-width: 768px) and (max-width: 1023px) {
+          .business-container { padding: 28px 16px !important; }
+          .business-header { padding: 24px !important; }
+          .business-form-card { padding: 22px !important; }
+        }
+
+        @media (min-width: 640px) and (max-width: 767px) {
           .business-container { padding: 20px 12px !important; }
+          .business-grid-2 { grid-template-columns: 1fr !important; }
+          .business-header { padding: 20px 16px !important; margin-bottom: 20px !important; }
+          .business-header-left { align-items: flex-start !important; }
+          .business-header-copy { width: 100% !important; }
+          .business-header-title { font-size: 22px !important; }
+          .business-header-subtitle { font-size: 13px !important; }
+          .business-form-card { padding: 20px !important; }
+          .business-success-banner {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 10px !important;
+          }
+          .business-success-main { width: 100% !important; }
+          .business-success-banner button { width: 100% !important; }
+          .business-username-row { align-items: center !important; }
+          .business-submit-row {
+            flex-direction: column !important;
+            align-items: stretch !important;
+          }
+          .business-submit-row button {
+            width: 100% !important;
+          }
+          .business-required-note {
+            margin-left: 0 !important;
+          }
+        }
+
+        @media (max-width: 639px) {
+          .business-container { padding: 14px 10px !important; }
+          .business-grid-2 { grid-template-columns: 1fr !important; }
+          .business-header {
+            padding: 18px 14px !important;
+            margin-bottom: 18px !important;
+            border-radius: 14px !important;
+          }
+          .business-header-left {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 12px !important;
+          }
+          .business-header-icon {
+            width: 46px !important;
+            height: 46px !important;
+            font-size: 18px !important;
+          }
+          .business-header-copy { width: 100% !important; }
+          .business-header-title { font-size: 20px !important; line-height: 1.2 !important; }
+          .business-header-subtitle { font-size: 12px !important; }
+          .business-form-card { padding: 16px !important; }
+          .business-form h2 { font-size: 14px !important; }
+          .business-form label { font-size: 12px !important; }
+          .business-form input,
+          .business-form select,
+          .business-form textarea {
+            font-size: 13px !important;
+            padding: 10px 12px !important;
+          }
+          .business-error-banner,
+          .business-success-banner {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 10px !important;
+          }
+          .business-success-main { width: 100% !important; }
+          .business-success-banner button { width: 100% !important; }
+          .business-username-row {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 6px !important;
+          }
+          .business-username-suffix {
+            align-self: flex-end !important;
+            padding-bottom: 0 !important;
+          }
+          .business-submit-row {
+            flex-direction: column !important;
+            align-items: stretch !important;
+          }
+          .business-submit-row button {
+            width: 100% !important;
+          }
+          .business-required-note {
+            margin-left: 0 !important;
+          }
+        }
+
+        @media (hover: none) {
+          .business-primary-btn:hover,
+          .business-ghost-btn:hover,
+          .business-success-btn:hover {
+            transform: none !important;
+            box-shadow: none !important;
+            filter: none !important;
+          }
         }
       `}</style>
 
       <div style={styles.container} className="business-container">
         <div style={styles.header} className="business-header">
-          <div style={styles.headerLeft}>
-            <div style={{ width: 56, height: 56, borderRadius: 16, background: "rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 22 }}>Б</div>
-            <div>
-              <h1 style={styles.headerTitle}>Бизнес профил</h1>
-              <p style={styles.headerSubtitle}>Попълни информацията на твоя бизнес. Ще получиш имейл за потвърждение на акаунта.</p>
+          <div style={styles.headerLeft} className="business-header-left">
+            <div className="business-header-icon" style={{ width: 56, height: 56, borderRadius: 16, background: "rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 22 }}>Б</div>
+            <div className="business-header-copy">
+              <h1 style={styles.headerTitle} className="business-header-title">Бизнес профил</h1>
+              <p style={styles.headerSubtitle} className="business-header-subtitle">Попълни информацията на твоя бизнес. Ще получиш имейл за потвърждение на акаунта.</p>
             </div>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="business-form" style={styles.formCard}>
+        <form onSubmit={handleSubmit} className="business-form business-form-card" style={styles.formCard}>
           {errors.submit && (
-            <div style={styles.errorBanner}>
+            <div style={styles.errorBanner} className="business-error-banner">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                 <circle cx="12" cy="12" r="10" />
                 <line x1="15" y1="9" x2="9" y2="15" />
@@ -321,17 +433,17 @@ const BusinessProfilePage: React.FC = () => {
           )}
 
           {successMessage && (
-            <div style={styles.successBanner}>
+            <div style={styles.successBanner} className="business-success-banner">
               <div style={styles.successIcon}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20 6 9 17l-5-5" />
                 </svg>
               </div>
-              <div style={{ flex: 1 }}>
+              <div style={{ flex: 1 }} className="business-success-main">
                 <div style={styles.successTitle}>Провери пощата си</div>
                 <div style={styles.successText}>{successMessage}</div>
               </div>
-              <button type="button" style={styles.successButton} onClick={() => navigate("/auth")}>
+              <button type="button" className="business-success-btn" style={styles.successButton} onClick={() => navigate("/auth")}>
                 Вход
               </button>
             </div>
@@ -426,7 +538,7 @@ const BusinessProfilePage: React.FC = () => {
 
             <div style={styles.formRow}>
               <label style={styles.label}>Потребителско име *</label>
-              <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+              <div className="business-username-row" style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
                 <input
                   style={{ ...styles.input, borderColor: errors.username ? "#fca5a5" : "#e2e8f0", flex: 1 }}
                   type="text"
@@ -435,7 +547,7 @@ const BusinessProfilePage: React.FC = () => {
                   value={formData.username}
                   onChange={handleChange}
                 />
-                <span style={{ fontSize: 13, color: "#6b7280", paddingBottom: 10 }}>.kar.bg</span>
+                <span className="business-username-suffix" style={{ fontSize: 13, color: "#6b7280", paddingBottom: 10 }}>.kar.bg</span>
               </div>
               {errors.username && <span style={styles.errorText}>{errors.username}</span>}
             </div>
@@ -525,10 +637,10 @@ const BusinessProfilePage: React.FC = () => {
             </div>
           </div>
 
-          <div style={styles.submitRow}>
-            <button type="submit" style={styles.primaryButton}>{loading ? "Създавам..." : "Създай профил"}</button>
-            <button type="button" onClick={() => { setFormData({ dealerName: "", city: "", address: "", phone: "", email: "", website: "", username: "", password: "", confirmPassword: "", companyName: "", registrationAddress: "", mol: "", bulstat: "", vatNumber: "", adminName: "", adminPhone: "", description: "" }); setErrors({}); }} style={styles.ghostButton}>Изчисти</button>
-            <p style={{ ...styles.smallNote, marginLeft: 8 }}>* Задължителни полета</p>
+          <div style={styles.submitRow} className="business-submit-row">
+            <button type="submit" className="business-primary-btn" style={styles.primaryButton}>{loading ? "Създавам..." : "Създай профил"}</button>
+            <button type="button" onClick={() => { setFormData({ dealerName: "", city: "", address: "", phone: "", email: "", website: "", username: "", password: "", confirmPassword: "", companyName: "", registrationAddress: "", mol: "", bulstat: "", vatNumber: "", adminName: "", adminPhone: "", description: "" }); setErrors({}); }} className="business-ghost-btn" style={styles.ghostButton}>Изчисти</button>
+            <p className="business-required-note" style={{ ...styles.smallNote, marginLeft: 8 }}>* Задължителни полета</p>
           </div>
         </form>
       </div>
@@ -537,4 +649,3 @@ const BusinessProfilePage: React.FC = () => {
 };
 
 export default BusinessProfilePage;
-

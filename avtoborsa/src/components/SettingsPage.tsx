@@ -641,6 +641,77 @@ const SettingsPage: React.FC = () => {
       opacity: 0.45;
       cursor: not-allowed;
     }
+
+    @media (max-width: 1023px) {
+      .settings-container {
+        padding: 22px 14px 48px !important;
+      }
+      .settings-hero {
+        padding: 18px !important;
+      }
+      .settings-hero-top {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 10px !important;
+      }
+      .settings-hero-title {
+        font-size: 22px !important;
+      }
+      .settings-hero-subtitle {
+        font-size: 13px !important;
+      }
+      .settings-tabs {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      }
+      .settings-section {
+        padding: 18px !important;
+      }
+      .settings-section-header {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+      }
+      .transaction-row {
+        padding: 12px !important;
+      }
+      .settings-pagination-wrap {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+      }
+    }
+
+    @media (max-width: 639px) {
+      .settings-container {
+        padding: 16px 10px 34px !important;
+      }
+      .settings-hero {
+        padding: 14px !important;
+      }
+      .settings-tabs {
+        grid-template-columns: 1fr !important;
+      }
+      .settings-section {
+        padding: 14px !important;
+      }
+      .settings-form button,
+      .settings-transaction-tabs button {
+        width: 100% !important;
+        justify-content: center !important;
+      }
+      .settings-transaction-tabs {
+        width: 100%;
+      }
+      .settings-transaction-tabs button {
+        flex: 1 1 auto;
+      }
+      .transaction-row {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 10px !important;
+      }
+      .transaction-row > div {
+        width: 100%;
+      }
+    }
   `;
 
   const styles: Record<string, React.CSSProperties> = {
@@ -1027,19 +1098,19 @@ const SettingsPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div style={styles.page}>
+      <div style={styles.page} className="settings-page-root">
         <style>{globalCss}</style>
-        <div style={styles.container}>Зареждане...</div>
+        <div style={styles.container} className="settings-container">Зареждане...</div>
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div style={styles.page}>
+      <div style={styles.page} className="settings-page-root">
         <style>{globalCss}</style>
-        <div style={styles.container}>
-          <div style={styles.section}>
+        <div style={styles.container} className="settings-container">
+          <div style={styles.section} className="settings-section">
             <div style={{ fontSize: 16, fontWeight: 700 }}>
               Нужно е да влезеш, за да управляваш настройките си.
             </div>
@@ -1087,15 +1158,15 @@ const SettingsPage: React.FC = () => {
   const sitePurchaseVisibleTo = Math.min(sitePurchaseEndIndex, sitePurchases.length);
 
   return (
-    <div style={styles.page}>
+    <div style={styles.page} className="settings-page-root">
       <style>{globalCss}</style>
-      <div style={styles.container}>
-        <div style={styles.hero}>
+      <div style={styles.container} className="settings-container">
+        <div style={styles.hero} className="settings-hero">
           <div style={styles.heroGlow} />
-          <div style={styles.heroTop}>
+          <div style={styles.heroTop} className="settings-hero-top">
             <div>
-              <h1 style={styles.heroTitle}>Настройки</h1>
-              <div style={styles.heroSubtitle}>
+              <h1 style={styles.heroTitle} className="settings-hero-title">Настройки</h1>
+              <div style={styles.heroSubtitle} className="settings-hero-subtitle">
                 Управлявай профила си, сигурността и плащанията от едно място. {tabDescriptions[activeTab]}
               </div>
             </div>
@@ -1104,7 +1175,7 @@ const SettingsPage: React.FC = () => {
               {user.username || user.email}
             </div>
           </div>
-          <div style={styles.tabs} role="tablist" aria-label="Настройки табове">
+          <div style={styles.tabs} className="settings-tabs" role="tablist" aria-label="Настройки табове">
             <button
               type="button"
               role="tab"
@@ -1166,8 +1237,8 @@ const SettingsPage: React.FC = () => {
         </div>
 
         {activeTab === "profile" && (
-          <div style={styles.section}>
-            <div style={styles.sectionHeader}>
+          <div style={styles.section} className="settings-section">
+            <div style={styles.sectionHeader} className="settings-section-header">
               <div>
                 <h2 style={styles.sectionTitle}>Профилни данни</h2>
                 <div style={styles.sectionDescription}>Поддържай имената си актуални за по-добро доверие в обявите.</div>
@@ -1177,7 +1248,7 @@ const SettingsPage: React.FC = () => {
                 {tabTitles.profile}
               </div>
             </div>
-            <form style={styles.form} onSubmit={handleUpdateProfile}>
+            <form style={styles.form} className="settings-form" onSubmit={handleUpdateProfile}>
               {profileError && <div style={styles.error}>{profileError}</div>}
               {profileStatus && (
                 <div style={styles.success}>
@@ -1216,8 +1287,8 @@ const SettingsPage: React.FC = () => {
         )}
 
         {activeTab === "password" && (
-          <div style={styles.section}>
-            <div style={styles.sectionHeader}>
+          <div style={styles.section} className="settings-section">
+            <div style={styles.sectionHeader} className="settings-section-header">
               <div>
                 <h2 style={styles.sectionTitle}>Смяна на парола</h2>
                 <div style={styles.sectionDescription}>Използвай силна парола, за да защитиш профила и обявите си.</div>
@@ -1227,7 +1298,7 @@ const SettingsPage: React.FC = () => {
                 {tabTitles.password}
               </div>
             </div>
-            <form style={styles.form} onSubmit={handleChangePassword}>
+            <form style={styles.form} className="settings-form" onSubmit={handleChangePassword}>
               {passwordError && <div style={styles.error}>{passwordError}</div>}
               {passwordStatus && (
                 <div style={styles.success}>
@@ -1274,8 +1345,8 @@ const SettingsPage: React.FC = () => {
         )}
 
         {activeTab === "transactions" && (
-          <div style={styles.section}>
-            <div style={styles.sectionHeader}>
+          <div style={styles.section} className="settings-section">
+            <div style={styles.sectionHeader} className="settings-section-header">
               <div>
                 <h2 style={styles.sectionTitle}>Транзакции</h2>
                 <div style={styles.sectionDescription}>
@@ -1288,7 +1359,7 @@ const SettingsPage: React.FC = () => {
               </div>
             </div>
 
-            <div style={styles.transactionInnerTabs}>
+            <div style={styles.transactionInnerTabs} className="settings-transaction-tabs">
               <button
                 type="button"
                 style={{
@@ -1378,7 +1449,7 @@ const SettingsPage: React.FC = () => {
                       })}
                     </div>
                     {totalTransactionPages > 1 && (
-                      <div style={styles.paginationWrap}>
+                      <div style={styles.paginationWrap} className="settings-pagination-wrap">
                         <div style={styles.paginationInfo}>
                           Показани {visibleFrom}-{visibleTo} от {transactions.length}
                         </div>
@@ -1477,7 +1548,7 @@ const SettingsPage: React.FC = () => {
                       ))}
                     </div>
                     {totalSitePurchasePages > 1 && (
-                      <div style={styles.paginationWrap}>
+                      <div style={styles.paginationWrap} className="settings-pagination-wrap">
                         <div style={styles.paginationInfo}>
                           Показани {sitePurchaseVisibleFrom}-{sitePurchaseVisibleTo} от {sitePurchases.length}
                         </div>
@@ -1530,8 +1601,8 @@ const SettingsPage: React.FC = () => {
         )}
 
         {canUseImportApi && activeTab === "api" && (
-          <div style={styles.section}>
-            <div style={styles.sectionHeader}>
+          <div style={styles.section} className="settings-section">
+            <div style={styles.sectionHeader} className="settings-section-header">
               <div>
                 <h2 style={styles.sectionTitle}>API ключ за Chrome Extension</h2>
                 <div style={styles.sectionDescription}>
@@ -1645,8 +1716,8 @@ const SettingsPage: React.FC = () => {
         )}
 
         {activeTab === "delete" && (
-          <div style={styles.section}>
-            <div style={styles.sectionHeader}>
+          <div style={styles.section} className="settings-section">
+            <div style={styles.sectionHeader} className="settings-section-header">
               <div>
                 <h2 style={styles.sectionTitle}>Изтриване на акаунт</h2>
                 <div style={styles.sectionDescription}>Крайна стъпка, която премахва профила и всички свързани данни.</div>

@@ -15,6 +15,9 @@ const ProfileTypePage: React.FC = () => {
           transform: translateY(-4px);
           box-shadow: 0 12px 32px rgba(15,23,42,0.12) !important;
         }
+        .profile-card-interactive:active {
+          transform: translateY(-1px);
+        }
         .profile-card-btn {
           transition: background 0.2s ease, box-shadow 0.2s ease;
         }
@@ -37,16 +40,21 @@ const ProfileTypePage: React.FC = () => {
           .profile-type-container { padding: 20px 12px !important; }
           .profile-cards-grid { grid-template-columns: 1fr !important; gap: 16px !important; }
           .profile-hero { padding: 24px 20px !important; }
+          .profile-hero-content { align-items: flex-start !important; }
           .profile-hero-title { font-size: 24px !important; }
           .profile-hero-subtitle { font-size: 13px !important; }
           .profile-card-body { padding: 24px !important; }
+          .profile-card-btn { min-height: 44px !important; white-space: normal !important; line-height: 1.3 !important; text-align: center !important; }
+          .profile-login-note { margin-top: 22px !important; }
         }
 
         /* Mobile Small (< 640px) */
         @media (max-width: 639px) {
-          .profile-type-container { padding: 16px 8px !important; }
+          .profile-type-container { padding: 14px 10px !important; }
           .profile-cards-grid { grid-template-columns: 1fr !important; gap: 14px !important; }
           .profile-hero { padding: 20px 16px !important; margin-bottom: 20px !important; }
+          .profile-hero-content { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
+          .profile-hero-copy { width: 100% !important; }
           .profile-hero-title { font-size: 22px !important; }
           .profile-hero-subtitle { font-size: 12px !important; }
           .profile-hero-icon { width: 44px !important; height: 44px !important; font-size: 18px !important; }
@@ -55,21 +63,34 @@ const ProfileTypePage: React.FC = () => {
           .profile-card-icon-wrap svg { width: 24px !important; height: 24px !important; }
           .profile-card-title { font-size: 18px !important; }
           .profile-card-desc { font-size: 13px !important; }
-          .profile-feature-item { font-size: 12px !important; }
+          .profile-feature-item { font-size: 12px !important; align-items: flex-start !important; }
+          .profile-card-btn { min-height: 44px !important; white-space: normal !important; line-height: 1.25 !important; text-align: center !important; }
+          .profile-login-note { margin-top: 20px !important; font-size: 13px !important; }
+        }
+
+        @media (hover: none) {
+          .profile-card-interactive:hover {
+            transform: none !important;
+            box-shadow: 0 16px 34px rgba(15,23,42,0.08) !important;
+          }
+          .profile-card-btn:hover,
+          .profile-card-btn-business:hover {
+            box-shadow: none !important;
+          }
         }
       `}</style>
 
       <div style={styles.container} className="profile-type-container">
         {/* Hero Header */}
         <div style={styles.hero} className="profile-hero">
-          <div style={styles.heroContent}>
+          <div style={styles.heroContent} className="profile-hero-content">
             <div style={styles.heroIcon} className="profile-hero-icon">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                 <circle cx="12" cy="7" r="4" />
               </svg>
             </div>
-            <div>
+            <div className="profile-hero-copy">
               <h1 style={styles.heroTitle} className="profile-hero-title">Избери тип профил</h1>
               <p style={styles.heroSubtitle} className="profile-hero-subtitle">
                 Създай акаунт като частно лице или регистрирай бизнес
@@ -186,7 +207,7 @@ const ProfileTypePage: React.FC = () => {
         </div>
 
         {/* Already have an account link */}
-        <div style={styles.footerNote}>
+        <div style={styles.footerNote} className="profile-login-note">
           <span style={{ color: "#6b7280" }}>Вече имаш акаунт?</span>{" "}
           <span
             style={styles.loginLink}

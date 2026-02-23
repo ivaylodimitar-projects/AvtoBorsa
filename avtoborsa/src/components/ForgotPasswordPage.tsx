@@ -39,13 +39,46 @@ const ForgotPasswordPage: React.FC = () => {
   };
 
   return (
-    <div style={styles.page}>
-      <div style={styles.container}>
-        <div style={styles.card}>
-          <div style={styles.header}>
+    <div style={styles.page} className="forgot-page">
+      <style>{`
+        @media (max-width: 767px) {
+          .forgot-container {
+            padding: 20px 12px !important;
+          }
+          .forgot-card {
+            padding: 20px !important;
+          }
+          .forgot-title {
+            font-size: 22px !important;
+          }
+          .forgot-subtitle {
+            font-size: 13px !important;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .forgot-container {
+            padding: 14px 10px !important;
+          }
+          .forgot-card {
+            padding: 16px !important;
+          }
+          .forgot-header {
+            margin-bottom: 14px !important;
+            padding-bottom: 14px !important;
+          }
+          .forgot-primary-btn,
+          .forgot-link-btn {
+            min-height: 42px !important;
+          }
+        }
+      `}</style>
+      <div style={styles.container} className="forgot-container">
+        <div style={styles.card} className="forgot-card">
+          <div style={styles.header} className="forgot-header">
             <img src={karBgLogo} alt="Kar.bg logo" style={styles.badge} />
-            <h1 style={styles.title}>Забравена парола</h1>
-            <p style={styles.subtitle}>Ще ти изпратим линк за смяна на парола.</p>
+            <h1 style={styles.title} className="forgot-title">Забравена парола</h1>
+            <p style={styles.subtitle} className="forgot-subtitle">Ще ти изпратим линк за смяна на парола.</p>
           </div>
 
           {error && <div style={styles.errorBanner}>{error}</div>}
@@ -64,12 +97,12 @@ const ForgotPasswordPage: React.FC = () => {
               />
             </div>
 
-            <button type="submit" style={styles.primaryBtn} disabled={loading}>
+            <button type="submit" style={styles.primaryBtn} className="forgot-primary-btn" disabled={loading}>
               {loading ? "Изпращам..." : "Изпрати линк"}
             </button>
           </form>
 
-          <button type="button" style={styles.linkBtn} onClick={() => navigate("/auth")}>
+          <button type="button" style={styles.linkBtn} className="forgot-link-btn" onClick={() => navigate("/auth")}>
             Върни се към вход
           </button>
         </div>

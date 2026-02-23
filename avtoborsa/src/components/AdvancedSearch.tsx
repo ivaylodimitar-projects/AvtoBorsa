@@ -2521,14 +2521,16 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         width: 100%;
       }
       .adv-sticky-submit-bar {
-        left: 12px;
-        right: 12px;
-        bottom: 12px;
+        left: 10px;
+        right: 10px;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
         width: auto;
         max-width: none;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 10px;
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+        padding: 8px;
+        border-radius: 18px;
         transform: translateY(18px);
       }
       .adv-sticky-submit-bar.is-visible {
@@ -2537,15 +2539,35 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       .adv-sticky-category-panel {
         min-width: 0;
         max-width: none;
+        flex: 0 0 auto;
       }
       .adv-sticky-category-trigger {
-        height: 40px;
+        width: 42px;
+        min-width: 42px;
+        height: 42px;
+        padding: 0;
+        border-radius: 14px;
+        justify-content: center;
+        gap: 0;
+      }
+      .adv-sticky-category-trigger-icon {
+        width: 22px;
+        height: 22px;
       }
       .adv-sticky-category-trigger-label {
-        font-size: 11px;
+        display: none;
+      }
+      .adv-sticky-category-trigger-chevron {
+        display: none;
       }
       .adv-sticky-category-dropdown {
-        max-height: min(320px, calc(100vh - 124px));
+        position: fixed;
+        left: 10px;
+        right: 10px;
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 64px);
+        max-height: min(340px, 52vh);
+        border-radius: 16px;
+        z-index: 1400;
       }
       .adv-sticky-category-option {
         min-height: 36px;
@@ -2564,7 +2586,9 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         flex: 1;
         min-width: 0;
         font-size: 14px;
+        min-height: 42px;
         padding: 0 14px;
+        border-radius: 14px;
       }
     }
     @media (min-width: 769px) and (max-width: 1024px) {

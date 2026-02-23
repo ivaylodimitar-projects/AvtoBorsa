@@ -86,8 +86,9 @@ const SavedSearchesMenu: React.FC = () => {
       background: "#fff",
       border: "1px solid #e0e0e0",
       borderRadius: 16, boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
-      minWidth: 320,
-      maxWidth: 400,
+      width: "min(92vw, 400px)",
+      minWidth: "min(320px, 92vw)",
+      maxWidth: "calc(100vw - 20px)",
       marginTop: 8,
       zIndex: 1000,
       overflow: "hidden",
@@ -176,25 +177,70 @@ const SavedSearchesMenu: React.FC = () => {
 
   return (
     <div style={styles.container}>
+      <style>{`
+        .saved-searches-backdrop {
+          z-index: 999;
+        }
+        @media (max-width: 960px) {
+          .saved-searches-trigger {
+            width: 100% !important;
+            justify-content: flex-start !important;
+          }
+          .saved-searches-badge {
+            right: 10px !important;
+            top: 50% !important;
+            transform: translateY(-50%);
+          }
+          .saved-searches-dropdown {
+            position: fixed !important;
+            top: calc(64px + env(safe-area-inset-top, 0px) + 8px) !important;
+            left: 10px !important;
+            right: 10px !important;
+            width: auto !important;
+            min-width: 0 !important;
+            max-width: none !important;
+            margin-top: 0 !important;
+            border-radius: 18px !important;
+            box-shadow: 0 18px 38px rgba(15, 23, 42, 0.22) !important;
+            max-height: calc(100dvh - 84px) !important;
+            overflow: hidden !important;
+            z-index: 370 !important;
+          }
+          .saved-searches-backdrop {
+            z-index: 360 !important;
+            background: rgba(15, 23, 42, 0.2) !important;
+          }
+        }
+        @media (max-width: 640px) {
+          .saved-searches-dropdown {
+            top: calc(58px + env(safe-area-inset-top, 0px) + 8px) !important;
+            left: 8px !important;
+            right: 8px !important;
+            border-radius: 16px !important;
+            max-height: calc(100dvh - 74px) !important;
+          }
+        }
+      `}</style>
       <button
         style={{
           ...styles.navLink,
           ...(isDropdownOpen ? styles.navLinkActive : {}),
         }}
-        className="nav-link"
+        className="nav-link saved-searches-trigger"
         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
         title="Запазени търсения"
       >
         <Bookmark size={18} />
         Запазени
         {savedSearches.length > 0 && (
-          <div style={styles.badge}>{savedSearches.length}</div>
+          <div style={styles.badge} className="saved-searches-badge">{savedSearches.length}</div>
         )}
       </button>
 
       {isDropdownOpen && (
         <>
           <div
+            className="saved-searches-backdrop"
             style={{
               position: "fixed",
               top: 0,
@@ -205,7 +251,7 @@ const SavedSearchesMenu: React.FC = () => {
             }}
             onClick={closeDropdown}
           />
-          <div style={styles.dropdown}>
+          <div style={styles.dropdown} className="saved-searches-dropdown">
             <div style={styles.header}>
               <h3 style={styles.headerTitle}>Запазени търсения</h3>
               <button

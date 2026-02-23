@@ -48,6 +48,7 @@ type CarListing = {
   gearbox_display?: string;
   power: number;
   location_country?: string;
+  location_region?: string;
   city: string;
   image_url?: string;
   images?: Array<{
@@ -253,6 +254,27 @@ const SearchPage: React.FC = () => {
     } else {
       return `${label} току-що`;
     }
+  };
+
+  const getRelativeTimeCompact = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffDays > 30) {
+      return date.toLocaleDateString("bg-BG", { day: "2-digit", month: "2-digit", year: "2-digit" });
+    } else if (diffDays > 0) {
+      return `преди ${diffDays}д`;
+    } else if (diffHours > 0) {
+      return `преди ${diffHours}ч`;
+    } else if (diffMins > 0) {
+      return `преди ${diffMins}м`;
+    }
+    return "току-що";
   };
 
   useEffect(() => {
@@ -1391,17 +1413,18 @@ const SearchPage: React.FC = () => {
       color: "#0f172a",
       lineHeight: 1.65,
       marginBottom: 0,
-      maxHeight: 96,
+      height: 96,
+      maxWidth: "100%",
       overflow: "hidden",
-      textOverflow: "ellipsis",
-      display: "-webkit-box",
-      WebkitLineClamp: 4,
-      WebkitBoxOrient: "vertical" as any,
+      overflowWrap: "anywhere",
+      wordBreak: "break-word",
+      whiteSpace: "normal" as const,
       background: "#f8fafc",
       border: "1px solid #e2e8f0",
       padding: "10px 12px",
       borderRadius: 16, fontWeight: 500,
       fontFamily: "inherit",
+      boxSizing: "border-box" as const,
     },
     itemSide: { width: 240, padding: 16, background: "linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)", borderLeft: "1px solid #e2e8f0", display: "flex", flexDirection: "column" as const, gap: 12 },
     sideSection: { display: "flex", flexDirection: "column" as const, gap: 8 },
@@ -1527,7 +1550,7 @@ const SearchPage: React.FC = () => {
   };
 
   return (
-    <div style={styles.page}>
+    <div style={styles.page} className="search-page">
       <style>{`
         @keyframes skeletonShimmer {
           0% { background-position: 200% 0; }
@@ -1551,11 +1574,486 @@ const SearchPage: React.FC = () => {
         .search-modal-btn-save:hover {
           background: #ea580c !important;
         }
+
+        .search-result-item {
+          border-color: #dbe3ee !important;
+          box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+        }
+
+        .search-photo-main {
+          border-top-left-radius: 6px;
+          overflow: visible;
+        }
+
+        .search-thumb-strip {
+          background: #f8fafc !important;
+        }
+
+        .search-criteria {
+          scrollbar-width: thin;
+        }
+
+        .search-item-description {
+          max-width: 100%;
+          box-sizing: border-box;
+          display: flex;
+          align-items: flex-start;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+          white-space: normal;
+        }
+
+        .search-item-description-content {
+          display: -webkit-box;
+          width: 100%;
+          -webkit-line-clamp: 3;
+          line-clamp: 3;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+          white-space: normal;
+        }
+
+        .search-mobile-promo-badge {
+          display: none;
+        }
+
+        .search-mobile-main-specs,
+        .search-mobile-meta-row {
+          display: none;
+        }
+
+        @media (max-width: 1023px) {
+          .search-page {
+            padding-top: 12px !important;
+            padding-bottom: 24px !important;
+          }
+          .search-container {
+            padding: 0 14px !important;
+          }
+          .search-header {
+            padding: 18px !important;
+            margin-bottom: 18px !important;
+          }
+          .search-title {
+            font-size: clamp(1.85rem, 4.1vw, 2.3rem) !important;
+            line-height: 1.1 !important;
+          }
+          .search-item-row {
+            flex-direction: column !important;
+          }
+          .search-item-photo {
+            width: 100% !important;
+          }
+          .search-photo-main {
+            height: clamp(210px, 42vw, 268px) !important;
+            border-top-left-radius: 16px !important;
+            border-top-right-radius: 16px !important;
+          }
+          .search-thumb-strip {
+            padding: 8px !important;
+            gap: 6px !important;
+          }
+          .search-item-text {
+            min-height: 0 !important;
+          }
+          .search-item-main {
+            padding: 14px !important;
+          }
+          .search-item-header {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 8px !important;
+          }
+          .search-item-header-main {
+            width: 100% !important;
+          }
+          .search-item-price {
+            width: 100% !important;
+            display: flex !important;
+            align-items: baseline !important;
+            justify-content: space-between !important;
+            gap: 10px !important;
+            margin-bottom: 0 !important;
+          }
+          .search-item-price-small {
+            font-size: 12px !important;
+            line-height: 1.2 !important;
+          }
+          .search-item-param {
+            font-size: 12px !important;
+            padding: 6px 9px !important;
+          }
+          .search-item-description {
+            font-size: 13.5px !important;
+            line-height: 1.55 !important;
+            -webkit-line-clamp: 3 !important;
+          }
+          .search-item-side {
+            width: 100% !important;
+            border-left: none !important;
+            border-top: 1px solid #e2e8f0 !important;
+            padding: 12px 14px !important;
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px !important;
+          }
+          .search-side-section {
+            min-width: 0;
+          }
+          .search-meta-row {
+            font-size: 12px !important;
+          }
+          .search-skeleton-photo,
+          .search-skeleton-side {
+            width: 100% !important;
+          }
+          .search-skeleton-card {
+            flex-direction: column !important;
+          }
+          .search-skeleton-side {
+            border-left: none !important;
+            border-top: 1px solid #e2e8f0 !important;
+          }
+          .search-skeleton-main {
+            padding: 14px !important;
+          }
+        }
+
+        @media (max-width: 767px) {
+          .search-page {
+            padding-top: 10px !important;
+          }
+          .search-container {
+            padding: 0 10px !important;
+          }
+          .search-header {
+            padding: 14px !important;
+            border-radius: 16px !important;
+            margin-bottom: 14px !important;
+          }
+          .search-header-top {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 10px !important;
+          }
+          .search-title {
+            font-size: clamp(1.45rem, 6.2vw, 1.85rem) !important;
+            line-height: 1.1 !important;
+          }
+          .search-save-btn {
+            width: 100% !important;
+            justify-content: center !important;
+            min-height: 44px !important;
+            border-radius: 14px !important;
+          }
+          .search-summary-line {
+            font-size: 14px !important;
+            line-height: 1.45 !important;
+            margin-top: 12px !important;
+          }
+          .search-criteria {
+            margin-top: 12px !important;
+            gap: 8px !important;
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            padding-bottom: 2px;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+          }
+          .search-criteria::-webkit-scrollbar {
+            display: none;
+          }
+          .search-criteria-tag {
+            flex: 0 0 auto;
+            font-size: 12px !important;
+            padding: 6px 10px !important;
+            border-radius: 999px !important;
+          }
+          .search-results {
+            gap: 14px !important;
+          }
+          .search-result-item {
+            border-radius: 16px !important;
+            overflow: visible !important;
+            border: 1px solid #e5e7eb !important;
+            background: #fff !important;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08) !important;
+          }
+          .search-inline-promo-badge {
+            display: none !important;
+          }
+          .search-mobile-promo-badge {
+            display: inline !important;
+          }
+          .search-mobile-promo-badge > span {
+            left: -18px !important;
+          }
+          .search-item-row {
+            flex-direction: column !important;
+            align-items: stretch !important;
+          }
+          .search-item-photo {
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: none !important;
+            border-right: none !important;
+          }
+          .search-photo-main {
+            height: clamp(176px, 50vw, 216px) !important;
+            min-height: 176px !important;
+            border-top-left-radius: 16px !important;
+            border-top-right-radius: 16px !important;
+            border-bottom-left-radius: 0 !important;
+            border-bottom-right-radius: 0 !important;
+            overflow: hidden !important;
+          }
+          .search-favorite-btn {
+            width: 38px !important;
+            height: 38px !important;
+          }
+          .search-thumb-strip {
+            display: none !important;
+          }
+          .search-item-text {
+            min-height: 0 !important;
+            display: block !important;
+          }
+          .search-item-main {
+            min-width: 0 !important;
+            padding: 14px 15px 13px !important;
+            gap: 9px !important;
+          }
+          .search-item-header {
+            margin-bottom: 0 !important;
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            justify-content: flex-start !important;
+            gap: 8px !important;
+          }
+          .search-item-header-main {
+            width: 100% !important;
+            min-width: 0 !important;
+            flex: 1 !important;
+          }
+          .search-item-title {
+            font-size: 16.5px !important;
+            line-height: 1.3 !important;
+            margin: 0 !important;
+            display: -webkit-box !important;
+            -webkit-line-clamp: 2 !important;
+            -webkit-box-orient: vertical !important;
+            overflow: hidden !important;
+          }
+          .search-item-price {
+            width: 100% !important;
+            display: flex !important;
+            align-items: center !important;
+            flex-wrap: wrap !important;
+            gap: 6px 8px !important;
+            font-size: 22px !important;
+            text-align: left !important;
+            line-height: 1.1 !important;
+            flex-shrink: 0 !important;
+            margin-bottom: 0 !important;
+          }
+          .search-price-change-badge {
+            margin-left: 0 !important;
+            margin-top: 0 !important;
+            padding: 3px 8px !important;
+            font-size: 10px !important;
+            gap: 4px !important;
+          }
+          .search-item-price-small {
+            font-size: 12px !important;
+            color: #64748b !important;
+            width: auto !important;
+          }
+          .search-item-params {
+            display: none !important;
+          }
+          .search-mobile-main-specs {
+            display: flex !important;
+            align-items: center !important;
+            width: 100% !important;
+            gap: 5px !important;
+            flex-wrap: nowrap !important;
+            overflow: hidden !important;
+          }
+          .search-mobile-main-spec {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            flex: 1 1 0 !important;
+            min-width: 0 !important;
+            padding: 6px 6px !important;
+            font-size: 11.5px !important;
+            font-weight: 700 !important;
+            color: #0f172a !important;
+            background: #ecfdf5 !important;
+            border: 1px solid #99f6e4 !important;
+            border-radius: 999px !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+          }
+          .search-mobile-meta-row {
+            display: flex !important;
+            align-items: center !important;
+            flex-wrap: nowrap !important;
+            gap: 10px !important;
+            width: 100% !important;
+            font-size: 12.5px !important;
+            color: #64748b !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            padding-bottom: 1px !important;
+          }
+          .search-mobile-meta-row::-webkit-scrollbar {
+            display: none;
+          }
+          .search-mobile-meta-item {
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 6px !important;
+            flex: 0 0 auto !important;
+            min-width: 0 !important;
+          }
+          .search-mobile-meta-item svg {
+            width: 15px !important;
+            height: 15px !important;
+            flex-shrink: 0 !important;
+            color: #0f766e !important;
+          }
+          .search-mobile-meta-item-text {
+            display: block !important;
+            font-size: inherit !important;
+            font-weight: 600 !important;
+            white-space: nowrap !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+          }
+          .search-item-param {
+            font-size: 12px !important;
+            padding: 5px 9px !important;
+          }
+          .search-item-param:nth-child(n + 5) {
+            display: none !important;
+          }
+          .search-item-description,
+          .search-item-side,
+          .search-side-section,
+          .search-side-divider {
+            display: none !important;
+          }
+          .search-skeleton-card {
+            flex-direction: column !important;
+          }
+          .search-skeleton-photo {
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: none !important;
+            border-right: none !important;
+          }
+          .search-skeleton-main {
+            padding: 14px !important;
+          }
+          .search-skeleton-side {
+            display: none !important;
+          }
+          .search-pagination {
+            justify-content: center !important;
+            gap: 6px !important;
+            margin-top: 18px !important;
+          }
+          .search-pagination button {
+            min-height: 38px !important;
+            border-radius: 12px !important;
+          }
+          .search-pagination-info {
+            width: 100%;
+            text-align: center;
+            margin-top: 4px;
+            font-size: 12px !important;
+          }
+          .search-modal-card {
+            width: min(100%, 420px) !important;
+            padding: 16px !important;
+            border-radius: 14px !important;
+          }
+        }
+
+        @media (max-width: 520px) {
+          .search-container {
+            padding: 0 8px !important;
+          }
+          .search-result-item {
+            border-radius: 14px !important;
+          }
+          .search-photo-main {
+            height: 168px !important;
+            min-height: 168px !important;
+            border-top-left-radius: 14px !important;
+            border-top-right-radius: 14px !important;
+          }
+          .search-item-main {
+            padding: 12px 13px !important;
+          }
+          .search-item-title {
+            font-size: 15px !important;
+          }
+          .search-item-price {
+            font-size: 19px !important;
+          }
+          .search-item-price-small {
+            font-size: 11px !important;
+          }
+          .search-price-change-badge {
+            display: none !important;
+          }
+          .search-mobile-promo-badge > span {
+            left: -14px !important;
+          }
+          .search-mobile-main-spec {
+            font-size: 10.5px !important;
+            padding: 5px 5px !important;
+          }
+          .search-mobile-meta-row {
+            font-size: 11.5px !important;
+            gap: 7px !important;
+          }
+          .search-mobile-meta-item svg {
+            width: 14px !important;
+            height: 14px !important;
+          }
+          .search-item-param {
+            font-size: 11px !important;
+            padding: 5px 8px !important;
+          }
+          .search-item-param:nth-child(n + 4) {
+            display: none !important;
+          }
+          .search-save-btn {
+            min-height: 42px !important;
+            font-size: 12px !important;
+          }
+        }
+
+        @media (hover: none) {
+          .search-result-item:hover {
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08) !important;
+            transform: none !important;
+          }
+        }
       `}</style>
-      <div style={styles.container}>
-        <div style={styles.header}>
-          <div style={styles.headerTop}>
-            <h1 style={styles.title}>Резултати от търсене</h1>
+      <div style={styles.container} className="search-container">
+        <div style={styles.header} className="search-header">
+          <div style={styles.headerTop} className="search-header-top">
+            <h1 style={styles.title} className="search-title">Резултати от търсене</h1>
             <button
               type="button"
               className="search-save-btn"
@@ -1569,13 +2067,13 @@ const SearchPage: React.FC = () => {
           <p style={styles.headerLead}>Намерените обяви според избраните филтри</p>
           {saveSearchFeedback && <div style={styles.saveSearchFeedback}>{saveSearchFeedback}</div>}
           {searchCriteriaDisplay.length > 0 && (
-            <div style={styles.criteria}>
+            <div style={styles.criteria} className="search-criteria">
               {searchCriteriaDisplay.map((criterion, idx) => (
-                <span key={idx} style={styles.criteriaTag}>{criterion}</span>
+                <span key={idx} style={styles.criteriaTag} className="search-criteria-tag">{criterion}</span>
               ))}
             </div>
           )}
-          <p style={{ fontSize: 15, color: "#555", margin: "16px 0 0 0", fontWeight: 500 }}>
+          <p style={{ fontSize: 15, color: "#555", margin: "16px 0 0 0", fontWeight: 500 }} className="search-summary-line">
             1 - 20 от общо{" "}
             <strong style={{ color: "rgb(15, 118, 110)" }}>{totalListings}</strong> намерени обяви за{" "}
             <strong style={{ color: "rgb(15, 118, 110)" }}>{listingsScopeLabel}</strong>
@@ -1586,10 +2084,10 @@ const SearchPage: React.FC = () => {
         {isLoading ? (
           <div style={styles.results} className="search-results">
             {skeletonRows.map((index) => (
-              <div key={`skeleton-${index}`} style={styles.skeletonCard}>
-                <div style={styles.skeletonPhoto}>
+              <div key={`skeleton-${index}`} style={styles.skeletonCard} className="search-skeleton-card">
+                <div style={styles.skeletonPhoto} className="search-skeleton-photo">
                   <div style={styles.skeletonImage} />
-                  <div style={styles.thumbStrip}>
+                  <div style={styles.thumbStrip} className="search-thumb-strip">
                     {Array.from({ length: 3 }, (_, thumbIndex) => (
                       <div key={`skeleton-thumb-${index}-${thumbIndex}`} style={styles.thumb}>
                         <div style={styles.skeletonThumb} />
@@ -1598,7 +2096,7 @@ const SearchPage: React.FC = () => {
                   </div>
                 </div>
                 <div style={styles.itemText}>
-                  <div style={styles.skeletonMain}>
+                  <div style={styles.skeletonMain} className="search-skeleton-main">
                     <div style={styles.skeletonTitle} />
                     <div style={styles.skeletonPrice} />
                     <div style={styles.itemParams}>
@@ -1609,7 +2107,7 @@ const SearchPage: React.FC = () => {
                     <div style={styles.skeletonDesc} />
                     <div style={{ ...styles.skeletonDesc, width: "85%" }} />
                   </div>
-                  <div style={styles.skeletonSide}>
+                  <div style={styles.skeletonSide} className="search-skeleton-side">
                     <div style={styles.skeletonSideLine} />
                     <div style={styles.skeletonSideLine} />
                     <div style={{ ...styles.skeletonSideLine, width: "60%" }} />
@@ -1682,6 +2180,18 @@ const SearchPage: React.FC = () => {
               }
               const listingTitle = (listing.title || `${listing.brand} ${listing.model}`).trim() || "Обява";
               const technicalParams = getListingTechnicalParams(listing);
+              const mobileYear = listing.year_from ? `${listing.year_from} г.` : "";
+              const mobileMileageNumeric = toPositiveNumber(listing.mileage);
+              const mobileMileage =
+                mobileMileageNumeric !== null
+                  ? `${Math.round(mobileMileageNumeric).toLocaleString("bg-BG")} км`
+                  : "";
+              const mobileFuel = formatFuelLabel(listing.fuel_display || listing.fuel);
+              const mobileMainSpecs = [mobileYear, mobileMileage, mobileFuel].filter(Boolean);
+              const mobilePublishedLabel = getRelativeTimeCompact(listing.created_at);
+              const mobileRegionLabel =
+                toText(listing.location_region) || toText(listing.city) || toText(listing.location_country) || "Не е посочено";
+              const mobileSellerLabel = sellerTypeLabel || sellerLabel;
 
                 return (
                   <div
@@ -1690,11 +2200,29 @@ const SearchPage: React.FC = () => {
                     style={styles.item}
                     onClick={() => openListing(listing.slug)}
                   >
-                    <div style={styles.itemRow}>
-                      <div style={styles.itemPhoto}>
-                        <div style={styles.photoMain}>
-                          {isTop && <ListingPromoBadge type="top" />}
-                          {isVip && <ListingPromoBadge type="vip" />}
+                    {isTop && (
+                      <span className="search-mobile-promo-badge">
+                        <ListingPromoBadge type="top" size="xs" />
+                      </span>
+                    )}
+                    {isVip && (
+                      <span className="search-mobile-promo-badge">
+                        <ListingPromoBadge type="vip" size="xs" />
+                      </span>
+                    )}
+                    <div style={styles.itemRow} className="search-item-row">
+                      <div style={styles.itemPhoto} className="search-item-photo">
+                        <div style={styles.photoMain} className="search-photo-main">
+                          {isTop && (
+                            <span className="search-inline-promo-badge">
+                              <ListingPromoBadge type="top" />
+                            </span>
+                          )}
+                          {isVip && (
+                            <span className="search-inline-promo-badge">
+                              <ListingPromoBadge type="vip" />
+                            </span>
+                          )}
                           {listing.is_kaparirano && <KapariranoBadge />}
                           {isNewListing && (
                             <div style={{ ...styles.newBadge, top: "auto", bottom: 10, left: 10 }}>
@@ -1713,6 +2241,7 @@ const SearchPage: React.FC = () => {
                               />
                               <div style={styles.itemPhotoOverlay}>
                                 <button
+                                  className="search-favorite-btn"
                                   style={{
                                     ...styles.favoriteButton,
                                     background: listing.is_favorited ? "#ff4458" : "rgba(255,255,255,0.95)",
@@ -1741,7 +2270,7 @@ const SearchPage: React.FC = () => {
                             </div>
                           )}
                         </div>
-                        <div style={styles.thumbStrip}>
+                        <div style={styles.thumbStrip} className="search-thumb-strip">
                           {thumbItems.map((thumb, index) => {
                             if (thumb.type === "image" && thumb.src) {
                               return (
@@ -1773,13 +2302,14 @@ const SearchPage: React.FC = () => {
                           })}
                         </div>
                       </div>
-                      <div style={styles.itemText}>
-                        <div style={styles.itemMain}>
-                          <div style={styles.itemHeader}>
-                            <div style={styles.itemHeaderMain}>
+                      <div style={styles.itemText} className="search-item-text">
+                        <div style={styles.itemMain} className="search-item-main">
+                          <div style={styles.itemHeader} className="search-item-header">
+                            <div style={styles.itemHeaderMain} className="search-item-header-main">
                               <a
                                 href={`/details/${listing.slug}`}
                                 style={styles.itemTitle}
+                                className="search-item-title"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (e.defaultPrevented) return;
@@ -1791,10 +2321,11 @@ const SearchPage: React.FC = () => {
                                 {listingTitle}
                               </a>
                             </div>
-                            <div style={styles.itemPrice}>
+                            <div style={styles.itemPrice} className="search-item-price">
                               € {listing.price.toLocaleString("bg-BG")}
                               {showPriceChange && (
                                 <span
+                                  className="search-price-change-badge"
                                   style={{
                                     ...styles.priceChangeBadge,
                                     ...(priceBadge?.kind === "up"
@@ -1821,16 +2352,16 @@ const SearchPage: React.FC = () => {
                                   )}
                                 </span>
                               )}
-                              <div style={styles.itemPriceSmall}>
+                              <div style={styles.itemPriceSmall} className="search-item-price-small">
                                 {(listing.price * 1.96).toLocaleString("bg-BG", { maximumFractionDigits: 2 })} лв.
                               </div>
                             </div>
                           </div>
-                          <div style={styles.itemParams}>
+                          <div style={styles.itemParams} className="search-item-params">
                             {technicalParams.map((param, paramIndex) => {
                               const Icon = param.icon;
                               return (
-                                <span key={`${listing.id}-param-${paramIndex}`} style={styles.itemParam}>
+                                <span key={`${listing.id}-param-${paramIndex}`} style={styles.itemParam} className="search-item-param">
                                   <Icon size={16} style={styles.paramIcon} />
                                   <span style={styles.itemParamValueBlack}>
                                     {param.label}: {param.value}
@@ -1839,43 +2370,70 @@ const SearchPage: React.FC = () => {
                               );
                             })}
                           </div>
+                          {mobileMainSpecs.length > 0 && (
+                            <div className="search-mobile-main-specs" aria-label="Основни параметри">
+                              {mobileMainSpecs.map((spec, specIndex) => (
+                                <span key={`${listing.id}-mobile-spec-${specIndex}`} className="search-mobile-main-spec">
+                                  {spec}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <div className="search-mobile-meta-row" aria-label="Информация за обявата">
+                            <span className="search-mobile-meta-item">
+                              <Clock size={13} />
+                              <span className="search-mobile-meta-item-text">{mobilePublishedLabel}</span>
+                            </span>
+                            <span className="search-mobile-meta-item">
+                              <MapPin size={13} />
+                              <span className="search-mobile-meta-item-text">{mobileRegionLabel}</span>
+                            </span>
+                            <span className="search-mobile-meta-item">
+                              <User size={13} />
+                              <span className="search-mobile-meta-item-text">{mobileSellerLabel}</span>
+                            </span>
+                          </div>
                           {(listing.description_preview || listing.description) && (
-                            <div style={styles.itemDescription}>{listing.description_preview || listing.description}</div>
+                            <div style={styles.itemDescription} className="search-item-description">
+                              <span className="search-item-description-content">
+                                {listing.description_preview || listing.description}
+                              </span>
+                            </div>
                           )}
                         </div>
-                        <div style={styles.itemSide}>
-                          <div style={styles.sideSection}>
+                        <div style={styles.itemSide} className="search-item-side">
+                          <div style={styles.sideSection} className="search-side-section">
                             <div style={styles.sideTitleLocation}>Локация</div>
-                            <div style={styles.metaRow}>
+                            <div style={styles.metaRow} className="search-meta-row">
                               <MapPin size={16} style={styles.metaIcon} />
                               <span style={!locationLabel || locationLabel === "Не е посочено" ? styles.metaMuted : undefined}>
                                 {locationLabel}
                               </span>
                             </div>
                           </div>
-                          <div style={styles.sideDivider} />
-                          <div style={styles.sideSection}>
+                          <div style={styles.sideDivider} className="search-side-divider" />
+                          <div style={styles.sideSection} className="search-side-section">
                             <div style={styles.sideTitleSeller}>Продавач</div>
-                            <div style={styles.metaRow}>
+                            <div style={styles.metaRow} className="search-meta-row">
                               <User size={16} style={styles.metaIcon} />
                               <span style={!listing.seller_name ? styles.metaMuted : undefined}>
                                 {sellerLabel}
                               </span>
                             </div>
-                            <div style={styles.metaRow}>
+                            <div style={styles.metaRow} className="search-meta-row">
                               <SellerTypeIcon size={16} style={styles.metaIcon} />
                               <span style={listing.seller_type ? undefined : styles.metaMuted}>{sellerTypeLabel}</span>
                             </div>
                           </div>
-                          <div style={styles.sideDivider} />
-                          <div style={styles.sideSection}>
+                          <div style={styles.sideDivider} className="search-side-divider" />
+                          <div style={styles.sideSection} className="search-side-section">
                             <div style={styles.sideTitle}>Детайли</div>
-                            <div style={styles.metaRow}>
+                            <div style={styles.metaRow} className="search-meta-row">
                               <Clock size={16} style={styles.metaIcon} />
                               <span>{getRelativeTime(listing.created_at, "Публикувана")}</span>
                             </div>
                             {updatedLabel && (
-                              <div style={styles.metaRow}>
+                              <div style={styles.metaRow} className="search-meta-row">
                                 <PencilLine size={16} style={styles.metaIcon} />
                                 <span>{updatedLabel}</span>
                               </div>
@@ -1889,7 +2447,7 @@ const SearchPage: React.FC = () => {
               })}
             </div>
           {totalPages > 1 && (
-            <div style={styles.pagination}>
+            <div style={styles.pagination} className="search-pagination">
               <button
                 type="button"
                 style={{
@@ -1931,7 +2489,7 @@ const SearchPage: React.FC = () => {
               >
                 Следваща
               </button>
-              <span style={styles.paginationInfo}>
+              <span style={styles.paginationInfo} className="search-pagination-info">
                 Страница {currentPage} от {totalPages}
               </span>
             </div>
@@ -1946,7 +2504,7 @@ const SearchPage: React.FC = () => {
 
         {showSaveModal && (
           <div style={styles.modalOverlay} onClick={() => setShowSaveModal(false)}>
-            <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalCard} className="search-modal-card" onClick={(e) => e.stopPropagation()}>
               <h3 style={styles.modalTitle}>Запази търсене</h3>
               <input
                 type="text"

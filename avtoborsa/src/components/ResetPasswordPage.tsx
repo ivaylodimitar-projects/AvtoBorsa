@@ -53,13 +53,46 @@ const ResetPasswordPage: React.FC = () => {
   };
 
   return (
-    <div style={styles.page}>
-      <div style={styles.container}>
-        <div style={styles.card}>
-          <div style={styles.header}>
+    <div style={styles.page} className="reset-page">
+      <style>{`
+        @media (max-width: 767px) {
+          .reset-container {
+            padding: 20px 12px !important;
+          }
+          .reset-card {
+            padding: 20px !important;
+          }
+          .reset-title {
+            font-size: 22px !important;
+          }
+          .reset-subtitle {
+            font-size: 13px !important;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .reset-container {
+            padding: 14px 10px !important;
+          }
+          .reset-card {
+            padding: 16px !important;
+          }
+          .reset-header {
+            margin-bottom: 14px !important;
+            padding-bottom: 14px !important;
+          }
+          .reset-primary-btn,
+          .reset-link-btn {
+            min-height: 42px !important;
+          }
+        }
+      `}</style>
+      <div style={styles.container} className="reset-container">
+        <div style={styles.card} className="reset-card">
+          <div style={styles.header} className="reset-header">
             <img src={karBgLogo} alt="Kar.bg logo" style={styles.badge} />
-            <h1 style={styles.title}>Смяна на парола</h1>
-            <p style={styles.subtitle}>Въведи нова парола за акаунта си.</p>
+            <h1 style={styles.title} className="reset-title">Смяна на парола</h1>
+            <p style={styles.subtitle} className="reset-subtitle">Въведи нова парола за акаунта си.</p>
           </div>
 
           {error && <div style={styles.errorBanner}>{error}</div>}
@@ -89,12 +122,12 @@ const ResetPasswordPage: React.FC = () => {
               />
             </div>
 
-            <button type="submit" style={styles.primaryBtn} disabled={loading}>
+            <button type="submit" style={styles.primaryBtn} className="reset-primary-btn" disabled={loading}>
               {loading ? "Записвам..." : "Запази"}
             </button>
           </form>
 
-          <button type="button" style={styles.linkBtn} onClick={() => navigate("/auth")}>
+          <button type="button" style={styles.linkBtn} className="reset-link-btn" onClick={() => navigate("/auth")}>
             Към вход
           </button>
         </div>
