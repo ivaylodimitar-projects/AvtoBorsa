@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Phone, MapPin } from 'lucide-react';
 
 interface SellerCardProps {
@@ -52,7 +52,7 @@ const SellerCard: React.FC<SellerCardProps> = ({
   const styles: Record<string, React.CSSProperties> = {
     container: {
       background: '#fff',
-      borderRadius: 8,
+      borderRadius: 16,
       padding: isMobile ? 16 : 20,
       boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
       border: '1px solid #e0e0e0',
@@ -155,7 +155,7 @@ const SellerCard: React.FC<SellerCardProps> = ({
       gap: isMobile ? 10 : 12,
       padding: isMobile ? 10 : 12,
       background: '#f9f9f9',
-      borderRadius: 6,
+      borderRadius: 16,
       border: '1px solid #e0e0e0',
     },
     phoneIcon: {
@@ -204,7 +204,7 @@ const SellerCard: React.FC<SellerCardProps> = ({
       background: '#0f766e',
       color: '#fff',
       border: 'none',
-      borderRadius: 6,
+      borderRadius: 16,
       fontSize: isMobile ? 13 : 14,
       fontWeight: 700,
       cursor: 'pointer',

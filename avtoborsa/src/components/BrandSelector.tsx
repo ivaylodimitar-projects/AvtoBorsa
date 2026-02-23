@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import { groupOptionsByInitial, sortUniqueOptions } from "../utils/alphabeticalOptions";
 
@@ -72,7 +72,7 @@ export const BrandSelector: React.FC<BrandSelectorProps> = ({
           display: "flex",
           alignItems: "center",
           border: "1.5px solid #e5e7eb",
-          borderRadius: "10px",
+          borderRadius: "16px",
           padding: "0 12px",
           height: 42,
           cursor: "pointer",
@@ -134,7 +134,7 @@ export const BrandSelector: React.FC<BrandSelectorProps> = ({
             right: 0,
             background: "#fff",
             border: "1.5px solid #e5e7eb",
-            borderRadius: "10px",
+            borderRadius: "16px",
             maxHeight: "300px",
             overflowY: "auto",
             zIndex: 1000,

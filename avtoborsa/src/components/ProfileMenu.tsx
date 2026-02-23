@@ -14,13 +14,12 @@ import {
 import TopUpModal from "./TopUpModal";
 import { useToast } from "../context/ToastContext";
 import { addDepositNotification } from "../utils/notifications";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+import { API_BASE_URL } from "../config/api";
 const STRIPE_SESSION_STORAGE_KEY = "stripe_checkout_session_id";
 const PAYMENT_SYNC_MIN_MS = 650;
 
 type DealerProfile = {
-  email: string;
+  email?: string;
   profile_image_url?: string | null;
 };
 
@@ -231,7 +230,7 @@ const ProfileMenu: React.FC = () => {
       const formData = new FormData();
       formData.append("image", file);
 
-      const response = await fetch("http://localhost:8000/api/auth/profile/upload-photo/", {
+      const response = await fetch(`${API_BASE_URL}/api/auth/profile/upload-photo/`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
@@ -244,7 +243,7 @@ const ProfileMenu: React.FC = () => {
         // Also refetch from dealers API to ensure persistence
         setTimeout(async () => {
           try {
-            const dealersRes = await fetch("http://localhost:8000/api/auth/dealers/", {
+            const dealersRes = await fetch(`${API_BASE_URL}/api/auth/dealers/`, {
               headers: { Authorization: `Bearer ${token}` },
             });
             if (dealersRes.ok) {
@@ -280,7 +279,7 @@ const ProfileMenu: React.FC = () => {
       fontSize: 14,
       padding: "0 6px",
       height: 40,
-      borderRadius: 8,
+      borderRadius: 16,
       fontWeight: 650,
       transition: "color 0.2s ease",
       whiteSpace: "nowrap",
@@ -307,7 +306,7 @@ const ProfileMenu: React.FC = () => {
       top: "100%",
       right: 0,
       background: "#fff",
-      borderRadius: 12,
+      borderRadius: 16,
       border: "1px solid #e0e0e0",
       boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
       minWidth: 320,
@@ -332,7 +331,7 @@ const ProfileMenu: React.FC = () => {
     closeBtn: {
       background: "rgba(255,255,255,0.2)",
       border: "none",
-      borderRadius: 6,
+      borderRadius: 16,
       padding: 6,
       cursor: "pointer",
       display: "flex",
@@ -368,7 +367,7 @@ const ProfileMenu: React.FC = () => {
       background: "#fff",
       color: "#0f766e",
       border: "none",
-      borderRadius: "14px",
+      borderRadius: "16px",
       cursor: "pointer",
       fontFamily:"Inter, sans-serif",
       fontWeight: 600,
@@ -399,7 +398,7 @@ const ProfileMenu: React.FC = () => {
       background: "none",
       width: "100%",
       textAlign: "left",
-      borderRadius: 8,
+      borderRadius: 16,
     },
     menuItemDanger: {
       color: "#6b7280",
@@ -720,7 +719,7 @@ const ProfileMenu: React.FC = () => {
               maxWidth: 420,
               background: "#ffffff",
               border: "1px solid #e2e8f0",
-              borderRadius: 14,
+              borderRadius: 16,
               padding: "24px 22px",
               textAlign: "center",
               boxShadow: "0 14px 36px rgba(15, 23, 42, 0.14)",

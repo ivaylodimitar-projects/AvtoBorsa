@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { API_ORIGIN } from "../config/api";
 
 interface LazyImage {
   id: number;
@@ -68,12 +69,12 @@ export const useImageUrl = () => {
       return imagePath;
     }
     if (imagePath.startsWith('/')) {
-      return `http://localhost:8000${imagePath}`;
+      return `${API_ORIGIN}${imagePath}`;
     }
     if (imagePath.startsWith('media/')) {
-      return `http://localhost:8000/${imagePath}`;
+      return `${API_ORIGIN}/${imagePath}`;
     }
-    return `http://localhost:8000/media/${imagePath}`;
+    return `${API_ORIGIN}/media/${imagePath}`;
   }, []);
 };
 

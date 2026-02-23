@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiBell } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
@@ -9,6 +9,7 @@ import {
   getUserFollowedDealersStorageKey,
   unfollowDealer,
 } from "../utils/dealerSubscriptions";
+import { API_BASE_URL } from "../config/api";
 
 type Dealer = {
   id: number;
@@ -44,7 +45,7 @@ const DealersPage: React.FC = () => {
   useEffect(() => {
     const fetchDealers = async () => {
       try {
-        const res = await fetch("http://localhost:8000/api/auth/dealers/", {
+        const res = await fetch(`${API_BASE_URL}/api/auth/dealers/`, {
           cache: "no-store",
         });
         if (res.ok) {
@@ -196,7 +197,7 @@ const DealersPage: React.FC = () => {
     hero: {
       background: "#fff",
       border: "1px solid #e0e0e0",
-      borderRadius: 12,
+      borderRadius: 16,
       padding: "22px 24px",
       boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
       display: "flex",
@@ -243,7 +244,7 @@ const DealersPage: React.FC = () => {
     filterSelect: {
       padding: "10px 16px",
       border: "1px solid #d0d0d0",
-      borderRadius: 6,
+      borderRadius: 16,
       fontSize: 14,
       color: "#333",
       background: "#fff",
@@ -260,7 +261,7 @@ const DealersPage: React.FC = () => {
       marginTop: 24,
       background: "#fff",
       border: "1px solid #e5e7eb",
-      borderRadius: 12,
+      borderRadius: 16,
       padding: 22,
       boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
     },
@@ -292,7 +293,7 @@ const DealersPage: React.FC = () => {
     },
     podiumCard: {
       border: "1px solid #e5e7eb",
-      borderRadius: 12,
+      borderRadius: 16,
       background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)",
       boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
       padding: 16,
@@ -373,7 +374,7 @@ const DealersPage: React.FC = () => {
     },
     podiumButton: {
       padding: "10px 12px",
-      borderRadius: 6,
+      borderRadius: 16,
       border: "none",
       background: "#0f766e",
       color: "#fff",
@@ -385,7 +386,7 @@ const DealersPage: React.FC = () => {
     },
     followButton: {
       padding: "10px 12px",
-      borderRadius: 6,
+      borderRadius: 16,
       border: "1px solid #99f6e4",
       background: "#ecfdf5",
       color: "#0f766e",
@@ -416,7 +417,7 @@ const DealersPage: React.FC = () => {
       gap: 12,
       alignItems: "center",
       padding: "12px 14px",
-      borderRadius: 10,
+      borderRadius: 16,
       border: "1px solid #e5e7eb",
       background: "#fff",
       cursor: "pointer",
@@ -425,7 +426,7 @@ const DealersPage: React.FC = () => {
     rankIndex: {
       width: 36,
       height: 36,
-      borderRadius: 8,
+      borderRadius: 16,
       background: "#f5f5f5",
       border: "1px solid #e0e0e0",
       display: "grid",
@@ -482,7 +483,7 @@ const DealersPage: React.FC = () => {
     },
     rankButton: {
       padding: "8px 12px",
-      borderRadius: 6,
+      borderRadius: 16,
       border: "none",
       background: "#0f766e",
       color: "#fff",
@@ -501,7 +502,7 @@ const DealersPage: React.FC = () => {
       textAlign: "center",
       padding: 50,
       background: "#fff",
-      borderRadius: 10,
+      borderRadius: 16,
       border: "1px solid #e0e0e0",
     },
     emptyTitle: {

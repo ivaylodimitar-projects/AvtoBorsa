@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
 import { CAR_FEATURE_GROUPS, normalizeCarFeatureLabel } from '../../constants/carFeatures';
 import { HEAVY_FEATURE_GROUPS } from '../../constants/heavyFeatures';
@@ -55,7 +55,7 @@ const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features, mainCateg
   const styles: Record<string, React.CSSProperties> = {
     container: {
       background: '#fff',
-      borderRadius: 8,
+      borderRadius: 16,
       boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
       overflow: 'hidden',
       border: '1px solid #e0e0e0',
@@ -93,7 +93,7 @@ const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features, mainCateg
     featureCheckbox: {
       width: 18,
       height: 18,
-      borderRadius: 4,
+      borderRadius: 16,
       background: '#0f766e',
       display: 'flex',
       alignItems: 'center',

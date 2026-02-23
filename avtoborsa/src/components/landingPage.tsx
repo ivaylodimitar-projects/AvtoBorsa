@@ -42,8 +42,7 @@ import { CAR_BRANDS, CAR_MODELS } from "../constants/carBrandModels";
 import { APP_MAIN_CATEGORY_OPTIONS, getMainCategoryLabel } from "../constants/mobileBgData";
 import { formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 import { resolvePriceBadgeState } from "../utils/priceChangeBadge";
-
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/+$/, "");
+import { API_BASE_URL } from "../config/api";
 const PUBLIC_API_DOCS_URL = `${API_BASE_URL}/docs/api/`;
 
 type CarListing = {
@@ -380,7 +379,7 @@ function clampNumber(n: number, min: number, max: number) {
 const inputBase: React.CSSProperties = {
   width: "100%",
   height: 36,
-  borderRadius: 4,
+  borderRadius: 16,
   border: "1px solid #ccc",
   background: "#fff",
   color: "#333",
@@ -450,9 +449,9 @@ export default function LandingPage() {
         }
 
         const [latestResponse, fallbackResponse] = await Promise.all([
-          fetch("http://localhost:8000/api/listings/latest/", { signal: controller.signal }),
+          fetch(`${API_BASE_URL}/api/listings/latest/`, { signal: controller.signal }),
           fetch(
-            `http://localhost:8000/api/listings/?page=1&page_size=24&lite=1&sortBy=newest&_ts=${Date.now()}`,
+            `${API_BASE_URL}/api/listings/?page=1&page_size=24&lite=1&sortBy=newest&_ts=${Date.now()}`,
             {
               signal: controller.signal,
             }
@@ -1209,7 +1208,7 @@ export default function LandingPage() {
                       style={{
                         width: "100%",
                         height: 36,
-                        borderRadius: 4,
+                        borderRadius: 16,
                         border: "1px solid #ccc",
                         background: "#fff",
                         color: "#333",
@@ -1258,7 +1257,7 @@ export default function LandingPage() {
                         <div
                           style={{
                             background: "#fff",
-                            borderRadius: 8,
+                            borderRadius: 16,
                             padding: 24,
                             maxWidth: 1000,
                             width: "90%",
@@ -1326,7 +1325,7 @@ export default function LandingPage() {
                                 padding: "10px 20px",
                                 background: "#f0f0f0",
                                 border: "1px solid #ccc",
-                                borderRadius: 4,
+                                borderRadius: 16,
                                 fontSize: 14,
                                 fontWeight: 600,
                                 cursor: "pointer",
@@ -1342,7 +1341,7 @@ export default function LandingPage() {
                                 padding: "10px 20px",
                                 background: "#0f766e",
                                 border: "none",
-                                borderRadius: 4,
+                                borderRadius: 16,
                                 fontSize: 14,
                                 fontWeight: 600,
                                 cursor: "pointer",
@@ -1451,7 +1450,7 @@ export default function LandingPage() {
             }
             .brand-cinema {
               margin-top: 8px;
-              border-radius: 20px;
+              border-radius: 16px;
               border: 1px solid rgba(100, 116, 139, 0.42);
               background:
                 radial-gradient(circle at 14% 10%, rgba(255, 255, 255, 0.08), transparent 42%),
@@ -1492,7 +1491,7 @@ export default function LandingPage() {
               width: clamp(280px, 47vw, 640px);
               aspect-ratio: 16 / 9;
               border: 1px solid rgba(74, 222, 128, 0.24);
-              border-radius: 18px;
+              border-radius: 16px;
               overflow: hidden;
               background: #0f172a;
               padding: 0;
@@ -1606,7 +1605,7 @@ export default function LandingPage() {
               justify-content: center;
               gap: 8px;
               padding: 9px 11px;
-              border-radius: 12px;
+              border-radius: 16px;
               border: 1px solid rgba(236, 253, 245, 0.24);
               background: linear-gradient(180deg, rgba(2, 6, 23, 0.56) 0%, rgba(2, 6, 23, 0.76) 100%);
               backdrop-filter: blur(6px);
@@ -1739,7 +1738,7 @@ export default function LandingPage() {
               display: flex;
               align-items: center;
               gap: 8px;
-              padding: 0 8px 9px;
+              padding: 1rem 8px 9px;
               border: none;
               background: transparent;
               box-shadow: none;
@@ -1853,7 +1852,7 @@ export default function LandingPage() {
               .latest-grid { grid-template-columns: 1fr !important; gap: 14px !important; padding-top: 10px !important; }
               .brand-cinema { padding: 14px 10px 62px; }
               .brand-cinema-track { height: 282px; --brand-step: 102px; --brand-far-step: 154px; }
-              .brand-cinema-card { width: min(92vw, 420px); border-radius: 14px; }
+              .brand-cinema-card { width: min(92vw, 420px); border-radius: 16px; }
               .brand-cinema-card[data-distance="-2"],
               .brand-cinema-card[data-distance="2"] {
                 opacity: 0;
@@ -1894,7 +1893,7 @@ export default function LandingPage() {
             </div>
 
             {listingsLoading ? (
-              <div style={{ textAlign: "center", padding: 40, background: "#f8fafc", borderRadius: 10, border: "1px solid #eef2f7" }}>
+              <div style={{ textAlign: "center", padding: 40, background: "#f8fafc", borderRadius: 16, border: "1px solid #eef2f7" }}>
                 <p style={{ fontSize: 15, color: "#6b7280", margin: 0 }}>Зареждане на обяви...</p>
               </div>
             ) : latestListings.length > 0 ? (
@@ -2098,7 +2097,7 @@ export default function LandingPage() {
                     background: "#0f766e",
                     color: "#fff",
                     border: "none",
-                    borderRadius: 10,
+                    borderRadius: 16,
                     fontSize: 15,
                     fontWeight: 700,
                     cursor: "pointer",
@@ -2114,7 +2113,7 @@ export default function LandingPage() {
                 </div>
               </>
             ) : (
-              <div style={{ textAlign: "center", padding: 40, background: "#f8fafc", borderRadius: 10, border: "1px solid #eef2f7" }}>
+              <div style={{ textAlign: "center", padding: 40, background: "#f8fafc", borderRadius: 16, border: "1px solid #eef2f7" }}>
                 <p style={{ fontSize: 15, color: "#6b7280", margin: 0 }}>Няма налични обяви в момента</p>
               </div>
             )}
@@ -2472,7 +2471,7 @@ const styles: Record<string, React.CSSProperties> = {
   logo: {
     width: 40,
     height: 40,
-    borderRadius: 6,
+    borderRadius: 16,
     display: "grid",
     placeItems: "center",
     fontWeight: 800,
@@ -2501,7 +2500,7 @@ const styles: Record<string, React.CSSProperties> = {
     textDecoration: "none",
     fontSize: 15,
     padding: "6px 12px",
-    borderRadius: 4,
+    borderRadius: 16,
     fontWeight: 500,
   },
 
@@ -2538,7 +2537,7 @@ const styles: Record<string, React.CSSProperties> = {
   lead: { margin: 0, color: "#666", fontSize: 15, lineHeight: 1.6, maxWidth: "100%" },
 
   searchCard: {
-    borderRadius: 8,
+    borderRadius: 16,
     border: "1px solid #d0d0d0",
     background: "#fff",
     boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
@@ -2604,7 +2603,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderColor: "transparent",
     background: "transparent",
     color: "#111827",
-    borderRadius: 15,
+    borderRadius: 16,
     padding: "5px 4px",
     cursor: "pointer",
     fontSize: 12,
@@ -2635,7 +2634,7 @@ const styles: Record<string, React.CSSProperties> = {
   mainCategoryIconWrap: {
     width: 54,
     height: 54,
-    borderRadius: 14,
+    borderRadius: 16,
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
@@ -2689,7 +2688,7 @@ const styles: Record<string, React.CSSProperties> = {
   primaryBtn: {
     height: 36,
     padding: "0 20px",
-    borderRadius: 4,
+    borderRadius: 16,
     border: "none",
     background: "#0f766e",
     color: "#fff",
@@ -2700,7 +2699,7 @@ const styles: Record<string, React.CSSProperties> = {
   primaryBtnWide: {
     height: 42,
     padding: "0 24px",
-    borderRadius: 4,
+    borderRadius: 16,
     border: "none",
     background: "#0f766e",
     color: "#fff",
@@ -2711,7 +2710,7 @@ const styles: Record<string, React.CSSProperties> = {
   secondaryBtn: {
     height: 42,
     padding: "0 20px",
-    borderRadius: 4,
+    borderRadius: 16,
     border: "1px solid #ccc",
     background: "#fff",
     color: "#333",
@@ -2727,7 +2726,7 @@ const styles: Record<string, React.CSSProperties> = {
   secondaryBtnSmall: {
     height: 34,
     padding: "0 16px",
-    borderRadius: 4,
+    borderRadius: 16,
     border: "1px solid #ccc",
     background: "#fff",
     color: "#333",
@@ -2738,7 +2737,7 @@ const styles: Record<string, React.CSSProperties> = {
   primaryBtnSmall: {
     height: 34,
     padding: "0 16px",
-    borderRadius: 4,
+    borderRadius: 16,
     border: "none",
     background: "#0f766e",
     color: "#fff",
@@ -2755,7 +2754,7 @@ const styles: Record<string, React.CSSProperties> = {
   latestContainer: {
     background: "#fff",
     border: "1px solid #e5e7eb",
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 22,
     boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
   },
@@ -2763,7 +2762,7 @@ const styles: Record<string, React.CSSProperties> = {
   popularBrandsContainer: {
     background: "#fff",
     border: "1px solid #e5e7eb",
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 22,
     boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
   },
@@ -2783,7 +2782,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 16,
   },
   card: {
-    borderRadius: 6,
+    borderRadius: 16,
     overflow: "hidden",
     border: "1px solid #e0e0e0",
     background: "#fff",
@@ -2800,7 +2799,7 @@ const styles: Record<string, React.CSSProperties> = {
     right: 12,
     bottom: 12,
     padding: "6px 12px",
-    borderRadius: 4,
+    borderRadius: 16,
     fontWeight: 800,
     fontSize: 14,
     background: "#0f766e",
@@ -2820,7 +2819,7 @@ const styles: Record<string, React.CSSProperties> = {
   cityPill: {
     fontSize: 13,
     padding: "4px 8px",
-    borderRadius: 3,
+    borderRadius: 16,
     border: "1px solid #e0e0e0",
     background: "#f5f5f5",
     color: "#666",
@@ -2832,7 +2831,7 @@ const styles: Record<string, React.CSSProperties> = {
   tag: {
     fontSize: 12,
     padding: "4px 8px",
-    borderRadius: 3,
+    borderRadius: 16,
     border: "1px solid #99f6e4",
     background: "#ecfdf5",
     color: "#0f766e",
@@ -2841,7 +2840,7 @@ const styles: Record<string, React.CSSProperties> = {
 
   empty: {
     gridColumn: "1 / -1",
-    borderRadius: 6,
+    borderRadius: 16,
     border: "1px solid #e0e0e0",
     background: "#fff",
     padding: 30,
@@ -2858,7 +2857,7 @@ const styles: Record<string, React.CSSProperties> = {
   infoContainer: {
     background: "radial-gradient(circle at top right, #ecfeff 0%, #ffffff 42%, #f8fafc 100%)",
     border: "1px solid #dbeafe",
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 24,
     boxShadow: "0 10px 28px rgba(15, 118, 110, 0.08)",
   },
@@ -2904,7 +2903,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   apiInfoBanner: {
     marginTop: 10,
-    borderRadius: 12,
+    borderRadius: 16,
     border: "1px solid #99f6e4",
     background: "linear-gradient(90deg, #f0fdfa 0%, #ecfeff 55%, #f8fafc 100%)",
     padding: "16px 18px",
@@ -2932,7 +2931,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   apiInfoButton: {
     border: "none",
-    borderRadius: 10,
+    borderRadius: 16,
     background: "#0f766e",
     color: "#ffffff",
     fontWeight: 700,
@@ -2949,7 +2948,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: 16,
   },
   infoCard: {
-    borderRadius: 8,
+    borderRadius: 16,
     border: "1px solid #e3e7ee",
     background: "linear-gradient(180deg, #ffffff 0%, #f8fbff 100%)",
     padding: 18,
@@ -2984,7 +2983,7 @@ const styles: Record<string, React.CSSProperties> = {
 
   cta: {
     marginTop: 30,
-    borderRadius: 6,
+    borderRadius: 16,
     border: "1px solid #e0e0e0",
     background: "#fff",
     boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
@@ -3066,7 +3065,7 @@ const styles: Record<string, React.CSSProperties> = {
   footerApiButton: {
     marginTop: 8,
     border: "none",
-    borderRadius: 8,
+    borderRadius: 16,
     background: "linear-gradient(90deg, #0f766e 0%, #0d9488 100%)",
     color: "#fff",
     fontSize: 13,

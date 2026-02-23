@@ -1,4 +1,4 @@
-﻿import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
 import { ChevronLeft, ChevronRight, Monitor, X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import ThumbnailStrip from './ThumbnailStrip';
 import { useThrottle } from '../../hooks/useThrottle';
@@ -612,7 +612,7 @@ const FullscreenModal = memo<{
                 bottom: 18,
                 background: 'rgba(15, 23, 42, 0.58)',
                 border: '1px solid rgba(255,255,255,0.24)',
-                borderRadius: 10,
+                borderRadius: 16,
                 padding: 6,
                 zIndex: 12,
                 pointerEvents: 'none',
@@ -624,7 +624,7 @@ const FullscreenModal = memo<{
                   position: 'relative',
                   width: miniMapData.miniW,
                   height: miniMapData.miniH,
-                  borderRadius: 6,
+                  borderRadius: 16,
                   overflow: 'hidden',
                   background: '#111827',
                 }}
@@ -650,7 +650,7 @@ const FullscreenModal = memo<{
                     height: miniMapData.rectH,
                     border: '2px solid #34d399',
                     boxShadow: '0 0 0 999px rgba(15, 23, 42, 0.26)',
-                    borderRadius: 4,
+                    borderRadius: 16,
                   }}
                 />
               </div>
@@ -790,7 +790,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
           width: '100%',
           minHeight: isMobile ? 300 : 500,
           background: '#f0f0f0',
-          borderRadius: 8,
+          borderRadius: 16,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -812,7 +812,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
       container: {
         width: '100%',
         background: '#fff',
-        borderRadius: 8,
+        borderRadius: 16,
         overflow: 'visible',
         boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
         border: '1px solid #e0e0e0',
@@ -825,7 +825,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         background: '#f0f0f0',
         minHeight: isMobile ? 300 : 500,
         overflow: 'visible',
-        borderRadius: 8,
+        borderRadius: 16,
         isolation: 'isolate' as const,
         backfaceVisibility: 'hidden' as const,
         transform: 'translateZ(0)',
@@ -843,7 +843,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
-        borderRadius: 8,
+        borderRadius: 16,
         background: '#0f172a',
         willChange: 'transform',
         backfaceVisibility: 'hidden' as const,
@@ -903,7 +903,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         background: 'rgba(0,0,0,0.6)',
         color: '#fff',
         padding: isMobile ? '4px 8px' : '6px 12px',
-        borderRadius: 4,
+        borderRadius: 16,
         fontSize: isMobile ? 11 : 12,
         fontWeight: 600,
         zIndex: 10,

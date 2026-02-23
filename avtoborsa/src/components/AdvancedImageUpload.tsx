@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Star, Trash2, UploadCloud } from "lucide-react";
 
 interface ImageItem {
@@ -11,7 +11,7 @@ interface ExistingImageItem {
   id?: number;
   image: string;
   thumbnail?: string | null;
-  isCover?: boolean;
+  isCover: boolean;
 }
 
 interface AdvancedImageUploadProps {
@@ -359,7 +359,7 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
     },
     uploadZone: {
       border: dragActive ? "2px solid #0f766e" : "2px dashed #d1d5db",
-      borderRadius: 14,
+      borderRadius: 16,
       padding: "28px 20px",
       textAlign: "center" as const,
       cursor: isAddingImages ? "wait" : "pointer",
@@ -422,7 +422,7 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
     },
     imageCard: {
       position: "relative" as const,
-      borderRadius: 12,
+      borderRadius: 16,
       overflow: "hidden",
       border: "1px solid #e2e8f0",
       background: "#fff",
@@ -498,7 +498,7 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
       textAlign: "center" as const,
       padding: "32px 20px",
       color: "#64748b",
-      borderRadius: 12,
+      borderRadius: 16,
       border: "1px dashed #d1d5db",
       background: "#f8fafc",
     },

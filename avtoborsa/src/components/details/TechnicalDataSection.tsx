@@ -318,8 +318,7 @@ const TechnicalDataSection: React.FC<TechnicalDataSectionProps> = ({
   const styles: Record<string, React.CSSProperties> = {
     container: {
       background: '#fff',
-      borderRadius: 10,
-      padding: isMobile ? 16 : 20,
+      borderRadius: 16, padding: isMobile ? 16 : 20,
       boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
       border: '1px solid #e0e0e0',
     },
@@ -355,15 +354,13 @@ const TechnicalDataSection: React.FC<TechnicalDataSectionProps> = ({
       alignItems: 'flex-start',
       gap: 12,
       padding: '12px 14px',
-      borderRadius: 8,
-      background: '#fafafa',
+      borderRadius: 16, background: '#fafafa',
       border: '1px solid #e5e7eb',
     },
     iconWrap: {
       width: 36,
       height: 36,
-      borderRadius: 8,
-      background: '#ecfdf5',
+      borderRadius: 16, background: '#ecfdf5',
       color: '#0f766e',
       display: 'flex',
       alignItems: 'center',

@@ -8,17 +8,30 @@ def _normalize_email(value: str) -> str:
     return str(value).strip().lower()
 
 
+PASSWORD_POLICY_ERROR = (
+    "Паролата трябва да е поне 8 символа, с поне 1 главна буква и 1 цифра."
+)
+
+
+def _validate_password_policy(password: str) -> None:
+    has_uppercase = any(char.isupper() for char in password)
+    has_digit = any(char.isdigit() for char in password)
+    if len(password) < 8 or not has_uppercase or not has_digit:
+        raise serializers.ValidationError(PASSWORD_POLICY_ERROR)
+
+
 class PrivateUserSerializer(serializers.ModelSerializer):
     """Serializer for private user registration"""
     email = serializers.EmailField()
-    password = serializers.CharField(write_only=True, min_length=6)
-    confirm_password = serializers.CharField(write_only=True, min_length=6)
+    password = serializers.CharField(write_only=True, min_length=8)
+    confirm_password = serializers.CharField(write_only=True, min_length=8)
 
     class Meta:
         model = PrivateUser
         fields = ['email', 'password', 'confirm_password']
 
     def validate(self, data):
+        _validate_password_policy(data['password'])
         if data['password'] != data['confirm_password']:
             raise serializers.ValidationError({"confirm_password": "Паролите не съвпадат"})
         return data
@@ -54,8 +67,8 @@ class PrivateUserSerializer(serializers.ModelSerializer):
 class BusinessUserSerializer(serializers.ModelSerializer):
     """Serializer for business user registration"""
     email = serializers.EmailField()
-    password = serializers.CharField(write_only=True, min_length=6)
-    confirm_password = serializers.CharField(write_only=True, min_length=6)
+    password = serializers.CharField(write_only=True, min_length=8)
+    confirm_password = serializers.CharField(write_only=True, min_length=8)
 
     class Meta:
         model = BusinessUser
@@ -67,6 +80,7 @@ class BusinessUserSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, data):
+        _validate_password_policy(data['password'])
         if data['password'] != data['confirm_password']:
             raise serializers.ValidationError({"confirm_password": "Паролите не съвпадат"})
         if len(data['username']) < 3:

@@ -1,0 +1,21 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://api.bwraap.com/api/:path*"
+    },
+    {
+      "source": "/media/:path*",
+      "destination": "https://api.bwraap.com/media/:path*"
+    },
+    {
+      "source": "/docs/api",
+      "destination": "https://api.bwraap.com/docs/api/"
+    },
+
+    {
+      "source": "/(.*)",
+      "destination": "/"
+    }
+  ]
+}

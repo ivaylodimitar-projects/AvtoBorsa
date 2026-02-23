@@ -93,3 +93,40 @@ class AuthFlowTests(APITestCase):
         )
         self.assertEqual(second_register.status_code, 400)
         self.assertIn("email", second_register.data)
+
+    def test_private_registration_rejects_weak_password_policy(self):
+        response = self.client.post(
+            "/api/auth/register/private/",
+            {
+                "email": "weak-private@example.com",
+                "password": "weakpass1",
+                "confirm_password": "weakpass1",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Паролата", str(response.data))
+
+    def test_business_registration_rejects_weak_password_policy(self):
+        response = self.client.post(
+            "/api/auth/register/business/",
+            {
+                "dealer_name": "Weak Dealer",
+                "city": "Sofia",
+                "address": "Weak Street 1",
+                "phone": "+359881112233",
+                "email": "weak-business@example.com",
+                "username": "weak_dealer",
+                "password": "weakpass1",
+                "confirm_password": "weakpass1",
+                "company_name": "Weak LTD",
+                "registration_address": "Sofia",
+                "mol": "Weak MOL",
+                "bulstat": "123456789",
+                "admin_name": "Weak Admin",
+                "admin_phone": "+359881112244",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Паролата", str(response.data))

@@ -36,10 +36,13 @@ import {
   type DealerListingSnapshot,
   type FollowedDealer,
 } from "../utils/dealerSubscriptions";
+import karBgLogo from "../assets/karbglogo.jpg";
+import { API_BASE_URL } from "../config/api";
 
 const DEALER_LISTINGS_SYNC_COOLDOWN_MS = 15_000;
 const DEALER_NOTIFICATIONS_STACK_WINDOW_MS = 60 * 60 * 1000;
 const DEALER_NOTIFICATIONS_WS_RECONNECT_MS = 5_000;
+const WS_BASE_URL = (import.meta.env.VITE_WS_BASE_URL || "").replace(/\/+$/, "");
 
 type NotificationRenderItem =
   | {
@@ -136,6 +139,31 @@ const areFollowedDealersEqual = (
   }
 
   return true;
+};
+
+const normalizeWsUrl = (rawValue: string) => {
+  if (!rawValue) return "";
+  try {
+    const parsed = new URL(rawValue);
+    const protocol = parsed.protocol === "https:" ? "wss:" : parsed.protocol === "http:" ? "ws:" : parsed.protocol;
+    return `${protocol}//${parsed.host}`;
+  } catch {
+    return "";
+  }
+};
+
+const getNotificationsWebSocketUrl = () => {
+  const preferredWsBase = normalizeWsUrl(WS_BASE_URL);
+  if (preferredWsBase) return `${preferredWsBase}/ws/notifications/`;
+
+  try {
+    const apiUrl = new URL(API_BASE_URL);
+    const wsProtocol = apiUrl.protocol === "https:" ? "wss:" : "ws:";
+    return `${wsProtocol}//${apiUrl.host}/ws/notifications/`;
+  } catch {
+    const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+    return `${wsProtocol}://${window.location.host}/ws/notifications/`;
+  }
 };
 
 const Navbar: React.FC = () => {
@@ -255,7 +283,7 @@ const Navbar: React.FC = () => {
       isSyncInFlight = true;
       lastSyncAtMs = nowMs;
       try {
-        const response = await fetch("http://localhost:8000/api/auth/dealers/", {
+        const response = await fetch(`${API_BASE_URL}/api/auth/dealers/`, {
           cache: "no-store",
         });
         if (!response.ok) return;
@@ -314,11 +342,6 @@ const Navbar: React.FC = () => {
     let socket: WebSocket | null = null;
     let reconnectTimerId: number | null = null;
 
-    const getWebSocketUrl = () => {
-      const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-      return `${protocol}://localhost:8000/ws/notifications/`;
-    };
-
     const clearReconnectTimer = () => {
       if (reconnectTimerId !== null) {
         window.clearTimeout(reconnectTimerId);
@@ -337,7 +360,7 @@ const Navbar: React.FC = () => {
     const connect = () => {
       if (isDisposed) return;
       try {
-        socket = new WebSocket(getWebSocketUrl());
+        socket = new WebSocket(getNotificationsWebSocketUrl());
       } catch {
         scheduleReconnect();
         return;
@@ -573,8 +596,7 @@ const Navbar: React.FC = () => {
       <div style={styles.inner} className="nav-inner">
         {/* Brand */}
         <Link to="/" style={styles.brand} aria-label="Kar.bg">
-          <div style={styles.logo}>KB</div>
-          <div style={styles.brandText}>Kar.bg</div>
+          <img src={karBgLogo} alt="Kar.bg logo" style={styles.logoImage} className="nav-logo-image" />
         </Link>
 
         {/* Mobile burger */}
@@ -952,12 +974,19 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#fff",
     borderBottom: "1px solid #e0e0e0",
     boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+    fontFamily: "\"Manrope\", \"Segoe UI\", -apple-system, system-ui, sans-serif",
+    fontSize: 14,
+    lineHeight: 1.2,
     position: "sticky",
     top: 0,
     zIndex: 100,
     display: "flex",
     justifyContent: "center",
-    padding: "10px 0",
+    width: "100%",
+    maxWidth: "100vw",
+    boxSizing: "border-box",
+    overflowX: "clip",
+    padding: "0",
   },
   inner: {
     maxWidth: 1200,
@@ -966,30 +995,27 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "0 20px",
     display: "flex",
     alignItems: "center",
+    flexWrap: "nowrap",
     gap: 24,
     minHeight: 64,
+    boxSizing: "border-box",
   },
   brand: {
     display: "flex",
     alignItems: "center",
-    gap: 12,
+    gap: 0,
     textDecoration: "none",
     justifyContent: "flex-start",
     paddingLeft: 0,
     flexShrink: 0,
   },
-  logo: {
-    width: 40,
-    height: 40,
-    borderRadius: 6,
-    background: "#0f766e",
-    color: "#fff",
-    fontWeight: 800,
-    display: "grid",
-    placeItems: "center",
-    fontSize: 14,
-    letterSpacing: 0.8,
-    boxShadow: "0 6px 12px rgba(15, 118, 110, 0.25)",
+  logoImage: {
+    width: "8rem",
+    height: "3rem",
+    borderRadius: 16,
+    objectFit: "cover",
+    display: "block",
+    boxShadow: "0 6px 12px rgba(15, 118, 110, 0.2)",
   },
   brandText: {
     fontSize: 19,
@@ -1008,8 +1034,18 @@ const styles: Record<string, React.CSSProperties> = {
 };
 
 const css = `
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+
 .nav {
   font-family: "Manrope", "Segoe UI", -apple-system, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.2;
+  min-width: 0;
+}
+
+.nav-logo-image {
+  width: 8rem;
+  height: 4rem;
 }
 
 .nav-group {
@@ -1034,8 +1070,12 @@ const css = `
   align-items: center;
   justify-content: center;
   gap: 10px;
+  box-sizing: border-box;
+  width: 11rem;
   height: 46px;
-  min-width: 176px;
+  min-width: 11rem;
+  max-width: 11rem;
+  flex: 0 0 11rem;
   padding: 0 22px 0 14px;
   border-radius: 16px;
   border: 1px solid #0f766e;
@@ -1048,9 +1088,19 @@ const css = `
   background-position: 0% 50%;
   box-shadow: none;
   animation: navPublishPulse 3.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1),
     background-position 0.32s cubic-bezier(0.4, 0, 0.2, 1),
     border-color 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-publish-cta,
+.nav-publish-cta:visited,
+.nav-publish-cta:hover,
+.nav-publish-cta:focus-visible,
+.nav-publish-cta.active,
+.nav-publish-cta.active:hover,
+.nav-publish-cta.active:focus-visible {
+  text-decoration: none;
 }
 
 .nav-publish-cta::before {
@@ -1061,7 +1111,7 @@ const css = `
   content: "";
   position: absolute;
   inset: 1px;
-  border-radius: 12px;
+  border-radius: 16px;
   background: linear-gradient(120deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0) 45%);
   opacity: 0.65;
   pointer-events: none;
@@ -1070,12 +1120,11 @@ const css = `
 
 .nav-publish-cta:hover,
 .nav-publish-cta:focus-visible {
-  transform: translateY(-1px) scale(1.01);
+  transform: translateY(-1px);
   background-position: 100% 50%;
   border-color: #0b5f59;
   color: #fff;
   box-shadow: none;
-  animation: none;
 }
 
 .nav-publish-cta:hover::before,
@@ -1084,20 +1133,27 @@ const css = `
 }
 
 .nav-publish-cta.active {
-  transform: translateY(0);
-  background-position: 100% 50%;
-  border-color: #0b5f59;
+  background-position: 0% 50%;
+  border-color: #0f766e;
   color: #fff;
   box-shadow: none;
-  animation: none;
+  animation: navPublishPulse 3.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 .nav-publish-cta.active::before {
   content: none;
 }
 
+.nav-publish-cta.active:hover,
+.nav-publish-cta.active:focus-visible {
+  transform: translateY(-1px);
+  background-position: 100% 50%;
+  border-color: #0b5f59;
+  color: #fff;
+  box-shadow: none;
+}
+
 .nav-publish-cta:active {
-  transform: translateY(0) scale(0.992);
   box-shadow: none;
 }
 
@@ -1110,7 +1166,7 @@ const css = `
 .nav-publish-icon {
   width: 24px;
   height: 24px;
-  border-radius: 10px;
+  border-radius: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1121,8 +1177,7 @@ const css = `
 }
 
 .nav-publish-cta:hover .nav-publish-icon,
-.nav-publish-cta:focus-visible .nav-publish-icon,
-.nav-publish-cta.active .nav-publish-icon {
+.nav-publish-cta:focus-visible .nav-publish-icon {
   background: rgba(255, 255, 255, 0.3);
   color: #ffffff;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
@@ -1146,8 +1201,7 @@ const css = `
 }
 
 .nav-publish-cta:hover .nav-publish-ribbon,
-.nav-publish-cta:focus-visible .nav-publish-ribbon,
-.nav-publish-cta.active .nav-publish-ribbon {
+.nav-publish-cta:focus-visible .nav-publish-ribbon {
   filter: drop-shadow(0 3px 6px rgba(15, 23, 42, 0.22)) brightness(1.06) contrast(1.04);
 }
 
@@ -1155,15 +1209,12 @@ const css = `
   0%,
   62%,
   100% {
-    transform: scale(1);
     background-position: 0% 50%;
   }
   18% {
-    transform: scale(1.02);
     background-position: 14% 50%;
   }
   30% {
-    transform: scale(1.008);
     background-position: 8% 50%;
   }
 }
@@ -1255,7 +1306,7 @@ const css = `
   top: calc(100% + 10px);
   right: 0;
   width: 340px;
-  border-radius: 12px;
+  border-radius: 16px;
   border: 1px solid #e2e8f0;
   background: #fff;
   box-shadow: 0 14px 36px rgba(15, 23, 42, 0.14);
@@ -1279,7 +1330,7 @@ const css = `
 
 .notifications-tab {
   height: 34px;
-  border-radius: 9px;
+  border-radius: 16px;
   border: 1px solid #cbd5e1;
   background: #f8fafc;
   color: #334155;
@@ -1301,7 +1352,7 @@ const css = `
 }
 
 .notifications-empty {
-  border-radius: 10px;
+  border-radius: 16px;
   border: 1px dashed #cbd5e1;
   background: #f8fafc;
   padding: 10px;
@@ -1321,7 +1372,7 @@ const css = `
 
 .notification-item {
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  border-radius: 16px;
   background: #fff;
   padding: 10px;
   display: flex;
@@ -1531,7 +1582,7 @@ const css = `
   border: 1px solid #bfdbfe;
   background: #eff6ff;
   color: #1e3a8a;
-  border-radius: 10px;
+  border-radius: 16px;
   padding: 8px 10px;
   font-size: 12px;
   font-weight: 700;
@@ -1562,7 +1613,7 @@ const css = `
 
 .subscription-item {
   border: 1px solid #dbeafe;
-  border-radius: 10px;
+  border-radius: 16px;
   padding: 10px;
   background: #f8fafc;
   display: flex;
@@ -1656,7 +1707,7 @@ const css = `
   gap: 7px;
   height: 40px;
   padding: 0 8px;
-  border-radius: 8px;
+  border-radius: 16px;
   text-decoration: none;
   font-size: 14px;
   font-weight: 650;
@@ -1678,7 +1729,7 @@ const css = `
 
 .nav-link.active {
   color: #0f766e;
-  font-weight: 800;
+  font-weight: 650;
   text-decoration: underline;
   text-decoration-thickness: 2px;
   text-underline-offset: 8px;
@@ -1697,9 +1748,11 @@ const css = `
 .btn-primary {
   height: 40px;
   padding: 0 18px;
-  border-radius: 999px;
+  border-radius: 16px;
   background: #0f766e;
   color: #fff;
+  font-size: 14px;
+  line-height: 1;
   font-weight: 700;
   border: none;
   cursor: pointer;
@@ -1723,7 +1776,7 @@ const css = `
 .btn-ghost {
   height: 40px;
   padding: 0 16px;
-  border-radius: 999px;
+  border-radius: 16px;
   background: #fff;
   border: 1px solid #ccc;
   color: #333;
@@ -1748,7 +1801,7 @@ const css = `
   background: #0f766e;
   color: #fff;
   border: none;
-  border-radius: 8px;
+  border-radius: 16px;
   padding: 8px 12px;
   font-size: 18px;
   cursor: pointer;
@@ -1757,6 +1810,11 @@ const css = `
 
 /* MOBILE */
 @media (max-width: 960px) {
+  .nav-logo-image {
+    width: 7rem;
+    height: 3.5rem;
+  }
+
   .burger {
     display: block;
   }
@@ -1835,6 +1893,13 @@ const css = `
   .nav button {
     width: 100%;
     justify-content: center;
+  }
+}
+
+@media (max-width: 640px) {
+  .nav-logo-image {
+    width: 6.25rem;
+    height: 3.125rem;
   }
 }
 

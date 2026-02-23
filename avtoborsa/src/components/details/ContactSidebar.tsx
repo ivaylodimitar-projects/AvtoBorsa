@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Phone,
   Heart,
@@ -22,7 +22,7 @@ import {
 import { useToast } from '../../context/ToastContext';
 import { resolvePriceBadgeState } from '../../utils/priceChangeBadge';
 
-const API_BASE_URL = 'http://localhost:8000';
+import { API_BASE_URL } from '../../config/api';
 const DUPLICATE_REPORT_MESSAGE = 'Можете да съобщите за нередност с тази обява само веднъж, благодаря.';
 const SAVE_ACCENT_COLOR = 'rgb(233, 30, 99)';
 
@@ -434,7 +434,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
   const getCustomCheckboxStyle = (checked: boolean, compact = false): React.CSSProperties => ({
     width: compact ? 16 : 18,
     height: compact ? 16 : 18,
-    borderRadius: 5,
+    borderRadius: 16,
     border: checked ? '1px solid #0f766e' : '1px solid #cbd5e1',
     background: checked ? 'linear-gradient(135deg, #0f766e 0%, #0b5f58 100%)' : '#ffffff',
     display: 'inline-flex',
@@ -471,7 +471,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
             background: '#0f766e',
             color: '#fff',
             border: 'none',
-            borderRadius: 10,
+            borderRadius: 16,
             fontSize: 14,
             fontWeight: 700,
             cursor: 'pointer',
@@ -491,7 +491,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
             background: isFavorite ? '#fff1f7' : '#f8fafc',
             color: isFavorite ? SAVE_ACCENT_COLOR : '#374151',
             border: `1px solid ${isFavorite ? '#f8bbd0' : '#eef2f7'}`,
-            borderRadius: 10,
+            borderRadius: 16,
             fontSize: 14,
             fontWeight: 600,
             cursor: 'pointer',
@@ -514,7 +514,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
       <div
           style={{
             background: '#fff',
-            borderRadius: 14,
+            borderRadius: 16,
             border: '1px solid #eef2f7',
             boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
             overflow: 'visible',
@@ -582,7 +582,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                     maxWidth: 280,
                     background: '#fff',
                     border: '1px solid #e5e7eb',
-                    borderRadius: 10,
+                    borderRadius: 16,
                     boxShadow: '0 12px 26px rgba(15, 23, 42, 0.12)',
                     padding: 10,
                     zIndex: 20,
@@ -609,7 +609,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                           justifyContent: 'space-between',
                           gap: 8,
                           padding: '6px 8px',
-                          borderRadius: 8,
+                          borderRadius: 16,
                           background: '#f8fafc',
                           border: '1px solid #e2e8f0',
                           marginBottom: 6,
@@ -680,7 +680,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
             margin: '0 20px',
             padding: '16px',
             background: '#ecfdf5',
-            borderRadius: 10,
+            borderRadius: 16,
             marginBottom: 16,
           }}
         >
@@ -744,7 +744,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
             margin: '0 20px 16px',
             padding: '14px 16px',
             background: '#f8fafc',
-            borderRadius: 10,
+            borderRadius: 16,
             border: '1px solid #eef2f7',
           }}
         >
@@ -824,7 +824,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
               background: '#0f766e',
               color: '#fff',
               border: 'none',
-              borderRadius: 8,
+              borderRadius: 16,
               fontSize: 13,
               fontWeight: 700,
               cursor: 'pointer',
@@ -847,7 +847,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
               marginTop: 10,
               padding: 12,
               background: '#f8fafc',
-              borderRadius: 10,
+              borderRadius: 16,
               border: '1px solid #eef2f7',
             }}
           >
@@ -1013,7 +1013,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
               right: 12,
               top: 'calc(100% + 8px)',
               padding: '10px 12px',
-              borderRadius: 12,
+              borderRadius: 16,
               border: '1px solid #e5e7eb',
               background: '#fff',
               boxShadow: '0 12px 30px rgba(15, 23, 42, 0.12)',
@@ -1039,7 +1039,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                 width: 44,
                 height: 40,
                 padding: 0,
-                borderRadius: 8,
+                borderRadius: 16,
                 border: '1px solid transparent',
                 background: '#f8fafc',
                 color: '#334155',
@@ -1106,7 +1106,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
             style={{
               width: '100%',
               padding: '11px 12px',
-              borderRadius: 10,
+              borderRadius: 16,
               border: '1px solid #fecaca',
               background: showReportForm ? '#fef2f2' : '#fff',
               color: '#b91c1c',
@@ -1193,7 +1193,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                 style={{
                   width: '100%',
                   resize: 'none',
-                  borderRadius: 10,
+                  borderRadius: 16,
                   border: '1px solid #d1d5db',
                   padding: '10px 11px',
                   fontSize: 13,
@@ -1254,7 +1254,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                 style={{
                   width: '100%',
                   padding: '10px 12px',
-                  borderRadius: 10,
+                  borderRadius: 16,
                   border: 'none',
                   background: isReporting ? '#fca5a5' : '#dc2626',
                   color: '#fff',

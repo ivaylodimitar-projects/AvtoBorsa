@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -292,7 +292,7 @@ const styles: Record<string, React.CSSProperties> = {
   // Form card
   formCard: {
     background: "#fff",
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 28,
     boxShadow: "0 12px 30px rgba(15,23,42,0.08)",
     border: "1px solid #e5e7eb",
@@ -307,7 +307,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "12px 14px",
     background: "#fef2f2",
     border: "1px solid #fecaca",
-    borderRadius: 10,
+    borderRadius: 16,
     fontSize: 13,
     color: "#991b1b",
     marginBottom: 18,
@@ -328,7 +328,7 @@ const styles: Record<string, React.CSSProperties> = {
   input: {
     padding: "12px 14px",
     border: "1px solid #e2e8f0",
-    borderRadius: 10,
+    borderRadius: 16,
     fontSize: 14,
     fontFamily: "inherit",
     width: "100%",
@@ -361,7 +361,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#0f766e",
     color: "#fff",
     border: "none",
-    borderRadius: 12,
+    borderRadius: 16,
     fontSize: 15,
     fontWeight: 700,
     cursor: "pointer",
@@ -403,7 +403,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     background: "none",
     border: "1px solid #cbd5f5",
-    borderRadius: 10,
+    borderRadius: 16,
     padding: "10px 22px",
     fontSize: 14,
     fontWeight: 600,

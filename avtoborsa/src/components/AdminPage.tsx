@@ -2,8 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
-
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/+$/, "");
+import { API_BASE_URL } from "../config/api";
 const ACCESS_TOKEN_KEY = "authToken";
 
 type TabKey = "dashboard" | "listings" | "users" | "transactions" | "extensionApi" | "reports";
@@ -353,14 +352,14 @@ const pageLabel = (pagination: Pagination | null | undefined) => {
 const panelStyle: React.CSSProperties = {
   background: color.panel,
   border: `1px solid ${color.border}`,
-  borderRadius: 12,
+  borderRadius: 16,
   padding: 14,
 };
 
 const tableWrap: React.CSSProperties = {
   overflowX: "auto",
   border: `1px solid ${color.border}`,
-  borderRadius: 10,
+  borderRadius: 16,
 };
 
 const thStyle: React.CSSProperties = {
@@ -383,7 +382,7 @@ const tdStyle: React.CSSProperties = {
 
 const inputStyle: React.CSSProperties = {
   height: 36,
-  borderRadius: 8,
+  borderRadius: 16,
   border: `1px solid ${color.borderStrong}`,
   padding: "0 12px",
   minWidth: 260,
@@ -394,7 +393,7 @@ const buttonStyle = (variant: "primary" | "neutral" | "danger" = "neutral"): Rea
     return {
       height: 34,
       padding: "0 12px",
-      borderRadius: 8,
+      borderRadius: 16,
       border: `1px solid ${color.accent}`,
       background: color.accent,
       color: "#fff",
@@ -407,7 +406,7 @@ const buttonStyle = (variant: "primary" | "neutral" | "danger" = "neutral"): Rea
     return {
       height: 34,
       padding: "0 12px",
-      borderRadius: 8,
+      borderRadius: 16,
       border: "1px solid #f2b8bf",
       background: "#fff",
       color: color.danger,
@@ -419,7 +418,7 @@ const buttonStyle = (variant: "primary" | "neutral" | "danger" = "neutral"): Rea
   return {
     height: 34,
     padding: "0 12px",
-    borderRadius: 8,
+    borderRadius: 16,
     border: `1px solid ${color.borderStrong}`,
     background: "#fff",
     color: color.text,
@@ -883,7 +882,7 @@ const AdminPage: React.FC = () => {
 
   if (!user) {
     return (
-      <section style={{ maxWidth: 430, margin: "40px auto", padding: 20, border: `1px solid ${color.border}`, borderRadius: 12, background: "#fff" }}>
+      <section style={{ maxWidth: 430, margin: "40px auto", padding: 20, border: `1px solid ${color.border}`, borderRadius: 16, background: "#fff" }}>
         <h1 style={{ marginTop: 0 }}>Admin Login</h1>
         <p style={{ color: color.muted }}>
           Use staff/superuser account. After password check you will receive a code by email.
@@ -934,7 +933,7 @@ const AdminPage: React.FC = () => {
 
   if (!isAdmin) {
     return (
-      <section style={{ maxWidth: 520, margin: "40px auto", padding: 20, border: `1px solid ${color.border}`, borderRadius: 12, background: "#fff" }}>
+      <section style={{ maxWidth: 520, margin: "40px auto", padding: 20, border: `1px solid ${color.border}`, borderRadius: 16, background: "#fff" }}>
         <h1 style={{ marginTop: 0 }}>Admin role required</h1>
         <p style={{ color: color.muted }}>Your account is authenticated but has no admin rights.</p>
         <div style={{ display: "flex", gap: 8 }}>
@@ -972,7 +971,7 @@ const AdminPage: React.FC = () => {
                 style={{
                   minWidth: 145,
                   textAlign: "left",
-                  borderRadius: 10,
+                  borderRadius: 16,
                   padding: "8px 10px",
                   border: `1px solid ${active ? color.accent : color.borderStrong}`,
                   background: active ? color.accentSoft : "#fff",
@@ -987,13 +986,13 @@ const AdminPage: React.FC = () => {
           })}
         </nav>
 
-        {error && <div style={{ border: "1px solid #f4c2c7", background: "#fff1f2", color: color.danger, borderRadius: 10, padding: "10px 12px", fontSize: 13 }}>{error}</div>}
+        {error && <div style={{ border: "1px solid #f4c2c7", background: "#fff1f2", color: color.danger, borderRadius: 16, padding: "10px 12px", fontSize: 13 }}>{error}</div>}
 
         {tab === "dashboard" && (
           <section style={panelStyle}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px,1fr))", gap: 10 }}>
               {cards.map(([label, value]) => (
-                <article key={String(label)} style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                <article key={String(label)} style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                   <div style={{ fontSize: 12, color: color.muted }}>{label}</div>
                   <strong style={{ fontSize: 22 }}>{String(value)}</strong>
                 </article>
@@ -1465,26 +1464,26 @@ const AdminPage: React.FC = () => {
             {transactionsInnerTab === "sitePurchases" && (
               <>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 12 }}>
-                  <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                  <article style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                     <div style={{ fontSize: 12, color: color.muted }}>Total purchases</div>
                     <strong style={{ fontSize: 22 }}>{sitePurchases?.summary.totals.count || 0}</strong>
                   </article>
-                  <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                  <article style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                     <div style={{ fontSize: 12, color: color.muted }}>Total spend</div>
                     <strong style={{ fontSize: 22 }}>{fmtMoney(sitePurchases?.summary.totals.amount || 0)} EUR</strong>
                   </article>
-                  <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                  <article style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                     <div style={{ fontSize: 12, color: color.muted }}>Last 30d count</div>
                     <strong style={{ fontSize: 22 }}>{dailySeriesTotalCount}</strong>
                   </article>
-                  <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                  <article style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                     <div style={{ fontSize: 12, color: color.muted }}>Last 30d amount</div>
                     <strong style={{ fontSize: 22 }}>{fmtMoney(dailySeriesTotalAmount)} EUR</strong>
                   </article>
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 10, marginBottom: 12 }}>
-                  <div style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                  <div style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                     <div style={{ fontWeight: 700, marginBottom: 8 }}>By type</div>
                     {(typeBreakdown.length === 0) && <div style={{ fontSize: 13, color: color.muted }}>No data.</div>}
                     {typeBreakdown.map((row) => (
@@ -1500,7 +1499,7 @@ const AdminPage: React.FC = () => {
                     ))}
                   </div>
 
-                  <div style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                  <div style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                     <div style={{ fontWeight: 700, marginBottom: 8 }}>By source</div>
                     {(sourceBreakdown.length === 0) && <div style={{ fontSize: 13, color: color.muted }}>No data.</div>}
                     {sourceBreakdown.map((row) => (
@@ -1516,7 +1515,7 @@ const AdminPage: React.FC = () => {
                     ))}
                   </div>
 
-                  <div style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                  <div style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                       <div style={{ fontWeight: 700 }}>By plan</div>
                       <div style={{ fontSize: 12, color: color.muted }}>
@@ -1537,7 +1536,7 @@ const AdminPage: React.FC = () => {
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))", gap: 10, marginBottom: 12 }}>
-                  <div style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                  <div style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                       <div style={{ fontWeight: 700 }}>Top bought listings</div>
                       <div style={{ fontSize: 12, color: color.muted }}>
@@ -1577,7 +1576,7 @@ const AdminPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+                  <div style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                       <div style={{ fontWeight: 700 }}>Top buyers</div>
                       <div style={{ fontSize: 12, color: color.muted }}>
@@ -1750,31 +1749,31 @@ const AdminPage: React.FC = () => {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10, marginBottom: 12 }}>
-              <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+              <article style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                 <div style={{ fontSize: 12, color: color.muted }}>Requests</div>
                 <strong style={{ fontSize: 20 }}>{extensionUsage?.summary.totals.requests || 0}</strong>
               </article>
-              <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+              <article style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                 <div style={{ fontSize: 12, color: color.muted }}>Success</div>
                 <strong style={{ fontSize: 20 }}>{extensionUsage?.summary.totals.success || 0}</strong>
               </article>
-              <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+              <article style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                 <div style={{ fontSize: 12, color: color.muted }}>Failed</div>
                 <strong style={{ fontSize: 20 }}>{extensionUsage?.summary.totals.failed || 0}</strong>
               </article>
-              <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+              <article style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                 <div style={{ fontSize: 12, color: color.muted }}>Success rate</div>
                 <strong style={{ fontSize: 20 }}>{(extensionUsage?.summary.totals.success_rate ?? 0).toFixed(2)}%</strong>
               </article>
-              <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+              <article style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                 <div style={{ fontSize: 12, color: color.muted }}>Users</div>
                 <strong style={{ fontSize: 20 }}>{extensionUsage?.summary.totals.unique_users || 0}</strong>
               </article>
-              <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+              <article style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                 <div style={{ fontSize: 12, color: color.muted }}>Imported listings</div>
                 <strong style={{ fontSize: 20 }}>{extensionUsage?.summary.totals.imports || 0}</strong>
               </article>
-              <article style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+              <article style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                 <div style={{ fontSize: 12, color: color.muted }}>Avg duration</div>
                 <strong style={{ fontSize: 20 }}>
                   {extensionUsage?.summary.totals.avg_duration_ms !== null && extensionUsage?.summary.totals.avg_duration_ms !== undefined
@@ -1785,7 +1784,7 @@ const AdminPage: React.FC = () => {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 10, marginBottom: 12 }}>
-              <div style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+              <div style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                 <div style={{ fontWeight: 700, marginBottom: 8 }}>By HTTP status</div>
                 {extensionStatusBreakdown.length === 0 && <div style={{ fontSize: 13, color: color.muted }}>No data.</div>}
                 {extensionStatusBreakdown.map((row) => (
@@ -1801,7 +1800,7 @@ const AdminPage: React.FC = () => {
                 ))}
               </div>
 
-              <div style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+              <div style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                 <div style={{ fontWeight: 700, marginBottom: 8 }}>By source</div>
                 {extensionSourceBreakdown.length === 0 && <div style={{ fontSize: 13, color: color.muted }}>No data.</div>}
                 {extensionSourceBreakdown.map((row) => (
@@ -1817,7 +1816,7 @@ const AdminPage: React.FC = () => {
                 ))}
               </div>
 
-              <div style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+              <div style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                 <div style={{ fontWeight: 700, marginBottom: 8 }}>30d totals</div>
                 <div style={{ display: "grid", gap: 6 }}>
                   <div style={{ fontSize: 13 }}>
@@ -1834,7 +1833,7 @@ const AdminPage: React.FC = () => {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))", gap: 10, marginBottom: 12 }}>
-              <div style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+              <div style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <div style={{ fontWeight: 700 }}>Top users by requests</div>
                   <div style={{ fontSize: 12, color: color.muted }}>
@@ -1878,7 +1877,7 @@ const AdminPage: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ border: `1px solid ${color.border}`, borderRadius: 10, padding: 10 }}>
+              <div style={{ border: `1px solid ${color.border}`, borderRadius: 16, padding: 10 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                   <div style={{ fontWeight: 700 }}>Top source hosts</div>
                   <div style={{ fontSize: 12, color: color.muted }}>

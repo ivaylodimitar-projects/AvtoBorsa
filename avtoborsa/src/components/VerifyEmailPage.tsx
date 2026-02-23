@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { API_BASE_URL } from "../config/api";
 
 type VerifyStatus = "pending" | "success" | "error";
 
@@ -23,7 +24,7 @@ const VerifyEmailPage: React.FC = () => {
     const verify = async () => {
       try {
         const response = await fetch(
-          `http://localhost:8000/api/auth/verify-email/?uid=${encodeURIComponent(uid)}&token=${encodeURIComponent(token)}`
+          `${API_BASE_URL}/api/auth/verify-email/?uid=${encodeURIComponent(uid)}&token=${encodeURIComponent(token)}`
         );
         const data = await response.json();
         if (response.ok) {
@@ -152,16 +153,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
   card: {
     background: "#fff",
-    borderRadius: 18,
-    padding: "32px 30px",
+    borderRadius: 16, padding: "32px 30px",
     border: "1px solid #e5e7eb",
     boxShadow: "0 16px 40px rgba(15, 23, 42, 0.08)",
   },
   iconWrap: {
     width: 52,
     height: 52,
-    borderRadius: 14,
-    display: "flex",
+    borderRadius: 16, display: "flex",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
@@ -200,8 +199,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#0f766e",
     color: "#fff",
     border: "none",
-    borderRadius: 10,
-    padding: "12px 20px",
+    borderRadius: 16, padding: "12px 20px",
     fontSize: 14,
     fontWeight: 700,
     cursor: "pointer",
@@ -211,16 +209,14 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#fff",
     color: "#0f766e",
     border: "1px solid #cbd5f5",
-    borderRadius: 10,
-    padding: "12px 20px",
+    borderRadius: 16, padding: "12px 20px",
     fontSize: 14,
     fontWeight: 600,
     cursor: "pointer",
   },
   sideCard: {
     background: "linear-gradient(160deg, #ecfdf5 0%, #f8fafc 55%, #fff 100%)",
-    borderRadius: 18,
-    padding: "28px 24px",
+    borderRadius: 16, padding: "28px 24px",
     border: "1px solid #d1fae5",
     boxShadow: "0 12px 26px rgba(15, 118, 110, 0.12)",
   },

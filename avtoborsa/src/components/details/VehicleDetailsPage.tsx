@@ -11,6 +11,7 @@ import { extractIdFromSlug } from '../../utils/slugify';
 import { useImageUrl } from '../../hooks/useGalleryLazyLoad';
 import ListingPromoBadge from '../ListingPromoBadge';
 import KapariranoBadge from '../KapariranoBadge';
+import { API_BASE_URL } from '../../config/api';
 
 interface CarImage {
   id: number;
@@ -310,7 +311,7 @@ const VehicleDetailsPage: React.FC = () => {
         }
 
         const response = await fetch(
-          `http://localhost:8000/api/listings/${id}/`,
+          `${API_BASE_URL}/api/listings/${id}/`,
           {
             headers,
             credentials: 'include',
@@ -372,7 +373,7 @@ const VehicleDetailsPage: React.FC = () => {
             params.set(key, value);
           });
 
-          const response = await fetch(`http://localhost:8000/api/listings/?${params.toString()}`, {
+          const response = await fetch(`${API_BASE_URL}/api/listings/?${params.toString()}`, {
             signal: controller.signal,
           });
           if (!response.ok) {
@@ -532,8 +533,7 @@ const VehicleDetailsPage: React.FC = () => {
       cursor: 'pointer',
       color: '#0f766e',
       padding: 6,
-      borderRadius: 4,
-      flexShrink: 0,
+      borderRadius: 16, flexShrink: 0,
       transition: 'opacity 0.2s',
     },
     navbarTitle: {
@@ -578,8 +578,7 @@ const VehicleDetailsPage: React.FC = () => {
     },
     heroSection: {
       background: '#fff',
-      borderRadius: 8,
-      padding: isMobile ? 16 : 20,
+      borderRadius: 16, padding: isMobile ? 16 : 20,
       boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
       border: '1px solid #e0e0e0',
     },
@@ -599,8 +598,7 @@ const VehicleDetailsPage: React.FC = () => {
     },
     descriptionSection: {
       background: '#fff',
-      borderRadius: 8,
-      padding: isMobile ? 16 : 20,
+      borderRadius: 16, padding: isMobile ? 16 : 20,
       boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
       border: '1px solid #e0e0e0',
     },
@@ -630,8 +628,7 @@ const VehicleDetailsPage: React.FC = () => {
     errorContainer: {
       background: '#fef2f2',
       border: '1px solid #fecaca',
-      borderRadius: 8,
-      padding: isMobile ? 16 : 20,
+      borderRadius: 16, padding: isMobile ? 16 : 20,
       color: '#b91c1c',
       textAlign: 'center',
       fontSize: isMobile ? 13 : 14,
@@ -639,8 +636,7 @@ const VehicleDetailsPage: React.FC = () => {
     },
     similarSection: {
       background: '#fff',
-      borderRadius: 8,
-      padding: isMobile ? 16 : 20,
+      borderRadius: 16, padding: isMobile ? 16 : 20,
       boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
       border: '1px solid #e0e0e0',
     },
@@ -703,8 +699,7 @@ const VehicleDetailsPage: React.FC = () => {
     similarCard: {
       display: 'flex',
       flexDirection: 'column',
-      borderRadius: 10,
-      overflow: 'visible',
+      borderRadius: 16, overflow: 'visible',
       background: '#fff',
       border: '1px solid #e5e7eb',
       boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
