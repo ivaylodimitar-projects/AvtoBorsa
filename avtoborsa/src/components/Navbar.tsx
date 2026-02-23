@@ -1315,10 +1315,11 @@ const css = `
   box-shadow: none;
   animation: navPublishPulse 3.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
-  
+
 .nav-publish-cta.active::before {
   content: none;
 }
+
 
 .nav-publish-cta.active:hover,
 .nav-publish-cta.active:focus-visible {
