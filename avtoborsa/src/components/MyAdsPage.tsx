@@ -348,6 +348,158 @@ const globalCss = `
       width: 100% !important;
     }
   }
+
+  @media (max-width: 900px) {
+    .myads-listingtype-overlay {
+      align-items: flex-start !important;
+      padding: 8px 8px calc(env(safe-area-inset-bottom, 0px) + 8px) !important;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .myads-listingtype-modal {
+      width: 100% !important;
+      max-width: 100% !important;
+      min-height: calc(100dvh - 16px);
+      max-height: calc(100dvh - 16px);
+      border-radius: 18px !important;
+      padding: 14px 12px !important;
+      gap: 12px !important;
+      overflow: hidden;
+    }
+
+    .myads-listingtype-header {
+      gap: 8px !important;
+    }
+
+    .myads-listingtype-title {
+      font-size: 18px !important;
+      line-height: 1.25 !important;
+    }
+
+    .myads-listingtype-subtitle {
+      margin-top: 4px !important;
+      font-size: 12px !important;
+      line-height: 1.45 !important;
+    }
+
+    .myads-listingtype-close {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #f8fafc !important;
+      border: 1px solid #e2e8f0 !important;
+      color: #334155 !important;
+      flex: 0 0 auto;
+      padding: 0 !important;
+    }
+
+    .myads-listingtype-content {
+      grid-template-columns: 1fr !important;
+      gap: 12px !important;
+      flex: 1 1 auto;
+      overflow-y: auto;
+      min-height: 0;
+      padding-right: 2px;
+      scrollbar-gutter: stable;
+    }
+
+    .myads-listingtype-left,
+    .myads-listingtype-right {
+      gap: 10px !important;
+    }
+
+    .myads-listingtype-grid,
+    .myads-listingtype-vip-grid {
+      grid-template-columns: 1fr !important;
+      gap: 10px !important;
+    }
+
+    .myads-listingtype-card {
+      min-height: 56px;
+      padding: 14px !important;
+    }
+
+    .myads-listingtype-plan-card {
+      min-height: 56px;
+      padding: 12px !important;
+    }
+
+    .myads-listingtype-card-title {
+      font-size: 15px !important;
+      line-height: 1.25 !important;
+      margin-bottom: 4px !important;
+    }
+
+    .myads-listingtype-card-desc {
+      font-size: 12px !important;
+      line-height: 1.45 !important;
+    }
+
+    .myads-listingtype-card-price {
+      margin-top: 4px !important;
+      font-size: 13px !important;
+    }
+
+    .myads-listingtype-preview-media {
+      height: 160px !important;
+    }
+
+    .myads-listingtype-preview-badge-wrap {
+      top: 14px !important;
+      left: 29px !important;
+    }
+
+    .myads-listingtype-actions {
+      position: sticky;
+      bottom: 0;
+      z-index: 2;
+      margin-top: 6px !important;
+      padding-top: 10px;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, #ffffff 36%);
+      flex-direction: column-reverse !important;
+      gap: 8px !important;
+    }
+
+    .myads-listingtype-btn {
+      display: inline-flex;
+      align-items: center;
+      width: 100%;
+      min-height: 44px;
+      justify-content: center;
+    }
+
+    .myads-listingtype-hint {
+      font-size: 12px !important;
+      line-height: 1.45 !important;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .myads-listingtype-overlay {
+      padding: 6px 6px calc(env(safe-area-inset-bottom, 0px) + 6px) !important;
+    }
+
+    .myads-listingtype-modal {
+      min-height: calc(100dvh - 12px);
+      max-height: calc(100dvh - 12px);
+      border-radius: 16px !important;
+      padding: 12px 10px !important;
+    }
+
+    .myads-listingtype-preview-media {
+      height: 148px !important;
+    }
+
+    .myads-listingtype-preview-badge-wrap {
+      top: 12px !important;
+      left: 25px !important;
+    }
+  }
 `;
 
 const MyAdsPage: React.FC = () => {
@@ -561,6 +713,19 @@ const MyAdsPage: React.FC = () => {
 
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!listingTypeModal.isOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const previousTouchAction = document.body.style.touchAction;
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.touchAction = previousTouchAction;
+    };
+  }, [listingTypeModal.isOpen]);
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
@@ -2419,6 +2584,13 @@ const MyAdsPage: React.FC = () => {
     overflow: "visible" as const,
     isolation: "isolate" as const,
   },
+  listingTypePreviewBadgeWrap: {
+    position: "absolute" as const,
+    top: 0,
+    left: 0,
+    zIndex: 8,
+    pointerEvents: "none" as const,
+  },
   listingTypePreviewFrame: {
     width: "100%",
     height: "100%",
@@ -3589,22 +3761,28 @@ const MyAdsPage: React.FC = () => {
         )}
 
         {listingTypeModal.isOpen && (
-          <div style={styles.modalOverlay} onClick={closeListingTypeModal}>
+          <div
+            style={styles.modalOverlay}
+            className="myads-listingtype-overlay"
+            onClick={closeListingTypeModal}
+          >
             <div
               style={styles.modal}
+              className="myads-listingtype-modal"
               role="dialog"
               aria-modal="true"
               onClick={(e) => e.stopPropagation()}
             >
-              <div style={styles.modalHeader}>
+              <div style={styles.modalHeader} className="myads-listingtype-header">
                 <div>
-                  <h2 style={styles.modalTitle}>{modalTitle}</h2>
-                  <p style={styles.modalSubtitle}>{modalSubtitle}</p>
+                  <h2 style={styles.modalTitle} className="myads-listingtype-title">{modalTitle}</h2>
+                  <p style={styles.modalSubtitle} className="myads-listingtype-subtitle">{modalSubtitle}</p>
                 </div>
                 <button
                   type="button"
                   onClick={closeListingTypeModal}
                   style={styles.modalClose}
+                  className="myads-listingtype-close"
                   aria-label="Затвори"
                   disabled={isModalBusy}
                 >
@@ -3612,25 +3790,26 @@ const MyAdsPage: React.FC = () => {
                 </button>
               </div>
 
-              <div style={styles.modalContentSplit}>
-                <div style={styles.modalContentLeft}>
-                  <div style={styles.listingTypeGrid}>
+              <div style={styles.modalContentSplit} className="myads-listingtype-content">
+                <div style={styles.modalContentLeft} className="myads-listingtype-left">
+                  <div style={styles.listingTypeGrid} className="myads-listingtype-grid">
                     <button
                       type="button"
                       style={{
                         ...styles.listingTypeCard,
                         ...(listingTypeModal.selectedType === "normal" ? styles.listingTypeCardSelected : {}),
                       }}
+                      className="myads-listingtype-card"
                       onClick={() =>
                         setListingTypeModal((prev) => ({ ...prev, selectedType: "normal" }))
                       }
                       disabled={isModalBusy}
                     >
-                      <h3 style={styles.listingTypeTitle}>Нормална обява</h3>
-                      <p style={styles.listingTypeDesc}>
+                      <h3 style={styles.listingTypeTitle} className="myads-listingtype-card-title">Нормална обява</h3>
+                      <p style={styles.listingTypeDesc} className="myads-listingtype-card-desc">
                         Стандартно публикуване без допълнително позициониране.
                       </p>
-                      <p style={styles.listingTypePrice}>Цена: Безплатно</p>
+                      <p style={styles.listingTypePrice} className="myads-listingtype-card-price">Цена: Безплатно</p>
                     </button>
 
                     <button
@@ -3639,16 +3818,17 @@ const MyAdsPage: React.FC = () => {
                         ...styles.listingTypeCard,
                         ...(listingTypeModal.selectedType === "top" ? styles.listingTypeCardSelected : {}),
                       }}
+                      className="myads-listingtype-card"
                       onClick={() =>
                         setListingTypeModal((prev) => ({ ...prev, selectedType: "top" }))
                       }
                       disabled={isModalBusy}
                     >
-                      <h3 style={styles.listingTypeTitle}>Топ обява</h3>
-                      <p style={styles.listingTypeDesc}>
+                      <h3 style={styles.listingTypeTitle} className="myads-listingtype-card-title">Топ обява</h3>
+                      <p style={styles.listingTypeDesc} className="myads-listingtype-card-desc">
                         Приоритетна видимост и изкарване по-напред в резултатите.
                       </p>
-                      <p style={styles.listingTypePrice}>
+                      <p style={styles.listingTypePrice} className="myads-listingtype-card-price">
                         Цена: €{getPromotePrice(modalSourceListing, "top", listingTypeModal.topPlan, listingTypeModal.vipPlan).toFixed(2)}
                       </p>
                     </button>
@@ -3659,29 +3839,31 @@ const MyAdsPage: React.FC = () => {
                         ...styles.listingTypeCard,
                         ...(listingTypeModal.selectedType === "vip" ? styles.listingTypeCardSelected : {}),
                       }}
+                      className="myads-listingtype-card"
                       onClick={() =>
                         setListingTypeModal((prev) => ({ ...prev, selectedType: "vip" }))
                       }
                       disabled={isModalBusy}
                     >
-                      <h3 style={styles.listingTypeTitle}>VIP обява</h3>
-                      <p style={styles.listingTypeDesc}>
+                      <h3 style={styles.listingTypeTitle} className="myads-listingtype-card-title">VIP обява</h3>
+                      <p style={styles.listingTypeDesc} className="myads-listingtype-card-desc">
                         Визуално открояване с VIP етикет без приоритет в класирането.
                       </p>
-                      <p style={styles.listingTypePrice}>
+                      <p style={styles.listingTypePrice} className="myads-listingtype-card-price">
                         Цена: €{getPromotePrice(modalSourceListing, "vip", listingTypeModal.topPlan, listingTypeModal.vipPlan).toFixed(2)}
                       </p>
                     </button>
                   </div>
 
                   {listingTypeModal.selectedType === "top" && (
-                    <div style={styles.vipPlanGrid}>
+                    <div style={styles.vipPlanGrid} className="myads-listingtype-vip-grid">
                       <button
                         type="button"
                         style={{
                           ...styles.vipPlanCard,
                           ...(listingTypeModal.topPlan === "1d" ? styles.vipPlanCardSelected : {}),
                         }}
+                        className="myads-listingtype-plan-card"
                         onClick={() =>
                           setListingTypeModal((prev) => ({ ...prev, topPlan: "1d" }))
                         }
@@ -3696,6 +3878,7 @@ const MyAdsPage: React.FC = () => {
                           ...styles.vipPlanCard,
                           ...(listingTypeModal.topPlan === "7d" ? styles.vipPlanCardSelected : {}),
                         }}
+                        className="myads-listingtype-plan-card"
                         onClick={() =>
                           setListingTypeModal((prev) => ({ ...prev, topPlan: "7d" }))
                         }
@@ -3708,13 +3891,14 @@ const MyAdsPage: React.FC = () => {
                   )}
 
                   {listingTypeModal.selectedType === "vip" && (
-                    <div style={styles.vipPlanGrid}>
+                    <div style={styles.vipPlanGrid} className="myads-listingtype-vip-grid">
                       <button
                         type="button"
                         style={{
                           ...styles.vipPlanCard,
                           ...(listingTypeModal.vipPlan === "7d" ? styles.vipPlanCardSelected : {}),
                         }}
+                        className="myads-listingtype-plan-card"
                         onClick={() =>
                           setListingTypeModal((prev) => ({ ...prev, vipPlan: "7d" }))
                         }
@@ -3729,6 +3913,7 @@ const MyAdsPage: React.FC = () => {
                           ...styles.vipPlanCard,
                           ...(listingTypeModal.vipPlan === "lifetime" ? styles.vipPlanCardSelected : {}),
                         }}
+                        className="myads-listingtype-plan-card"
                         onClick={() =>
                           setListingTypeModal((prev) => ({ ...prev, vipPlan: "lifetime" }))
                         }
@@ -3742,10 +3927,11 @@ const MyAdsPage: React.FC = () => {
                     </div>
                   )}
 
-                  <div style={styles.modalActions}>
+                  <div style={styles.modalActions} className="myads-listingtype-actions">
                     <button
                       type="button"
                       style={{ ...styles.modalButton, ...styles.modalButtonSecondary }}
+                      className="myads-listingtype-btn"
                       onClick={closeListingTypeModal}
                       disabled={isModalBusy}
                     >
@@ -3754,6 +3940,7 @@ const MyAdsPage: React.FC = () => {
                     <button
                       type="button"
                       style={{ ...styles.modalButton, ...styles.modalButtonPrimary }}
+                      className="myads-listingtype-btn"
                       onClick={handleListingTypeConfirm}
                       disabled={isModalBusy || modalVipPrepayBlocked}
                     >
@@ -3761,17 +3948,27 @@ const MyAdsPage: React.FC = () => {
                     </button>
                   </div>
                   {modalVipPrepayMessage && (
-                    <p style={{ ...styles.modalHint, color: "#b91c1c", fontWeight: 700 }}>
+                    <p
+                      style={{ ...styles.modalHint, color: "#b91c1c", fontWeight: 700 }}
+                      className="myads-listingtype-hint"
+                    >
                       {modalVipPrepayMessage}
                     </p>
                   )}
-                  <p style={styles.modalHint}>{modalHint}</p>
+                  <p style={styles.modalHint} className="myads-listingtype-hint">{modalHint}</p>
                 </div>
 
-                <div style={styles.modalContentRight}>
+                <div style={styles.modalContentRight} className="myads-listingtype-right">
                   <div style={styles.listingTypePreviewCard}>
-                    <div style={styles.listingTypePreviewMedia}>
-                      {modalPreviewBadgeType && <ListingPromoBadge type={modalPreviewBadgeType} />}
+                    <div style={styles.listingTypePreviewMedia} className="myads-listingtype-preview-media">
+                      {modalPreviewBadgeType && (
+                        <span
+                          style={styles.listingTypePreviewBadgeWrap}
+                          className="myads-listingtype-preview-badge-wrap"
+                        >
+                          <ListingPromoBadge type={modalPreviewBadgeType} />
+                        </span>
+                      )}
                       <div style={styles.listingTypePreviewFrame}>
                         {modalPreviewImage ? (
                           <img src={modalPreviewImage} alt={modalPreviewTitle} style={styles.listingTypePreviewImage} />

@@ -222,16 +222,11 @@ const Navbar: React.FC = () => {
   }, [location.pathname, location.search, location.hash]);
 
   React.useEffect(() => {
-    if (!mobileOpen) {
-      setShowNotificationsMenu(false);
-      setIsProfileMenuOpen(false);
-      setIsTopUpModalOpen(false);
-      setIsSavedSearchesOpen(false);
-      setProfileMenuCloseRequestKey((prev) => prev + 1);
-      setTopUpModalCloseRequestKey((prev) => prev + 1);
-      setSavedSearchesCloseRequestKey((prev) => prev + 1);
-    }
-  }, [mobileOpen]);
+    if (mobileOpen) return;
+    if (!isSavedSearchesOpen) return;
+    setSavedSearchesCloseRequestKey((prev) => prev + 1);
+    setIsSavedSearchesOpen(false);
+  }, [mobileOpen, isSavedSearchesOpen]);
 
   React.useEffect(() => {
     if (!isProfileMenuOpen) return;
@@ -270,6 +265,18 @@ const Navbar: React.FC = () => {
       document.body.style.overflow = previousOverflow;
     };
   }, [mobileOpen]);
+
+  React.useLayoutEffect(() => {
+    if (!mobileOpen || !isMobileViewport()) return;
+    if (!showNotificationsMenu && !isProfileMenuOpen && !isTopUpModalOpen) return;
+    setMobileOpen(false);
+  }, [
+    mobileOpen,
+    isMobileViewport,
+    showNotificationsMenu,
+    isProfileMenuOpen,
+    isTopUpModalOpen,
+  ]);
 
   React.useEffect(() => {
     if (!user?.id) {
@@ -705,7 +712,7 @@ const Navbar: React.FC = () => {
   };
 
   const hasMobileFocusPanel =
-    mobileOpen && (showNotificationsMenu || isProfileMenuOpen || isTopUpModalOpen);
+    mobileOpen && (isProfileMenuOpen || isTopUpModalOpen);
   const mobileFocusClass = isTopUpModalOpen
     ? "focus-topup"
     : showNotificationsMenu
@@ -737,6 +744,31 @@ const Navbar: React.FC = () => {
       setSavedSearchesCloseRequestKey((prev) => prev + 1);
       setIsSavedSearchesOpen(false);
     }
+  };
+
+  const handleMobileMenuToggle = () => {
+    if (mobileOpen) {
+      setMobileOpen(false);
+      return;
+    }
+
+    if (showNotificationsMenu) {
+      closeNotificationsMenu(false);
+    }
+    if (isTopUpModalOpen) {
+      setTopUpModalCloseRequestKey((prev) => prev + 1);
+      setIsTopUpModalOpen(false);
+    }
+    if (isProfileMenuOpen) {
+      setProfileMenuCloseRequestKey((prev) => prev + 1);
+      setIsProfileMenuOpen(false);
+    }
+    if (isSavedSearchesOpen) {
+      setSavedSearchesCloseRequestKey((prev) => prev + 1);
+      setIsSavedSearchesOpen(false);
+    }
+
+    setMobileOpen(true);
   };
 
   return (
@@ -783,11 +815,21 @@ const Navbar: React.FC = () => {
               </span>
             </button>
           ) : null}
+          {!isAuthenticated ? (
+            <Link
+              to="/auth"
+              className="btn-primary mobile-login-cta"
+              onClick={() => setMobileOpen(false)}
+            >
+              <FiUser size={15} />
+              Вход
+            </Link>
+          ) : null}
           {/* Mobile burger */}
           <button
             type="button"
             className={`burger ${mobileOpen ? "open" : ""}`}
-            onClick={() => setMobileOpen((v) => !v)}
+            onClick={handleMobileMenuToggle}
             aria-expanded={mobileOpen}
             aria-controls="site-main-nav"
             aria-label={mobileOpen ? "Затвори менюто" : "Отвори менюто"}
@@ -1198,11 +1240,11 @@ const Navbar: React.FC = () => {
             ) : (
               <Link
                 to="/auth"
-                className="btn-primary"
+                className="btn-primary desktop-login-cta"
                 onClick={() => setMobileOpen(false)}
               >
                 <FiUser size={16} />
-                Влизане
+                Вход
               </Link>
             )}
           </div>
@@ -1301,6 +1343,10 @@ const css = `
 }
 
 .mobile-header-bell {
+  display: none;
+}
+
+.mobile-login-cta {
   display: none;
 }
 
@@ -2382,6 +2428,23 @@ const css = `
     background: linear-gradient(180deg, #ffffff 0%, #d1fae5 100%);
   }
 
+  .mobile-login-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 42px;
+    padding: 0 12px;
+    border-radius: 14px;
+    font-size: 13px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .nav .desktop-login-cta {
+    display: none !important;
+  }
+
   .nav-right > .profile-menu-desktop-slot {
     display: none !important;
   }
@@ -2422,6 +2485,10 @@ const css = `
     display: block !important;
     width: auto !important;
     pointer-events: auto;
+  }
+
+  .nav.focus-notifications .btn-notifications {
+    display: none !important;
   }
 
   .burger {
@@ -2770,6 +2837,13 @@ const css = `
     width: 40px;
     height: 40px;
     border-radius: 12px;
+  }
+
+  .mobile-login-cta {
+    height: 40px;
+    border-radius: 12px;
+    padding: 0 10px;
+    font-size: 12px;
   }
 
   .nav {
