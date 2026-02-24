@@ -93,6 +93,7 @@ const FullscreenModal = memo<{
     const isPanningRef = useRef(false);
     const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
     const minZoom = 1;
+    const headerBadgeLabel = showTopBadge ? 'TOP' : showVipBadge ? 'VIP' : null;
 
     useEffect(() => {
       if (isOpen) {
@@ -332,6 +333,30 @@ const FullscreenModal = memo<{
           onClick={(e) => e.stopPropagation()}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {headerBadgeLabel && (
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: isMobile ? '4px 8px' : '5px 10px',
+                  borderRadius: 999,
+                  fontSize: isMobile ? 10 : 11,
+                  fontWeight: 800,
+                  letterSpacing: 0.3,
+                  color: '#fff',
+                  background:
+                    headerBadgeLabel === 'TOP'
+                      ? 'linear-gradient(135deg, #ef4444, #dc2626)'
+                      : 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+                  boxShadow:
+                    headerBadgeLabel === 'TOP'
+                      ? '0 6px 14px rgba(239, 68, 68, 0.35)'
+                      : '0 6px 14px rgba(37, 99, 235, 0.35)',
+                }}
+              >
+                {headerBadgeLabel}
+              </span>
+            )}
             <h2 style={{ color: '#fff', margin: 0, fontSize: isMobile ? 14 : 16 }}>
               {title}
             </h2>
@@ -513,8 +538,6 @@ const FullscreenModal = memo<{
                 onDragStart={(e) => e.preventDefault()}
                 onLoad={recomputeMaxZoom}
               />
-              {showTopBadge && <ListingPromoBadge type="top" zIndex={24} />}
-              {showVipBadge && <ListingPromoBadge type="vip" zIndex={24} />}
               {showKapariranoBadge && (
                 <KapariranoBadge size={isMobile ? 'sm' : 'default'} zIndex={24} />
               )}

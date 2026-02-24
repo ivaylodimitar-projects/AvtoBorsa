@@ -420,6 +420,9 @@ export default function LandingPage() {
   const [isBrandAutoplayEnabled, setIsBrandAutoplayEnabled] = useState(true);
   const popularBrandsSectionRef = useRef<HTMLElement | null>(null);
   const brandAutoplayResumeTimeoutRef = useRef<number | null>(null);
+  const brandTouchStartXRef = useRef<number | null>(null);
+  const brandTouchStartYRef = useRef<number | null>(null);
+  const suppressBrandCardClickUntilRef = useRef(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -615,6 +618,61 @@ export default function LandingPage() {
     const backwardSteps = (activeBrandIndex - targetIndex + totalPopularBrands) % totalPopularBrands;
     setBrandSlideDirection(forwardSteps <= backwardSteps ? "next" : "prev");
     setActiveBrandIndex(targetIndex);
+  };
+
+  const resetBrandTouchTracking = () => {
+    brandTouchStartXRef.current = null;
+    brandTouchStartYRef.current = null;
+  };
+
+  const handleBrandTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    const touch = event.touches[0];
+    if (!touch) return;
+    brandTouchStartXRef.current = touch.clientX;
+    brandTouchStartYRef.current = touch.clientY;
+  };
+
+  const handleBrandTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (brandTouchStartXRef.current === null || brandTouchStartYRef.current === null) {
+      return;
+    }
+
+    const touch = event.touches[0];
+    if (!touch) return;
+    const deltaX = touch.clientX - brandTouchStartXRef.current;
+    const deltaY = touch.clientY - brandTouchStartYRef.current;
+
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 14) {
+      event.preventDefault();
+    }
+  };
+
+  const handleBrandTouchEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (brandTouchStartXRef.current === null || brandTouchStartYRef.current === null) {
+      resetBrandTouchTracking();
+      return;
+    }
+
+    const touch = event.changedTouches[0];
+    if (!touch) {
+      resetBrandTouchTracking();
+      return;
+    }
+
+    const deltaX = touch.clientX - brandTouchStartXRef.current;
+    const deltaY = touch.clientY - brandTouchStartYRef.current;
+    resetBrandTouchTracking();
+
+    if (Math.abs(deltaX) < 44 || Math.abs(deltaX) <= Math.abs(deltaY)) {
+      return;
+    }
+
+    suppressBrandCardClickUntilRef.current = Date.now() + 360;
+    if (deltaX < 0) {
+      goToNextBrand();
+      return;
+    }
+    goToPrevBrand();
   };
 
   const activeBrand = POPULAR_CAR_BRANDS[activeBrandIndex];
@@ -1493,6 +1551,9 @@ export default function LandingPage() {
               isolation: isolate;
               --brand-step: clamp(142px, 16.2vw, 238px);
               --brand-far-step: calc(var(--brand-step) * 1.9);
+              touch-action: pan-y;
+              user-select: none;
+              -webkit-user-select: none;
             }
             .brand-cinema-track--next {
               animation: brandCinemaShiftNext 680ms cubic-bezier(0.18, 0.78, 0.22, 1);
@@ -1518,6 +1579,7 @@ export default function LandingPage() {
               backface-visibility: hidden;
               -webkit-backface-visibility: hidden;
               will-change: transform, opacity;
+              touch-action: manipulation;
             }
             .brand-cinema-card[data-distance="-2"] {
               transform: translate3d(calc(-50% - var(--brand-far-step)), calc(-50% + 14px), -260px) rotateY(25deg) scale(0.68);
@@ -1532,12 +1594,13 @@ export default function LandingPage() {
               box-shadow: 0 14px 28px rgba(2, 6, 23, 0.34);
             }
             .brand-cinema-card[data-distance="0"] {
-              transform: translate3d(-50%, calc(-50% - 3px), 0) rotateY(0deg) scale(1.02);
+              transform: translate(-50%, calc(-50% - 2px)) scale(1);
               opacity: 1;
               filter: none;
               border-color: rgba(134, 239, 172, 0.72);
               box-shadow: 0 24px 56px rgba(15, 118, 110, 0.28), 0 0 0 1px rgba(110, 231, 183, 0.22) inset;
               isolation: isolate;
+              will-change: auto;
             }
             .brand-cinema-card[data-distance="1"] {
               transform: translate3d(calc(-50% + var(--brand-step)), calc(-50% + 9px), -132px) rotateY(-16deg) scale(0.84);
@@ -1552,7 +1615,7 @@ export default function LandingPage() {
               box-shadow: none;
             }
             .brand-cinema-card:hover[data-distance="0"] {
-              transform: translate3d(-50%, calc(-50% - 6px), 0) scale(1.04);
+              transform: translate(-50%, calc(-50% - 4px)) scale(1.01);
               box-shadow: 0 28px 62px rgba(45, 212, 191, 0.32), 0 0 0 1px rgba(167, 243, 208, 0.34) inset;
             }
             .brand-cinema-card:hover[data-distance="0"] .brand-cinema-border-line rect {
@@ -1593,15 +1656,15 @@ export default function LandingPage() {
               width: 100%;
               height: 100%;
               object-fit: cover;
-              transform: translateZ(0);
-              backface-visibility: hidden;
-              -webkit-backface-visibility: hidden;
-              will-change: transform;
+              transform: none;
+              backface-visibility: visible;
+              -webkit-backface-visibility: visible;
+              will-change: auto;
               image-rendering: auto;
               transition: none;
             }
             .brand-cinema-card[data-distance="0"] .brand-cinema-image {
-              transform: translateZ(0);
+              transform: none;
             }
             .brand-cinema-overlay {
               position: absolute;
@@ -1869,44 +1932,48 @@ export default function LandingPage() {
 
               .popular-brands-shell {
                 padding: 14px !important;
-                border-radius: 14px !important;
+                border-radius: 16px !important;
               }
-              .popular-brands-header { margin-bottom: 10px !important; }
+              .popular-brands-header { margin-bottom: 12px !important; }
               .popular-brands-title {
-                font-size: clamp(21px, 6vw, 25px) !important;
+                font-size: clamp(20px, 6.2vw, 24px) !important;
                 line-height: 1.14;
               }
               .popular-brands-lead {
-                font-size: 14px !important;
-                line-height: 1.48 !important;
+                font-size: 13px !important;
+                line-height: 1.5 !important;
+                max-width: 34ch;
               }
 
-              #popular-brands .brand-cinema { padding: 12px 8px 64px; border-radius: 14px; }
-              #popular-brands .brand-cinema-track {
-                height: clamp(248px, 65vw, 286px);
-                --brand-step: clamp(74px, 18vw, 100px);
-                --brand-far-step: calc(var(--brand-step) * 1.55);
+              #popular-brands .brand-cinema {
+                padding: 12px 8px 14px;
+                border-radius: 14px;
+                border-color: rgba(148, 163, 184, 0.55);
+                box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 12px 30px rgba(2, 6, 23, 0.42);
               }
-              #popular-brands .brand-cinema-card { width: min(88vw, 410px); border-radius: 14px; }
+              #popular-brands .brand-cinema-track {
+                height: clamp(246px, 66vw, 294px);
+                --brand-step: clamp(64px, 16.5vw, 90px);
+                --brand-far-step: calc(var(--brand-step) * 1.45);
+              }
+              #popular-brands .brand-cinema-card { width: min(90vw, 430px); border-radius: 14px; }
               #popular-brands .brand-cinema-card[data-distance="-2"],
-              #popular-brands .brand-cinema-card[data-distance="2"] {
+              #popular-brands .brand-cinema-card[data-distance="2"],
+              #popular-brands .brand-cinema-card[data-distance="-1"],
+              #popular-brands .brand-cinema-card[data-distance="1"] {
                 opacity: 0;
                 pointer-events: none;
               }
-              #popular-brands .brand-cinema-card[data-distance="-1"] {
-                transform: translate3d(calc(-50% - var(--brand-step)), calc(-50% + 7px), -90px) rotateY(13deg) scale(0.84);
-                opacity: 0.28;
-              }
-              #popular-brands .brand-cinema-card[data-distance="1"] {
-                transform: translate3d(calc(-50% + var(--brand-step)), calc(-50% + 7px), -90px) rotateY(-13deg) scale(0.84);
-                opacity: 0.28;
+              #popular-brands .brand-cinema-card[data-distance="0"] {
+                transform: translate(-50%, -50%) scale(1);
+                box-shadow: 0 18px 42px rgba(15, 118, 110, 0.24), 0 0 0 1px rgba(110, 231, 183, 0.2) inset;
               }
               #popular-brands .brand-cinema-meta {
-                left: 7px;
-                bottom: 7px;
+                left: 8px;
+                bottom: 8px;
                 width: fit-content;
-                max-width: calc(100% - 14px);
-                padding: 7px 8px;
+                max-width: calc(100% - 16px);
+                padding: 7px 9px;
                 gap: 6px;
                 border-radius: 12px;
               }
@@ -1914,20 +1981,32 @@ export default function LandingPage() {
               #popular-brands .brand-cinema-name { font-size: 12px; letter-spacing: 0.01em; }
               #popular-brands .brand-cinema-state { font-size: 9px; padding: 4px 7px; letter-spacing: 0; }
               #popular-brands .brand-logo-dots {
-                left: 0;
-                right: 0;
+                position: static;
+                left: auto;
+                right: auto;
                 transform: none;
-                bottom: 8px;
-                padding: 8px 48px 7px;
-                max-width: none;
+                bottom: auto;
+                margin-top: 10px;
+                width: 100%;
+                padding: 0;
+                max-width: 100%;
                 gap: 6px;
-                justify-content: flex-start;
-                scrollbar-width: none;
-                -ms-overflow-style: none;
+                justify-content: center;
+                flex-wrap: wrap;
+                overflow-x: visible;
+                overflow-y: visible;
+                scrollbar-width: auto;
+                -ms-overflow-style: auto;
+                scroll-snap-type: none;
               }
-              #popular-brands .brand-logo-dots::-webkit-scrollbar { display: none; }
-              #popular-brands .brand-logo-dot { width: 26px; height: 26px; padding: 4px; }
-              #popular-brands .brand-nav { width: 42px; height: 42px; top: 43%; }
+              #popular-brands .brand-logo-dots::after { display: none; }
+              #popular-brands .brand-logo-dot {
+                width: 28px;
+                height: 28px;
+                padding: 4px;
+                scroll-snap-align: none;
+              }
+              #popular-brands .brand-nav { width: 44px; height: 44px; top: 45%; }
               #popular-brands .brand-nav::after { inset: -2px; }
               #popular-brands .brand-nav svg { width: 19px; height: 19px; }
               #popular-brands .brand-nav--left { left: 4px; }
@@ -1935,13 +2014,13 @@ export default function LandingPage() {
               #popular-brands .brand-autoplay-meter { margin-top: 10px; height: 3px; }
             }
             @media (max-width: 480px) {
-              #popular-brands .brand-cinema { padding: 10px 6px 60px; }
+              #popular-brands .brand-cinema { padding: 10px 6px 12px; }
               #popular-brands .brand-cinema-track {
-                height: 238px;
-                --brand-step: 62px;
-                --brand-far-step: 96px;
+                height: 232px;
+                --brand-step: 54px;
+                --brand-far-step: 86px;
               }
-              #popular-brands .brand-cinema-card { width: min(84vw, 330px); }
+              #popular-brands .brand-cinema-card { width: min(88vw, 336px); }
               #popular-brands .brand-cinema-card[data-distance="-1"],
               #popular-brands .brand-cinema-card[data-distance="1"] {
                 opacity: 0;
@@ -1951,7 +2030,7 @@ export default function LandingPage() {
               #popular-brands .brand-cinema-logo { width: 20px; height: 20px; }
               #popular-brands .brand-cinema-name { font-size: 11px; }
               #popular-brands .brand-cinema-state { display: none; }
-              #popular-brands .brand-logo-dots { padding: 8px 42px 6px; gap: 5px; }
+              #popular-brands .brand-logo-dots { margin-top: 9px; gap: 5px; }
               #popular-brands .brand-logo-dot { width: 24px; height: 24px; padding: 3px; }
               #popular-brands .brand-nav { width: 38px; height: 38px; }
               #popular-brands .brand-nav svg { width: 17px; height: 17px; }
@@ -2221,6 +2300,10 @@ export default function LandingPage() {
 
               <div
                 className={`brand-cinema-track ${brandSlideDirection === "next" ? "brand-cinema-track--next" : "brand-cinema-track--prev"}`}
+                onTouchStart={handleBrandTouchStart}
+                onTouchMove={handleBrandTouchMove}
+                onTouchEnd={handleBrandTouchEnd}
+                onTouchCancel={resetBrandTouchTracking}
               >
                 {visibleBrandCards.map((brandCard) => {
                   const isCenterCard = brandCard.distance === 0;
@@ -2240,6 +2323,9 @@ export default function LandingPage() {
                           : `Премини към ${brandCard.name}`
                       }
                       onClick={() => {
+                        if (Date.now() < suppressBrandCardClickUntilRef.current) {
+                          return;
+                        }
                         if (isCenterCard) {
                           pauseBrandAutoplayUntilIdle();
                           navigate(searchPath);
@@ -2409,70 +2495,6 @@ export default function LandingPage() {
         {/* CTA */}
       </main>
 
-      <footer style={styles.footer}>
-        <div style={styles.footerInner} className="footer-grid">
-          <div style={styles.footerCol}>
-            <div style={styles.footerBrand}>Kar.bg</div>
-            <p style={styles.footerText}>
-              Платформа за бърза покупко-продажба на автомобили, части и услуги с фокус върху ясни резултати и реални сделки.
-            </p>
-          </div>
-
-          <div style={styles.footerCol}>
-            <div style={styles.footerTitle}>Бърз достъп</div>
-            <button
-              type="button"
-              style={{ ...styles.footerLinkButton, ...styles.footerLinkButtonReset }}
-              onClick={() => navigate("/")}
-            >
-              Начало
-            </button>
-            <a href="#search" style={styles.footerLink}>Търсене</a>
-            <a href="#latest" style={styles.footerLink}>Последни обяви</a>
-            <a href="#about" style={styles.footerLink}>За нас</a>
-            <button
-              type="button"
-              style={{ ...styles.footerLinkButton, ...styles.footerLinkButtonReset }}
-              onClick={() => navigate("/dealers")}
-            >
-              Дилъри
-            </button>
-            <button
-              type="button"
-              style={{ ...styles.footerLinkButton, ...styles.footerLinkButtonReset }}
-              onClick={() => navigate("/publish")}
-            >
-              Публикуване
-            </button>
-            <button
-              type="button"
-              style={{ ...styles.footerLinkButton, ...styles.footerLinkButtonReset }}
-              onClick={() => navigate("/search")}
-            >
-              Всички обяви
-            </button>
-          </div>
-
-          <div style={styles.footerCol} id="api-footer">
-            <div style={styles.footerTitle}>Kar.bg API</div>
-            <p style={styles.footerText}>
-              Връзка за автоматичен импорт на обяви, обновяване на наличности и по-бързо управление на инвентар.
-            </p>
-            <div style={styles.footerApiDealerBadge}>API само за дилъри</div>
-            <button
-              type="button"
-              className="footer-api-btn"
-              style={styles.footerApiButton}
-              onClick={() => {
-                window.location.assign(PUBLIC_API_DOCS_URL);
-              }}
-            >
-              Заяви API достъп
-            </button>
-          </div>
-        </div>
-
-      </footer>
     </div>
   );
 }

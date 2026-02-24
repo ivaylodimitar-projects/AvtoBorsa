@@ -11,6 +11,7 @@ import {
   FiExternalLink,
   FiHome,
   FiMenu,
+  FiX,
   FiPlus,
   FiUser,
 } from "react-icons/fi";
@@ -37,7 +38,7 @@ import {
   type DealerListingSnapshot,
   type FollowedDealer,
 } from "../utils/dealerSubscriptions";
-import karBgLogo from "../assets/karbglogo.jpg";
+import karBgLogo from "../assets/karbglogo.png";
 import { API_BASE_URL } from "../config/api";
 
 const DEALER_LISTINGS_SYNC_COOLDOWN_MS = 15_000;
@@ -175,9 +176,12 @@ const Navbar: React.FC = () => {
   const [showNotificationsMenu, setShowNotificationsMenu] = React.useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = React.useState(false);
   const [isTopUpModalOpen, setIsTopUpModalOpen] = React.useState(false);
+  const [isSavedSearchesOpen, setIsSavedSearchesOpen] = React.useState(false);
   const [profileMenuCloseRequestKey, setProfileMenuCloseRequestKey] =
     React.useState(0);
   const [topUpModalCloseRequestKey, setTopUpModalCloseRequestKey] =
+    React.useState(0);
+  const [savedSearchesCloseRequestKey, setSavedSearchesCloseRequestKey] =
     React.useState(0);
   const [notificationsTab, setNotificationsTab] = React.useState<
     "notifications" | "subscriptions"
@@ -189,6 +193,20 @@ const Navbar: React.FC = () => {
     Record<string, boolean>
   >({});
   const notificationsRef = React.useRef<HTMLDivElement | null>(null);
+  const mobileNotificationsTriggerRef = React.useRef<HTMLButtonElement | null>(null);
+  const isMobileViewport = React.useCallback(
+    () => typeof window !== "undefined" && window.innerWidth <= 960,
+    []
+  );
+  const closeNotificationsMenu = React.useCallback(
+    (closeMobileMenu = false) => {
+      setShowNotificationsMenu(false);
+      if (closeMobileMenu && isMobileViewport()) {
+        setMobileOpen(false);
+      }
+    },
+    [isMobileViewport]
+  );
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -197,8 +215,10 @@ const Navbar: React.FC = () => {
     setShowNotificationsMenu(false);
     setIsProfileMenuOpen(false);
     setIsTopUpModalOpen(false);
+    setIsSavedSearchesOpen(false);
     setProfileMenuCloseRequestKey((prev) => prev + 1);
     setTopUpModalCloseRequestKey((prev) => prev + 1);
+    setSavedSearchesCloseRequestKey((prev) => prev + 1);
   }, [location.pathname, location.search, location.hash]);
 
   React.useEffect(() => {
@@ -206,22 +226,41 @@ const Navbar: React.FC = () => {
       setShowNotificationsMenu(false);
       setIsProfileMenuOpen(false);
       setIsTopUpModalOpen(false);
+      setIsSavedSearchesOpen(false);
       setProfileMenuCloseRequestKey((prev) => prev + 1);
       setTopUpModalCloseRequestKey((prev) => prev + 1);
+      setSavedSearchesCloseRequestKey((prev) => prev + 1);
     }
   }, [mobileOpen]);
 
   React.useEffect(() => {
     if (!isProfileMenuOpen) return;
     setShowNotificationsMenu(false);
+    setIsSavedSearchesOpen(false);
+    setSavedSearchesCloseRequestKey((prev) => prev + 1);
   }, [isProfileMenuOpen]);
 
   React.useEffect(() => {
     if (!isTopUpModalOpen) return;
     setShowNotificationsMenu(false);
     setIsProfileMenuOpen(false);
+    setIsSavedSearchesOpen(false);
     setProfileMenuCloseRequestKey((prev) => prev + 1);
+    setSavedSearchesCloseRequestKey((prev) => prev + 1);
   }, [isTopUpModalOpen]);
+
+  React.useEffect(() => {
+    if (!isSavedSearchesOpen) return;
+    setShowNotificationsMenu(false);
+    if (isProfileMenuOpen) {
+      setProfileMenuCloseRequestKey((prev) => prev + 1);
+      setIsProfileMenuOpen(false);
+    }
+    if (isTopUpModalOpen) {
+      setTopUpModalCloseRequestKey((prev) => prev + 1);
+      setIsTopUpModalOpen(false);
+    }
+  }, [isSavedSearchesOpen, isProfileMenuOpen, isTopUpModalOpen]);
 
   React.useEffect(() => {
     if (!mobileOpen || window.innerWidth > 960) return;
@@ -454,16 +493,22 @@ const Navbar: React.FC = () => {
 
     const handlePointerDownOutside = (event: PointerEvent) => {
       if (
+        mobileNotificationsTriggerRef.current &&
+        mobileNotificationsTriggerRef.current.contains(event.target as Node)
+      ) {
+        return;
+      }
+      if (
         notificationsRef.current &&
         !notificationsRef.current.contains(event.target as Node)
       ) {
-        setShowNotificationsMenu(false);
+        closeNotificationsMenu(false);
       }
     };
 
     const handleEsc = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setShowNotificationsMenu(false);
+        closeNotificationsMenu(false);
       }
     };
 
@@ -474,7 +519,7 @@ const Navbar: React.FC = () => {
       window.removeEventListener("pointerdown", handlePointerDownOutside);
       window.removeEventListener("keydown", handleEsc);
     };
-  }, [showNotificationsMenu]);
+  }, [showNotificationsMenu, closeNotificationsMenu]);
 
   React.useEffect(() => {
     setNotificationsNowMs(Date.now());
@@ -579,14 +624,37 @@ const Navbar: React.FC = () => {
 
   const handleNotificationsToggle = () => {
     const nextOpen = !showNotificationsMenu;
-    setShowNotificationsMenu(nextOpen);
-    if (nextOpen) {
-      setProfileMenuCloseRequestKey((prev) => prev + 1);
-      setIsProfileMenuOpen(false);
-      setNotificationsTab("notifications");
-      setExpandedNotificationGroups({});
-      setNotificationsNowMs(Date.now());
+    if (!nextOpen) {
+      closeNotificationsMenu();
+      return;
     }
+
+    setShowNotificationsMenu(true);
+    setProfileMenuCloseRequestKey((prev) => prev + 1);
+    setIsProfileMenuOpen(false);
+    setSavedSearchesCloseRequestKey((prev) => prev + 1);
+    setIsSavedSearchesOpen(false);
+    setNotificationsTab("notifications");
+    setExpandedNotificationGroups({});
+    setNotificationsNowMs(Date.now());
+  };
+
+  const handleOpenNotificationsFromMobileHeader = () => {
+    const nextOpen = !showNotificationsMenu;
+    if (!nextOpen) {
+      closeNotificationsMenu(true);
+      return;
+    }
+
+    setShowNotificationsMenu(true);
+    setMobileOpen(false);
+    setProfileMenuCloseRequestKey((prev) => prev + 1);
+    setIsProfileMenuOpen(false);
+    setSavedSearchesCloseRequestKey((prev) => prev + 1);
+    setIsSavedSearchesOpen(false);
+    setNotificationsTab("notifications");
+    setExpandedNotificationGroups({});
+    setNotificationsNowMs(Date.now());
   };
 
   const handleMarkAsRead = (notificationId: string) => {
@@ -622,14 +690,12 @@ const Navbar: React.FC = () => {
     if (user?.id && !notification.isRead) {
       markNotificationRead(user.id, notification.id);
     }
-    setShowNotificationsMenu(false);
-    setMobileOpen(false);
+    closeNotificationsMenu(true);
     navigate(`/dealers/${notification.dealerId}`);
   };
 
   const handleOpenFollowedDealer = (dealerId: number) => {
-    setShowNotificationsMenu(false);
-    setMobileOpen(false);
+    closeNotificationsMenu(true);
     navigate(`/dealers/${dealerId}`);
   };
 
@@ -651,12 +717,14 @@ const Navbar: React.FC = () => {
     ? "Зареди баланс"
     : showNotificationsMenu
       ? "Известия"
-      : isProfileMenuOpen
+    : isProfileMenuOpen
         ? (user?.username?.trim() || user?.first_name?.trim() || "Профил")
         : "";
 
   const handleCloseMobileFocusPanel = () => {
-    setShowNotificationsMenu(false);
+    if (showNotificationsMenu) {
+      closeNotificationsMenu(false);
+    }
     if (isTopUpModalOpen) {
       setTopUpModalCloseRequestKey((prev) => prev + 1);
       setIsTopUpModalOpen(false);
@@ -664,6 +732,10 @@ const Navbar: React.FC = () => {
     if (isProfileMenuOpen) {
       setProfileMenuCloseRequestKey((prev) => prev + 1);
       setIsProfileMenuOpen(false);
+    }
+    if (isSavedSearchesOpen) {
+      setSavedSearchesCloseRequestKey((prev) => prev + 1);
+      setIsSavedSearchesOpen(false);
     }
   };
 
@@ -680,17 +752,52 @@ const Navbar: React.FC = () => {
           <img src={karBgLogo} alt="Kar.bg logo" style={styles.logoImage} className="nav-logo-image" />
         </Link>
 
-        {/* Mobile burger */}
-        <button
-          type="button"
-          className="burger"
-          onClick={() => setMobileOpen((v) => !v)}
-          aria-expanded={mobileOpen}
-          aria-controls="site-main-nav"
-          aria-label="Toggle menu"
-        >
-          <FiMenu size={18} />
-        </button>
+        <div className="mobile-header-actions">
+          {isAuthenticated ? (
+            <div className="mobile-profile-slot">
+              <ProfileMenu
+                onDropdownOpenChange={setIsProfileMenuOpen}
+                onTopUpModalOpenChange={setIsTopUpModalOpen}
+                closeRequestKey={profileMenuCloseRequestKey}
+                topUpModalCloseRequestKey={topUpModalCloseRequestKey}
+                compactTrigger
+              />
+            </div>
+          ) : null}
+          {isAuthenticated ? (
+            <button
+              type="button"
+              className={`btn-ghost btn-notifications mobile-header-bell ${showNotificationsMenu ? "open" : ""} ${hasUnreadNotifications ? "has-unread" : ""}`}
+              onClick={handleOpenNotificationsFromMobileHeader}
+              aria-label="Известия"
+              title="Известия"
+              ref={mobileNotificationsTriggerRef}
+            >
+              <span className="notifications-icon-wrap">
+                <FiBell size={24} className="notifications-bell-icon" />
+                {hasUnreadNotifications && (
+                  <span className="notification-count-badge">
+                    {unreadNotificationsCount > 99 ? "99+" : unreadNotificationsCount}
+                  </span>
+                )}
+              </span>
+            </button>
+          ) : null}
+          {/* Mobile burger */}
+          <button
+            type="button"
+            className={`burger ${mobileOpen ? "open" : ""}`}
+            onClick={() => setMobileOpen((v) => !v)}
+            aria-expanded={mobileOpen}
+            aria-controls="site-main-nav"
+            aria-label={mobileOpen ? "Затвори менюто" : "Отвори менюто"}
+          >
+            <span className="burger-icon-wrap" aria-hidden="true">
+              <FiMenu size={18} className="burger-icon burger-icon-menu" />
+              <FiX size={18} className="burger-icon burger-icon-close" />
+            </span>
+          </button>
+        </div>
 
         <div className="mobile-panel-header" aria-live="polite">
           <button
@@ -705,17 +812,19 @@ const Navbar: React.FC = () => {
           <span className="mobile-panel-spacer" aria-hidden="true" />
         </div>
 
-        {mobileOpen && (
-          <button
-            type="button"
-            className="nav-mobile-backdrop"
-            onClick={() => {
-              setShowNotificationsMenu(false);
-              setMobileOpen(false);
-            }}
-            aria-label="Затвори менюто"
-          />
-        )}
+        <button
+          type="button"
+          className={`nav-mobile-backdrop ${mobileOpen ? "open" : ""}`}
+          onClick={() => {
+            closeNotificationsMenu(true);
+            setSavedSearchesCloseRequestKey((prev) => prev + 1);
+            setIsSavedSearchesOpen(false);
+            setMobileOpen(false);
+          }}
+          aria-label="Затвори менюто"
+          aria-hidden={!mobileOpen}
+          tabIndex={mobileOpen ? 0 : -1}
+        />
 
         {/* Nav */}
         <nav
@@ -741,7 +850,12 @@ const Navbar: React.FC = () => {
               Дилъри
             </Link>
 
-            <SavedSearchesMenu />
+            <div className="saved-searches-slot">
+              <SavedSearchesMenu
+                onDropdownOpenChange={setIsSavedSearchesOpen}
+                closeRequestKey={savedSearchesCloseRequestKey}
+              />
+            </div>
           </div>
 
           <div className="nav-group nav-right">
@@ -772,7 +886,7 @@ const Navbar: React.FC = () => {
                       <button
                         type="button"
                         className="notifications-mobile-back-btn"
-                        onClick={() => setShowNotificationsMenu(false)}
+                        onClick={() => closeNotificationsMenu(false)}
                         aria-label="Назад към менюто"
                       >
                         <span className="notifications-mobile-back-icon" aria-hidden="true">
@@ -1061,12 +1175,14 @@ const Navbar: React.FC = () => {
                     </div>
                   )}
                 </div>
-                <ProfileMenu
-                  onDropdownOpenChange={setIsProfileMenuOpen}
-                  onTopUpModalOpenChange={setIsTopUpModalOpen}
-                  closeRequestKey={profileMenuCloseRequestKey}
-                  topUpModalCloseRequestKey={topUpModalCloseRequestKey}
-                />
+                <div className="profile-menu-desktop-slot">
+                  <ProfileMenu
+                    onDropdownOpenChange={setIsProfileMenuOpen}
+                    onTopUpModalOpenChange={setIsTopUpModalOpen}
+                    closeRequestKey={profileMenuCloseRequestKey}
+                    topUpModalCloseRequestKey={topUpModalCloseRequestKey}
+                  />
+                </div>
                 <Link
                   to="/publish"
                   className={`nav-publish-cta ${isActive("/publish") ? "active" : ""}`}
@@ -1128,7 +1244,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     flexWrap: "nowrap",
     gap: 24,
-    minHeight: 64,
+    minHeight: 56,
     boxSizing: "border-box",
   },
   brand: {
@@ -1141,12 +1257,12 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   logoImage: {
-    width: "8rem",
-    height: "3rem",
-    borderRadius: 16,
-    objectFit: "cover",
+    objectFit: "contain",
     display: "block",
-    boxShadow: "0 6px 12px rgba(15, 118, 110, 0.2)",
+    borderRadius: 0,
+    boxShadow: "none",
+    border: 0,
+    background: "transparent",
   },
   brandText: {
     fontSize: 19,
@@ -1174,6 +1290,23 @@ const css = `
 
 .nav-inner {
   position: relative;
+}
+
+.mobile-header-actions {
+  display: none;
+}
+
+.mobile-profile-slot {
+  display: none;
+}
+
+.mobile-header-bell {
+  display: none;
+}
+
+.profile-menu-desktop-slot {
+  display: inline-flex;
+  align-items: center;
 }
 
 .mobile-panel-header {
@@ -1215,9 +1348,34 @@ const css = `
   height: 42px;
 }
 
+.nav-brand-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  align-self: center;
+  height: 42px;
+  flex-shrink: 0;
+  transition: opacity 0.2s ease;
+}
+
+.nav-brand-link:hover {
+  opacity: 0.92;
+}
+
+.nav-brand-link:active {
+  opacity: 0.82;
+}
+
 .nav-logo-image {
-  width: 8rem;
-  height: 4rem;
+  width: auto;
+  height: 100%;
+  max-height: 42px;
+  max-width: min(290px, 31vw);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
 }
 
 .nav-group {
@@ -1247,13 +1405,13 @@ const css = `
   justify-content: center;
   gap: 10px;
   box-sizing: border-box;
-  width: 11rem;
-  height: 46px;
-  min-width: 11rem;
-  max-width: 11rem;
-  flex: 0 0 11rem;
-  padding: 0 22px 0 14px;
-  border-radius: 16px;
+  width: 10.5rem;
+  height: 42px;
+  min-width: 10.5rem;
+  max-width: 10.5rem;
+  flex: 0 0 10.5rem;
+  padding: 0 18px 0 12px;
+  border-radius: 14px;
   border: 1px solid #0f766e;
   text-decoration: none;
   white-space: nowrap;
@@ -1287,7 +1445,7 @@ const css = `
   content: "";
   position: absolute;
   inset: 1px;
-  border-radius: 16px;
+  border-radius: 14px;
   background: linear-gradient(120deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0) 45%);
   opacity: 0.65;
   pointer-events: none;
@@ -1341,9 +1499,9 @@ const css = `
 }
 
 .nav-publish-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 16px;
+  width: 22px;
+  height: 22px;
+  border-radius: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1361,7 +1519,7 @@ const css = `
 }
 
 .nav-publish-label {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 800;
   line-height: 1;
   letter-spacing: 0.01em;
@@ -1401,9 +1559,9 @@ const css = `
 }
 
 .btn-notifications {
-  width: 48px;
-  min-width: 48px;
-  height: 48px;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
   padding: 0;
   justify-content: center;
   position: relative;
@@ -1433,8 +1591,8 @@ const css = `
 
 .notifications-bell-icon {
   display: block;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   stroke-width: 2.25;
 }
 
@@ -1897,9 +2055,9 @@ const css = `
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  height: 40px;
+  height: 38px;
   padding: 0 8px;
-  border-radius: 16px;
+  border-radius: 14px;
   text-decoration: none;
   font-size: 14px;
   font-weight: 650;
@@ -1938,9 +2096,9 @@ const css = `
 
 /* PRIMARY BUTTON */
 .btn-primary {
-  height: 40px;
-  padding: 0 18px;
-  border-radius: 16px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 14px;
   background: #0f766e;
   color: #fff;
   font-size: 14px;
@@ -1966,9 +2124,9 @@ const css = `
 
 /* GHOST BUTTON */
 .btn-ghost {
-  height: 40px;
-  padding: 0 16px;
-  border-radius: 16px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 14px;
   background: #fff;
   border: 1px solid #ccc;
   color: #333;
@@ -1998,6 +2156,42 @@ const css = `
   font-size: 18px;
   cursor: pointer;
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.2);
+  transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.24s ease, background 0.24s ease;
+}
+
+.burger-icon-wrap {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.burger-icon {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.2s ease, transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.burger-icon-menu {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+}
+
+.burger-icon-close {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.72);
+}
+
+.burger.open .burger-icon-menu {
+  opacity: 0;
+  transform: rotate(90deg) scale(0.72);
+}
+
+.burger.open .burger-icon-close {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
 }
 
 .nav-mobile-backdrop {
@@ -2031,7 +2225,7 @@ const css = `
   }
 
   .site-nav-header.mobile-sheet-open .nav-brand-link,
-  .site-nav-header.mobile-sheet-open .burger {
+  .site-nav-header.mobile-sheet-open .mobile-header-actions {
     display: none !important;
   }
 
@@ -2061,8 +2255,26 @@ const css = `
     display: none !important;
   }
 
+  .site-nav-header.mobile-sheet-open .nav.focus-saved .nav-left {
+    display: flex !important;
+    width: 100%;
+  }
+
+  .site-nav-header.mobile-sheet-open .nav.focus-saved .nav-left > * {
+    display: none !important;
+  }
+
+  .site-nav-header.mobile-sheet-open .nav.focus-saved .nav-left > .saved-searches-slot {
+    display: block !important;
+    width: 100%;
+  }
+
   .site-nav-header.mobile-sheet-open .nav-right {
     width: 100%;
+  }
+
+  .site-nav-header.mobile-sheet-open .nav.focus-saved .nav-right {
+    display: none !important;
   }
 
   .site-nav-header.mobile-sheet-open .nav-right > * {
@@ -2121,10 +2333,95 @@ const css = `
   }
 
   .nav-logo-image {
-    width: 7rem;
-    height: 3rem;
+    max-height: 44px;
+    max-width: min(228px, 48vw);
+  }
+
+  .nav-brand-link {
+    height: 44px;
+  }
+
+  .nav-brand-link:hover {
+    opacity: 0.92;
+  }
+
+  .mobile-header-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  .mobile-profile-slot {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .mobile-profile-slot .profile-menu-root {
+    display: inline-flex;
+  }
+
+  .mobile-header-bell {
+    display: inline-flex;
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    padding: 0;
+    justify-content: center;
     border-radius: 14px;
-    box-shadow: 0 5px 12px rgba(15, 118, 110, 0.2);
+    border: 1px solid #99f6e4;
+    background: linear-gradient(180deg, #ffffff 0%, #ecfdf5 100%);
+    box-shadow: 0 8px 18px rgba(15, 118, 110, 0.18);
+    color: #0f766e;
+  }
+
+  .mobile-header-bell:hover {
+    color: #0b5f59;
+    border-color: #5eead4;
+    background: linear-gradient(180deg, #ffffff 0%, #d1fae5 100%);
+  }
+
+  .nav-right > .profile-menu-desktop-slot {
+    display: none !important;
+  }
+
+  .nav-right > .notifications-wrap {
+    display: none !important;
+  }
+
+  .nav.focus-notifications {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: none;
+    transform: none;
+    padding: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    max-height: none;
+    overflow: visible;
+    backdrop-filter: none;
+    width: auto;
+    max-width: none;
+  }
+
+  .nav.focus-notifications .nav-left {
+    display: none !important;
+  }
+
+  .nav.focus-notifications .nav-right {
+    width: auto;
+  }
+
+  .nav.focus-notifications .nav-right > * {
+    display: none !important;
+  }
+
+  .nav.focus-notifications .nav-right > .notifications-wrap {
+    display: block !important;
+    width: auto !important;
+    pointer-events: auto;
   }
 
   .burger {
@@ -2134,21 +2431,33 @@ const css = `
     width: 42px;
     height: 42px;
     padding: 0;
-    margin-left: auto;
+    margin-left: 0;
     border-radius: 14px;
     background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
     box-shadow: 0 8px 18px rgba(15, 23, 42, 0.22);
   }
 
+  .burger.open {
+    background: linear-gradient(135deg, #0b5f59 0%, #0f766e 100%);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.28);
+    transform: translateY(-1px);
+  }
+
+  .burger:active {
+    transform: translateY(0);
+  }
+
   .nav {
-    display: none;
+    display: flex;
     position: fixed;
     top: calc(64px + env(safe-area-inset-top, 0px) + 6px);
-    left: 10px;
     right: 10px;
+    left: auto;
+    width: min(360px, calc(100vw - 16px));
+    max-width: calc(100vw - 16px);
     background: rgba(255, 255, 255, 0.98);
     border: 1px solid #dbeafe;
-    border-radius: 18px;
+    border-radius: 20px;
     padding: 12px;
     flex-direction: column;
     gap: 10px;
@@ -2158,10 +2467,27 @@ const css = `
     overflow-y: auto;
     overscroll-behavior: contain;
     z-index: 320;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateX(14px) scale(0.98);
+    transform-origin: top right;
+    transition:
+      opacity 0.24s ease,
+      transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+      visibility 0s linear 0.28s;
   }
 
   .nav.open {
-    display: flex;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(0) scale(1);
+    transition-delay: 0s;
+  }
+
+  .nav:not(.open):not(.focus-notifications):not(.focus-profile):not(.focus-topup):not(.focus-saved) .nav-group {
+    display: none !important;
   }
 
   .nav-mobile-backdrop {
@@ -2173,6 +2499,14 @@ const css = `
     padding: 0;
     background: rgba(15, 23, 42, 0.18);
     z-index: 300;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.24s ease;
+  }
+
+  .nav-mobile-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .site-nav-header.mobile-sheet-open .nav-mobile-backdrop {
@@ -2224,11 +2558,11 @@ const css = `
   }
 
   .notifications-wrap {
-    width: 100%;
+    width: auto;
     position: static;
   }
 
-  .btn-notifications {
+  .nav .btn-notifications {
     width: 100%;
     min-width: 0;
     min-height: 44px;
@@ -2238,7 +2572,7 @@ const css = `
     padding: 0 14px;
   }
 
-  .notifications-mobile-label {
+  .nav .notifications-mobile-label {
     display: inline-flex;
     align-items: center;
     font-size: 13px;
@@ -2249,16 +2583,37 @@ const css = `
   .notifications-menu {
     position: fixed;
     top: calc(64px + env(safe-area-inset-top, 0px) + 8px);
-    left: 10px;
     right: 10px;
-    width: auto;
+    left: auto;
+    width: min(360px, calc(100vw - 16px));
+    max-width: calc(100vw - 16px);
     margin-top: 0;
-    border-radius: 18px;
+    border-radius: 20px;
     box-shadow: 0 18px 38px rgba(15, 23, 42, 0.22);
     padding: 12px;
     max-height: calc(100dvh - 84px);
     overflow: hidden;
     z-index: 360;
+    border: 1px solid #dbeafe;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .notifications-title {
+    font-size: 15px;
+    margin-bottom: 10px;
+  }
+
+  .notifications-tabs {
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .notifications-tab {
+    height: 36px;
+    border-radius: 12px;
+    font-size: 12px;
   }
 
   .site-nav-header.mobile-sheet-open .nav {
@@ -2272,49 +2627,7 @@ const css = `
   }
 
   .notifications-mobile-back-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    height: 38px;
-    padding: 0 14px 0 8px;
-    border-radius: 999px;
-    border: 1px solid rgba(148, 163, 184, 0.48);
-    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-    color: #0f172a;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.01em;
-    margin-bottom: 10px;
-    cursor: pointer;
-    box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
-    position: sticky;
-    top: 0;
-    z-index: 2;
-  }
-
-  .site-nav-header.mobile-sheet-open .notifications-mobile-back-btn {
-    display: none;
-  }
-
-  .notifications-mobile-back-btn:hover {
-    border-color: rgba(45, 212, 191, 0.62);
-    background: linear-gradient(180deg, #ffffff 0%, #ecfeff 100%);
-  }
-
-  .notifications-mobile-back-btn:active {
-    transform: translateY(1px);
-  }
-
-  .notifications-mobile-back-icon {
-    width: 22px;
-    height: 22px;
-    border-radius: 999px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: #0f766e;
-    background: #ccfbf1;
-    border: 1px solid #99f6e4;
+    display: none !important;
   }
 
   .notifications-tabs {
@@ -2323,7 +2636,35 @@ const css = `
 
   .notifications-list,
   .subscriptions-list {
-    max-height: min(52vh, 420px);
+    max-height: min(56vh, 440px);
+    padding-right: 4px;
+  }
+
+  .notification-item,
+  .subscription-item {
+    border-radius: 14px;
+    padding: 11px;
+  }
+
+  .notifications-mark-all-btn {
+    min-height: 38px;
+    border-radius: 12px;
+    font-size: 13px;
+  }
+
+  .notification-link-btn,
+  .notification-expand-btn,
+  .notification-read-btn,
+  .notification-read-label {
+    width: 34px;
+    height: 30px;
+  }
+
+  .subscription-open-btn,
+  .subscription-remove-btn {
+    min-height: 30px;
+    padding: 4px 11px;
+    font-size: 11px;
   }
 
   .notification-item-main {
@@ -2413,9 +2754,16 @@ const css = `
   }
 
   .nav-logo-image {
-    width: 6.1rem;
-    height: 2.7rem;
-    border-radius: 12px;
+    max-height: 40px;
+    max-width: min(200px, 58vw);
+  }
+
+  .nav-brand-link {
+    height: 40px;
+  }
+
+  .nav-brand-link:hover {
+    opacity: 0.92;
   }
 
   .burger {
@@ -2426,10 +2774,12 @@ const css = `
 
   .nav {
     top: calc(58px + env(safe-area-inset-top, 0px) + 6px);
-    left: 8px;
     right: 8px;
+    left: auto;
+    width: min(332px, calc(100vw - 12px));
+    max-width: calc(100vw - 12px);
     padding: 10px;
-    border-radius: 16px;
+    border-radius: 18px;
     max-height: calc(100dvh - 74px);
   }
 
@@ -2450,10 +2800,12 @@ const css = `
 
   .notifications-menu {
     top: calc(58px + env(safe-area-inset-top, 0px) + 8px);
-    left: 8px;
     right: 8px;
+    left: auto;
+    width: min(332px, calc(100vw - 12px));
+    max-width: calc(100vw - 12px);
     padding: 10px;
-    border-radius: 16px;
+    border-radius: 18px;
     max-height: calc(100dvh - 74px);
   }
 
@@ -2481,7 +2833,11 @@ const css = `
   .nav-publish-cta,
   .nav-publish-cta::before,
   .nav-publish-icon,
-  .btn-notifications.has-unread .notifications-bell-icon {
+  .btn-notifications.has-unread .notifications-bell-icon,
+  .nav,
+  .nav-mobile-backdrop,
+  .burger,
+  .burger-icon {
     animation: none;
     transition: none;
   }

@@ -8,7 +8,6 @@ import {
   Plus,
   List,
   X,
-  ChevronLeft,
   Camera,
   LogOut,
 } from "lucide-react";
@@ -29,6 +28,7 @@ type ProfileMenuProps = {
   onTopUpModalOpenChange?: (isOpen: boolean) => void;
   closeRequestKey?: number;
   topUpModalCloseRequestKey?: number;
+  compactTrigger?: boolean;
 };
 
 const ProfileMenu: React.FC<ProfileMenuProps> = ({
@@ -36,6 +36,7 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
   onTopUpModalOpenChange,
   closeRequestKey,
   topUpModalCloseRequestKey,
+  compactTrigger = false,
 }) => {
   const { user, updateBalance, logout } = useAuth();
   const location = useLocation();
@@ -332,6 +333,18 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
       color: "#0f766e",
       border: "none",
     },
+    profileIconCompact: {
+      width: 42,
+      minWidth: 42,
+      height: 42,
+      padding: 0,
+      justifyContent: "center",
+      borderRadius: 14,
+      border: "1px solid #cbd5e1",
+      background: "#ffffff",
+      boxShadow: "0 6px 14px rgba(15, 23, 42, 0.14)",
+      gap: 0,
+    },
     profileLabel: {
       maxWidth: 96,
       overflow: "hidden",
@@ -525,6 +538,7 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
   const profileTriggerLabel =
     user.username?.trim() || user.first_name?.trim() || fullName || "Профил";
   const isBusiness = user.userType === "business";
+  const triggerAvatarSize = compactTrigger ? 22 : 20;
   const createdAtLabel = user.created_at
     ? new Date(user.created_at).toLocaleDateString("bg-BG", {
         day: "numeric",
@@ -535,16 +549,16 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
 
   return (
     <>
-      <div style={styles.profileContainer} className="profile-menu-root">
+      <div
+        style={styles.profileContainer}
+        className={`profile-menu-root ${compactTrigger ? "profile-menu-root-compact" : "profile-menu-root-default"}`}
+      >
         <style>{`
           .profile-menu-backdrop {
             z-index: 999;
           }
-          .profile-menu-mobile-back {
-            display: none;
-          }
           @media (max-width: 960px) {
-            .profile-menu-trigger {
+            .profile-menu-trigger:not(.profile-menu-trigger-compact) {
               width: 100% !important;
               min-height: 44px !important;
               justify-content: flex-start !important;
@@ -552,6 +566,21 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
               border-radius: 14px !important;
               background: #fff !important;
               padding: 0 14px !important;
+            }
+            .profile-menu-trigger.profile-menu-trigger-compact {
+              width: 42px !important;
+              min-width: 42px !important;
+              height: 42px !important;
+              min-height: 42px !important;
+              padding: 0 !important;
+              justify-content: center !important;
+              border: 1px solid #99f6e4 !important;
+              border-radius: 14px !important;
+              background: linear-gradient(180deg, #ffffff 0%, #ecfdf5 100%) !important;
+              box-shadow: 0 8px 18px rgba(15, 118, 110, 0.18) !important;
+            }
+            .profile-menu-trigger.profile-menu-trigger-compact .profile-menu-trigger-label {
+              display: none !important;
             }
             .profile-menu-dropdown {
               position: fixed !important;
@@ -566,45 +595,84 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
               z-index: 370 !important;
               max-height: calc(100dvh - 84px) !important;
               overflow-y: auto !important;
+              border: 1px solid #dbeafe !important;
+              background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
+              display: flex !important;
+              flex-direction: column !important;
+            }
+            .profile-menu-root-compact .profile-menu-dropdown {
+              left: auto !important;
+              right: 10px !important;
+              width: min(360px, calc(100vw - 16px)) !important;
+              max-width: calc(100vw - 16px) !important;
+              min-width: 0 !important;
+              border-radius: 20px !important;
             }
             .site-nav-header.mobile-sheet-open .profile-menu-dropdown {
               top: calc(82px + env(safe-area-inset-top, 0px) + 8px) !important;
               max-height: calc(100dvh - 102px) !important;
             }
-            .profile-menu-mobile-back {
-              width: calc(100% - 16px) !important;
-              margin: 8px 8px 6px !important;
-              display: inline-flex !important;
-              align-items: center !important;
-              gap: 8px !important;
-              height: 38px !important;
-              padding: 0 14px 0 8px !important;
-              border-radius: 999px !important;
-              border: 1px solid rgba(148, 163, 184, 0.48) !important;
-              background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%) !important;
-              color: #0f172a !important;
-              font-size: 12px !important;
-              font-weight: 700 !important;
-              letter-spacing: 0.01em !important;
-              cursor: pointer !important;
-              box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08) !important;
+            .site-nav-header.mobile-sheet-open .profile-menu-root-compact .profile-menu-dropdown {
+              left: auto !important;
+              right: 10px !important;
             }
-            .site-nav-header.mobile-sheet-open .profile-menu-mobile-back {
-              display: none !important;
+            .profile-menu-photo-section {
+              padding: 14px 14px 12px !important;
+              gap: 10px !important;
+              border-bottom: 1px solid #e2e8f0 !important;
             }
-            .profile-menu-mobile-back-icon {
-              width: 22px !important;
-              height: 22px !important;
-              border-radius: 999px !important;
-              display: inline-flex !important;
-              align-items: center !important;
-              justify-content: center !important;
+            .profile-menu-photo-name {
+              font-size: 13px !important;
+              line-height: 1.3 !important;
+            }
+            .profile-menu-photo-type {
+              font-size: 11px !important;
+            }
+            .profile-menu-close-btn {
+              width: 32px !important;
+              height: 32px !important;
+              padding: 0 !important;
+              border-radius: 10px !important;
+              background: rgba(15, 118, 110, 0.12) !important;
               color: #0f766e !important;
-              background: #ccfbf1 !important;
-              border: 1px solid #99f6e4 !important;
+              flex-shrink: 0 !important;
             }
-            .profile-menu-mobile-back:active {
-              transform: translateY(1px) !important;
+            .profile-menu-balance-section {
+              padding: 14px !important;
+            }
+            .profile-menu-balance-value {
+              font-size: 24px !important;
+              line-height: 1.15 !important;
+            }
+            .profile-menu-topup-btn {
+              min-height: 42px !important;
+              padding: 0 14px !important;
+              border-radius: 12px !important;
+              font-size: 13px !important;
+              font-weight: 700 !important;
+              box-shadow: 0 5px 14px rgba(15, 118, 110, 0.22) !important;
+            }
+            .profile-menu-items {
+              padding: 8px !important;
+              display: flex !important;
+              flex-direction: column !important;
+              gap: 6px !important;
+            }
+            .profile-menu-item-link {
+              min-height: 44px !important;
+              border: 1px solid #e2e8f0 !important;
+              border-radius: 12px !important;
+              background: #fff !important;
+              padding: 0 12px !important;
+              font-size: 13px !important;
+              font-weight: 700 !important;
+            }
+            .profile-menu-item-logout {
+              border-color: #fecaca !important;
+              background: #fff7f7 !important;
+            }
+            .profile-menu-divider {
+              display: none !important;
             }
             .profile-menu-backdrop {
               z-index: 360 !important;
@@ -619,9 +687,20 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
               border-radius: 16px !important;
               max-height: calc(100dvh - 74px) !important;
             }
+            .profile-menu-root-compact .profile-menu-dropdown {
+              left: auto !important;
+              right: 8px !important;
+              width: min(332px, calc(100vw - 12px)) !important;
+              max-width: calc(100vw - 12px) !important;
+              border-radius: 18px !important;
+            }
             .site-nav-header.mobile-sheet-open .profile-menu-dropdown {
               top: calc(72px + env(safe-area-inset-top, 0px) + 8px) !important;
               max-height: calc(100dvh - 88px) !important;
+            }
+            .site-nav-header.mobile-sheet-open .profile-menu-root-compact .profile-menu-dropdown {
+              left: auto !important;
+              right: 8px !important;
             }
           }
         `}</style>
@@ -638,22 +717,37 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
 
         {/* Profile Icon */}
         <button
-          className="profile-menu-trigger"
+          className={`profile-menu-trigger ${compactTrigger ? "profile-menu-trigger-compact" : "profile-menu-trigger-default"}`}
           style={{
             ...styles.profileIcon,
+            ...(compactTrigger ? styles.profileIconCompact : {}),
             ...(hoveredIcon || isDropdownOpen ? styles.profileIconHover : {}),
           }}
           onMouseEnter={() => setHoveredIcon(true)}
           onMouseLeave={() => setHoveredIcon(false)}
           onClick={() => setIsDropdownOpen(!isDropdownOpen)}
           title="Профилен меню"
+          aria-label={profileTriggerLabel}
         >
           {profileImageUrl ? (
-            <img src={profileImageUrl} alt="" style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover" }} />
+            <img
+              src={profileImageUrl}
+              alt=""
+              style={{
+                width: triggerAvatarSize,
+                height: triggerAvatarSize,
+                borderRadius: "50%",
+                objectFit: "cover",
+              }}
+            />
           ) : (
             <User size={18} />
           )}
-          <span style={styles.profileLabel}>{profileTriggerLabel}</span>
+          {!compactTrigger && (
+            <span style={styles.profileLabel} className="profile-menu-trigger-label">
+              {profileTriggerLabel}
+            </span>
+          )}
         </button>
 
         {/* Dropdown Menu */}
@@ -674,20 +768,8 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
             />
 
             <div style={styles.dropdown} className="profile-menu-dropdown">
-              <button
-                type="button"
-                className="profile-menu-mobile-back"
-                onClick={closeDropdown}
-                aria-label="Назад към менюто"
-              >
-                <span className="profile-menu-mobile-back-icon" aria-hidden="true">
-                  <ChevronLeft size={14} />
-                </span>
-                <span>Към менюто</span>
-              </button>
-
               {/* Profile photo + name section */}
-              <div style={styles.photoSection}>
+              <div style={styles.photoSection} className="profile-menu-photo-section">
                 <div
                   style={styles.avatarWrap}
                   onClick={() => isBusiness && fileInputRef.current?.click()}
@@ -712,8 +794,10 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
                   )}
                 </div>
                 <div style={styles.photoInfo}>
-                  <div style={styles.photoName}>{user.username || fullName || user.email}</div>
-                  <div style={styles.photoType}>
+                  <div style={styles.photoName} className="profile-menu-photo-name">
+                    {user.username || fullName || user.email}
+                  </div>
+                  <div style={styles.photoType} className="profile-menu-photo-type">
                     {isBusiness ? "Бизнес профил" : "Частен профил"}
                     {uploadingPhoto && " — качване..."}
                   </div>
@@ -723,6 +807,7 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
                 </div>
                 <button
                   style={styles.closeBtn}
+                  className="profile-menu-close-btn"
                   onClick={closeDropdown}
                 >
                   <X size={16} />
@@ -730,14 +815,14 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
               </div>
 
               {/* Balance Section */}
-              <div style={styles.balanceSection}>
+              <div style={styles.balanceSection} className="profile-menu-balance-section">
                 <div style={styles.balanceHeader}>
                   <div style={styles.balanceInfo}>
                     <div style={styles.balanceLabel}>
                       <Wallet size={14} />
                       Баланс
                     </div>
-                    <div style={styles.balanceValue}>
+                    <div style={styles.balanceValue} className="profile-menu-balance-value">
                       €{balance.toFixed(2)}
                     </div>
                     <div style={styles.balanceSubtext}>
@@ -748,6 +833,7 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
 
                 <button
                   style={styles.topupButton}
+                  className="profile-menu-topup-btn"
                   onMouseEnter={(e) => {
                     (e.target as HTMLElement).style.transform = "translateY(-2px)";
                     (e.target as HTMLElement).style.boxShadow = "0 4px 12px rgba(15,118,110,0.25)";
@@ -767,10 +853,11 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
               </div>
 
               {/* Menu Items */}
-              <div style={styles.menuSection}>
+              <div style={styles.menuSection} className="profile-menu-items">
                 <Link
                   to="/my-ads"
                   style={styles.menuItem}
+                  className="profile-menu-item-link"
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLElement).style.background = "#ecfdf5";
                     (e.currentTarget as HTMLElement).style.color = "#0f766e";
@@ -785,11 +872,12 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
                   <span>Моите обяви</span>
                 </Link>
 
-                <div style={styles.divider} />
+                <div style={styles.divider} className="profile-menu-divider" />
 
                 <Link
                   to="/settings"
                   style={styles.menuItem}
+                  className="profile-menu-item-link"
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLElement).style.background = "#ecfdf5";
                     (e.currentTarget as HTMLElement).style.color = "#0f766e";
@@ -804,10 +892,11 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
                   <span>Настройки</span>
                 </Link>
 
-                <div style={styles.divider} />
+                <div style={styles.divider} className="profile-menu-divider" />
 
                 <button
                   type="button"
+                  className="profile-menu-item-link profile-menu-item-logout"
                   style={{
                     ...styles.menuItem,
                     ...styles.menuItemDanger,

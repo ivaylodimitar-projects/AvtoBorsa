@@ -2521,20 +2521,20 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         width: 100%;
       }
       .adv-sticky-submit-bar {
-        left: 10px;
-        right: 10px;
+        left: 50%;
+        right: auto;
         bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
-        width: auto;
-        max-width: none;
+        width: min(520px, calc(100vw - 48px));
+        max-width: calc(100vw - 48px);
         flex-direction: row;
         align-items: center;
         gap: 8px;
         padding: 8px;
         border-radius: 18px;
-        transform: translateY(18px);
+        transform: translate(-50%, 18px);
       }
       .adv-sticky-submit-bar.is-visible {
-        transform: translateY(0);
+        transform: translate(-50%, 0);
       }
       .adv-sticky-category-panel {
         min-width: 0;
@@ -2562,12 +2562,18 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       }
       .adv-sticky-category-dropdown {
         position: fixed;
-        left: 10px;
-        right: 10px;
+        left: 50%;
+        right: auto;
+        width: min(520px, calc(100vw - 48px));
+        max-width: calc(100vw - 48px);
         bottom: calc(env(safe-area-inset-bottom, 0px) + 64px);
         max-height: min(340px, 52vh);
         border-radius: 16px;
         z-index: 1400;
+        transform: translate(-50%, 6px);
+      }
+      .adv-sticky-category-dropdown.is-open {
+        transform: translate(-50%, 0);
       }
       .adv-sticky-category-option {
         min-height: 36px;

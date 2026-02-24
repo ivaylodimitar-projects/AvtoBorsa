@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiBell } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
@@ -498,6 +498,66 @@ const DealersPage: React.FC = () => {
       gap: 8,
       justifySelf: "end",
     },
+    mobileRankList: {
+      display: "none",
+      flexDirection: "column",
+      gap: 10,
+      marginTop: 16,
+    },
+    mobileRankCard: {
+      border: "1px solid #e5e7eb",
+      borderRadius: 16,
+      background: "#fff",
+      padding: 12,
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+      cursor: "pointer",
+      transition: "box-shadow 0.2s, transform 0.2s",
+    },
+    mobileRankTop: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 10,
+    },
+    mobileRankLeft: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      minWidth: 0,
+      flex: 1,
+    },
+    mobileRankMeta: {
+      fontSize: 12,
+      color: "#6b7280",
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 6,
+    },
+    mobileRankScore: {
+      fontSize: 13,
+      fontWeight: 800,
+      color: "#0f766e",
+      background: "#ecfdf5",
+      border: "1px solid #99f6e4",
+      borderRadius: 999,
+      padding: "4px 10px",
+      whiteSpace: "nowrap",
+      alignSelf: "flex-start",
+    },
+    mobileRankActions: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      flexWrap: "wrap",
+    },
+    mobileTop3List: {
+      display: "none",
+      flexDirection: "column",
+      gap: 10,
+      marginTop: 8,
+    },
     empty: {
       textAlign: "center",
       padding: 50,
@@ -545,17 +605,34 @@ const DealersPage: React.FC = () => {
         @keyframes spin { to { transform: rotate(360deg); } }
         .podium-card:hover { transform: translateY(-3px); box-shadow: 0 6px 16px rgba(0,0,0,0.12); }
         .rank-row:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.10); }
+        .mobile-rank-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.10); }
 
         @media (max-width: 900px) {
-          .podium-grid { grid-template-columns: 1fr; }
+          .podium-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
+          .podium-card { min-height: 0 !important; padding: 14px !important; }
+          .podium-actions button { flex: 1 1 0; min-width: 120px; }
           .rank-row { grid-template-columns: 40px 48px 1fr; }
           .rank-stats { text-align: left !important; min-width: 0 !important; }
           .rank-actions { justify-self: start !important; }
         }
+
+        @media (max-width: 700px) {
+          .dealers-main { padding: 14px 12px 40px !important; }
+          .dealers-hero { padding: 16px !important; border-radius: 14px !important; }
+          .dealers-filter { width: 100%; }
+          .dealers-filter-select { width: 100%; min-width: 0 !important; }
+          .dealers-count { width: 100%; margin-left: 0 !important; }
+          .dealers-section { padding: 14px !important; border-radius: 14px !important; }
+          .podium-grid-desktop { display: none !important; }
+          .mobile-top3-list { display: flex !important; }
+          .desktop-rank-list { display: none !important; }
+          .mobile-rank-list { display: flex !important; }
+          .mobile-rank-actions button { flex: 1 1 0; min-width: 120px; }
+        }
       `}</style>
 
-      <main style={styles.main}>
-        <section style={styles.hero}>
+      <main style={styles.main} className="dealers-main">
+        <section style={styles.hero} className="dealers-hero">
           <div>
             <h1 style={styles.heroTitle}>Дилърски лидерборд</h1>
             <p style={styles.heroSubtitle}>
@@ -566,10 +643,11 @@ const DealersPage: React.FC = () => {
             {rankedDealers.length} {rankedDealers.length === 1 ? "дилър" : "дилъра"}
           </div>
 
-          <div style={styles.filterBar}>
+          <div style={styles.filterBar} className="dealers-filter">
             <span style={styles.filterLabel}>Филтър по град:</span>
             <select
               style={styles.filterSelect}
+              className="dealers-filter-select"
               value={searchCity}
               onChange={(e) => setSearchCity(e.target.value)}
             >
@@ -579,7 +657,7 @@ const DealersPage: React.FC = () => {
                 </option>
               ))}
             </select>
-            <span style={styles.dealerCount}>
+            <span style={styles.dealerCount} className="dealers-count">
               {filteredDealers.length} {filteredDealers.length === 1 ? "дилър" : "дилъра"}
             </span>
           </div>
@@ -591,7 +669,7 @@ const DealersPage: React.FC = () => {
           </div>
         ) : filteredDealers.length > 0 ? (
           <>
-            <section style={styles.section}>
+            <section style={styles.section} className="dealers-section">
               <div style={styles.sectionHeader}>
                 <div>
                   <h2 style={styles.h2}>ТОП 3</h2>
@@ -599,7 +677,7 @@ const DealersPage: React.FC = () => {
                 </div>
               </div>
 
-              <div style={styles.podiumGrid} className="podium-grid">
+              <div style={styles.podiumGrid} className="podium-grid podium-grid-desktop">
                 {podiumSlots.map((slot) => {
                   const dealer = slot.dealer!;
                   const rankStyles = getRankStyles(slot.rank);
@@ -641,7 +719,7 @@ const DealersPage: React.FC = () => {
                         {getDescription(dealer.description, 180)}
                       </div>
                       <div style={styles.podiumScore}>{dealer.listing_count} обяви</div>
-                      <div style={styles.podiumActions}>
+                      <div style={styles.podiumActions} className="podium-actions">
                         <button
                           type="button"
                           style={{
@@ -673,9 +751,88 @@ const DealersPage: React.FC = () => {
                   );
                 })}
               </div>
+              <div style={styles.mobileTop3List} className="mobile-top3-list">
+                {topDealers.map((dealer, index) => {
+                  const rank = index + 1;
+                  return (
+                    <div
+                      key={`top3-mobile-${dealer.id}`}
+                      className="mobile-rank-card"
+                      style={{
+                        ...styles.mobileRankCard,
+                        ...(hoveredCard === dealer.id ? { boxShadow: "0 4px 12px rgba(0,0,0,0.12)" } : {}),
+                      }}
+                      onMouseEnter={() => setHoveredCard(dealer.id)}
+                      onMouseLeave={() => setHoveredCard(null)}
+                      onClick={() => navigate(`/dealers/${dealer.id}`)}
+                    >
+                      <div style={styles.mobileRankTop}>
+                        <div style={styles.mobileRankLeft}>
+                          <div style={styles.rankIndex}>#{rank}</div>
+                          <div style={styles.rankAvatar}>
+                            {dealer.profile_image_url ? (
+                              <img
+                                src={dealer.profile_image_url}
+                                alt={dealer.dealer_name}
+                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                              />
+                            ) : (
+                              <div style={styles.podiumAvatarFallback}>
+                                {getInitial(dealer.dealer_name)}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={styles.rankName}>{dealer.dealer_name}</div>
+                            <div style={styles.mobileRankMeta}>
+                              <span>{dealer.city}</span>
+                              <span style={{ color: "#d1d5db" }}>|</span>
+                              <span>в Kar.bg {getRelativeTime(dealer.created_at)}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div style={styles.mobileRankScore}>{dealer.listing_count} обяви</div>
+                      </div>
+
+                      <div style={styles.rankDescription}>
+                        {getDescription(dealer.description, 130)}
+                      </div>
+
+                      <div style={styles.mobileRankActions} className="mobile-rank-actions">
+                        <button
+                          type="button"
+                          style={{
+                            ...styles.followButton,
+                            ...(isDealerFollowed(dealer.id) ? styles.followButtonActive : {}),
+                          }}
+                          onClick={(event) => handleToggleDealerFollow(event, dealer)}
+                          aria-label={
+                            isDealerFollowed(dealer.id)
+                              ? `Спри следването на ${dealer.dealer_name}`
+                              : `Следвай ${dealer.dealer_name}`
+                          }
+                          title={isDealerFollowed(dealer.id) ? "Спри следването" : "Следвай дилъра"}
+                        >
+                          <FiBell size={14} />
+                          {isDealerFollowed(dealer.id) ? "Следваш" : "Следвай"}
+                        </button>
+                        <button
+                          style={styles.rankButton}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/dealers/${dealer.id}`);
+                          }}
+                        >
+                          Профил
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </section>
 
-            <section style={styles.section}>
+            <section style={styles.section} className="dealers-section">
               <div style={styles.sectionHeader}>
                 <div>
                   <h2 style={styles.h2}>Класация</h2>
@@ -683,7 +840,7 @@ const DealersPage: React.FC = () => {
                 </div>
               </div>
 
-              <div style={styles.rankList}>
+              <div style={styles.rankList} className="desktop-rank-list">
                 {restDealers.map((dealer, index) => {
                   const rank = topDealers.length + index + 1;
                   return (
@@ -762,6 +919,87 @@ const DealersPage: React.FC = () => {
                   );
                 })}
               </div>
+
+              <div style={styles.mobileRankList} className="mobile-rank-list">
+                {rankedDealers.map((dealer, index) => {
+                  const rank = index + 1;
+                  return (
+                    <div
+                      key={`mobile-rank-${dealer.id}`}
+                      className="mobile-rank-card"
+                      style={{
+                        ...styles.mobileRankCard,
+                        ...(hoveredCard === dealer.id ? { boxShadow: "0 4px 12px rgba(0,0,0,0.12)" } : {}),
+                      }}
+                      onMouseEnter={() => setHoveredCard(dealer.id)}
+                      onMouseLeave={() => setHoveredCard(null)}
+                      onClick={() => navigate(`/dealers/${dealer.id}`)}
+                    >
+                      <div style={styles.mobileRankTop}>
+                        <div style={styles.mobileRankLeft}>
+                          <div style={styles.rankIndex}>#{rank}</div>
+                          <div style={styles.rankAvatar}>
+                            {dealer.profile_image_url ? (
+                              <img
+                                src={dealer.profile_image_url}
+                                alt={dealer.dealer_name}
+                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                              />
+                            ) : (
+                              <div style={styles.podiumAvatarFallback}>
+                                {getInitial(dealer.dealer_name)}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={styles.rankName}>{dealer.dealer_name}</div>
+                            <div style={styles.mobileRankMeta}>
+                              <span>{dealer.city}</span>
+                              <span style={{ color: "#d1d5db" }}>|</span>
+                              <span>в Kar.bg {getRelativeTime(dealer.created_at)}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div style={styles.mobileRankScore}>{dealer.listing_count} обяви</div>
+                      </div>
+
+                      <div style={styles.rankDescription}>
+                        {getDescription(dealer.description, 130)}
+                      </div>
+
+                      <div style={styles.mobileRankActions} className="mobile-rank-actions">
+                        <button
+                          type="button"
+                          style={{
+                            ...styles.followButton,
+                            ...(isDealerFollowed(dealer.id) ? styles.followButtonActive : {}),
+                          }}
+                          onClick={(event) => handleToggleDealerFollow(event, dealer)}
+                          aria-label={
+                            isDealerFollowed(dealer.id)
+                              ? `Спри следването на ${dealer.dealer_name}`
+                              : `Следвай ${dealer.dealer_name}`
+                          }
+                          title={isDealerFollowed(dealer.id) ? "Спри следването" : "Следвай дилъра"}
+                        >
+                          <FiBell size={14} />
+                          {isDealerFollowed(dealer.id) ? "Следваш" : "Следвай"}
+                        </button>
+                        <button
+                          style={styles.rankButton}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/dealers/${dealer.id}`);
+                          }}
+                        >
+                          Профил
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
             </section>
           </>
         ) : (
@@ -780,3 +1018,4 @@ const DealersPage: React.FC = () => {
 };
 
 export default DealersPage;
+

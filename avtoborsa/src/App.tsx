@@ -23,6 +23,7 @@ function App() {
   const location = useLocation()
   const { authTransition } = useAuth()
   const isAdminRoute = location.pathname === '/admin' || location.pathname.startsWith('/admin/')
+  const showSharedFooter = !isAdminRoute
   const showAuthTransitionScreen = authTransition !== null
   const transitionTitle =
     authTransition === 'logout' ? 'Излизане от профила...' : 'Влизане в профила...'
@@ -52,7 +53,7 @@ function App() {
         <Route path="/details/:slug" element={<VehicleDetailsPage />} />
         <Route path="/admin" element={<AdminPage />} />
       </Routes>
-      {!isAdminRoute && <Footer />}
+      {showSharedFooter && <Footer />}
       {showAuthTransitionScreen && (
         <div
           style={{

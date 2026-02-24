@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import karBgLogo from "../assets/karbglogo.jpg";
+import karBgLogo from "../assets/karbglogo.png";
 import { API_BASE_URL } from "../config/api";
 
 const ForgotPasswordPage: React.FC = () => {
