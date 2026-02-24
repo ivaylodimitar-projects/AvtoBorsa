@@ -194,6 +194,7 @@ CORS_ALLOWED_ORIGINS = sorted(
             "http://127.0.0.1:5173",
             "http://localhost:3000",
             "http://127.0.0.1:3000",
+	    "https://www.bwraap.com",
             FRONTEND_BASE_URL,
         ]
         + _split_csv_env("CORS_ALLOWED_ORIGINS")
