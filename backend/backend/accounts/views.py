@@ -18,6 +18,7 @@ from django.core.mail import send_mail
 from django.core.cache import cache
 from django.core.files.base import ContentFile
 from django.db import IntegrityError
+from django.db.models import Prefetch
 from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -1622,14 +1623,30 @@ def dealer_detail(request, pk):
     data = serializer.data
 
     # Include dealer's active listings
+    from backend.listings.models import CarImage
     from backend.listings.serializers import CarListingSerializer
     cutoff = get_expiry_cutoff()
+    image_prefetch = Prefetch(
+        'images',
+        queryset=CarImage.objects.only(
+            'id',
+            'image',
+            'thumbnail',
+            'renditions',
+            'original_width',
+            'original_height',
+            'low_res',
+            'order',
+            'is_cover',
+            'listing_id',
+        ).order_by('-is_cover', 'order', 'id')
+    )
     listings = dealer.user.car_listings.filter(
         is_active=True,
         is_draft=False,
         is_archived=False,
         created_at__gte=cutoff
-    ).order_by('-created_at')
+    ).prefetch_related(image_prefetch).order_by('-created_at')
     listings_data = CarListingSerializer(listings, many=True, context={'request': request}).data
     data['listings'] = listings_data
 

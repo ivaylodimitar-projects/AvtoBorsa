@@ -5,11 +5,13 @@ import { useThrottle } from '../../hooks/useThrottle';
 import { useGalleryLazyLoad, useImageUrl } from '../../hooks/useGalleryLazyLoad';
 import ListingPromoBadge from '../ListingPromoBadge';
 import KapariranoBadge from '../KapariranoBadge';
+import ResponsiveImage, { type ApiPhoto, type PhotoRendition } from '../ResponsiveImage';
 
-interface Image {
+interface Image extends ApiPhoto {
   id: number;
   image: string;
   thumbnail?: string | null;
+  renditions?: PhotoRendition[] | null;
 }
 
 interface RezonGalleryProps {
@@ -25,29 +27,32 @@ interface RezonGalleryProps {
 
 // Memoized main image component with lazy loading
 const MainCarouselImage = memo<{
-  src: string;
+  photo: Image;
+  fallbackPath?: string | null;
   title: string;
   isActive: boolean;
-}>(({ src, title, isActive }) => (
-  <img
-    src={src}
+}>(({ photo, fallbackPath, title, isActive }) => (
+  <ResponsiveImage
+    photo={photo}
+    fallbackPath={fallbackPath}
     alt={title}
+    kind="detail"
+    strictKind
+    preventUpscale={false}
+    sizes="(max-width: 768px) 100vw, 658px"
     loading={isActive ? 'eager' : 'lazy'}
     decoding="async"
     fetchPriority={isActive ? 'high' : 'auto'}
-    draggable={false}
-    style={{
+    objectFit="cover"
+    containerStyle={{ width: '100%', height: '100%' }}
+    imgStyle={{
       width: '100%',
       height: '100%',
-      objectFit: 'cover',
-      objectPosition: 'center',
-      imageRendering: 'auto',
       display: 'block',
       userSelect: 'none',
       WebkitUserSelect: 'none',
       msUserSelect: 'none',
     }}
-    onDragStart={(e) => e.preventDefault()}
   />
 ));
 
@@ -722,30 +727,109 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
   const touchStartRef = useRef<number>(0);
   const getImageUrl = useImageUrl();
-  const isThumbnailPath = useCallback((path?: string | null) => {
-    const normalized = (path || '').toLowerCase();
-    return normalized.includes('/thumbs/') || /_sm\.(webp|jpg|jpeg|png)$/.test(normalized);
-  }, []);
-  const resolveMainImagePath = useCallback((img: Image) => {
-    const originalPath = (img?.image || '').trim();
-    const thumbPath = (img?.thumbnail || '').trim();
-    if (!originalPath) return thumbPath;
-    if (!thumbPath) return originalPath;
-    if (isThumbnailPath(originalPath) && !isThumbnailPath(thumbPath)) {
-      return thumbPath;
-    }
-    return originalPath;
-  }, [isThumbnailPath]);
+  const resolveRenditionPath = useCallback(
+    (
+      img: Image,
+      kind: 'grid' | 'detail',
+      preferredWidth: number,
+      allowSmaller = true
+    ) => {
+      const normalizedRenditions = (Array.isArray(img?.renditions) ? img.renditions : [])
+        .map((item) => {
+          const width = typeof item?.width === 'number' ? item.width : Number(item?.width || 0);
+          const url = typeof item?.url === 'string' ? item.url.trim() : '';
+          const renditionKind =
+            typeof item?.kind === 'string' && item.kind.trim() ? item.kind.trim() : '';
+          const format =
+            typeof item?.format === 'string' && item.format.trim()
+              ? item.format.trim().toLowerCase()
+              : 'webp';
+          if (!url || !Number.isFinite(width) || width <= 0) return null;
+          return {
+            width: Math.round(width),
+            url,
+            kind: renditionKind,
+            format,
+          };
+        })
+        .filter(
+          (
+            item
+          ): item is {
+            width: number;
+            url: string;
+            kind: string;
+            format: string;
+          } => Boolean(item)
+        )
+        .sort((a, b) => a.width - b.width);
+
+      const webpByKind = normalizedRenditions.filter(
+        (item) => item.format === 'webp' && item.kind === kind
+      );
+      if (!webpByKind.length) return '';
+      const preferred = webpByKind.find((item) => item.width >= preferredWidth);
+      if (preferred) return preferred.url;
+      if (!allowSmaller) return '';
+      return webpByKind[webpByKind.length - 1].url;
+    },
+    []
+  );
+  const resolveMainImagePath = useCallback(
+    (img: Image) => {
+      const detailPath = resolveRenditionPath(img, 'detail', 1200);
+      if (detailPath) return detailPath;
+      const gridPath = resolveRenditionPath(img, 'grid', 600, false);
+      if (gridPath) return gridPath;
+      const originalPath = (img?.original_url || img?.image || '').trim();
+      if (originalPath) return originalPath;
+      return (img?.thumbnail || '').trim();
+    },
+    [resolveRenditionPath]
+  );
+  const resolveThumbnailPath = useCallback(
+    (img: Image) => {
+      const gridPath = resolveRenditionPath(img, 'grid', 300);
+      if (gridPath) return gridPath;
+      const thumbPath = (img?.thumbnail || '').trim();
+      return thumbPath || (img?.original_url || img?.image || '').trim();
+    },
+    [resolveRenditionPath]
+  );
   const safeImages = useMemo(
     () =>
       (Array.isArray(images) ? images : []).filter(
-        (img): img is Image => !!img && typeof img.image === 'string' && img.image.trim().length > 0
+        (img): img is Image =>
+          !!img &&
+          Boolean(
+            (typeof img.image === 'string' && img.image.trim()) ||
+              (typeof img.original_url === 'string' && img.original_url.trim()) ||
+              (typeof img.thumbnail === 'string' && img.thumbnail.trim())
+          )
       ),
     [images]
   );
+  const lazyLoadImages = useMemo(
+    () =>
+      safeImages
+        .map((img) => ({
+          id: img.id,
+          image: resolveMainImagePath(img),
+        }))
+        .filter((img) => Boolean(img.image)),
+    [resolveMainImagePath, safeImages]
+  );
+  const thumbnailImages = useMemo(
+    () =>
+      safeImages.map((img) => ({
+        ...img,
+        image: resolveThumbnailPath(img) || img.image,
+      })),
+    [resolveThumbnailPath, safeImages]
+  );
 
   // Lazy load images
-  useGalleryLazyLoad(safeImages, currentIndex, getImageUrl);
+  useGalleryLazyLoad(lazyLoadImages, currentIndex, getImageUrl);
 
   useEffect(() => {
     if (safeImages.length === 0 && currentIndex !== 0) {
@@ -967,10 +1051,11 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
           onTouchEnd={handleTouchEnd}
         >
           <div style={styles.carouselInner}>
-              <MainCarouselImage
-                src={currentImageSrc}
-                title={title}
-                isActive={true}
+            <MainCarouselImage
+              photo={currentImage}
+              fallbackPath={resolveMainImagePath(currentImage)}
+              title={title}
+              isActive={true}
             />
           </div>
 
@@ -1077,7 +1162,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         {/* Thumbnail Strip */}
         {safeImages.length > 0 && (
           <ThumbnailStrip
-            images={safeImages}
+            images={thumbnailImages}
             currentIndex={safeIndex}
             onSlideTo={setCurrentIndex}
             getImageUrl={getImageUrl}

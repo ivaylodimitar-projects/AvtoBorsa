@@ -3,9 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { CAR_FEATURES } from "../constants/carFeatures";
 import { AdvancedSearch } from "./AdvancedSearch";
 import { useRecentSearches } from "../hooks/useRecentSearches";
-import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 import ListingPromoBadge from "./ListingPromoBadge";
 import KapariranoBadge from "./KapariranoBadge";
+import ResponsiveImage, { type ApiPhoto } from "./ResponsiveImage";
 import sportCarIcon from "../assets/sport-car.png";
 import tiresIcon from "../assets/tires.png";
 import carPartsIcon from "../assets/car-parts.png";
@@ -63,6 +63,7 @@ type CarListing = {
   location_region?: string;
   location_country?: string;
   image_url?: string;
+  photo?: ApiPhoto | null;
   is_active: boolean;
   is_kaparirano?: boolean;
   created_at: string;
@@ -397,7 +398,6 @@ const selectBase: React.CSSProperties = {
 export default function LandingPage() {
   const navigate = useNavigate();
   const { searches } = useRecentSearches();
-  const getImageUrl = useImageUrl();
   const initialLatestListingsRef = useRef<CarListing[] | null>(
     readLatestListingsCache<CarListing>()
   );
@@ -2052,14 +2052,22 @@ export default function LandingPage() {
             ) : latestListings.length > 0 ? (
               <>
                 <div className="latest-grid">
-                {latestListings.map((listing, index) => {
+                {latestListings.map((listing) => {
                   const isTop = isTopListing(listing);
                   const isVip = isVipListing(listing);
                   const isNew = isListingNew(listing.created_at);
-                  const isAboveFold = index < 4;
                   const listingMeta = getLatestListingMeta(listing);
                   const locationLabel = getListingLocationLabel(listing);
-                  const listingImageUrl = listing.image_url ? getImageUrl(listing.image_url) : "";
+                  const coverPhoto =
+                    listing.photo ||
+                    (listing.image_url ? ({ original_url: listing.image_url } as ApiPhoto) : null);
+                  const hasListingImage = Boolean(
+                    listing.image_url ||
+                      (typeof coverPhoto?.original_url === "string" && coverPhoto.original_url.trim()) ||
+                      (typeof coverPhoto?.image === "string" && coverPhoto.image.trim()) ||
+                      (typeof coverPhoto?.thumbnail === "string" && coverPhoto.thumbnail.trim()) ||
+                      (Array.isArray(coverPhoto?.renditions) && coverPhoto.renditions.length > 0)
+                  );
                   const priceBadge = resolvePriceBadgeState(
                     listing.price_change
                       ? {
@@ -2096,21 +2104,18 @@ export default function LandingPage() {
                       {/* Image */}
                       <div style={{ position: "relative", height: 178, background: "#e5e7eb", overflow: "visible", borderTopLeftRadius: 16, borderTopRightRadius: 16 }}>
                         <div className="listing-image-layer">
-                          {listing.image_url ? (
-                            <img
-                              src={listingImageUrl}
+                          {hasListingImage ? (
+                            <ResponsiveImage
+                              photo={coverPhoto}
+                              fallbackPath={listing.image_url}
                               alt={`${listing.brand} ${listing.model}`}
-                              style={{
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
-                                objectPosition: "center",
-                                imageRendering: "auto",
-                                display: "block",
-                              }}
-                              loading={isAboveFold ? "eager" : "lazy"}
+                              kind="grid"
+                              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
+                              loading="lazy"
                               decoding="async"
-                              fetchPriority={isAboveFold ? "high" : "low"}
+                              fetchPriority="low"
+                              containerStyle={{ width: "100%", height: "100%" }}
+                              imgStyle={{ width: "100%", height: "100%" }}
                             />
                           ) : (
                             <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#9ca3af", fontSize: 13 }}>

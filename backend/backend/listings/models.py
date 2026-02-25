@@ -1,6 +1,7 @@
 from datetime import timedelta
 import io
 import os
+import posixpath
 
 from PIL import Image as PILImage, ImageOps
 from django.db import models
@@ -18,8 +19,14 @@ TOP_PLAN_7D = "7d"
 TOP_LISTING_DURATION_DAYS_1D = 1
 TOP_LISTING_DURATION_DAYS_7D = 7
 VIP_LISTING_DURATION_DAYS = 7
-CAR_IMAGE_THUMBNAIL_SIZE = (280, 194)
-CAR_IMAGE_THUMBNAIL_QUALITY = 82
+CAR_IMAGE_DETAIL_WIDTHS = (800, 1200, 1600, 2000)
+CAR_IMAGE_GRID_RENDITIONS = (
+    (300, 178),
+    (600, 356),
+)
+CAR_IMAGE_WEBP_QUALITY = 82
+CAR_IMAGE_WEBP_METHOD = 6
+CAR_IMAGE_LOW_RES_MIN_WIDTH = 800
 
 
 def get_expiry_cutoff(now=None):
@@ -597,6 +604,10 @@ class CarImage(models.Model):
     listing = models.ForeignKey(CarListing, on_delete=models.CASCADE, related_name='images')
     image = models.ImageField(upload_to='car_listings/%Y/%m/%d/')
     thumbnail = models.ImageField(upload_to='car_listings/thumbs/%Y/%m/%d/', null=True, blank=True)
+    original_width = models.PositiveIntegerField(null=True, blank=True)
+    original_height = models.PositiveIntegerField(null=True, blank=True)
+    low_res = models.BooleanField(default=False)
+    renditions = models.JSONField(default=dict, blank=True)
     order = models.IntegerField(default=0)
     is_cover = models.BooleanField(default=False, help_text="Mark this image as the cover/main image for the listing")
     created_at = models.DateTimeField(auto_now_add=True)
@@ -609,28 +620,138 @@ class CarImage(models.Model):
     def __str__(self):
         return f"Image for {self.listing.title}"
 
-    def _build_thumbnail_content(self):
+    @staticmethod
+    def _collect_rendition_paths(renditions_data):
+        paths = set()
+        if not isinstance(renditions_data, dict):
+            return paths
+        for items in renditions_data.values():
+            if not isinstance(items, list):
+                continue
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                path = str(item.get('path') or '').strip()
+                if path:
+                    paths.add(path)
+        return paths
+
+    def _has_valid_renditions(self, payload):
+        if not payload:
+            return False
+        width = payload.get('original_width')
+        height = payload.get('original_height')
+        if not isinstance(width, int) or width <= 0:
+            return False
+        if not isinstance(height, int) or height <= 0:
+            return False
+        return bool(self._collect_rendition_paths(payload.get('renditions')))
+
+    def _get_rendition_directory(self):
+        image_name = str(self.image.name or '')
+        image_dir = posixpath.dirname(image_name)
+        if image_dir:
+            return posixpath.join(image_dir, 'renditions')
+        return 'car_listings/renditions'
+
+    def _build_rendition_path(self, base_name, kind, width):
+        return posixpath.join(
+            self._get_rendition_directory(),
+            f'{base_name}_{kind}_{width}.webp',
+        )
+
+    def _store_rendition(self, rendered_image, rendition_path):
+        buffer = io.BytesIO()
+        rendered_image.save(
+            buffer,
+            format='WEBP',
+            quality=CAR_IMAGE_WEBP_QUALITY,
+            method=CAR_IMAGE_WEBP_METHOD,
+            optimize=True,
+        )
+        storage = self.image.storage
+        _delete_storage_path_safely(storage, rendition_path)
+        storage.save(rendition_path, ContentFile(buffer.getvalue()))
+        return rendition_path
+
+    def _generate_webp_renditions(self):
         if not self.image:
             return None
+
         try:
             self.image.open('rb')
-            with PILImage.open(self.image) as source:
-                source = source.convert('RGB')
+            with PILImage.open(self.image) as source_file:
+                source = ImageOps.exif_transpose(source_file).convert('RGB')
+                original_width, original_height = source.size
+                if original_width <= 0 or original_height <= 0:
+                    return None
+
+                image_name = os.path.basename(self.image.name or f'listing-{self.pk}')
+                base_name, _ = os.path.splitext(image_name)
                 resampling = getattr(PILImage, 'Resampling', PILImage)
-                thumb = ImageOps.fit(
-                    source,
-                    CAR_IMAGE_THUMBNAIL_SIZE,
-                    method=resampling.LANCZOS,
-                    centering=(0.5, 0.5),
-                )
-                buffer = io.BytesIO()
-                thumb.save(
-                    buffer,
-                    format='WEBP',
-                    quality=CAR_IMAGE_THUMBNAIL_QUALITY,
-                    optimize=True,
-                )
-                return ContentFile(buffer.getvalue())
+
+                renditions = []
+                thumbnail_path = None
+
+                for detail_width in CAR_IMAGE_DETAIL_WIDTHS:
+                    if detail_width > original_width:
+                        continue
+                    detail_height = max(
+                        1,
+                        int(round((detail_width / float(original_width)) * original_height)),
+                    )
+                    resized = source.resize(
+                        (detail_width, detail_height),
+                        resampling.LANCZOS,
+                    )
+                    try:
+                        rendition_path = self._build_rendition_path(base_name, 'detail', detail_width)
+                        stored_path = self._store_rendition(resized, rendition_path)
+                    finally:
+                        resized.close()
+                    renditions.append(
+                        {
+                            'width': detail_width,
+                            'height': detail_height,
+                            'kind': 'detail',
+                            'format': 'webp',
+                            'path': stored_path,
+                        }
+                    )
+
+                for grid_width, grid_height in CAR_IMAGE_GRID_RENDITIONS:
+                    if grid_width > original_width or grid_height > original_height:
+                        continue
+                    fitted = ImageOps.fit(
+                        source,
+                        (grid_width, grid_height),
+                        method=resampling.LANCZOS,
+                        centering=(0.5, 0.5),
+                    )
+                    try:
+                        rendition_path = self._build_rendition_path(base_name, 'grid', grid_width)
+                        stored_path = self._store_rendition(fitted, rendition_path)
+                    finally:
+                        fitted.close()
+                    renditions.append(
+                        {
+                            'width': grid_width,
+                            'height': grid_height,
+                            'kind': 'grid',
+                            'format': 'webp',
+                            'path': stored_path,
+                        }
+                    )
+                    if grid_width == 300:
+                        thumbnail_path = stored_path
+
+                renditions.sort(key=lambda item: (0 if item.get('kind') == 'grid' else 1, item.get('width') or 0))
+                return {
+                    'original_width': original_width,
+                    'original_height': original_height,
+                    'thumbnail_path': thumbnail_path,
+                    'renditions': renditions,
+                }
         except Exception:
             return None
         finally:
@@ -639,26 +760,104 @@ class CarImage(models.Model):
             except Exception:
                 pass
 
-    def save(self, *args, **kwargs):
-        should_generate_thumbnail = bool(self.image)
-        if self.pk and should_generate_thumbnail:
-            previous = CarImage.objects.filter(pk=self.pk).values('image', 'thumbnail').first()
-            if previous and str(previous.get('image') or '') == str(self.image.name or '') and previous.get('thumbnail'):
-                should_generate_thumbnail = False
+    def _cleanup_previous_assets(self, previous):
+        if not previous or not self.image:
+            return
+        storage = self.image.storage
+        previous_image = str(previous.get('image') or '').strip()
+        previous_thumbnail = str(previous.get('thumbnail') or '').strip()
+        current_image = str(self.image.name or '').strip()
 
+        if previous_image and previous_image != current_image:
+            _delete_storage_path_safely(storage, previous_image)
+        if previous_thumbnail and previous_thumbnail != current_image:
+            _delete_storage_path_safely(storage, previous_thumbnail)
+        for rendition_path in self._collect_rendition_paths(previous.get('renditions')):
+            if rendition_path != current_image:
+                _delete_storage_path_safely(storage, rendition_path)
+
+    def save(self, *args, **kwargs):
+        previous = None
+        if self.pk:
+            previous = CarImage.objects.filter(pk=self.pk).values(
+                'image',
+                'thumbnail',
+                'renditions',
+                'original_width',
+                'original_height',
+            ).first()
         super().save(*args, **kwargs)
 
-        if not should_generate_thumbnail:
+        if not self.image:
             return
 
-        thumbnail_content = self._build_thumbnail_content()
-        if not thumbnail_content:
+        current_image_name = str(self.image.name or '').strip()
+        if not current_image_name:
             return
 
-        image_name = os.path.basename(self.image.name or f'listing-{self.pk}')
-        base_name, _ = os.path.splitext(image_name)
-        self.thumbnail.save(f'{base_name}_sm.webp', thumbnail_content, save=False)
-        super().save(update_fields=['thumbnail'])
+        previous_image_name = str((previous or {}).get('image') or '').strip()
+        image_changed = bool(previous and previous_image_name and previous_image_name != current_image_name)
+
+        should_generate = previous is None or image_changed or not self._has_valid_renditions(previous)
+        if not should_generate:
+            return
+
+        if image_changed:
+            self._cleanup_previous_assets(previous)
+
+        generated = self._generate_webp_renditions()
+        if not generated:
+            return
+
+        thumbnail_path = generated.get('thumbnail_path')
+        self.thumbnail = thumbnail_path or None
+        self.original_width = generated.get('original_width')
+        self.original_height = generated.get('original_height')
+        self.low_res = bool(self.original_width and self.original_width < CAR_IMAGE_LOW_RES_MIN_WIDTH)
+        self.renditions = {
+            'webp': generated.get('renditions') or [],
+        }
+
+        super().save(
+            update_fields=[
+                'thumbnail',
+                'original_width',
+                'original_height',
+                'low_res',
+                'renditions',
+            ]
+        )
+
+    def ensure_renditions(self):
+        """Generate renditions for legacy images that predate rendition support."""
+        if not self.image:
+            return False
+        current_payload = {
+            'original_width': self.original_width,
+            'original_height': self.original_height,
+            'renditions': self.renditions,
+        }
+        if self._has_valid_renditions(current_payload):
+            return False
+        self.save()
+        return True
+
+
+def _delete_storage_path_safely(storage, name):
+    normalized = str(name or '').strip()
+    if not normalized:
+        return
+    try:
+        if storage.exists(normalized):
+            storage.delete(normalized)
+            return
+    except Exception:
+        pass
+
+    try:
+        storage.delete(normalized)
+    except Exception:
+        pass
 
 
 def _delete_file_field_safely(file_field):
@@ -666,15 +865,7 @@ def _delete_file_field_safely(file_field):
     if not name:
         return
     try:
-        storage = file_field.storage
-        if storage.exists(name):
-            storage.delete(name)
-            return
-    except Exception:
-        pass
-
-    try:
-        file_field.delete(save=False)
+        _delete_storage_path_safely(file_field.storage, name)
     except Exception:
         pass
 
@@ -683,6 +874,11 @@ def _delete_file_field_safely(file_field):
 def cleanup_car_image_files(sender, instance, **kwargs):
     """Ensure image files are removed from storage when CarImage rows are deleted."""
     _delete_file_field_safely(instance.thumbnail)
+    for rendition_path in CarImage._collect_rendition_paths(getattr(instance, 'renditions', {}) or {}):
+        try:
+            _delete_storage_path_safely(instance.image.storage, rendition_path)
+        except Exception:
+            pass
     _delete_file_field_safely(instance.image)
 
 

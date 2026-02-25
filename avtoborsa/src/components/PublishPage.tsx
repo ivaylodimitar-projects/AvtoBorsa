@@ -23,6 +23,7 @@ import AdvancedImageUpload, { type ExistingImageItem } from "./AdvancedImageUplo
 import FormFieldWithTooltip from "./FormFieldWithTooltip";
 import ListingPreview from "./ListingPreview";
 import ListingQualityIndicator from "./ListingQualityIndicator";
+import type { ApiPhoto } from "./ResponsiveImage";
 import { CAR_FEATURE_GROUPS, normalizeCarFeatures } from "../constants/carFeatures";
 import type { CarFeatureGroup } from "../constants/carFeatures";
 import { HEAVY_FEATURE_GROUPS } from "../constants/heavyFeatures";
@@ -1628,6 +1629,9 @@ const normalizeExistingImagesFromPayload = (
       const image = normalizeExistingImageUrl(
         record.image ?? record.url ?? record.src ?? record.preview
       );
+      const originalUrl = normalizeExistingImageUrl(
+        record.original_url ?? record.originalUrl ?? record.image ?? record.url
+      );
       const thumbnail = normalizeExistingImageUrl(record.thumbnail ?? record.thumb);
       const rawIsCover = record.is_cover ?? record.isCover;
       const isCover =
@@ -1635,6 +1639,25 @@ const normalizeExistingImagesFromPayload = (
         rawIsCover === "true" ||
         rawIsCover === 1 ||
         rawIsCover === "1";
+      const rawRenditions = record.renditions;
+      const renditions = Array.isArray(rawRenditions)
+        ? (rawRenditions as ExistingImageItem["renditions"])
+        : null;
+      const srcsetWebp = normalizeExistingImageUrl(record.srcset_webp ?? record.srcsetWebp);
+      const toOptionalNumber = (value: unknown) => {
+        if (typeof value === "number" && Number.isFinite(value)) return Math.round(value);
+        if (typeof value === "string") {
+          const parsed = Number(value);
+          if (Number.isFinite(parsed)) return Math.round(parsed);
+        }
+        return null;
+      };
+      const rawLowRes = record.low_res ?? record.lowRes;
+      const lowRes =
+        rawLowRes === true ||
+        rawLowRes === "true" ||
+        rawLowRes === 1 ||
+        rawLowRes === "1";
 
       const resolvedImage = image || thumbnail;
       if (!resolvedImage) return null;
@@ -1643,6 +1666,12 @@ const normalizeExistingImagesFromPayload = (
         id: normalizeExistingImageId(record.id),
         image: resolvedImage,
         thumbnail: thumbnail || null,
+        original_url: originalUrl || resolvedImage,
+        renditions,
+        srcset_webp: srcsetWebp || null,
+        original_width: toOptionalNumber(record.original_width ?? record.originalWidth),
+        original_height: toOptionalNumber(record.original_height ?? record.originalHeight),
+        low_res: lowRes,
         isCover,
       } as ExistingImageItem;
     })
@@ -1656,6 +1685,12 @@ const normalizeExistingImagesFromPayload = (
     parsedItems.unshift({
       image: normalizedFallbackCover,
       thumbnail: null,
+      original_url: normalizedFallbackCover,
+      renditions: null,
+      srcset_webp: null,
+      original_width: null,
+      original_height: null,
+      low_res: false,
       isCover: true,
       id: undefined,
     });
@@ -2861,12 +2896,36 @@ const PublishPage: React.FC = () => {
           ? formData.city
           : "не е избран",
   };
+  const newCoverPreview = images.find((img) => img.isCover)?.preview;
+  const existingCoverPreviewItem =
+    existingListingImages.find((image) => image.isCover) || existingListingImages[0] || null;
   const coverPreview =
-    images.find((img) => img.isCover)?.preview ||
-    existingListingImages.find((image) => image.isCover)?.image ||
+    newCoverPreview ||
+    existingCoverPreviewItem?.image ||
     existingCoverImage ||
-    existingListingImages[0]?.image ||
     undefined;
+  const coverPreviewPhoto: ApiPhoto | null =
+    newCoverPreview
+      ? null
+      : existingCoverPreviewItem
+        ? {
+            id: existingCoverPreviewItem.id,
+            image: existingCoverPreviewItem.image,
+            original_url:
+              existingCoverPreviewItem.original_url ||
+              existingCoverPreviewItem.image ||
+              null,
+            thumbnail: existingCoverPreviewItem.thumbnail || null,
+            renditions: existingCoverPreviewItem.renditions || null,
+            srcset_webp: existingCoverPreviewItem.srcset_webp || null,
+            original_width: existingCoverPreviewItem.original_width ?? null,
+            original_height: existingCoverPreviewItem.original_height ?? null,
+            low_res: Boolean(existingCoverPreviewItem.low_res),
+            is_cover: existingCoverPreviewItem.isCover,
+          }
+        : existingCoverImage
+          ? { original_url: existingCoverImage }
+          : null;
   const previewTitle = buildListingTitle(formData, defaultClassifiedTopmenu);
   const previewYear =
     formData.mainCategory === "u" ? formData.partYearFrom : formData.yearFrom;
@@ -6475,6 +6534,7 @@ const PublishPage: React.FC = () => {
             gearbox={previewGearbox}
             power={formData.power}
             coverImage={coverPreview}
+            coverPhoto={coverPreviewPhoto}
             imageCount={previewImageCount}
             priceRequired={requiresPrice(formData.mainCategory)}
             description={formData.description}

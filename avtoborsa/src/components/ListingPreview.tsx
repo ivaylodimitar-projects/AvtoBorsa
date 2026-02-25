@@ -2,6 +2,7 @@ import React from "react";
 import { FiCheckCircle, FiHome, FiImage } from "react-icons/fi";
 import { formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 import ListingPromoBadge from "./ListingPromoBadge";
+import ResponsiveImage, { type ApiPhoto } from "./ResponsiveImage";
 
 interface ListingPreviewProps {
   title: string;
@@ -15,6 +16,7 @@ interface ListingPreviewProps {
   gearbox: string;
   power?: string;
   coverImage?: string;
+  coverPhoto?: ApiPhoto | null;
   description: string;
   completionPercentage: number;
   variant?: "full" | "compact";
@@ -36,6 +38,7 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
   gearbox,
   power,
   coverImage,
+  coverPhoto,
   description,
   completionPercentage,
   variant = "full",
@@ -62,6 +65,18 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
       ? "Добави цена"
       : "По договаряне";
   const mediaLabel = `${imageCount} ${imageCount === 1 ? "снимка" : "снимки"}`;
+
+  const isBlobCover = typeof coverImage === "string" && coverImage.startsWith("blob:");
+  const coverFallbackPath =
+    coverImage ||
+    coverPhoto?.original_url ||
+    coverPhoto?.image ||
+    coverPhoto?.thumbnail ||
+    "";
+  const hasCoverImage = Boolean(
+    coverFallbackPath ||
+      (Array.isArray(coverPhoto?.renditions) && coverPhoto.renditions.length > 0)
+  );
 
   const specs = [
     { label: "Година", value: year },
@@ -262,8 +277,23 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
           {listingType === "vip" && (
             <ListingPromoBadge type="vip" />
           )}
-          {coverImage ? (
-            <img src={coverImage} alt="Cover" style={styles.image} />
+          {hasCoverImage ? (
+            isBlobCover ? (
+              <img src={coverImage} alt="Cover" style={styles.image} loading="eager" decoding="async" />
+            ) : (
+              <ResponsiveImage
+                photo={coverPhoto}
+                fallbackPath={coverFallbackPath}
+                alt="Cover"
+                kind="grid"
+                sizes="(max-width: 1024px) 90vw, 320px"
+                loading="eager"
+                decoding="async"
+                fetchPriority="low"
+                containerStyle={{ width: "100%", height: "100%" }}
+                imgStyle={styles.image}
+              />
+            )
           ) : (
             <div style={styles.noImage}>
               <FiImage size={32} />

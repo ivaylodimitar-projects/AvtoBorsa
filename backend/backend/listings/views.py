@@ -59,7 +59,7 @@ LISTINGS_PUBLIC_STALE_SECONDS = 120
 TOP_DEMOTION_MIN_INTERVAL_SECONDS = 60
 TOP_DEMOTION_LOCK_KEY = "listings:demote-expired-top:lock"
 LATEST_LISTINGS_CACHE_SECONDS = 30
-LATEST_LISTINGS_CACHE_KEY = "listings:latest:v4"
+LATEST_LISTINGS_CACHE_KEY = "listings:latest:v5"
 
 
 class ListingsPagination(PageNumberPagination):
@@ -1038,7 +1038,18 @@ class CarListingViewSet(viewsets.ModelViewSet):
             ).order_by('-is_cover', 'order', 'id').values('image')[:1]
             image_prefetch = Prefetch(
                 'images',
-                queryset=CarImage.objects.only('id', 'image', 'thumbnail', 'order', 'is_cover', 'listing_id').order_by('order')
+                queryset=CarImage.objects.only(
+                    'id',
+                    'image',
+                    'thumbnail',
+                    'renditions',
+                    'original_width',
+                    'original_height',
+                    'low_res',
+                    'order',
+                    'is_cover',
+                    'listing_id',
+                ).order_by('-is_cover', 'order', 'id')
             )
 
             if lite in {"1", "true", "yes"}:
@@ -1091,7 +1102,23 @@ class CarListingViewSet(viewsets.ModelViewSet):
                 'user',
                 'user__business_profile',
                 'user__private_profile'
-            ).prefetch_related('images')
+            ).prefetch_related(
+                Prefetch(
+                    'images',
+                    queryset=CarImage.objects.only(
+                        'id',
+                        'image',
+                        'thumbnail',
+                        'renditions',
+                        'original_width',
+                        'original_height',
+                        'low_res',
+                        'order',
+                        'is_cover',
+                        'listing_id',
+                    ).order_by('order', 'id'),
+                )
+            )
 
         return queryset
 
@@ -1134,6 +1161,13 @@ class CarListingViewSet(viewsets.ModelViewSet):
         if should_increment:
             CarListing.objects.filter(pk=instance.pk).update(view_count=F('view_count') + 1)
             instance.refresh_from_db(fields=['view_count'])
+
+        # Backfill legacy images so detail view does not load large originals by default.
+        for image_obj in instance.images.all():
+            try:
+                image_obj.ensure_renditions()
+            except Exception:
+                continue
 
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
@@ -1813,6 +1847,21 @@ def latest_listings(request):
     latest_price_change = CarListingPriceHistory.objects.filter(
         listing=OuterRef('pk')
     ).order_by('-changed_at')
+    image_prefetch = Prefetch(
+        'images',
+        queryset=CarImage.objects.only(
+            'id',
+            'image',
+            'thumbnail',
+            'renditions',
+            'original_width',
+            'original_height',
+            'low_res',
+            'order',
+            'is_cover',
+            'listing_id',
+        ).order_by('-is_cover', 'order', 'id')
+    )
 
     queryset = (
         CarListing.objects.filter(
@@ -1822,6 +1871,7 @@ def latest_listings(request):
             created_at__gte=cutoff
         )
         .select_related('parts_details')
+        .prefetch_related(image_prefetch)
         .annotate(
             first_image=Coalesce(
                 Subquery(first_thumbnail_subquery),

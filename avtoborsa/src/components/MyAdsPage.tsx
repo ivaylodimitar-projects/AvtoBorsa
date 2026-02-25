@@ -53,6 +53,7 @@ import { addBalanceUsageRecord } from "../utils/balanceUsageHistory";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 import ListingPromoBadge from "./ListingPromoBadge";
 import KapariranoBadge from "./KapariranoBadge";
+import ResponsiveImage, { type ApiPhoto } from "./ResponsiveImage";
 import { API_BASE_URL } from "../config/api";
 import karBgQrCodeAnimation from "../assets/karbgqrcode.json";
 import topBadgeImage from "../assets/top_badge.png";
@@ -82,8 +83,9 @@ interface CarListing {
   displacement: number;
   euro_standard: string;
   description: string;
-  images: Array<{ id: number; image: string; thumbnail?: string | null }>;
+  images: ApiPhoto[];
   image_url?: string;
+  photo?: ApiPhoto | null;
   created_at: string;
   updated_at?: string;
   is_archived: boolean;
@@ -154,6 +156,18 @@ interface CarListing {
 type PreviewImageSource = {
   full: string;
   thumb: string;
+  photo?: ApiPhoto | null;
+  fullFallbackPath?: string | null;
+  thumbFallbackPath?: string | null;
+};
+
+type CardImageSource = {
+  photo: ApiPhoto | null;
+  fallbackPath: string | null;
+  display: string;
+  full: string;
+  thumb: string;
+  hasImage: boolean;
 };
 
 type MyAdsNavigationState = {
@@ -1031,42 +1045,85 @@ const MyAdsPage: React.FC = () => {
     }
   };
 
-  const getCardImageSources = (listing: CarListing) => {
-    const coverImage = (listing.images || []).find((img) => Boolean(img.image));
-    const fullRaw = (listing.image_url || coverImage?.image || coverImage?.thumbnail || "").trim();
-    const thumbRaw = (coverImage?.thumbnail || "").trim();
-    const displayRaw = (thumbRaw || fullRaw).trim();
-    const full = fullRaw ? getImageUrl(fullRaw) : "";
+  const getCoverPhoto = (listing: CarListing): ApiPhoto | null => {
+    const orderedImages = Array.isArray(listing.images) ? listing.images : [];
+    return (
+      listing.photo ||
+      orderedImages.find((img) => Boolean(img?.is_cover)) ||
+      orderedImages[0] ||
+      null
+    );
+  };
+
+  const getCardImageSources = (listing: CarListing): CardImageSource => {
+    const coverPhoto = getCoverPhoto(listing);
+    const fallbackRaw =
+      (listing.image_url ||
+        coverPhoto?.original_url ||
+        coverPhoto?.image ||
+        coverPhoto?.thumbnail ||
+        "").trim();
+    const thumbRaw = (coverPhoto?.thumbnail || fallbackRaw).trim();
+    const displayRaw = (thumbRaw || fallbackRaw).trim();
+    const full = fallbackRaw ? getImageUrl(fallbackRaw) : "";
     const thumb = thumbRaw ? getImageUrl(thumbRaw) : full;
     const display = displayRaw ? getImageUrl(displayRaw) : "";
-    if (!display) {
-      return { display: "", full: "", thumb: "" };
-    }
-    return { display, full, thumb };
+    const hasImage = Boolean(
+      display ||
+        (Array.isArray(coverPhoto?.renditions) && coverPhoto.renditions.length > 0)
+    );
+    return {
+      photo: coverPhoto,
+      fallbackPath: fallbackRaw || null,
+      display,
+      full,
+      thumb,
+      hasImage,
+    };
   };
 
   const getPreviewImages = (listing: CarListing): PreviewImageSource[] => {
-    const orderedImages = listing.images || [];
+    const orderedImages = Array.isArray(listing.images) ? listing.images : [];
     const resolved: PreviewImageSource[] = [];
     const seen = new Set<string>();
 
-    const pushImage = (fullCandidate?: string | null, thumbCandidate?: string | null) => {
+    const pushImage = (
+      photoCandidate?: ApiPhoto | null,
+      fullCandidate?: string | null,
+      thumbCandidate?: string | null
+    ) => {
       const fullRaw = (fullCandidate || thumbCandidate || "").trim();
       const full = fullRaw ? getImageUrl(fullRaw) : "";
       if (!full || seen.has(full)) return;
       seen.add(full);
       const thumbRaw = (thumbCandidate || fullCandidate || "").trim();
       const thumb = thumbRaw ? getImageUrl(thumbRaw) : full;
-      resolved.push({ full, thumb: thumb || full });
+      resolved.push({
+        full,
+        thumb: thumb || full,
+        photo: photoCandidate || null,
+        fullFallbackPath: fullRaw || null,
+        thumbFallbackPath: thumbRaw || fullRaw || null,
+      });
     };
 
-    if (listing.image_url) {
-      const coverMatch = orderedImages.find((img) => img.image === listing.image_url);
-      pushImage(listing.image_url, coverMatch?.thumbnail);
+    const coverPhoto = getCoverPhoto(listing);
+    if (coverPhoto) {
+      pushImage(
+        coverPhoto,
+        coverPhoto.original_url || coverPhoto.image || listing.image_url || null,
+        coverPhoto.thumbnail || coverPhoto.original_url || coverPhoto.image || listing.image_url || null
+      );
+    } else if (listing.image_url) {
+      pushImage(null, listing.image_url, listing.image_url);
     }
 
     orderedImages.forEach((img) => {
-      pushImage(img.image, img.thumbnail || img.image);
+      pushImage(
+        img,
+        img.original_url || img.image || null,
+        img.thumbnail || img.original_url || img.image || null
+      );
     });
 
     return resolved;
@@ -3626,7 +3683,9 @@ const MyAdsPage: React.FC = () => {
         ? "TOP"
         : "VIP";
   const showModalPromoDetails = listingTypeModal.selectedType !== "normal";
-  const modalPreviewImage = modalSourceListing ? getCardImageSources(modalSourceListing).display : "";
+  const modalPreviewImageSource = modalSourceListing
+    ? getCardImageSources(modalSourceListing)
+    : null;
   const modalPreviewTitle = (modalSourceListing?.title || listingTypeModal.listingTitle || "Обявата").trim();
   const modalPreviewPriceValue = modalSourceListing ? Number(modalSourceListing.price) : Number.NaN;
   const modalPreviewPriceLabel =
@@ -3659,7 +3718,7 @@ const MyAdsPage: React.FC = () => {
         : "Без промо значка при нормална обява.";
   const isPreviewTab = activeTab === "archived" || activeTab === "expired" || activeTab === "drafts";
   const previewImages = previewListing ? getPreviewImages(previewListing) : [];
-  const previewImage = previewImages[previewImageIndex]?.full || "";
+  const previewImage = previewImages[previewImageIndex] || null;
   const previewPriceValue = previewListing ? Number(previewListing.price) : Number.NaN;
   const previewPriceLabel =
     Number.isFinite(previewPriceValue) && previewPriceValue > 0
@@ -3970,8 +4029,21 @@ const MyAdsPage: React.FC = () => {
                         </span>
                       )}
                       <div style={styles.listingTypePreviewFrame}>
-                        {modalPreviewImage ? (
-                          <img src={modalPreviewImage} alt={modalPreviewTitle} style={styles.listingTypePreviewImage} />
+                        {modalPreviewImageSource?.hasImage ? (
+                          <ResponsiveImage
+                            photo={modalPreviewImageSource.photo}
+                            fallbackPath={
+                              modalPreviewImageSource.fallbackPath || modalPreviewImageSource.display
+                            }
+                            alt={modalPreviewTitle}
+                            kind="grid"
+                            sizes="320px"
+                            loading="eager"
+                            decoding="async"
+                            fetchPriority="low"
+                            containerStyle={{ width: "100%", height: "100%" }}
+                            imgStyle={styles.listingTypePreviewImage}
+                          />
                         ) : (
                           <div style={styles.listingTypePreviewPlaceholder}>
                             <Car size={22} />
@@ -4165,13 +4237,17 @@ const MyAdsPage: React.FC = () => {
                       </div>
                     )}
                     {previewImage ? (
-                      <img
-                        src={previewImage}
+                      <ResponsiveImage
+                        photo={previewImage.photo}
+                        fallbackPath={previewImage.fullFallbackPath || previewImage.full}
                         alt={previewListing.title || `${previewListing.brand} ${previewListing.model}`}
-                        style={styles.previewImage}
+                        kind="detail"
+                        sizes="(max-width: 768px) 100vw, 658px"
                         loading="eager"
                         decoding="async"
                         fetchPriority="high"
+                        containerStyle={{ width: "100%", height: "100%" }}
+                        imgStyle={styles.previewImage}
                       />
                     ) : (
                       <div style={styles.previewPlaceholder}>
@@ -4197,12 +4273,17 @@ const MyAdsPage: React.FC = () => {
                           }}
                           aria-label={`Снимка ${idx + 1}`}
                         >
-                          <img
-                            src={previewSource.thumb}
+                          <ResponsiveImage
+                            photo={previewSource.photo}
+                            fallbackPath={previewSource.thumbFallbackPath || previewSource.thumb}
                             alt={`Снимка ${idx + 1}`}
-                            style={styles.previewThumb}
+                            kind="grid"
+                            sizes="120px"
                             loading="lazy"
                             decoding="async"
+                            fetchPriority="low"
+                            containerStyle={{ width: "100%", height: "100%" }}
+                            imgStyle={styles.previewThumb}
                           />
                         </button>
                       ))}
@@ -4479,7 +4560,7 @@ const MyAdsPage: React.FC = () => {
           ) : (
             <>
               <div style={styles.listingsGrid}>
-                {paginatedListings.map((listing, index) => {
+                {paginatedListings.map((listing) => {
                   const statusLabel = getPreviewStatusLabel(activeTab);
                   const fallbackTitle = `${listing.brand || ""} ${listing.model || ""}`.trim();
                   const listingTitle = (listing.title || fallbackTitle || "Без заглавие").trim();
@@ -4564,7 +4645,6 @@ const MyAdsPage: React.FC = () => {
                   );
                   const isNewListing = isListingNew(listing.created_at);
                   const cardImage = getCardImageSources(listing);
-                  const isPriorityImage = index < 4;
                   const categoryBadgeLabel = getListingCategoryBadge(listing);
                   const listingExpiryLabel = getListingExpiryLabel(listing);
                   const hasQrTarget = Boolean(listing.slug && listing.slug.trim());
@@ -4628,14 +4708,18 @@ const MyAdsPage: React.FC = () => {
                     {statusLabel}
                   </div>
                 )}
-                {cardImage.display ? (
-                  <img
-                    src={cardImage.display}
+                {cardImage.hasImage ? (
+                  <ResponsiveImage
+                    photo={cardImage.photo}
+                    fallbackPath={cardImage.fallbackPath || cardImage.display}
                     alt={listingTitle}
-                    style={styles.listingImage}
-                    loading={isPriorityImage ? "eager" : "lazy"}
+                    kind="grid"
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
+                    loading="lazy"
                     decoding="async"
-                    fetchPriority={isPriorityImage ? "high" : "low"}
+                    fetchPriority="low"
+                    containerStyle={{ width: "100%", height: "100%" }}
+                    imgStyle={styles.listingImage}
                   />
                 ) : (
                   <div style={styles.listingPlaceholder}>
