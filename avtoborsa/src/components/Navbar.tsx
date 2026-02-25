@@ -222,11 +222,12 @@ const Navbar: React.FC = () => {
   }, [location.pathname, location.search, location.hash]);
 
   React.useEffect(() => {
+    if (!isMobileViewport()) return;
     if (mobileOpen) return;
     if (!isSavedSearchesOpen) return;
     setSavedSearchesCloseRequestKey((prev) => prev + 1);
     setIsSavedSearchesOpen(false);
-  }, [mobileOpen, isSavedSearchesOpen]);
+  }, [isMobileViewport, mobileOpen, isSavedSearchesOpen]);
 
   React.useEffect(() => {
     if (!isProfileMenuOpen) return;

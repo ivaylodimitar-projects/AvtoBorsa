@@ -194,6 +194,7 @@ const TOP_TO_VIP_DISCOUNT_RATIO = 0.9;
 const VIP_PREPAY_ALLOWED_REMAINING_DAYS = 3;
 const LISTING_EXPIRY_DAYS = 30;
 const PAGE_SIZE = 21;
+const PROMOTE_LOADING_MIN_MS = 1100;
 const QR_BRAND_TAG = "Kar.bg";
 const CATEGORY_AS_BRAND_MAIN_CATEGORIES = new Set(["6", "7", "8", "a", "b"]);
 const GENERIC_BRAND_TERMS = new Set([
@@ -233,6 +234,10 @@ const globalCss = `
   * { box-sizing: border-box; }
   body { margin: 0; font-family: "Manrope", "Segoe UI", sans-serif; font-size: 15px; }
   input, select, button { font-family: inherit; }
+  @keyframes myadsPromotionSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
   .myads-icon-btn {
     position: relative;
     overflow: visible;
@@ -559,6 +564,7 @@ const MyAdsPage: React.FC = () => {
     topPlan: "1d",
     vipPlan: "7d",
   });
+  const [promoteLoadingTailVisible, setPromoteLoadingTailVisible] = useState(false);
   const [previewListing, setPreviewListing] = useState<CarListing | null>(null);
   const [previewTab, setPreviewTab] = useState<TabType | null>(null);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
@@ -1604,12 +1610,36 @@ const MyAdsPage: React.FC = () => {
   const executeListingTypeConfirm = async () => {
     if (!listingTypeModal.listingId) return;
     const { listingId, selectedType, mode, topPlan, vipPlan } = listingTypeModal;
-    const success =
-      mode === "republish"
-        ? await submitRepublish(listingId, selectedType, topPlan, vipPlan)
-        : await submitListingTypeUpdate(listingId, selectedType, topPlan, vipPlan);
-    if (success) {
-      closeListingTypeModal();
+    const isPromoteFlow = mode === "promote";
+    const startedAtMs = Date.now();
+
+    if (isPromoteFlow) {
+      setPromoteLoadingTailVisible(true);
+    }
+
+    try {
+      const success =
+        mode === "republish"
+          ? await submitRepublish(listingId, selectedType, topPlan, vipPlan)
+          : await submitListingTypeUpdate(listingId, selectedType, topPlan, vipPlan);
+
+      if (isPromoteFlow) {
+        const elapsedMs = Date.now() - startedAtMs;
+        const remainingMs = Math.max(0, PROMOTE_LOADING_MIN_MS - elapsedMs);
+        if (remainingMs > 0) {
+          await new Promise<void>((resolve) => {
+            window.setTimeout(resolve, remainingMs);
+          });
+        }
+      }
+
+      if (success) {
+        closeListingTypeModal();
+      }
+    } finally {
+      if (isPromoteFlow) {
+        setPromoteLoadingTailVisible(false);
+      }
     }
   };
 
@@ -2339,6 +2369,50 @@ const MyAdsPage: React.FC = () => {
     fontSize: 14,
     fontWeight: 700,
     cursor: "pointer",
+  },
+  promotionLoadingOverlay: {
+    position: "fixed" as const,
+    inset: 0,
+    background: "rgba(15, 23, 42, 0.18)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1400,
+    backdropFilter: "blur(1.5px)",
+    padding: "20px",
+  },
+  promotionLoadingCard: {
+    width: "min(320px, 90vw)",
+    background: "rgba(255, 255, 255, 0.96)",
+    border: "1px solid #dbeafe",
+    borderRadius: 16,
+    boxShadow: "0 16px 34px rgba(15, 23, 42, 0.18)",
+    padding: "16px 18px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 8,
+  },
+  promotionLoadingSpinner: {
+    width: 26,
+    height: 26,
+    borderRadius: "50%",
+    border: "3px solid #bfdbfe",
+    borderTopColor: "#0f766e",
+    animation: "myadsPromotionSpin 0.8s linear infinite",
+  },
+  promotionLoadingTitle: {
+    margin: "2px 0 0 0",
+    fontSize: 15,
+    fontWeight: 800,
+    color: "#0f172a",
+    textAlign: "center",
+  },
+  promotionLoadingText: {
+    margin: 0,
+    fontSize: 12,
+    color: "#475569",
+    textAlign: "center",
   },
   modal: {
     width: "min(860px, 96vw)",
@@ -3575,6 +3649,9 @@ const MyAdsPage: React.FC = () => {
   const vipListingsCount = activeListings.filter((listing) => listing.listing_type === "vip").length;
   const isModalBusy =
     listingTypeModal.isOpen && actionLoading === listingTypeModal.listingId;
+  const showPromoteLoadingOverlay =
+    listingTypeModal.mode === "promote" &&
+    (isModalBusy || promoteLoadingTailVisible);
   const modalTitle =
     listingTypeModal.mode === "republish" ? "Пусни обявата отново" : "Промотирай обявата";
   const modalSubtitle = listingTypeModal.listingTitle
@@ -3816,6 +3893,16 @@ const MyAdsPage: React.FC = () => {
             animation: "slideIn 0.3s ease-in-out",
           }}>
             {toast.message}
+          </div>
+        )}
+
+        {showPromoteLoadingOverlay && (
+          <div style={styles.promotionLoadingOverlay} role="status" aria-live="polite">
+            <div style={styles.promotionLoadingCard}>
+              <div style={styles.promotionLoadingSpinner} aria-hidden="true" />
+              <p style={styles.promotionLoadingTitle}>Промотираме обявата...</p>
+              <p style={styles.promotionLoadingText}>Моля, изчакайте момент.</p>
+            </div>
           </div>
         )}
 
