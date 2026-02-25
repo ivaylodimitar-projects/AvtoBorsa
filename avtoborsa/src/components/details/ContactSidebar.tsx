@@ -449,7 +449,99 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
 
   if (isMobile) {
     return (
-      <div
+      <>
+        {showPriceHistoryTooltip && hasPriceHistory && (
+          <div
+            style={{
+              position: 'fixed',
+              left: 12,
+              right: 12,
+              bottom: 86,
+              borderRadius: 16,
+              border: '1px solid #e2e8f0',
+              background: '#fff',
+              boxShadow: '0 12px 30px rgba(15, 23, 42, 0.16)',
+              padding: '12px 12px 10px',
+              maxHeight: 'min(52vh, 420px)',
+              overflowY: 'auto',
+              zIndex: 160,
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 8,
+                marginBottom: 10,
+              }}
+            >
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#111827' }}>Разлики в цената</div>
+              <button
+                type="button"
+                onClick={() => setShowPriceHistoryTooltip(false)}
+                style={{
+                  border: '1px solid #e2e8f0',
+                  background: '#f8fafc',
+                  color: '#475569',
+                  borderRadius: 999,
+                  padding: '6px 10px',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Затвори
+              </button>
+            </div>
+            <div style={{ display: 'grid', gap: 8 }}>
+              {priceHistoryPreview.map((entry, index) => {
+                const oldPrice = Number(entry.old_price);
+                const newPrice = Number(entry.new_price);
+                const deltaValue = Number(entry.delta);
+                const deltaLabel = Number.isFinite(deltaValue)
+                  ? `${deltaValue > 0 ? '+' : ''}${deltaValue.toLocaleString('bg-BG')}`
+                  : `${entry.delta}`;
+                const metaLabel =
+                  Number.isFinite(oldPrice) && Number.isFinite(newPrice)
+                    ? `${oldPrice.toLocaleString('bg-BG')} → ${newPrice.toLocaleString('bg-BG')}`
+                    : `${entry.old_price} → ${entry.new_price}`;
+                const deltaColor = deltaValue > 0 ? '#16a34a' : deltaValue < 0 ? '#dc2626' : '#64748b';
+                return (
+                  <div
+                    key={`${entry.changed_at}-${index}`}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                      padding: '10px',
+                      borderRadius: 14,
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: '#111827' }}>{deltaLabel}</div>
+                      <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
+                        {metaLabel} · {formatHistoryTime(entry.changed_at)}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: deltaColor }}>
+                      {deltaValue > 0 ? '↑' : deltaValue < 0 ? '↓' : '•'}
+                    </div>
+                  </div>
+                );
+              })}
+              {priceHistoryMore > 0 && (
+                <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600, textAlign: 'right' }}>
+                  + още {priceHistoryMore}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        <div
         style={{
           position: 'fixed',
           bottom: 0,
@@ -486,6 +578,34 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
           Позвъни
         </button>
         <button
+          type="button"
+          onClick={() => {
+            if (!hasPriceHistory) return;
+            setShowPriceHistoryTooltip((prev) => !prev);
+          }}
+          disabled={!hasPriceHistory}
+          style={{
+            padding: '12px 12px',
+            minWidth: 86,
+            background: hasPriceHistory ? '#ecfdf5' : '#f8fafc',
+            color: hasPriceHistory ? '#0f766e' : '#94a3b8',
+            border: `1px solid ${hasPriceHistory ? '#99f6e4' : '#eef2f7'}`,
+            borderRadius: 16,
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: hasPriceHistory ? 'pointer' : 'not-allowed',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            opacity: hasPriceHistory ? 1 : 0.7,
+          }}
+          title={hasPriceHistory ? 'Разлики в цената' : 'Няма промени в цената'}
+        >
+          <PriceDeltaIcon size={15} />
+          Разлики
+        </button>
+        <button
           style={{
             padding: '12px 16px',
             background: isFavorite ? '#fff1f7' : '#f8fafc',
@@ -504,7 +624,8 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
         >
           <Heart size={16} fill={isFavorite ? 'currentColor' : 'none'} />
         </button>
-      </div>
+        </div>
+      </>
     );
   }
 

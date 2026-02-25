@@ -97,6 +97,11 @@ const FullscreenModal = memo<{
     const imageRef = useRef<HTMLImageElement | null>(null);
     const isPanningRef = useRef(false);
     const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+    const pinchStateRef = useRef<{
+      startDistance: number;
+      startZoom: number;
+      anchor: { x: number; y: number };
+    } | null>(null);
     const minZoom = 1;
     const headerBadgeLabel = showTopBadge ? 'TOP' : showVipBadge ? 'VIP' : null;
 
@@ -239,6 +244,12 @@ const FullscreenModal = memo<{
       setPan({ x: 0, y: 0 });
     };
 
+    const handleZoomSlider = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const next = Number(e.target.value);
+      if (Number.isNaN(next)) return;
+      applyZoom(next);
+    };
+
     const handleWheelZoom = (e: React.WheelEvent) => {
       e.preventDefault();
       const rect = containerRef.current?.getBoundingClientRect();
@@ -253,10 +264,59 @@ const FullscreenModal = memo<{
       applyZoom(zoomLevel * factor, { x: cx, y: cy });
     };
 
-    const handleZoomSlider = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const next = Number(e.target.value);
-      if (Number.isNaN(next)) return;
-      applyZoom(next);
+    const getTouchDistance = useCallback((touches: React.TouchList) => {
+      if (touches.length < 2) return 0;
+      const first = touches[0];
+      const second = touches[1];
+      return Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY);
+    }, []);
+
+    const getTouchAnchor = useCallback((touches: React.TouchList) => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect || touches.length < 2) {
+        return { x: 0, y: 0 };
+      }
+
+      const first = touches[0];
+      const second = touches[1];
+      const centerX = (first.clientX + second.clientX) / 2;
+      const centerY = (first.clientY + second.clientY) / 2;
+
+      return {
+        x: centerX - rect.left - rect.width / 2,
+        y: centerY - rect.top - rect.height / 2,
+      };
+    }, []);
+
+    const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+      if (e.touches.length !== 2) return;
+      const distance = getTouchDistance(e.touches);
+      if (!distance) return;
+
+      pinchStateRef.current = {
+        startDistance: distance,
+        startZoom: zoomLevel,
+        anchor: getTouchAnchor(e.touches),
+      };
+      isPanningRef.current = false;
+      setIsDragging(false);
+    };
+
+    const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+      if (e.touches.length !== 2 || !pinchStateRef.current) return;
+      e.preventDefault();
+
+      const distance = getTouchDistance(e.touches);
+      if (!distance) return;
+
+      const scaleFactor = distance / pinchStateRef.current.startDistance;
+      applyZoom(pinchStateRef.current.startZoom * scaleFactor, pinchStateRef.current.anchor);
+    };
+
+    const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+      if (e.touches.length < 2) {
+        pinchStateRef.current = null;
+      }
     };
 
     const handlePointerDown = (e: React.PointerEvent) => {
@@ -367,39 +427,39 @@ const FullscreenModal = memo<{
             </h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                background: 'rgba(255,255,255,0.12)',
-                borderRadius: 999,
-                padding: isMobile ? '4px 6px' : '6px 8px',
-              }}
-            >
-              <button
-                onClick={handleZoomOut}
-                disabled={zoomLevel <= minZoom}
+            {!isMobile && (
+              <div
                 style={{
-                  background: 'rgba(255,255,255,0.2)',
-                  border: 'none',
-                  color: '#fff',
-                  cursor: zoomLevel <= minZoom ? 'not-allowed' : 'pointer',
-                  opacity: zoomLevel <= minZoom ? 0.5 : 1,
-                  padding: isMobile ? '6px' : '8px',
-                  borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
+                  gap: 6,
+                  background: 'rgba(255,255,255,0.12)',
+                  borderRadius: 999,
+                  padding: '6px 8px',
                 }}
-                aria-label="Zoom out"
               >
-                <ZoomOut size={isMobile ? 16 : 18} />
-              </button>
-              <span style={{ color: '#fff', fontSize: isMobile ? 11 : 12, fontWeight: 600, minWidth: 42, textAlign: 'center' }}>
-                {zoomLevel.toFixed(2)}x
-              </span>
-              {!isMobile && (
+                <button
+                  onClick={handleZoomOut}
+                  disabled={zoomLevel <= minZoom}
+                  style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    border: 'none',
+                    color: '#fff',
+                    cursor: zoomLevel <= minZoom ? 'not-allowed' : 'pointer',
+                    opacity: zoomLevel <= minZoom ? 0.5 : 1,
+                    padding: '8px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  aria-label="Zoom out"
+                >
+                  <ZoomOut size={18} />
+                </button>
+                <span style={{ color: '#fff', fontSize: 12, fontWeight: 600, minWidth: 42, textAlign: 'center' }}>
+                  {zoomLevel.toFixed(2)}x
+                </span>
                 <input
                   type="range"
                   min={minZoom}
@@ -414,44 +474,44 @@ const FullscreenModal = memo<{
                     cursor: 'pointer',
                   }}
                 />
-              )}
-              <button
-                onClick={handleZoomIn}
-                disabled={zoomLevel >= maxZoom}
-                style={{
-                  background: 'rgba(255,255,255,0.2)',
-                  border: 'none',
-                  color: '#fff',
-                  cursor: zoomLevel >= maxZoom ? 'not-allowed' : 'pointer',
-                  opacity: zoomLevel >= maxZoom ? 0.5 : 1,
-                  padding: isMobile ? '6px' : '8px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                aria-label="Zoom in"
-              >
-                <ZoomIn size={isMobile ? 16 : 18} />
-              </button>
-              <button
-                onClick={handleZoomReset}
-                style={{
-                  background: 'rgba(255,255,255,0.2)',
-                  border: 'none',
-                  color: '#fff',
-                  cursor: 'pointer',
-                  padding: isMobile ? '6px' : '8px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                aria-label="Reset zoom"
-              >
-                <RotateCcw size={isMobile ? 16 : 18} />
-              </button>
-            </div>
+                <button
+                  onClick={handleZoomIn}
+                  disabled={zoomLevel >= maxZoom}
+                  style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    border: 'none',
+                    color: '#fff',
+                    cursor: zoomLevel >= maxZoom ? 'not-allowed' : 'pointer',
+                    opacity: zoomLevel >= maxZoom ? 0.5 : 1,
+                    padding: '8px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  aria-label="Zoom in"
+                >
+                  <ZoomIn size={18} />
+                </button>
+                <button
+                  onClick={handleZoomReset}
+                  style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    border: 'none',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    padding: '8px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  aria-label="Reset zoom"
+                >
+                  <RotateCcw size={18} />
+                </button>
+              </div>
+            )}
             <button
               onClick={onClose}
               style={{
@@ -492,6 +552,10 @@ const FullscreenModal = memo<{
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={handleTouchEnd}
             style={{
               width: '100%',
               height: '100%',
@@ -503,7 +567,7 @@ const FullscreenModal = memo<{
               background: 'rgba(0, 0, 0, 0.92)',
               padding: 0,
               cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default',
-              touchAction: zoomLevel > 1 ? 'none' : 'pan-y',
+              touchAction: isMobile ? 'none' : zoomLevel > 1 ? 'none' : 'pan-y',
               overscrollBehavior: 'contain',
               position: 'relative',
               zIndex: 1,
@@ -1050,7 +1114,23 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
-          <div style={styles.carouselInner}>
+          <div
+            style={{ ...styles.carouselInner, ...(isMobile ? { cursor: 'zoom-in' } : {}) }}
+            onClick={isMobile ? () => setIsFullscreenOpen(true) : undefined}
+            role={isMobile ? 'button' : undefined}
+            tabIndex={isMobile ? 0 : -1}
+            aria-label={isMobile ? 'Open image fullscreen' : undefined}
+            onKeyDown={
+              isMobile
+                ? (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setIsFullscreenOpen(true);
+                    }
+                  }
+                : undefined
+            }
+          >
             <MainCarouselImage
               photo={currentImage}
               fallbackPath={resolveMainImagePath(currentImage)}
@@ -1094,7 +1174,10 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
           {safeImages.length > 1 && (
             <>
               <button
-                onClick={() => throttledPrevious()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  throttledPrevious();
+                }}
                 style={{ ...styles.controls, ...styles.prevButton }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = 'rgba(0,0,0,0.8)';
@@ -1111,7 +1194,10 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
                 <ChevronLeft size={isMobile ? 22 : 28} strokeWidth={3} />
               </button>
               <button
-                onClick={() => throttledNext()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  throttledNext();
+                }}
                 style={{ ...styles.controls, ...styles.nextButton }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = 'rgba(0,0,0,0.8)';
@@ -1130,21 +1216,22 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
             </>
           )}
 
-          {/* Fullscreen Button */}
-          <button
-            onClick={() => setIsFullscreenOpen(true)}
-            style={styles.fullscreenButton}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.background = 'rgba(15, 23, 42, 0.85)')
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.background = 'rgba(15, 23, 42, 0.65)')
-            }
-            aria-label="View fullscreen"
-          >
-            <Monitor size={isMobile ? 16 : 18} />
-            {!isMobile && <span>Голям екран</span>}
-          </button>
+          {!isMobile && (
+            <button
+              onClick={() => setIsFullscreenOpen(true)}
+              style={styles.fullscreenButton}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = 'rgba(15, 23, 42, 0.85)')
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = 'rgba(15, 23, 42, 0.65)')
+              }
+              aria-label="View fullscreen"
+            >
+              <Monitor size={18} />
+              <span>Голям екран</span>
+            </button>
+          )}
 
           {/* Counter */}
           {safeImages.length > 1 && (
