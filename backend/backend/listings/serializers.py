@@ -43,6 +43,153 @@ def _normalize_media_path(raw_path):
     return f"{media_url}/{path.lstrip('/')}"
 
 
+def _to_positive_int(value):
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return None
+    if number <= 0:
+        return None
+    return number
+
+
+def _file_field_name(file_field):
+    return str(getattr(file_field, 'name', '') or '').strip()
+
+
+def _image_original_path(image_obj):
+    if not image_obj:
+        return None
+    image_field = getattr(image_obj, 'image', None)
+    return _file_field_name(image_field)
+
+
+def _extract_webp_renditions(image_obj):
+    if not image_obj:
+        return []
+
+    payload = getattr(image_obj, 'renditions', None)
+    raw_items = payload.get('webp') if isinstance(payload, dict) else None
+
+    normalized = []
+    if isinstance(raw_items, list):
+        for raw in raw_items:
+            if not isinstance(raw, dict):
+                continue
+            width = _to_positive_int(raw.get('width'))
+            if width is None:
+                continue
+            raw_path = raw.get('path') or raw.get('url')
+            path = str(raw_path or '').strip()
+            if not path:
+                continue
+            height = _to_positive_int(raw.get('height'))
+            kind = str(raw.get('kind') or '').strip() or ('grid' if width <= 600 else 'detail')
+            image_format = str(raw.get('format') or 'webp').strip().lower() or 'webp'
+            normalized.append(
+                {
+                    'width': width,
+                    'height': height,
+                    'kind': kind,
+                    'format': image_format,
+                    'path': path,
+                }
+            )
+
+    if not normalized:
+        thumbnail_field = getattr(image_obj, 'thumbnail', None)
+        thumbnail_path = _file_field_name(thumbnail_field)
+        if thumbnail_path:
+            normalized.append(
+                {
+                    'width': 300,
+                    'height': None,
+                    'kind': 'grid',
+                    'format': 'webp',
+                    'path': thumbnail_path,
+                }
+            )
+
+    normalized.sort(key=lambda item: item['width'])
+    return normalized
+
+
+def _serialize_image_renditions(image_obj):
+    serialized = []
+    for item in _extract_webp_renditions(image_obj):
+        url = _normalize_media_path(item.get('path'))
+        if not url:
+            continue
+        row = {
+            'width': item['width'],
+            'url': url,
+            'kind': item.get('kind') or 'detail',
+            'format': item.get('format') or 'webp',
+        }
+        if item.get('height'):
+            row['height'] = item['height']
+        serialized.append(row)
+    return serialized
+
+
+def _build_srcset_webp(image_obj):
+    parts = [
+        f"{item['url']} {item['width']}w"
+        for item in _serialize_image_renditions(image_obj)
+        if item.get('format') == 'webp'
+    ]
+    return ", ".join(parts)
+
+
+def _pick_rendition(renditions, preferred_kind=None, preferred_width=None):
+    candidates = renditions
+    if preferred_kind:
+        candidates = [item for item in renditions if item.get('kind') == preferred_kind]
+        if not candidates:
+            candidates = renditions
+    if not candidates:
+        return None
+
+    sorted_items = sorted(candidates, key=lambda item: item.get('width') or 0)
+    if preferred_width is None:
+        return sorted_items[-1]
+
+    for item in sorted_items:
+        width = item.get('width') or 0
+        if width >= preferred_width:
+            return item
+    return sorted_items[-1]
+
+
+def _select_image_url(image_obj, preferred_kind='grid', preferred_width=600):
+    if not image_obj:
+        return None
+
+    selected = _pick_rendition(
+        _serialize_image_renditions(image_obj),
+        preferred_kind=preferred_kind,
+        preferred_width=preferred_width,
+    )
+    if selected and selected.get('url'):
+        return selected['url']
+
+    original_path = _image_original_path(image_obj)
+    thumbnail_field = getattr(image_obj, 'thumbnail', None)
+    thumbnail_path = _file_field_name(thumbnail_field)
+    if preferred_kind == 'detail':
+        if original_path:
+            return _normalize_media_path(original_path)
+        if thumbnail_path:
+            return _normalize_media_path(thumbnail_path)
+        return None
+
+    if thumbnail_path:
+        return _normalize_media_path(thumbnail_path)
+    if original_path:
+        return _normalize_media_path(original_path)
+    return None
+
+
 def _normalize_choice_alias(value, aliases):
     if value in (None, ""):
         return value
@@ -216,10 +363,45 @@ MAIN_CATEGORIES_WITH_OPTIONAL_IMAGES = {"y", "z"}
 
 class CarImageSerializer(serializers.ModelSerializer):
     """Serializer for car images"""
+    original_url = serializers.SerializerMethodField()
+    renditions = serializers.SerializerMethodField()
+    srcset_webp = serializers.SerializerMethodField()
+
     class Meta:
         model = CarImage
-        fields = ['id', 'image', 'thumbnail', 'order', 'is_cover', 'created_at']
-        read_only_fields = ['id', 'created_at']
+        fields = [
+            'id',
+            'image',
+            'original_url',
+            'thumbnail',
+            'renditions',
+            'srcset_webp',
+            'original_width',
+            'original_height',
+            'low_res',
+            'order',
+            'is_cover',
+            'created_at',
+        ]
+        read_only_fields = [
+            'id',
+            'original_url',
+            'renditions',
+            'srcset_webp',
+            'original_width',
+            'original_height',
+            'low_res',
+            'created_at',
+        ]
+
+    def get_original_url(self, obj):
+        return _normalize_media_path(_image_original_path(obj))
+
+    def get_renditions(self, obj):
+        return _serialize_image_renditions(obj)
+
+    def get_srcset_webp(self, obj):
+        return _build_srcset_webp(obj)
 
 
 class CarListingLiteSerializer(serializers.ModelSerializer):
@@ -227,6 +409,7 @@ class CarListingLiteSerializer(serializers.ModelSerializer):
     fuel_display = serializers.SerializerMethodField()
     listing_type_display = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
+    photo = serializers.SerializerMethodField()
     price_change = serializers.SerializerMethodField()
     part_for = serializers.SerializerMethodField()
     part_element = serializers.SerializerMethodField()
@@ -236,7 +419,7 @@ class CarListingLiteSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'slug', 'main_category', 'brand', 'model', 'year_from', 'price', 'mileage',
             'fuel', 'fuel_display', 'power', 'city', 'created_at',
-            'listing_type', 'listing_type_display', 'image_url', 'price_change',
+            'listing_type', 'listing_type_display', 'image_url', 'photo', 'price_change',
             'is_kaparirano',
             'part_for', 'part_element',
         ]
@@ -248,16 +431,36 @@ class CarListingLiteSerializer(serializers.ModelSerializer):
     def get_listing_type_display(self, obj):
         return obj.listing_type
 
+    def _get_cover_image(self, obj):
+        cache = self.context.setdefault('_lite_cover_image_cache', {})
+        if obj.id in cache:
+            return cache[obj.id]
+
+        prefetched_images = getattr(obj, '_prefetched_objects_cache', {}).get('images')
+        if prefetched_images is not None:
+            images = list(prefetched_images)
+        else:
+            images = list(
+                obj.images.all().order_by('-is_cover', 'order', 'id')[:1]
+            )
+
+        cover = None
+        if images:
+            cover = next((image for image in images if image.is_cover), images[0])
+        cache[obj.id] = cover
+        return cover
+
     def get_image_url(self, obj):
         first_image = getattr(obj, 'first_image', None)
         if first_image:
             return _normalize_media_path(first_image)
-        images = list(obj.images.all()[:1])
-        if images:
-            image_obj = images[0]
-            source_url = image_obj.thumbnail.url if image_obj.thumbnail else image_obj.image.url
-            return _normalize_media_path(source_url)
-        return None
+        return _select_image_url(self._get_cover_image(obj), preferred_kind='grid', preferred_width=600)
+
+    def get_photo(self, obj):
+        image_obj = self._get_cover_image(obj)
+        if not image_obj:
+            return None
+        return CarImageSerializer(image_obj, context=self.context).data
 
     def _resolve_price_change(self, obj):
         delta = getattr(obj, 'last_price_change_delta', None)
@@ -322,6 +525,7 @@ class CarListingListSerializer(serializers.ModelSerializer):
     category_display = serializers.SerializerMethodField()
     listing_type_display = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
+    photo = serializers.SerializerMethodField()
     images = serializers.SerializerMethodField()
     is_favorited = serializers.SerializerMethodField()
     seller_name = serializers.SerializerMethodField()
@@ -338,42 +542,50 @@ class CarListingListSerializer(serializers.ModelSerializer):
             'description_preview', 'created_at', 'updated_at',
             'listing_type', 'listing_type_display',
             'is_active', 'is_draft', 'is_archived', 'is_kaparirano',
-            'image_url', 'images', 'is_favorited', 'seller_name', 'seller_type', 'price_change'
+            'image_url', 'photo', 'images', 'is_favorited', 'seller_name', 'seller_type', 'price_change'
         ]
         read_only_fields = fields
 
     def _get_preview_images(self, obj):
         cache = self.context.setdefault('_images_preview_cache', {})
-        cached = cache.get(obj.id)
-        if cached is not None:
-            return cached
-        images = list(obj.images.all()[:4])
+        if obj.id in cache:
+            return cache[obj.id]
+
+        prefetched_images = getattr(obj, '_prefetched_objects_cache', {}).get('images')
+        if prefetched_images is not None:
+            images = list(prefetched_images)[:4]
+        else:
+            images = list(obj.images.all()[:4])
         cache[obj.id] = images
         return images
 
-    def _build_image_url(self, image_obj):
-        if not image_obj or not image_obj.image:
+    def _get_cover_image(self, obj):
+        images = self._get_preview_images(obj)
+        if not images:
             return None
-        source_url = image_obj.thumbnail.url if image_obj.thumbnail else image_obj.image.url
-        return _normalize_media_path(source_url)
+        return next((image for image in images if image.is_cover), images[0])
+
+    def _build_image_url(self, image_obj):
+        return _select_image_url(image_obj, preferred_kind='grid', preferred_width=600)
 
     def get_images(self, obj):
-        return [
-            {
-                'id': image.id,
-                'image': self._build_image_url(image),
-                'order': image.order,
-                'is_cover': image.is_cover,
-            }
-            for image in self._get_preview_images(obj)
-        ]
+        images = self._get_preview_images(obj)
+        return CarImageSerializer(images, many=True, context=self.context).data
 
     def get_image_url(self, obj):
+        image_obj = self._get_cover_image(obj)
+        if image_obj:
+            return self._build_image_url(image_obj)
         first_image = getattr(obj, 'first_image', None)
         if first_image:
             return _normalize_media_path(first_image)
-        images = self._get_preview_images(obj)
-        return self._build_image_url(images[0]) if images else None
+        return None
+
+    def get_photo(self, obj):
+        image_obj = self._get_cover_image(obj)
+        if not image_obj:
+            return None
+        return CarImageSerializer(image_obj, context=self.context).data
 
     def get_fuel_display(self, obj):
         return obj.fuel
@@ -475,7 +687,7 @@ class CarListingSearchCompactSerializer(CarListingListSerializer):
             'fuel_display', 'gearbox_display', 'category_display', 'condition_display',
             'description_preview', 'created_at', 'updated_at',
             'listing_type', 'listing_type_display',
-            'is_kaparirano', 'image_url', 'images', 'is_favorited', 'seller_name', 'seller_type', 'price_change'
+            'is_kaparirano', 'image_url', 'photo', 'images', 'is_favorited', 'seller_name', 'seller_type', 'price_change'
         ]
         read_only_fields = fields
 
@@ -537,6 +749,7 @@ class CarListingSerializer(serializers.ModelSerializer):
     category_display = serializers.SerializerMethodField()
     listing_type_display = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
+    photo = serializers.SerializerMethodField()
     is_favorited = serializers.SerializerMethodField()
     seller_name = serializers.SerializerMethodField()
     seller_type = serializers.SerializerMethodField()
@@ -617,7 +830,7 @@ class CarListingSerializer(serializers.ModelSerializer):
             'power', 'displacement', 'euro_standard',
             'description', 'phone', 'email', 'features', 'listing_type', 'listing_type_display',
             'top_plan', 'vip_plan', 'top_expires_at', 'vip_expires_at',
-            'view_count', 'is_draft', 'is_active', 'is_archived', 'is_kaparirano', 'created_at', 'updated_at', 'images', 'image_url',
+            'view_count', 'is_draft', 'is_active', 'is_archived', 'is_kaparirano', 'created_at', 'updated_at', 'images', 'image_url', 'photo',
             'is_favorited', 'seller_name', 'seller_type', 'seller_created_at', 'price_history', 'images_upload',
             'wheel_for', 'offer_type',
             'tire_brand', 'tire_width', 'tire_height', 'tire_diameter',
@@ -634,7 +847,7 @@ class CarListingSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id', 'slug', 'user', 'user_email', 'created_at', 'updated_at', 'images', 'image_url', 'is_favorited',
             'is_active', 'fuel_display', 'gearbox_display', 'condition_display', 'category_display',
-            'listing_type_display', 'seller_name', 'seller_type', 'seller_created_at', 'price_history',
+            'listing_type_display', 'seller_name', 'seller_type', 'seller_created_at', 'price_history', 'photo',
             'top_expires_at', 'vip_expires_at', 'view_count', 'is_kaparirano'
         ]
 
@@ -653,15 +866,28 @@ class CarListingSerializer(serializers.ModelSerializer):
     def get_listing_type_display(self, obj):
         return obj.listing_type
 
+    def _get_cover_image(self, obj):
+        prefetched_images = getattr(obj, '_prefetched_objects_cache', {}).get('images')
+        if prefetched_images is not None:
+            images = list(prefetched_images)
+            if not images:
+                return None
+            return next((image for image in images if image.is_cover), images[0])
+
+        return (
+            obj.images.all()
+            .order_by('-is_cover', 'order', 'id')
+            .first()
+        )
+
     def get_image_url(self, obj):
-        images = list(obj.images.all())
-        if images:
-            first_image = images[0]
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(first_image.image.url)
-            return first_image.image.url
-        return None
+        return _select_image_url(self._get_cover_image(obj), preferred_kind='detail', preferred_width=1200)
+
+    def get_photo(self, obj):
+        image_obj = self._get_cover_image(obj)
+        if not image_obj:
+            return None
+        return CarImageSerializer(image_obj, context=self.context).data
 
     def get_is_favorited(self, obj):
         request = self.context.get('request')

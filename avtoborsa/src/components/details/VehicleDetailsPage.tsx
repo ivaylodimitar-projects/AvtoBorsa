@@ -8,14 +8,15 @@ import ContactSidebar from './ContactSidebar';
 import SellerCard from './SellerCard';
 import SkeletonLoader from './SkeletonLoader';
 import { extractIdFromSlug } from '../../utils/slugify';
-import { useImageUrl } from '../../hooks/useGalleryLazyLoad';
 import ListingPromoBadge from '../ListingPromoBadge';
 import KapariranoBadge from '../KapariranoBadge';
+import ResponsiveImage, { type ApiPhoto, type PhotoRendition } from '../ResponsiveImage';
 import { API_BASE_URL } from '../../config/api';
 
-interface CarImage {
+interface CarImage extends ApiPhoto {
   id: number;
   image: string;
+  renditions?: PhotoRendition[] | null;
 }
 
 interface PriceHistoryEntry {
@@ -146,6 +147,7 @@ interface SimilarListing {
   vip_plan?: string | null;
   vip_expires_at?: string | null;
   image_url?: string;
+  photo?: ApiPhoto | null;
   images?: CarImage[];
 }
 
@@ -270,7 +272,6 @@ const VehicleDetailsPage: React.FC = () => {
   const [similarListings, setSimilarListings] = useState<SimilarListing[]>([]);
   const [isSimilarLoading, setIsSimilarLoading] = useState(false);
   const [similarError, setSimilarError] = useState<string | null>(null);
-  const getImageUrl = useImageUrl();
   const similarScrollRef = useRef<HTMLDivElement | null>(null);
 
   useLayoutEffect(() => {
@@ -1009,8 +1010,22 @@ const VehicleDetailsPage: React.FC = () => {
                 </div>
                 <div style={styles.similarScroller} ref={similarScrollRef} className="similar-scroll">
                   {similarListings.map((item, index) => {
-                    const imagePath = item.image_url || item.images?.[0]?.image || '';
-                    const imageUrl = imagePath ? getImageUrl(imagePath) : '';
+                    const itemImages = Array.isArray(item.images) ? item.images : [];
+                    const coverPhoto =
+                      item.photo ||
+                      itemImages.find((img) => Boolean(img?.is_cover)) ||
+                      itemImages[0] ||
+                      null;
+                    const imageFallbackPath =
+                      item.image_url ||
+                      coverPhoto?.original_url ||
+                      coverPhoto?.image ||
+                      coverPhoto?.thumbnail ||
+                      '';
+                    const hasImage = Boolean(
+                      imageFallbackPath ||
+                        (Array.isArray(coverPhoto?.renditions) && coverPhoto.renditions.length > 0)
+                    );
                     const isTop = isSimilarTopListing(item);
                     const isVip = isSimilarVipListing(item);
                     const isNew = isRecentListing(item.created_at);
@@ -1051,13 +1066,18 @@ const VehicleDetailsPage: React.FC = () => {
                               Нова
                             </span>
                           )}
-                          {imageUrl ? (
-                            <img
-                              src={imageUrl}
+                          {hasImage ? (
+                            <ResponsiveImage
+                              photo={coverPhoto}
+                              fallbackPath={imageFallbackPath}
                               alt={`${item.brand} ${item.model}`}
-                              style={styles.similarImage}
+                              kind="grid"
+                              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
                               loading="lazy"
                               decoding="async"
+                              fetchPriority="low"
+                              containerStyle={{ width: '100%', height: '100%' }}
+                              imgStyle={styles.similarImage}
                             />
                           ) : (
                             <div style={styles.similarImagePlaceholder}>

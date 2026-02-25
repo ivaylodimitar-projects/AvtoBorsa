@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Star, Trash2, UploadCloud } from "lucide-react";
+import ResponsiveImage, { type ApiPhoto } from "./ResponsiveImage";
 
 interface ImageItem {
   file: File;
@@ -11,6 +12,12 @@ export interface ExistingImageItem {
   id?: number;
   image: string;
   thumbnail?: string | null;
+  original_url?: string | null;
+  renditions?: ApiPhoto["renditions"] | null;
+  srcset_webp?: string | null;
+  original_width?: number | null;
+  original_height?: number | null;
+  low_res?: boolean;
   isCover: boolean;
 }
 
@@ -583,8 +590,25 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
           <div style={styles.groupTitle}>Текущи снимки</div>
           <div style={styles.gallery}>
             {existingImages.map((item, index) => {
-              const previewUrl = item.thumbnail || item.image;
-              if (!previewUrl) return null;
+              const fallbackPath =
+                (item.original_url || item.image || item.thumbnail || "").trim();
+              const hasPreviewImage = Boolean(
+                fallbackPath ||
+                  (Array.isArray(item.renditions) && item.renditions.length > 0)
+              );
+              if (!hasPreviewImage) return null;
+              const previewPhoto: ApiPhoto = {
+                id: item.id,
+                image: item.image,
+                original_url: item.original_url || item.image,
+                thumbnail: item.thumbnail || null,
+                renditions: item.renditions || null,
+                srcset_webp: item.srcset_webp || null,
+                original_width: item.original_width ?? null,
+                original_height: item.original_height ?? null,
+                low_res: Boolean(item.low_res),
+                is_cover: item.isCover,
+              };
               return (
                 <div
                   key={`${item.id ?? item.image}-${index}`}
@@ -631,10 +655,17 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
                     </div>
                   )}
                   <div style={styles.existingBadge}>Налична</div>
-                  <img
-                    src={previewUrl}
+                  <ResponsiveImage
+                    photo={previewPhoto}
+                    fallbackPath={fallbackPath}
                     alt={`Existing ${index + 1}`}
-                    style={{ ...styles.image, ...styles.imageMuted }}
+                    kind="grid"
+                    sizes="(max-width: 640px) 45vw, 180px"
+                    loading="lazy"
+                    decoding="async"
+                    fetchPriority="low"
+                    containerStyle={{ width: "100%", height: "100%" }}
+                    imgStyle={{ ...styles.image, ...styles.imageMuted }}
                   />
                   {canEditExistingImages && (
                     <div style={styles.imageActions}>

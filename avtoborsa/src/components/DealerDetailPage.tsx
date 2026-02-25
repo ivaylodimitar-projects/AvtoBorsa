@@ -12,6 +12,7 @@ import {
   unfollowDealer,
 } from "../utils/dealerSubscriptions";
 import ListingPromoBadge from "./ListingPromoBadge";
+import ResponsiveImage, { type ApiPhoto } from "./ResponsiveImage";
 import { API_BASE_URL } from "../config/api";
 
 type CarListing = {
@@ -30,6 +31,8 @@ type CarListing = {
   power: number;
   city: string;
   image_url?: string;
+  photo?: ApiPhoto | null;
+  images?: ApiPhoto[];
   description?: string | null;
   condition?: string | number;
   condition_display?: string;
@@ -1209,6 +1212,22 @@ const DealerDetailPage: React.FC = () => {
                   const technicalSpecs = getTechnicalSpecs(listing);
                   const visibleChips = technicalSpecs.slice(0, 4);
                   const createdLabel = getRelativeTime(listing.created_at);
+                  const images = Array.isArray(listing.images) ? listing.images : [];
+                  const coverPhoto =
+                    listing.photo ||
+                    images.find((img) => Boolean(img?.is_cover)) ||
+                    images[0] ||
+                    null;
+                  const mainImageFallbackPath =
+                    listing.image_url ||
+                    coverPhoto?.original_url ||
+                    coverPhoto?.image ||
+                    coverPhoto?.thumbnail ||
+                    null;
+                  const hasListingImage = Boolean(
+                    mainImageFallbackPath ||
+                      (Array.isArray(coverPhoto?.renditions) && coverPhoto.renditions.length > 0)
+                  );
 
                   return (
                   <div
@@ -1233,11 +1252,18 @@ const DealerDetailPage: React.FC = () => {
                           Нова
                         </div>
                       )}
-                      {listing.image_url ? (
-                        <img
-                          src={listing.image_url}
+                      {hasListingImage ? (
+                        <ResponsiveImage
+                          photo={coverPhoto}
+                          fallbackPath={mainImageFallbackPath}
                           alt={`${listing.brand} ${listing.model}`}
-                          style={styles.listingImage}
+                          kind="grid"
+                          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
+                          loading="lazy"
+                          decoding="async"
+                          fetchPriority="low"
+                          containerStyle={{ width: "100%", height: "100%" }}
+                          imgStyle={styles.listingImage}
                         />
                       ) : (
                         <div style={styles.listingPlaceholder}>

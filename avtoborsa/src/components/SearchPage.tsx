@@ -24,13 +24,13 @@ import {
   Leaf,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 import { formatConditionLabel, formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 import { getMainCategoryFromTopmenu, getMainCategoryLabel } from "../constants/mobileBgData";
 import { useSavedSearches } from "../hooks/useSavedSearches";
 import { resolvePriceBadgeState } from "../utils/priceChangeBadge";
 import ListingPromoBadge from "./ListingPromoBadge";
 import KapariranoBadge from "./KapariranoBadge";
+import ResponsiveImage, { type ApiPhoto } from "./ResponsiveImage";
 import { API_BASE_URL } from "../config/api";
 
 type CarListing = {
@@ -51,12 +51,8 @@ type CarListing = {
   location_region?: string;
   city: string;
   image_url?: string;
-  images?: Array<{
-    id: number;
-    image: string;
-    order?: number;
-    is_cover?: boolean;
-  }>;
+  photo?: ApiPhoto | null;
+  images?: ApiPhoto[];
   is_active: boolean;
   is_draft: boolean;
   is_archived: boolean;
@@ -192,7 +188,6 @@ const SearchPage: React.FC = () => {
   const [saveSearchFeedback, setSaveSearchFeedback] = useState("");
   const saveSearchFeedbackTimeoutRef = useRef<number | null>(null);
   const { saveSearch } = useSavedSearches();
-  const getImageUrl = useImageUrl();
 
   const baseQueryString = useMemo(() => {
     const params = new URLSearchParams(searchParams);
@@ -2125,11 +2120,10 @@ const SearchPage: React.FC = () => {
         ) : results.length > 0 ? (
           <>
             <div style={styles.results} className="search-results">
-              {results.map((listing, index) => {
+              {results.map((listing) => {
                   const isTop = isTopListing(listing);
                   const isVip = isVipListing(listing);
                   const isNewListing = isListingNew(listing.created_at);
-                  const isPriorityImage = index < 3;
                   const sellerLabel = listing.seller_name || "Частно лице";
                   const locationLabel =
                     [listing.location_country, listing.city].filter(Boolean).join(", ") || "Не е посочено";
@@ -2157,21 +2151,45 @@ const SearchPage: React.FC = () => {
                   : listing.seller_type === "private"
                     ? BadgeCheck
                     : HelpCircle;
-              const images = listing.images || [];
-              const mainImagePath = listing.image_url || images[0]?.image;
-              const mainImageUrl = mainImagePath ? getImageUrl(mainImagePath) : "";
-              const extraImages = images.slice(1);
+              const images = Array.isArray(listing.images) ? listing.images : [];
+              const coverPhoto = listing.photo || images.find((img) => img?.is_cover) || images[0] || null;
+              const mainImageFallbackPath =
+                listing.image_url ||
+                coverPhoto?.original_url ||
+                coverPhoto?.image ||
+                null;
+              const hasMainImage = Boolean(
+                mainImageFallbackPath ||
+                  (typeof coverPhoto?.thumbnail === "string" && coverPhoto.thumbnail.trim()) ||
+                  (Array.isArray(coverPhoto?.renditions) && coverPhoto.renditions.length > 0)
+              );
+              const extraImages = coverPhoto?.id
+                ? images.filter((img) => img.id !== coverPhoto.id)
+                : images.slice(1);
               const maxThumbs = 3;
-              const thumbItems: Array<{ type: "image" | "more" | "placeholder"; src?: string; label?: string }> = [];
+              const thumbItems: Array<{
+                type: "image" | "more" | "placeholder";
+                photo?: ApiPhoto;
+                fallbackPath?: string | null;
+                label?: string;
+              }> = [];
 
               if (extraImages.length > maxThumbs) {
                 extraImages.slice(0, maxThumbs - 1).forEach((img) => {
-                  thumbItems.push({ type: "image", src: getImageUrl(img.image) });
+                  thumbItems.push({
+                    type: "image",
+                    photo: img,
+                    fallbackPath: img.original_url || img.image || null,
+                  });
                 });
                 thumbItems.push({ type: "more", label: `+${extraImages.length - (maxThumbs - 1)}` });
               } else {
                 extraImages.forEach((img) => {
-                  thumbItems.push({ type: "image", src: getImageUrl(img.image) });
+                  thumbItems.push({
+                    type: "image",
+                    photo: img,
+                    fallbackPath: img.original_url || img.image || null,
+                  });
                 });
               }
 
@@ -2229,15 +2247,19 @@ const SearchPage: React.FC = () => {
                               Нова
                             </div>
                           )}
-                          {mainImageUrl ? (
+                          {hasMainImage ? (
                             <>
-                              <img
-                                src={mainImageUrl}
+                              <ResponsiveImage
+                                photo={coverPhoto}
+                                fallbackPath={mainImageFallbackPath}
                                 alt={listingTitle}
-                                style={styles.itemImage}
-                                loading={isPriorityImage ? "eager" : "lazy"}
+                                kind="grid"
+                                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
+                                loading="lazy"
                                 decoding="async"
-                                fetchPriority={isPriorityImage ? "high" : "low"}
+                                fetchPriority="low"
+                                containerStyle={{ width: "100%", height: "100%" }}
+                                imgStyle={styles.itemImage}
                               />
                               <div style={styles.itemPhotoOverlay}>
                                 <button
@@ -2272,15 +2294,20 @@ const SearchPage: React.FC = () => {
                         </div>
                         <div style={styles.thumbStrip} className="search-thumb-strip">
                           {thumbItems.map((thumb, index) => {
-                            if (thumb.type === "image" && thumb.src) {
+                            if (thumb.type === "image" && (thumb.photo || thumb.fallbackPath)) {
                               return (
                                 <div key={`thumb-${listing.id}-${index}`} style={styles.thumb}>
-                                  <img
-                                    src={thumb.src}
+                                  <ResponsiveImage
+                                    photo={thumb.photo}
+                                    fallbackPath={thumb.fallbackPath}
                                     alt={`Допълнителна снимка ${index + 1}`}
-                                    style={styles.thumbImage}
+                                    kind="grid"
+                                    sizes="120px"
                                     loading="lazy"
                                     decoding="async"
+                                    fetchPriority="low"
+                                    containerStyle={{ width: "100%", height: "100%" }}
+                                    imgStyle={styles.thumbImage}
                                   />
                                 </div>
                               );
