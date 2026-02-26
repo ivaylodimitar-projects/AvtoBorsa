@@ -34,7 +34,7 @@ type ResponsiveImageProps = {
   fetchPriority?: "high" | "low" | "auto";
   containerStyle?: React.CSSProperties;
   imgStyle?: React.CSSProperties;
-  objectFit?: "cover" | "contain";
+  objectFit?: "cover";
   strictKind?: boolean;
   preventUpscale?: boolean;
   width?: number;
@@ -44,8 +44,6 @@ type ResponsiveImageProps = {
   onDecoded?: (img: HTMLImageElement) => void;
 };
 
-const CARD_DISPLAY_WIDTH = 320;
-const DETAIL_DISPLAY_WIDTH = 658;
 const CARD_TARGET_WIDTH = 600;
 const DETAIL_TARGET_WIDTH = 1200;
 
@@ -125,7 +123,6 @@ const ResponsiveImage: React.FC<ResponsiveImageProps> = ({
   imgStyle,
   objectFit = "cover",
   strictKind = false,
-  preventUpscale = true,
   width,
   height,
   onLoad,
@@ -173,26 +170,7 @@ const ResponsiveImage: React.FC<ResponsiveImageProps> = ({
   const fallbackSrc = fallbackSource ? getImageUrl(fallbackSource) : "";
   const finalSrc = bestSrc || fallbackSrc;
 
-  const maxRenditionWidth = activeRenditions.reduce(
-    (max, item) => Math.max(max, item.width),
-    0
-  );
-  const originalWidth = toPositiveNumber(photo?.original_width);
-  const maxAvailableWidth = maxRenditionWidth || originalWidth || 0;
-  const requiredDisplayWidth = kind === "detail" ? DETAIL_DISPLAY_WIDTH : CARD_DISPLAY_WIDTH;
-  const lowResMode =
-    preventUpscale &&
-    (Boolean(photo?.low_res) || (maxAvailableWidth > 0 && maxAvailableWidth < requiredDisplayWidth));
-
-  const capStyle: React.CSSProperties =
-    preventUpscale && lowResMode && maxAvailableWidth > 0 && maxAvailableWidth < requiredDisplayWidth
-      ? { maxWidth: `${maxAvailableWidth}px`, marginLeft: "auto", marginRight: "auto" }
-      : {};
-
-  const requestedObjectFit = imgStyle?.objectFit;
-  const resolvedObjectFit: React.CSSProperties["objectFit"] = lowResMode
-    ? "contain"
-    : (requestedObjectFit as React.CSSProperties["objectFit"]) || objectFit;
+  const resolvedObjectFit: React.CSSProperties["objectFit"] = objectFit;
   const resolvedObjectPosition: React.CSSProperties["objectPosition"] =
     (imgStyle?.objectPosition as React.CSSProperties["objectPosition"]) || "center";
 
@@ -224,7 +202,6 @@ const ResponsiveImage: React.FC<ResponsiveImageProps> = ({
         width: "100%",
         height: "100%",
         ...containerStyle,
-        ...capStyle,
       }}
     >
       <picture style={{ display: "block", width: "100%", height: "100%" }}>
