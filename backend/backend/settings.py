@@ -249,6 +249,12 @@ JWT_REFRESH_COOKIE_SECURE = os.getenv(
     "0" if DEBUG else "1",
 ).lower() in ("1", "true", "yes")
 
+CAR_IMAGE_ASYNC_RENDITIONS = _env_flag("CAR_IMAGE_ASYNC_RENDITIONS", default=True)
+try:
+    CAR_IMAGE_RENDITION_WORKERS = max(1, int(os.getenv("CAR_IMAGE_RENDITION_WORKERS", "2")))
+except (TypeError, ValueError):
+    CAR_IMAGE_RENDITION_WORKERS = 2
+
 
 CACHES = {
     "default": {

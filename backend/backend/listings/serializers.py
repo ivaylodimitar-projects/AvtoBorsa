@@ -1423,11 +1423,12 @@ class CarListingSerializer(serializers.ModelSerializer):
         instance.save()
         self._upsert_details(instance, detail_payload)
 
-        for image in images_data:
+        existing_count = instance.images.count()
+        for index, image in enumerate(images_data):
             CarImage.objects.create(
                 listing=instance,
                 image=image,
-                order=instance.images.count(),
+                order=existing_count + index,
                 is_cover=False
             )
 

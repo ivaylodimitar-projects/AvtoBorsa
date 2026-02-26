@@ -184,6 +184,212 @@ const CLASSIFIED_FOR_OPTIONS = MOBILE_CLASSIFIED_FOR_OPTIONS;
 const MIN_IMAGES_REQUIRED_TO_PUBLISH = 3;
 const IMAGE_OPTIONAL_MAIN_CATEGORIES = new Set<MainCategoryKey>(["y", "z"]);
 const EDIT_REDIRECT_LOADING_DELAY_MS = 650;
+const CLIENT_IMAGE_OPTIMIZE_MAX_DIMENSION = 2560;
+const CLIENT_IMAGE_OPTIMIZE_MIN_FILE_SIZE_BYTES = 2_400_000;
+const CLIENT_IMAGE_OPTIMIZE_TARGET_QUALITY = 0.9;
+const CLIENT_IMAGE_OPTIMIZE_CONCURRENCY = 3;
+const CLIENT_IMAGE_OPTIMIZABLE_TYPES = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+]);
+const optimizedUploadImageCache = new WeakMap<File, File>();
+
+type DecodedImageSource = {
+  width: number;
+  height: number;
+  draw: (context: CanvasRenderingContext2D, width: number, height: number) => void;
+  cleanup: () => void;
+};
+
+const loadImageSourceFromFile = async (file: File): Promise<DecodedImageSource | null> => {
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(file, {
+        imageOrientation: "from-image",
+      } as ImageBitmapOptions);
+      return {
+        width: bitmap.width,
+        height: bitmap.height,
+        draw: (context, width, height) => {
+          context.drawImage(bitmap, 0, 0, width, height);
+        },
+        cleanup: () => bitmap.close(),
+      };
+    } catch {
+      // Fallback to HTMLImageElement decode.
+    }
+  }
+
+  return new Promise<DecodedImageSource | null>((resolve) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      const naturalWidth = image.naturalWidth || image.width;
+      const naturalHeight = image.naturalHeight || image.height;
+      URL.revokeObjectURL(objectUrl);
+      if (naturalWidth <= 0 || naturalHeight <= 0) {
+        resolve(null);
+        return;
+      }
+      resolve({
+        width: naturalWidth,
+        height: naturalHeight,
+        draw: (context, width, height) => {
+          context.drawImage(image, 0, 0, width, height);
+        },
+        cleanup: () => {},
+      });
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(null);
+    };
+    image.src = objectUrl;
+  });
+};
+
+const canvasToBlob = (
+  canvas: HTMLCanvasElement,
+  mimeType: string,
+  quality?: number
+): Promise<Blob | null> =>
+  new Promise((resolve) => {
+    canvas.toBlob(resolve, mimeType, quality);
+  });
+
+const replaceFileExtension = (fileName: string, extension: string): string => {
+  const safeExtension = extension.replace(/^\./, "").trim();
+  if (!safeExtension) return fileName;
+  const lastDotIndex = fileName.lastIndexOf(".");
+  const baseName = lastDotIndex > 0 ? fileName.slice(0, lastDotIndex) : fileName;
+  return `${baseName}.${safeExtension}`;
+};
+
+const resolveOutputMimeType = (inputMimeType: string): "image/jpeg" | "image/png" | "image/webp" => {
+  const normalized = String(inputMimeType || "").toLowerCase();
+  if (normalized === "image/png") return "image/png";
+  if (normalized === "image/webp") return "image/webp";
+  return "image/jpeg";
+};
+
+const resolveOutputExtension = (mimeType: string): "jpg" | "png" | "webp" => {
+  if (mimeType === "image/png") return "png";
+  if (mimeType === "image/webp") return "webp";
+  return "jpg";
+};
+
+const optimizeImageForUpload = async (file: File): Promise<File> => {
+  const normalizedType = String(file.type || "").toLowerCase();
+  if (!CLIENT_IMAGE_OPTIMIZABLE_TYPES.has(normalizedType)) {
+    return file;
+  }
+  if (normalizedType === "image/gif" || normalizedType === "image/svg+xml") {
+    return file;
+  }
+
+  const source = await loadImageSourceFromFile(file);
+  if (!source) {
+    return file;
+  }
+
+  try {
+    const { width, height } = source;
+    if (width <= 0 || height <= 0) return file;
+
+    const scaleRatio = Math.min(
+      1,
+      CLIENT_IMAGE_OPTIMIZE_MAX_DIMENSION / width,
+      CLIENT_IMAGE_OPTIMIZE_MAX_DIMENSION / height
+    );
+    const targetWidth = Math.max(1, Math.round(width * scaleRatio));
+    const targetHeight = Math.max(1, Math.round(height * scaleRatio));
+    const needsResize = targetWidth < width || targetHeight < height;
+    const needsReencode = file.size >= CLIENT_IMAGE_OPTIMIZE_MIN_FILE_SIZE_BYTES;
+    if (!needsResize && !needsReencode) {
+      return file;
+    }
+
+    const outputMimeType = resolveOutputMimeType(normalizedType);
+    const canvas = document.createElement("canvas");
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    const context = canvas.getContext("2d", {
+      alpha: outputMimeType !== "image/jpeg",
+    });
+    if (!context) {
+      return file;
+    }
+
+    if (outputMimeType === "image/jpeg") {
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, targetWidth, targetHeight);
+    }
+
+    source.draw(context, targetWidth, targetHeight);
+
+    const blob = await canvasToBlob(
+      canvas,
+      outputMimeType,
+      outputMimeType === "image/png" ? undefined : CLIENT_IMAGE_OPTIMIZE_TARGET_QUALITY
+    );
+    if (!blob || blob.size <= 0) {
+      return file;
+    }
+
+    const sizeReductionThreshold = needsResize ? 1.04 : 0.98;
+    if (blob.size >= file.size * sizeReductionThreshold) {
+      return file;
+    }
+
+    const outputExtension = resolveOutputExtension(outputMimeType);
+    const outputName =
+      outputMimeType === normalizedType
+        ? file.name
+        : replaceFileExtension(file.name, outputExtension);
+    return new File([blob], outputName, {
+      type: outputMimeType,
+      lastModified: file.lastModified,
+    });
+  } finally {
+    source.cleanup();
+  }
+};
+
+const optimizeImagesForUpload = async (files: File[]): Promise<File[]> => {
+  if (files.length === 0) return [];
+
+  const optimizedFiles: File[] = new Array(files.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(CLIENT_IMAGE_OPTIMIZE_CONCURRENCY, files.length);
+
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (true) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      if (currentIndex >= files.length) return;
+
+      const sourceFile = files[currentIndex];
+      const cachedOptimizedFile = optimizedUploadImageCache.get(sourceFile);
+      if (cachedOptimizedFile) {
+        optimizedFiles[currentIndex] = cachedOptimizedFile;
+        continue;
+      }
+
+      try {
+        const optimizedFile = await optimizeImageForUpload(sourceFile);
+        optimizedUploadImageCache.set(sourceFile, optimizedFile);
+        optimizedFiles[currentIndex] = optimizedFile;
+      } catch {
+        optimizedFiles[currentIndex] = sourceFile;
+      }
+    }
+  });
+
+  await Promise.all(workers);
+  return optimizedFiles;
+};
 
 const getMinimumRequiredImageCount = (mainCategory: MainCategoryKey) =>
   IMAGE_OPTIONAL_MAIN_CATEGORIES.has(mainCategory) ? 0 : MIN_IMAGES_REQUIRED_TO_PUBLISH;
@@ -3458,8 +3664,21 @@ const PublishPage: React.FC = () => {
           break;
       }
 
-      images.forEach((img) => {
-        formDataToSend.append("images_upload", img.file);
+      const imagesForUpload = (() => {
+        if (isEditMode || images.length <= 1) return images;
+        const selectedCoverIndex = images.findIndex((img) => img.isCover);
+        if (selectedCoverIndex <= 0) return images;
+        const reorderedImages = [...images];
+        const [selectedCoverImage] = reorderedImages.splice(selectedCoverIndex, 1);
+        reorderedImages.unshift(selectedCoverImage);
+        return reorderedImages;
+      })();
+
+      const optimizedImageFilesForUpload = await optimizeImagesForUpload(
+        imagesForUpload.map((img) => img.file)
+      );
+      optimizedImageFilesForUpload.forEach((imageFile) => {
+        formDataToSend.append("images_upload", imageFile);
       });
 
       const token = await getValidAccessToken();

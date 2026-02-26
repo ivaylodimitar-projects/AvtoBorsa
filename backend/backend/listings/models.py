@@ -1,10 +1,13 @@
 from datetime import timedelta
+from concurrent.futures import ThreadPoolExecutor
 import io
 import os
 import posixpath
+from threading import Lock
 
 from PIL import Image as PILImage, ImageOps
-from django.db import models
+from django.conf import settings
+from django.db import close_old_connections, models, transaction as db_transaction
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.core.files.base import ContentFile
@@ -19,14 +22,44 @@ TOP_PLAN_7D = "7d"
 TOP_LISTING_DURATION_DAYS_1D = 1
 TOP_LISTING_DURATION_DAYS_7D = 7
 VIP_LISTING_DURATION_DAYS = 7
-CAR_IMAGE_DETAIL_WIDTHS = (800, 1200, 1600, 2000)
+CAR_IMAGE_DETAIL_WIDTHS = (800, 1200, 1600)
 CAR_IMAGE_GRID_RENDITIONS = (
     (300, 178),
     (600, 356),
 )
 CAR_IMAGE_WEBP_QUALITY = 82
-CAR_IMAGE_WEBP_METHOD = 6
+CAR_IMAGE_WEBP_METHOD = 4
 CAR_IMAGE_LOW_RES_MIN_WIDTH = 800
+
+
+def _resolve_rendition_worker_count():
+    default_workers = max(2, min(4, os.cpu_count() or 2))
+    raw_value = getattr(settings, "CAR_IMAGE_RENDITION_WORKERS", default_workers)
+    try:
+        parsed = int(raw_value)
+    except (TypeError, ValueError):
+        parsed = default_workers
+    return max(1, min(8, parsed))
+
+
+_CAR_IMAGE_RENDITION_EXECUTOR = None
+_CAR_IMAGE_RENDITION_EXECUTOR_LOCK = Lock()
+_CAR_IMAGE_PENDING_RENDITIONS = set()
+_CAR_IMAGE_PENDING_RENDITIONS_LOCK = Lock()
+
+
+def _get_car_image_rendition_executor():
+    global _CAR_IMAGE_RENDITION_EXECUTOR
+    if _CAR_IMAGE_RENDITION_EXECUTOR is not None:
+        return _CAR_IMAGE_RENDITION_EXECUTOR
+
+    with _CAR_IMAGE_RENDITION_EXECUTOR_LOCK:
+        if _CAR_IMAGE_RENDITION_EXECUTOR is None:
+            _CAR_IMAGE_RENDITION_EXECUTOR = ThreadPoolExecutor(
+                max_workers=_resolve_rendition_worker_count(),
+                thread_name_prefix="car-image-rendition",
+            )
+    return _CAR_IMAGE_RENDITION_EXECUTOR
 
 
 def get_expiry_cutoff(now=None):
@@ -776,7 +809,92 @@ class CarImage(models.Model):
             if rendition_path != current_image:
                 _delete_storage_path_safely(storage, rendition_path)
 
+    @classmethod
+    def _schedule_rendition_generation(cls, image_id):
+        try:
+            normalized_id = int(image_id)
+        except (TypeError, ValueError):
+            return
+        if normalized_id <= 0:
+            return
+
+        with _CAR_IMAGE_PENDING_RENDITIONS_LOCK:
+            if normalized_id in _CAR_IMAGE_PENDING_RENDITIONS:
+                return
+            _CAR_IMAGE_PENDING_RENDITIONS.add(normalized_id)
+
+        def _enqueue():
+            try:
+                _get_car_image_rendition_executor().submit(
+                    cls._run_rendition_generation_task,
+                    normalized_id,
+                )
+            except Exception:
+                with _CAR_IMAGE_PENDING_RENDITIONS_LOCK:
+                    _CAR_IMAGE_PENDING_RENDITIONS.discard(normalized_id)
+
+        try:
+            db_transaction.on_commit(_enqueue)
+        except Exception:
+            _enqueue()
+
+    @classmethod
+    def _run_rendition_generation_task(cls, image_id):
+        close_old_connections()
+        try:
+            image_obj = cls.objects.filter(pk=image_id).only(
+                'id',
+                'image',
+                'thumbnail',
+                'original_width',
+                'original_height',
+                'low_res',
+                'renditions',
+            ).first()
+            if image_obj is None or not image_obj.image:
+                return
+
+            current_payload = {
+                'original_width': image_obj.original_width,
+                'original_height': image_obj.original_height,
+                'renditions': image_obj.renditions,
+            }
+            if image_obj._has_valid_renditions(current_payload):
+                return
+
+            generated = image_obj._generate_webp_renditions()
+            if not generated:
+                return
+
+            original_width = generated.get('original_width')
+            cls.objects.filter(pk=image_obj.pk).update(
+                thumbnail=generated.get('thumbnail_path') or None,
+                original_width=original_width,
+                original_height=generated.get('original_height'),
+                low_res=bool(original_width and original_width < CAR_IMAGE_LOW_RES_MIN_WIDTH),
+                renditions={'webp': generated.get('renditions') or []},
+            )
+        finally:
+            with _CAR_IMAGE_PENDING_RENDITIONS_LOCK:
+                _CAR_IMAGE_PENDING_RENDITIONS.discard(image_id)
+            close_old_connections()
+
     def save(self, *args, **kwargs):
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None:
+            normalized_update_fields = {str(field_name) for field_name in update_fields}
+            image_related_fields = {
+                'image',
+                'thumbnail',
+                'original_width',
+                'original_height',
+                'low_res',
+                'renditions',
+            }
+            if normalized_update_fields and normalized_update_fields.isdisjoint(image_related_fields):
+                super().save(*args, **kwargs)
+                return
+
         previous = None
         if self.pk:
             previous = CarImage.objects.filter(pk=self.pk).values(
@@ -804,6 +922,13 @@ class CarImage(models.Model):
 
         if image_changed:
             self._cleanup_previous_assets(previous)
+
+        should_defer_renditions = bool(getattr(self, '_defer_renditions', False)) or (
+            previous is None and bool(getattr(settings, 'CAR_IMAGE_ASYNC_RENDITIONS', True))
+        )
+        if should_defer_renditions:
+            self._schedule_rendition_generation(self.pk)
+            return
 
         generated = self._generate_webp_renditions()
         if not generated:

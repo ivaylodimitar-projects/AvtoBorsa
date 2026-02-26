@@ -92,6 +92,9 @@ MainCarouselImage.displayName = 'MainCarouselImage';
 const FullscreenModal = memo<{
   isOpen: boolean;
   imageSrc: string;
+  imageCandidates?: Array<{ url: string; width: number }>;
+  imageOriginalSrc?: string;
+  imageOriginalWidth?: number | null;
   title: string;
   currentIndex: number;
   totalImages: number;
@@ -107,6 +110,9 @@ const FullscreenModal = memo<{
   ({
     isOpen,
     imageSrc,
+    imageCandidates = [],
+    imageOriginalSrc,
+    imageOriginalWidth = null,
     title,
     currentIndex,
     totalImages,
@@ -122,10 +128,24 @@ const FullscreenModal = memo<{
     const [zoomLevel, setZoomLevel] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
+    const [isZoomInteracting, setIsZoomInteracting] = useState(false);
     const [maxZoom, setMaxZoom] = useState(isMobile ? 4 : 6);
+    const [activeImageSrc, setActiveImageSrc] = useState(imageSrc);
     const containerRef = useRef<HTMLDivElement | null>(null);
     const imageRef = useRef<HTMLImageElement | null>(null);
     const isPanningRef = useRef(false);
+    const zoomLevelRef = useRef(1);
+    const panRef = useRef({ x: 0, y: 0 });
+    const pendingViewStateRef = useRef<{ zoom: number; pan: { x: number; y: number } } | null>(
+      null
+    );
+    const viewSyncFrameRef = useRef<number | null>(null);
+    const sourceRequestIdRef = useRef(0);
+    const pendingSourceRef = useRef<string | null>(null);
+    const zoomInteractionTimeoutRef = useRef<number | null>(null);
+    const sourceUpgradeTimeoutRef = useRef<number | null>(null);
+    const panMoveFrameRef = useRef<number | null>(null);
+    const queuedPanRef = useRef<{ x: number; y: number } | null>(null);
     const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
     const pinchStateRef = useRef<{
       startDistance: number;
@@ -135,12 +155,218 @@ const FullscreenModal = memo<{
     const minZoom = 1;
     const headerBadgeLabel = showTopBadge ? 'TOP' : showVipBadge ? 'VIP' : null;
 
+    const flushPendingViewState = useCallback(() => {
+      viewSyncFrameRef.current = null;
+      const pending = pendingViewStateRef.current;
+      if (!pending) return;
+      pendingViewStateRef.current = null;
+      setZoomLevel((prev) =>
+        Math.abs(prev - pending.zoom) < 0.0001 ? prev : pending.zoom
+      );
+      setPan((prev) => {
+        if (Math.abs(prev.x - pending.pan.x) < 0.01 && Math.abs(prev.y - pending.pan.y) < 0.01) {
+          return prev;
+        }
+        return pending.pan;
+      });
+    }, []);
+
+    const scheduleViewState = useCallback(
+      (nextZoom: number, nextPan: { x: number; y: number }, immediate = false) => {
+        zoomLevelRef.current = nextZoom;
+        panRef.current = nextPan;
+        pendingViewStateRef.current = { zoom: nextZoom, pan: nextPan };
+
+        if (immediate) {
+          if (viewSyncFrameRef.current !== null) {
+            window.cancelAnimationFrame(viewSyncFrameRef.current);
+            viewSyncFrameRef.current = null;
+          }
+          flushPendingViewState();
+          return;
+        }
+
+        if (viewSyncFrameRef.current !== null) return;
+        viewSyncFrameRef.current = window.requestAnimationFrame(flushPendingViewState);
+      },
+      [flushPendingViewState]
+    );
+
     useEffect(() => {
       if (isOpen) {
-        setZoomLevel(1);
-        setPan({ x: 0, y: 0 });
+        scheduleViewState(1, { x: 0, y: 0 }, true);
+        setActiveImageSrc(imageSrc);
+        setIsZoomInteracting(false);
+        sourceRequestIdRef.current += 1;
+        pendingSourceRef.current = null;
+        if (zoomInteractionTimeoutRef.current !== null) {
+          window.clearTimeout(zoomInteractionTimeoutRef.current);
+          zoomInteractionTimeoutRef.current = null;
+        }
+        if (sourceUpgradeTimeoutRef.current !== null) {
+          window.clearTimeout(sourceUpgradeTimeoutRef.current);
+          sourceUpgradeTimeoutRef.current = null;
+        }
+        if (panMoveFrameRef.current !== null) {
+          window.cancelAnimationFrame(panMoveFrameRef.current);
+          panMoveFrameRef.current = null;
+        }
+        queuedPanRef.current = null;
       }
-    }, [isOpen, imageSrc]);
+    }, [imageSrc, isOpen, scheduleViewState]);
+
+    const sortedSourceCandidates = useMemo(() => {
+      const widthByUrl = new Map<string, number>();
+      imageCandidates.forEach((candidate) => {
+        if (!candidate || !candidate.url) return;
+        if (!Number.isFinite(candidate.width) || candidate.width <= 0) return;
+        const normalizedWidth = Math.round(candidate.width);
+        const previousWidth = widthByUrl.get(candidate.url) || 0;
+        if (normalizedWidth > previousWidth) {
+          widthByUrl.set(candidate.url, normalizedWidth);
+        }
+      });
+
+      if (imageOriginalSrc && imageOriginalWidth && imageOriginalWidth > 0) {
+        widthByUrl.set(
+          imageOriginalSrc,
+          Math.max(Math.round(imageOriginalWidth), widthByUrl.get(imageOriginalSrc) || 0)
+        );
+      }
+
+      if (!widthByUrl.has(imageSrc)) {
+        const widestCandidate = [...widthByUrl.values()].reduce(
+          (max, width) => Math.max(max, width),
+          0
+        );
+        widthByUrl.set(imageSrc, widestCandidate || 0);
+      }
+
+      return [...widthByUrl.entries()]
+        .map(([url, width]) => ({ url, width }))
+        .sort((a, b) => a.width - b.width);
+    }, [imageCandidates, imageOriginalSrc, imageOriginalWidth, imageSrc]);
+
+    const sourceWidthMap = useMemo(() => {
+      const map = new Map<string, number>();
+      sortedSourceCandidates.forEach((item) => {
+        map.set(item.url, item.width);
+      });
+      return map;
+    }, [sortedSourceCandidates]);
+
+    const markZoomInteraction = useCallback(() => {
+      if (!isOpen) return;
+      setIsZoomInteracting(true);
+      if (zoomInteractionTimeoutRef.current !== null) {
+        window.clearTimeout(zoomInteractionTimeoutRef.current);
+      }
+      zoomInteractionTimeoutRef.current = window.setTimeout(() => {
+        setIsZoomInteracting(false);
+        zoomInteractionTimeoutRef.current = null;
+      }, 90);
+    }, [isOpen]);
+
+    const pickBestSourceForZoom = useCallback(
+      (targetPixelWidth: number) => {
+        const normalizedTargetWidth = Math.max(1, Math.round(targetPixelWidth));
+        const matchingCandidate = sortedSourceCandidates.find(
+          (candidate) => candidate.width >= normalizedTargetWidth
+        );
+        if (matchingCandidate?.url) return matchingCandidate.url;
+        return sortedSourceCandidates[sortedSourceCandidates.length - 1]?.url || imageSrc;
+      },
+      [imageSrc, sortedSourceCandidates]
+    );
+
+    const runSourceUpgrade = useCallback(() => {
+      if (!isOpen) return;
+      const container = containerRef.current;
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+
+      const devicePixelRatio = window.devicePixelRatio || 1;
+      const targetPixelWidth =
+        rect.width * Math.max(1, zoomLevelRef.current) * devicePixelRatio * 1.1;
+      const nextSource = pickBestSourceForZoom(targetPixelWidth);
+      if (!nextSource || nextSource === activeImageSrc) return;
+      if (pendingSourceRef.current === nextSource) return;
+
+      const currentWidth = sourceWidthMap.get(activeImageSrc) || 0;
+      const nextWidth = sourceWidthMap.get(nextSource) || 0;
+      const minUpgradeStep = currentWidth > 0 ? Math.max(140, Math.round(currentWidth * 0.12)) : 1;
+      if (nextWidth <= currentWidth + minUpgradeStep) return;
+
+      sourceRequestIdRef.current += 1;
+      const requestId = sourceRequestIdRef.current;
+      pendingSourceRef.current = nextSource;
+      const preload = new Image();
+      preload.decoding = 'async';
+      preload.onload = () => {
+        if (requestId !== sourceRequestIdRef.current) return;
+        pendingSourceRef.current = null;
+        setActiveImageSrc(nextSource);
+      };
+      preload.onerror = () => {
+        if (requestId !== sourceRequestIdRef.current) return;
+        pendingSourceRef.current = null;
+      };
+      preload.src = nextSource;
+    }, [activeImageSrc, isOpen, pickBestSourceForZoom, sourceWidthMap]);
+
+    const scheduleSourceUpgrade = useCallback(
+      (delayMs: number) => {
+        if (!isOpen) return;
+        if (sourceUpgradeTimeoutRef.current !== null) {
+          window.clearTimeout(sourceUpgradeTimeoutRef.current);
+        }
+        sourceUpgradeTimeoutRef.current = window.setTimeout(() => {
+          sourceUpgradeTimeoutRef.current = null;
+          runSourceUpgrade();
+        }, delayMs);
+      },
+      [isOpen, runSourceUpgrade]
+    );
+
+    useEffect(() => {
+      if (!isOpen || isZoomInteracting || isDragging) return;
+      scheduleSourceUpgrade(70);
+    }, [isDragging, isOpen, isZoomInteracting, scheduleSourceUpgrade, zoomLevel]);
+
+    useEffect(() => {
+      if (!isOpen) return;
+      const handleResize = () => {
+        scheduleSourceUpgrade(120);
+      };
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }, [isOpen, scheduleSourceUpgrade]);
+
+    useEffect(
+      () => () => {
+        if (zoomInteractionTimeoutRef.current !== null) {
+          window.clearTimeout(zoomInteractionTimeoutRef.current);
+          zoomInteractionTimeoutRef.current = null;
+        }
+        if (sourceUpgradeTimeoutRef.current !== null) {
+          window.clearTimeout(sourceUpgradeTimeoutRef.current);
+          sourceUpgradeTimeoutRef.current = null;
+        }
+        if (viewSyncFrameRef.current !== null) {
+          window.cancelAnimationFrame(viewSyncFrameRef.current);
+          viewSyncFrameRef.current = null;
+        }
+        if (panMoveFrameRef.current !== null) {
+          window.cancelAnimationFrame(panMoveFrameRef.current);
+          panMoveFrameRef.current = null;
+        }
+        pendingViewStateRef.current = null;
+        queuedPanRef.current = null;
+      },
+      []
+    );
 
     const getGeometry = useCallback((zoom: number) => {
       const container = containerRef.current;
@@ -184,16 +410,21 @@ const FullscreenModal = memo<{
     );
 
     useEffect(() => {
-      setPan((prev) => clampPan(prev, zoomLevel));
-    }, [zoomLevel, clampPan]);
+      const currentZoom = zoomLevelRef.current;
+      const clamped = clampPan(panRef.current, currentZoom);
+      if (clamped.x === panRef.current.x && clamped.y === panRef.current.y) return;
+      scheduleViewState(currentZoom, clamped, true);
+    }, [clampPan, scheduleViewState, zoomLevel]);
 
     useEffect(() => {
       const handleResize = () => {
-        setPan((prev) => clampPan(prev, zoomLevel));
+        const currentZoom = zoomLevelRef.current;
+        const clamped = clampPan(panRef.current, currentZoom);
+        scheduleViewState(currentZoom, clamped, true);
       };
       window.addEventListener('resize', handleResize);
       return () => window.removeEventListener('resize', handleResize);
-    }, [clampPan, zoomLevel]);
+    }, [clampPan, scheduleViewState]);
 
     const recomputeMaxZoom = useCallback(() => {
       const container = containerRef.current;
@@ -232,46 +463,50 @@ const FullscreenModal = memo<{
     }, [recomputeMaxZoom]);
 
     useEffect(() => {
-      setZoomLevel((prev) => Math.min(prev, maxZoom));
-    }, [maxZoom]);
+      const currentZoom = zoomLevelRef.current;
+      const nextZoom = Math.min(currentZoom, maxZoom);
+      if (nextZoom === currentZoom) return;
+      const clampedPan = clampPan(panRef.current, nextZoom);
+      scheduleViewState(nextZoom, clampedPan, true);
+    }, [clampPan, maxZoom, scheduleViewState]);
 
     const applyZoom = useCallback(
       (nextZoomRaw: number, anchor?: { x: number; y: number }) => {
+        const currentZoom = zoomLevelRef.current;
         const nextZoom = Math.max(minZoom, Math.min(maxZoom, Number(nextZoomRaw.toFixed(3))));
-        if (nextZoom === zoomLevel) return;
+        if (nextZoom === currentZoom) return;
+        markZoomInteraction();
 
         const ax = anchor?.x ?? 0;
         const ay = anchor?.y ?? 0;
-        const ratio = nextZoom / zoomLevel;
-
-        setPan((prev) => {
-          const nextPan = {
-            x: prev.x * ratio + (1 - ratio) * ax,
-            y: prev.y * ratio + (1 - ratio) * ay,
-          };
-          return clampPan(nextPan, nextZoom);
-        });
-        setZoomLevel(nextZoom);
+        const ratio = nextZoom / currentZoom;
+        const currentPan = panRef.current;
+        const nextPan = {
+          x: currentPan.x * ratio + (1 - ratio) * ax,
+          y: currentPan.y * ratio + (1 - ratio) * ay,
+        };
+        scheduleViewState(nextZoom, clampPan(nextPan, nextZoom));
       },
-      [clampPan, maxZoom, zoomLevel]
+      [clampPan, markZoomInteraction, maxZoom, scheduleViewState]
     );
 
     const handleZoomIn = (e: React.MouseEvent) => {
       e.stopPropagation();
-      const zoomStep = zoomLevel < 2 ? 0.2 : zoomLevel < 4 ? 0.35 : 0.5;
-      applyZoom(zoomLevel + zoomStep);
+      const currentZoom = zoomLevelRef.current;
+      const zoomStep = currentZoom < 2 ? 0.2 : currentZoom < 4 ? 0.35 : 0.5;
+      applyZoom(currentZoom + zoomStep);
     };
 
     const handleZoomOut = (e: React.MouseEvent) => {
       e.stopPropagation();
-      const zoomStep = zoomLevel <= 2 ? 0.2 : zoomLevel <= 4 ? 0.35 : 0.5;
-      applyZoom(zoomLevel - zoomStep);
+      const currentZoom = zoomLevelRef.current;
+      const zoomStep = currentZoom <= 2 ? 0.2 : currentZoom <= 4 ? 0.35 : 0.5;
+      applyZoom(currentZoom - zoomStep);
     };
 
     const handleZoomReset = (e: React.MouseEvent) => {
       e.stopPropagation();
-      setZoomLevel(1);
-      setPan({ x: 0, y: 0 });
+      scheduleViewState(1, { x: 0, y: 0 }, true);
     };
 
     const handleZoomSlider = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -291,7 +526,7 @@ const FullscreenModal = memo<{
       const cy = e.clientY - rect.top - rect.height / 2;
       const wheelIntensity = e.ctrlKey ? 0.0042 : 0.0022;
       const factor = Math.exp(-e.deltaY * wheelIntensity);
-      applyZoom(zoomLevel * factor, { x: cx, y: cy });
+      applyZoom(zoomLevelRef.current * factor, { x: cx, y: cy });
     };
 
     const getTouchDistance = useCallback((touches: React.TouchList) => {
@@ -325,7 +560,7 @@ const FullscreenModal = memo<{
 
       pinchStateRef.current = {
         startDistance: distance,
-        startZoom: zoomLevel,
+        startZoom: zoomLevelRef.current,
         anchor: getTouchAnchor(e.touches),
       };
       isPanningRef.current = false;
@@ -350,10 +585,15 @@ const FullscreenModal = memo<{
     };
 
     const handlePointerDown = (e: React.PointerEvent) => {
-      if (zoomLevel <= 1) return;
+      if (zoomLevelRef.current <= 1) return;
       isPanningRef.current = true;
       setIsDragging(true);
-      panStartRef.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+      panStartRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        panX: panRef.current.x,
+        panY: panRef.current.y,
+      };
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     };
 
@@ -361,19 +601,39 @@ const FullscreenModal = memo<{
       if (!isPanningRef.current) return;
       const dx = e.clientX - panStartRef.current.x;
       const dy = e.clientY - panStartRef.current.y;
-      const nextPan = { x: panStartRef.current.panX + dx, y: panStartRef.current.panY + dy };
-      setPan(clampPan(nextPan, zoomLevel));
+      queuedPanRef.current = {
+        x: panStartRef.current.panX + dx,
+        y: panStartRef.current.panY + dy,
+      };
+      markZoomInteraction();
+      if (panMoveFrameRef.current !== null) return;
+      panMoveFrameRef.current = window.requestAnimationFrame(() => {
+        panMoveFrameRef.current = null;
+        if (!queuedPanRef.current) return;
+        const nextPan = clampPan(queuedPanRef.current, zoomLevelRef.current);
+        queuedPanRef.current = null;
+        scheduleViewState(zoomLevelRef.current, nextPan);
+      });
     };
 
     const handlePointerUp = (e: React.PointerEvent) => {
       if (!isPanningRef.current) return;
       isPanningRef.current = false;
       setIsDragging(false);
+      if (panMoveFrameRef.current !== null) {
+        window.cancelAnimationFrame(panMoveFrameRef.current);
+        panMoveFrameRef.current = null;
+      }
+      if (queuedPanRef.current) {
+        const finalPan = clampPan(queuedPanRef.current, zoomLevelRef.current);
+        queuedPanRef.current = null;
+        scheduleViewState(zoomLevelRef.current, finalPan, true);
+      }
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
     };
 
     const miniMapData = useMemo(() => {
-      if (zoomLevel <= 1) return null;
+      if (zoomLevel <= 1 || isZoomInteracting || isDragging) return null;
       const geometry = getGeometry(zoomLevel);
       if (!geometry) return null;
 
@@ -392,7 +652,7 @@ const FullscreenModal = memo<{
       const rectH = (visibleHBase / geometry.baseH) * miniH;
 
       return { miniW, miniH, rectLeft, rectTop, rectW, rectH };
-    }, [getGeometry, isMobile, pan.x, pan.y, zoomLevel]);
+    }, [getGeometry, isDragging, isMobile, isZoomInteracting, pan.x, pan.y, zoomLevel]);
 
     if (!isOpen) return null;
 
@@ -614,13 +874,14 @@ const FullscreenModal = memo<{
                 lineHeight: 0,
                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomLevel})`,
                 transformOrigin: 'center center',
-                transition: isDragging ? 'none' : 'transform 0.05s ease-out',
+                transition:
+                  isDragging || isZoomInteracting ? 'none' : 'transform 0.08s ease-out',
                 willChange: 'transform',
               }}
             >
               <img
                 ref={imageRef}
-                src={imageSrc}
+                src={activeImageSrc}
                 alt={title}
                 draggable={false}
                 style={{
@@ -752,7 +1013,7 @@ const FullscreenModal = memo<{
                 }}
               >
                 <img
-                  src={imageSrc}
+                  src={activeImageSrc}
                   alt=""
                   aria-hidden="true"
                   style={{
@@ -1252,6 +1513,43 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
   const currentImage = safeImages[safeIndex];
   const currentMainPath = resolveMainImagePath(currentImage);
   const currentImageSrc = getImageUrl(currentMainPath);
+  const currentFullscreenCandidates = (() => {
+    const candidates = (Array.isArray(currentImage?.renditions) ? currentImage.renditions : [])
+      .map((item) => {
+        const width = typeof item?.width === 'number' ? item.width : Number(item?.width || 0);
+        const url = typeof item?.url === 'string' ? item.url.trim() : '';
+        const kind =
+          typeof item?.kind === 'string' && item.kind.trim() ? item.kind.trim() : 'detail';
+        const format =
+          typeof item?.format === 'string' && item.format.trim()
+            ? item.format.trim().toLowerCase()
+            : 'webp';
+        if (!url || !Number.isFinite(width) || width <= 0) return null;
+        if (kind !== 'detail' || format !== 'webp') return null;
+        const absoluteUrl = getImageUrl(url);
+        if (!absoluteUrl) return null;
+        return { url: absoluteUrl, width: Math.round(width) };
+      })
+      .filter((item): item is { url: string; width: number } => Boolean(item))
+      .sort((a, b) => a.width - b.width);
+
+    const uniqueByWidth = new Map<number, { url: string; width: number }>();
+    candidates.forEach((item) => {
+      if (!uniqueByWidth.has(item.width)) {
+        uniqueByWidth.set(item.width, item);
+      }
+    });
+
+    return [...uniqueByWidth.values()].sort((a, b) => a.width - b.width);
+  })();
+  const currentFullscreenOriginalPath = (() => {
+    const originalPath = (currentImage?.original_url || currentImage?.image || '').trim();
+    return originalPath ? getImageUrl(originalPath) : '';
+  })();
+  const currentFullscreenOriginalWidth =
+    typeof currentImage?.original_width === 'number' && currentImage.original_width > 0
+      ? Math.round(currentImage.original_width)
+      : null;
   const currentPlaceholderSrc = getImageUrl(resolveThumbnailPath(currentImage) || currentMainPath);
   const shouldShowInitialPlaceholder = !isHeroLoaded && safeIndex === 0;
   const heroWidth =
@@ -1633,6 +1931,9 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
       <FullscreenModal
         isOpen={isFullscreenOpen}
         imageSrc={currentImageSrc}
+        imageCandidates={currentFullscreenCandidates}
+        imageOriginalSrc={currentFullscreenOriginalPath}
+        imageOriginalWidth={currentFullscreenOriginalWidth}
         title={title}
         currentIndex={safeIndex}
         totalImages={safeImages.length}
