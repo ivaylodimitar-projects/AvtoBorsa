@@ -114,16 +114,46 @@ def _extract_webp_renditions(image_obj):
     return normalized
 
 
-def _serialize_image_renditions(image_obj):
+def _serialize_image_renditions(
+    image_obj,
+    *,
+    allowed_kinds=None,
+    allowed_widths=None,
+    max_width=None,
+):
     serialized = []
+    normalized_allowed_kinds = {
+        str(kind).strip().lower()
+        for kind in (allowed_kinds or [])
+        if str(kind).strip()
+    }
+    normalized_allowed_widths = {
+        _to_positive_int(width)
+        for width in (allowed_widths or [])
+    }
+    normalized_allowed_widths.discard(None)
+    normalized_max_width = _to_positive_int(max_width)
+
     for item in _extract_webp_renditions(image_obj):
+        kind = str(item.get('kind') or 'detail').strip().lower() or 'detail'
+        width = _to_positive_int(item.get('width'))
+        if width is None:
+            continue
+        if normalized_allowed_kinds and kind not in normalized_allowed_kinds:
+            continue
+        if normalized_allowed_widths and width not in normalized_allowed_widths:
+            continue
+        if normalized_max_width is not None and width > normalized_max_width:
+            continue
+
         url = _normalize_media_path(item.get('path'))
         if not url:
             continue
+
         row = {
-            'width': item['width'],
+            'width': width,
             'url': url,
-            'kind': item.get('kind') or 'detail',
+            'kind': kind,
             'format': item.get('format') or 'webp',
         }
         if item.get('height'):
@@ -132,13 +162,29 @@ def _serialize_image_renditions(image_obj):
     return serialized
 
 
-def _build_srcset_webp(image_obj):
+def _build_srcset_webp(
+    image_obj,
+    *,
+    allowed_kinds=None,
+    allowed_widths=None,
+    max_width=None,
+):
     parts = [
         f"{item['url']} {item['width']}w"
-        for item in _serialize_image_renditions(image_obj)
+        for item in _serialize_image_renditions(
+            image_obj,
+            allowed_kinds=allowed_kinds,
+            allowed_widths=allowed_widths,
+            max_width=max_width,
+        )
         if item.get('format') == 'webp'
     ]
     return ", ".join(parts)
+
+
+def _parse_positive_limit(value):
+    number = _to_positive_int(value)
+    return number if number and number > 0 else None
 
 
 def _pick_rendition(renditions, preferred_kind=None, preferred_width=None):
@@ -359,6 +405,41 @@ TOP_PLAN_ALIASES = {
 
 MIN_IMAGES_REQUIRED_FOR_PUBLISH = 3
 MAIN_CATEGORIES_WITH_OPTIONAL_IMAGES = {"y", "z"}
+LIST_IMAGE_RENDITION_WIDTHS = {300, 320, 600, 640}
+DETAIL_IMAGE_RENDITION_WIDTHS = {300, 320, 600, 640, 800, 1200, 1600}
+DETAIL_IMAGE_MAX_WIDTH = 1600
+
+
+def _resolve_photo_limit(context):
+    if not isinstance(context, dict):
+        return None
+
+    if context.get('photo_limit') is not None:
+        return _parse_positive_limit(context.get('photo_limit'))
+
+    request = context.get('request')
+    if request is None:
+        return None
+
+    return _parse_positive_limit(request.query_params.get('photo_limit'))
+
+
+def _use_detail_image_payload(context):
+    if not isinstance(context, dict):
+        return False
+
+    explicit_mode = str(context.get('image_payload_mode') or '').strip().lower()
+    if explicit_mode in {'detail', 'optimized'}:
+        return True
+    if explicit_mode in {'full', 'default'}:
+        return False
+
+    request = context.get('request')
+    if request is None:
+        return False
+
+    mode = str(request.query_params.get('view') or '').strip().lower()
+    return mode in {'detail', 'optimized'}
 
 
 class CarImageSerializer(serializers.ModelSerializer):
@@ -397,11 +478,63 @@ class CarImageSerializer(serializers.ModelSerializer):
     def get_original_url(self, obj):
         return _normalize_media_path(_image_original_path(obj))
 
+    def _rendition_options(self):
+        return {}
+
     def get_renditions(self, obj):
-        return _serialize_image_renditions(obj)
+        return _serialize_image_renditions(obj, **self._rendition_options())
 
     def get_srcset_webp(self, obj):
-        return _build_srcset_webp(obj)
+        return _build_srcset_webp(obj, **self._rendition_options())
+
+
+class CarImageListSerializer(CarImageSerializer):
+    """Compact image payload for list/grid cards."""
+
+    class Meta(CarImageSerializer.Meta):
+        fields = [
+            'id',
+            'image',
+            'original_url',
+            'thumbnail',
+            'renditions',
+            'order',
+            'is_cover',
+        ]
+        read_only_fields = fields
+
+    def _rendition_options(self):
+        return {
+            'allowed_kinds': {'grid'},
+            'allowed_widths': LIST_IMAGE_RENDITION_WIDTHS,
+            'max_width': 640,
+        }
+
+
+class CarImageDetailSerializer(CarImageSerializer):
+    """Detail payload with only thumbnail and hero renditions."""
+
+    class Meta(CarImageSerializer.Meta):
+        fields = [
+            'id',
+            'image',
+            'original_url',
+            'thumbnail',
+            'renditions',
+            'original_width',
+            'original_height',
+            'low_res',
+            'order',
+            'is_cover',
+        ]
+        read_only_fields = fields
+
+    def _rendition_options(self):
+        return {
+            'allowed_kinds': {'grid', 'detail'},
+            'allowed_widths': DETAIL_IMAGE_RENDITION_WIDTHS,
+            'max_width': DETAIL_IMAGE_MAX_WIDTH,
+        }
 
 
 class CarListingLiteSerializer(serializers.ModelSerializer):
@@ -460,7 +593,7 @@ class CarListingLiteSerializer(serializers.ModelSerializer):
         image_obj = self._get_cover_image(obj)
         if not image_obj:
             return None
-        return CarImageSerializer(image_obj, context=self.context).data
+        return CarImageListSerializer(image_obj, context=self.context).data
 
     def _resolve_price_change(self, obj):
         delta = getattr(obj, 'last_price_change_delta', None)
@@ -570,7 +703,7 @@ class CarListingListSerializer(serializers.ModelSerializer):
 
     def get_images(self, obj):
         images = self._get_preview_images(obj)
-        return CarImageSerializer(images, many=True, context=self.context).data
+        return CarImageListSerializer(images, many=True, context=self.context).data
 
     def get_image_url(self, obj):
         image_obj = self._get_cover_image(obj)
@@ -585,7 +718,7 @@ class CarListingListSerializer(serializers.ModelSerializer):
         image_obj = self._get_cover_image(obj)
         if not image_obj:
             return None
-        return CarImageSerializer(image_obj, context=self.context).data
+        return CarImageListSerializer(image_obj, context=self.context).data
 
     def get_fuel_display(self, obj):
         return obj.fuel
@@ -741,7 +874,7 @@ DETAIL_FIELDS_BY_MAIN_CATEGORY = {
 class CarListingSerializer(serializers.ModelSerializer):
     """Serializer for car listings with per-main-category detail models."""
 
-    images = CarImageSerializer(many=True, read_only=True)
+    images = serializers.SerializerMethodField()
     user_email = serializers.CharField(source='user.email', read_only=True)
     fuel_display = serializers.SerializerMethodField()
     gearbox_display = serializers.SerializerMethodField()
@@ -866,19 +999,39 @@ class CarListingSerializer(serializers.ModelSerializer):
     def get_listing_type_display(self, obj):
         return obj.listing_type
 
-    def _get_cover_image(self, obj):
+    def _get_ordered_images(self, obj):
+        cache = self.context.setdefault('_detail_images_cache', {})
+        if obj.id in cache:
+            return cache[obj.id]
+
         prefetched_images = getattr(obj, '_prefetched_objects_cache', {}).get('images')
         if prefetched_images is not None:
             images = list(prefetched_images)
-            if not images:
-                return None
-            return next((image for image in images if image.is_cover), images[0])
+        else:
+            images = list(obj.images.all().order_by('order', 'id'))
 
-        return (
-            obj.images.all()
-            .order_by('-is_cover', 'order', 'id')
-            .first()
-        )
+        cache[obj.id] = images
+        return images
+
+    def _get_cover_image(self, obj):
+        images = self._get_ordered_images(obj)
+        if not images:
+            return None
+        return next((image for image in images if image.is_cover), images[0])
+
+    def _get_image_serializer_class(self):
+        if _use_detail_image_payload(self.context):
+            return CarImageDetailSerializer
+        return CarImageSerializer
+
+    def get_images(self, obj):
+        images = self._get_ordered_images(obj)
+        photo_limit = _resolve_photo_limit(self.context)
+        if photo_limit is not None:
+            images = images[:photo_limit]
+
+        serializer_class = self._get_image_serializer_class()
+        return serializer_class(images, many=True, context=self.context).data
 
     def get_image_url(self, obj):
         return _select_image_url(self._get_cover_image(obj), preferred_kind='detail', preferred_width=1200)
@@ -887,7 +1040,8 @@ class CarListingSerializer(serializers.ModelSerializer):
         image_obj = self._get_cover_image(obj)
         if not image_obj:
             return None
-        return CarImageSerializer(image_obj, context=self.context).data
+        serializer_class = self._get_image_serializer_class()
+        return serializer_class(image_obj, context=self.context).data
 
     def get_is_favorited(self, obj):
         request = self.context.get('request')

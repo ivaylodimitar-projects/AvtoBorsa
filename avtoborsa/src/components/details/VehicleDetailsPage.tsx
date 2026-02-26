@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
+import React, { Suspense, useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Clock, ImageOff, MapPin } from 'lucide-react';
-import RezonGallery from './RezonGallery';
 import TechnicalDataSection from './TechnicalDataSection';
 import EquipmentSection from './EquipmentSection';
 import ContactSidebar from './ContactSidebar';
@@ -210,6 +209,124 @@ const SIMILAR_PROMO_HEADROOM_TOP = 16;
 const SIMILAR_FIRST_CARD_OFFSET = 20;
 const RECENTLY_VIEWED_STORAGE_KEY = "recently_viewed_listings";
 const MAX_RECENTLY_VIEWED = 12;
+const DETAIL_CACHE_TTL_MS = 60_000;
+const DETAIL_CACHE_MAX_ITEMS = 24;
+const DETAIL_INITIAL_PHOTO_LIMIT = 1;
+
+type CachedDetailEntry = {
+  payload: CarListing;
+  etag: string | null;
+  cachedAt: number;
+};
+
+type DetailPerfState = {
+  slug: string;
+  routeStartAt: number;
+  apiStartAt?: number;
+  apiResolvedAt?: number;
+  firstPaintAt?: number;
+  heroLoadedAt?: number;
+  observerLcpAt?: number;
+  source?: 'network' | 'cache' | 'revalidated';
+  logged: boolean;
+};
+
+const listingDetailCache = new Map<number, CachedDetailEntry>();
+const listingPhotosCache = new Map<number, CarImage[]>();
+const listingPhotosInFlight = new Map<number, Promise<CarImage[] | null>>();
+
+const buildListingDetailUrl = (listingId: number, photoLimit?: number) => {
+  const params = new URLSearchParams();
+  params.set('view', 'detail');
+  if (photoLimit && photoLimit > 0) {
+    params.set('photo_limit', String(photoLimit));
+  }
+  return `${API_BASE_URL}/api/listings/${listingId}/?${params.toString()}`;
+};
+
+const buildListingPhotosUrl = (listingId: number) => {
+  return `${API_BASE_URL}/api/listings/${listingId}/photos/?view=detail`;
+};
+
+const fetchListingPhotosOnce = (listingId: number): Promise<CarImage[] | null> => {
+  const cached = listingPhotosCache.get(listingId);
+  if (Array.isArray(cached)) {
+    return Promise.resolve(cached);
+  }
+
+  const inFlight = listingPhotosInFlight.get(listingId);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const token = localStorage.getItem('authToken');
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const request = fetch(buildListingPhotosUrl(listingId), {
+    headers,
+    credentials: 'include',
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        return null;
+      }
+
+      const photos: CarImage[] = await response.json();
+      if (!Array.isArray(photos)) {
+        return null;
+      }
+
+      listingPhotosCache.set(listingId, photos);
+      return photos;
+    })
+    .catch((error) => {
+      console.warn('Failed to load full listing photos:', error);
+      return null;
+    })
+    .finally(() => {
+      listingPhotosInFlight.delete(listingId);
+    });
+
+  listingPhotosInFlight.set(listingId, request);
+  return request;
+};
+
+const scheduleIdleTask = (task: () => void, timeoutMs = 700) => {
+  const idleWindow = window as Window & {
+    requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
+    cancelIdleCallback?: (id: number) => void;
+  };
+  if (typeof idleWindow.requestIdleCallback === 'function') {
+    const idleId = idleWindow.requestIdleCallback(task, { timeout: timeoutMs });
+    return () => {
+      if (typeof idleWindow.cancelIdleCallback === 'function') {
+        idleWindow.cancelIdleCallback(idleId);
+      }
+    };
+  }
+  const timeoutId = window.setTimeout(task, timeoutMs);
+  return () => window.clearTimeout(timeoutId);
+};
+
+const updateDetailCache = (listingId: number, payload: CarListing, etag: string | null) => {
+  listingDetailCache.set(listingId, {
+    payload,
+    etag,
+    cachedAt: Date.now(),
+  });
+  if (listingDetailCache.size <= DETAIL_CACHE_MAX_ITEMS) {
+    return;
+  }
+  const oldestEntry = Array.from(listingDetailCache.entries()).sort(
+    (a, b) => a[1].cachedAt - b[1].cachedAt
+  )[0];
+  if (oldestEntry) {
+    listingDetailCache.delete(oldestEntry[0]);
+  }
+};
 
 const persistRecentlyViewed = (listing: CarListing) => {
   if (!listing?.id || !listing.slug) return;
@@ -258,7 +375,13 @@ const globalCss = `
   .similar-scroll::-webkit-scrollbar { height: 8px; }
   .similar-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
   .similar-scroll::-webkit-scrollbar-track { background: transparent; }
+  @keyframes detail-gallery-shimmer {
+    0% { background-position: -220% 0; }
+    100% { background-position: 220% 0; }
+  }
 `;
+
+const RezonGallery = React.lazy(() => import('./RezonGallery'));
 
 const VehicleDetailsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -273,6 +396,9 @@ const VehicleDetailsPage: React.FC = () => {
   const [isSimilarLoading, setIsSimilarLoading] = useState(false);
   const [similarError, setSimilarError] = useState<string | null>(null);
   const similarScrollRef = useRef<HTMLDivElement | null>(null);
+  const loadedPhotosRef = useRef<Set<number>>(new Set());
+  const perfRef = useRef<DetailPerfState | null>(null);
+  const isDevPerfMode = import.meta.env.DEV;
 
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
@@ -303,7 +429,83 @@ const VehicleDetailsPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (!isDevPerfMode) return;
+    perfRef.current = {
+      slug: slug || '',
+      routeStartAt: performance.now(),
+      logged: false,
+    };
+  }, [isDevPerfMode, slug]);
+
+  useEffect(() => {
+    if (!isDevPerfMode || typeof PerformanceObserver === 'undefined') return;
+    const observer = new PerformanceObserver((entryList) => {
+      const entries = entryList.getEntries();
+      if (!entries.length) return;
+      const latest = entries[entries.length - 1];
+      if (!latest) return;
+      if (!perfRef.current) return;
+      perfRef.current.observerLcpAt = latest.startTime;
+    });
+    try {
+      observer.observe({ type: 'largest-contentful-paint', buffered: true } as PerformanceObserverInit);
+    } catch {
+      return () => observer.disconnect();
+    }
+    return () => observer.disconnect();
+  }, [isDevPerfMode, slug]);
+
+  const logPerfIfReady = useCallback(() => {
+    if (!isDevPerfMode) return;
+    const perf = perfRef.current;
+    if (!perf || perf.logged) return;
+    if (
+      perf.apiResolvedAt === undefined ||
+      perf.firstPaintAt === undefined ||
+      perf.heroLoadedAt === undefined
+    ) {
+      return;
+    }
+
+    perf.logged = true;
+    console.debug('[details-perf]', {
+      slug: perf.slug,
+      source: perf.source || 'network',
+      routeToApiMs: Math.round(perf.apiResolvedAt - perf.routeStartAt),
+      routeToFirstPaintMs: Math.round(perf.firstPaintAt - perf.routeStartAt),
+      routeToHeroLoadedMs: Math.round(perf.heroLoadedAt - perf.routeStartAt),
+      lcpObserverMs:
+        perf.observerLcpAt === undefined ? null : Math.round(perf.observerLcpAt),
+    });
+  }, [isDevPerfMode]);
+
+  const handleHeroImageLoad = useCallback(() => {
+    if (!isDevPerfMode) return;
+    const perf = perfRef.current;
+    if (!perf || perf.heroLoadedAt !== undefined) return;
+    perf.heroLoadedAt = performance.now();
+    logPerfIfReady();
+  }, [isDevPerfMode, logPerfIfReady]);
+
+  useEffect(() => {
+    if (!id) return;
+    let isCancelled = false;
+    const controller = new AbortController();
+
     const fetchListing = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      const perf = perfRef.current;
+      if (isDevPerfMode && perf) {
+        perf.apiStartAt = performance.now();
+        perf.apiResolvedAt = undefined;
+        perf.firstPaintAt = undefined;
+        perf.heroLoadedAt = undefined;
+        perf.source = undefined;
+        perf.logged = false;
+      }
+
       try {
         const token = localStorage.getItem('authToken');
         const headers: Record<string, string> = {};
@@ -311,36 +513,189 @@ const VehicleDetailsPage: React.FC = () => {
           headers['Authorization'] = `Bearer ${token}`;
         }
 
-        const response = await fetch(
-          `${API_BASE_URL}/api/listings/${id}/`,
-          {
-            headers,
-            credentials: 'include',
+        const cachedEntry = listingDetailCache.get(id);
+        const hasFreshCache =
+          cachedEntry && Date.now() - cachedEntry.cachedAt <= DETAIL_CACHE_TTL_MS;
+        if (hasFreshCache && cachedEntry) {
+          const cachedImages = Array.isArray(cachedEntry.payload.images)
+            ? cachedEntry.payload.images
+            : [];
+          if (cachedImages.length > DETAIL_INITIAL_PHOTO_LIMIT) {
+            listingPhotosCache.set(id, cachedImages);
+            loadedPhotosRef.current.add(id);
           }
-        );
-        if (!response.ok) {
-          if (response.status === 404 || response.status === 410) {
-            throw new Error('Обявата е премахната или изтекла.');
+          setListing(cachedEntry.payload);
+          setError(null);
+          if (isDevPerfMode && perf) {
+            perf.apiResolvedAt = performance.now();
+            perf.source = 'cache';
+            logPerfIfReady();
           }
-          throw new Error('Грешка при зареждане на обявата.');
+          setIsLoading(false);
+          return;
         }
-        const data = await response.json();
-        setListing(data);
-        persistRecentlyViewed(data);
+
+        if (cachedEntry?.etag) {
+          headers['If-None-Match'] = cachedEntry.etag;
+        }
+
+        const response = await fetch(buildListingDetailUrl(id, DETAIL_INITIAL_PHOTO_LIMIT), {
+          headers,
+          credentials: 'include',
+          signal: controller.signal,
+        });
+
+        let resolvedListing: CarListing | null = null;
+        let nextEtag = response.headers.get('ETag');
+        if (response.status === 304 && cachedEntry) {
+          resolvedListing = cachedEntry.payload;
+          nextEtag = nextEtag || cachedEntry.etag;
+          if (isDevPerfMode && perf) {
+            perf.source = 'revalidated';
+          }
+        } else {
+          if (!response.ok) {
+            if (response.status === 404 || response.status === 410) {
+              throw new Error('Listing is no longer available.');
+            }
+            throw new Error('Failed to load listing details.');
+          }
+          resolvedListing = await response.json();
+          if (isDevPerfMode && perf) {
+            perf.source = 'network';
+          }
+        }
+
+        if (!resolvedListing || isCancelled) return;
+
+        const cachedPhotos = listingPhotosCache.get(id);
+        const listingWithPhotos =
+          Array.isArray(cachedPhotos) && cachedPhotos.length > 0
+            ? {
+                ...resolvedListing,
+                images: cachedPhotos,
+              }
+            : resolvedListing;
+
+        const resolvedImages = Array.isArray(listingWithPhotos.images)
+          ? listingWithPhotos.images
+          : [];
+        if (resolvedImages.length > DETAIL_INITIAL_PHOTO_LIMIT) {
+          listingPhotosCache.set(id, resolvedImages);
+          loadedPhotosRef.current.add(id);
+        }
+
+        setListing(listingWithPhotos);
+        persistRecentlyViewed(listingWithPhotos);
+        updateDetailCache(id, listingWithPhotos, nextEtag || cachedEntry?.etag || null);
         setError(null);
+
+        if (isDevPerfMode && perf) {
+          perf.apiResolvedAt = performance.now();
+          logPerfIfReady();
+        }
       } catch (err) {
+        if (controller.signal.aborted || isCancelled) return;
         const errorMsg = err instanceof Error ? err.message : 'An error occurred';
         console.error('Error fetching listing:', errorMsg);
         setError(errorMsg);
       } finally {
-        setIsLoading(false);
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
-    if (id) {
-      fetchListing();
+    fetchListing();
+
+    return () => {
+      isCancelled = true;
+      controller.abort();
+    };
+  }, [id, isDevPerfMode, logPerfIfReady]);
+
+  useEffect(() => {
+    if (!isDevPerfMode || !listing) return;
+    let frameA = 0;
+    let frameB = 0;
+    frameA = window.requestAnimationFrame(() => {
+      frameB = window.requestAnimationFrame(() => {
+        const perf = perfRef.current;
+        if (!perf || perf.firstPaintAt !== undefined) return;
+        perf.firstPaintAt = performance.now();
+        logPerfIfReady();
+      });
+    });
+    return () => {
+      if (frameA) window.cancelAnimationFrame(frameA);
+      if (frameB) window.cancelAnimationFrame(frameB);
+    };
+  }, [isDevPerfMode, listing?.id, logPerfIfReady]);
+
+  useEffect(() => {
+    if (!id) return;
+    if (loadedPhotosRef.current.has(id)) return;
+
+    const applyPhotosToState = (photos: CarImage[]) => {
+      if (!Array.isArray(photos)) return;
+
+      listingPhotosCache.set(id, photos);
+      loadedPhotosRef.current.add(id);
+      if (photos.length === 0) return;
+      setListing((prev) =>
+        prev && prev.id === id
+          ? {
+              ...prev,
+              images: photos,
+            }
+          : prev
+      );
+
+      const cachedDetail = listingDetailCache.get(id);
+      if (cachedDetail) {
+        updateDetailCache(
+          id,
+          {
+            ...cachedDetail.payload,
+            images: photos,
+          },
+          cachedDetail.etag
+        );
+      }
+    };
+
+    const cachedPhotos = listingPhotosCache.get(id);
+    if (Array.isArray(cachedPhotos)) {
+      applyPhotosToState(cachedPhotos);
+      return;
     }
-  }, [id, slug]);
+
+    const cachedDetail = listingDetailCache.get(id);
+    const cachedDetailPhotos = Array.isArray(cachedDetail?.payload?.images)
+      ? cachedDetail.payload.images
+      : [];
+    if (cachedDetailPhotos.length > DETAIL_INITIAL_PHOTO_LIMIT) {
+      applyPhotosToState(cachedDetailPhotos);
+      return;
+    }
+
+    let isCancelled = false;
+    const cancelIdle = scheduleIdleTask(() => {
+      const inFlight = listingPhotosInFlight.get(id);
+      const request = inFlight || fetchListingPhotosOnce(id);
+      request.then((photos) => {
+        if (isCancelled || !Array.isArray(photos)) {
+          return;
+        }
+        applyPhotosToState(photos);
+      });
+    }, 650);
+
+    return () => {
+      isCancelled = true;
+      cancelIdle();
+    };
+  }, [id]);
 
   useEffect(() => {
     if (!listing) return;
@@ -354,9 +709,9 @@ const VehicleDetailsPage: React.FC = () => {
       try {
         const buildBaseParams = (options?: { includeMainCategory?: boolean; pageSize?: number }) => {
           const params = new URLSearchParams();
-          params.set('compact', '1');
+          params.set('lite', '1');
           params.set('page', '1');
-          params.set('page_size', String(options?.pageSize ?? 12));
+          params.set('page_size', String(options?.pageSize ?? 10));
           const includeMainCategory = options?.includeMainCategory !== false;
           if (includeMainCategory && listing.main_category) {
             params.set('main_category', String(listing.main_category));
@@ -418,7 +773,7 @@ const VehicleDetailsPage: React.FC = () => {
         }
         // 4) Fallback: if there are few/no listings in the same category, fill with random listings globally.
         if (merged.size < 6) {
-          const randomPool = await fetchBy({}, { includeMainCategory: false, pageSize: 60 });
+          const randomPool = await fetchBy({}, { includeMainCategory: false, pageSize: 24 });
           pushUnique(shuffleListings(randomPool));
         }
 
@@ -438,9 +793,10 @@ const VehicleDetailsPage: React.FC = () => {
       }
     };
 
-    fetchSimilarListings();
+    const cancelIdle = scheduleIdleTask(fetchSimilarListings, 600);
     return () => {
       isCancelled = true;
+      cancelIdle();
       controller.abort();
     };
   }, [listing?.id, listing?.brand, listing?.model, listing?.main_category]);
@@ -576,6 +932,22 @@ const VehicleDetailsPage: React.FC = () => {
       flexDirection: 'column',
       gap: isMobile ? 12 : 24,
       minWidth: 0,
+    },
+    galleryFallback: {
+      width: '100%',
+      borderRadius: 16,
+      border: '1px solid #e0e0e0',
+      overflow: 'hidden',
+      background: '#fff',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+    },
+    galleryFallbackInner: {
+      width: '100%',
+      minHeight: isMobile ? 300 : 500,
+      background:
+        'linear-gradient(110deg, rgba(148,163,184,0.25) 8%, rgba(148,163,184,0.14) 18%, rgba(148,163,184,0.25) 33%)',
+      backgroundSize: '220% 100%',
+      animation: 'detail-gallery-shimmer 1.4s linear infinite',
     },
     heroSection: {
       background: '#fff',
@@ -889,21 +1261,31 @@ const VehicleDetailsPage: React.FC = () => {
 
       <div style={styles.content}>
         <div style={styles.mainContent}>
-          <RezonGallery
-            images={
-              Array.isArray(listing.images) && listing.images.length > 0
-                ? listing.images
-                : listing.image_url
-                  ? [{ id: -1, image: listing.image_url }]
-                  : []
+          <Suspense
+            fallback={
+              <div style={styles.galleryFallback} aria-hidden="true">
+                <div style={styles.galleryFallbackInner} />
+              </div>
             }
-            title={title}
-            isMobile={isMobile}
-            showTopBadge={isTopListing(listing)}
-            showVipBadge={isVipListing(listing)}
-            showNewBadge={isNewListing}
-            showKapariranoBadge={Boolean(listing.is_kaparirano)}
-          />
+          >
+            <RezonGallery
+              listingId={listing.id}
+              images={
+                Array.isArray(listing.images) && listing.images.length > 0
+                  ? listing.images
+                  : listing.image_url
+                    ? [{ id: -1, image: listing.image_url }]
+                    : []
+              }
+              title={title}
+              isMobile={isMobile}
+              showTopBadge={isTopListing(listing)}
+              showVipBadge={isVipListing(listing)}
+              showNewBadge={isNewListing}
+              showKapariranoBadge={Boolean(listing.is_kaparirano)}
+              onHeroImageLoad={handleHeroImageLoad}
+            />
+          </Suspense>
 
           <TechnicalDataSection
             mainCategory={listing.main_category}
@@ -1174,3 +1556,4 @@ const VehicleDetailsPage: React.FC = () => {
 };
 
 export default VehicleDetailsPage;
+

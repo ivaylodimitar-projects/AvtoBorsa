@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from '
 import { ChevronLeft, ChevronRight, Monitor, X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import ThumbnailStrip from './ThumbnailStrip';
 import { useThrottle } from '../../hooks/useThrottle';
-import { useGalleryLazyLoad, useImageUrl } from '../../hooks/useGalleryLazyLoad';
+import { useImageUrl } from '../../hooks/useGalleryLazyLoad';
 import ListingPromoBadge from '../ListingPromoBadge';
 import KapariranoBadge from '../KapariranoBadge';
 import ResponsiveImage, { type ApiPhoto, type PhotoRendition } from '../ResponsiveImage';
@@ -15,6 +15,7 @@ interface Image extends ApiPhoto {
 }
 
 interface RezonGalleryProps {
+  listingId?: number | string;
   images: Image[];
   title: string;
   isMobile: boolean;
@@ -23,7 +24,27 @@ interface RezonGalleryProps {
   showVipBadge?: boolean;
   showNewBadge?: boolean;
   showKapariranoBadge?: boolean;
+  onHeroImageLoad?: () => void;
 }
+
+const prefetchImage = (url: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.decoding = 'async';
+    img.onload = () => {
+      if (typeof img.decode === 'function') {
+        img
+          .decode()
+          .catch(() => undefined)
+          .finally(() => resolve());
+        return;
+      }
+      resolve();
+    };
+    img.onerror = () => reject(new Error(`Failed to prefetch image: ${url}`));
+    img.src = url;
+  });
+};
 
 // Memoized main image component with lazy loading
 const MainCarouselImage = memo<{
@@ -31,7 +52,11 @@ const MainCarouselImage = memo<{
   fallbackPath?: string | null;
   title: string;
   isActive: boolean;
-}>(({ photo, fallbackPath, title, isActive }) => (
+  width?: number;
+  height?: number;
+  imageOpacity?: number;
+  onDecoded?: (img: HTMLImageElement) => void;
+}>(({ photo, fallbackPath, title, isActive, width, height, imageOpacity = 1, onDecoded }) => (
   <ResponsiveImage
     photo={photo}
     fallbackPath={fallbackPath}
@@ -40,15 +65,20 @@ const MainCarouselImage = memo<{
     strictKind
     preventUpscale={false}
     sizes="(max-width: 768px) 100vw, 658px"
-    loading={isActive ? 'eager' : 'lazy'}
+    loading="eager"
     decoding="async"
     fetchPriority={isActive ? 'high' : 'auto'}
+    width={width}
+    height={height}
+    onDecoded={onDecoded}
     objectFit="cover"
     containerStyle={{ width: '100%', height: '100%' }}
     imgStyle={{
       width: '100%',
       height: '100%',
       display: 'block',
+      opacity: imageOpacity,
+      transition: 'opacity 220ms ease',
       userSelect: 'none',
       WebkitUserSelect: 'none',
       msUserSelect: 'none',
@@ -778,6 +808,7 @@ const FullscreenModal = memo<{
 FullscreenModal.displayName = 'FullscreenModal';
 
 const RezonGallery: React.FC<RezonGalleryProps> = ({
+  listingId,
   images,
   title,
   isMobile,
@@ -786,10 +817,21 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
   showVipBadge = false,
   showNewBadge = false,
   showKapariranoBadge = false,
+  onHeroImageLoad,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false);
+  const [isHeroLoaded, setIsHeroLoaded] = useState(false);
   const touchStartRef = useRef<number>(0);
+  const navigationStartRef = useRef<{ index: number; startedAt: number; source: string } | null>(null);
+  const swipeDirectionRef = useRef<'forward' | 'backward'>('forward');
+  const prefetchQueueRef = useRef<Array<{ url: string; index: number; reason: string }>>([]);
+  const prefetchInFlightRef = useRef(0);
+  const prefetchedUrlsRef = useRef<Set<string>>(new Set());
+  const prefetchPendingUrlsRef = useRef<Set<string>>(new Set());
+  const prefetchGenerationRef = useRef(0);
+  const galleryStartRef = useRef<number>(performance.now());
+  const isDevMode = import.meta.env.DEV;
   const getImageUrl = useImageUrl();
   const resolveRenditionPath = useCallback(
     (
@@ -860,6 +902,46 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
     },
     [resolveRenditionPath]
   );
+  const resolvePreviewImagePath = useCallback(
+    (img: Image) => {
+      const normalizedRenditions = (Array.isArray(img?.renditions) ? img.renditions : [])
+        .map((item) => {
+          const width = typeof item?.width === 'number' ? item.width : Number(item?.width || 0);
+          const url = typeof item?.url === 'string' ? item.url.trim() : '';
+          const kind = typeof item?.kind === 'string' ? item.kind.trim() : '';
+          const format = typeof item?.format === 'string' ? item.format.trim().toLowerCase() : 'webp';
+          if (!url || !Number.isFinite(width) || width <= 0) return null;
+          return {
+            width: Math.round(width),
+            url,
+            kind,
+            format,
+          };
+        })
+        .filter(
+          (item): item is { width: number; url: string; kind: string; format: string } => Boolean(item)
+        );
+
+      const detailWebp = normalizedRenditions
+        .filter((item) => item.format === 'webp' && item.kind === 'detail')
+        .sort((a, b) => a.width - b.width);
+      if (detailWebp.length === 0) {
+        return resolveMainImagePath(img);
+      }
+
+      const preferredWidths = isMobile ? [800, 1200] : [1200, 800];
+      for (const preferredWidth of preferredWidths) {
+        const exact = detailWebp.find((item) => item.width === preferredWidth);
+        if (exact) return exact.url;
+      }
+
+      const bounded = detailWebp.find((item) => item.width >= 800 && item.width <= 1200);
+      if (bounded) return bounded.url;
+      const fallback = detailWebp.find((item) => item.width >= 800) || detailWebp[0];
+      return fallback?.url || resolveMainImagePath(img);
+    },
+    [isMobile, resolveMainImagePath]
+  );
   const safeImages = useMemo(
     () =>
       (Array.isArray(images) ? images : []).filter(
@@ -873,16 +955,6 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
       ),
     [images]
   );
-  const lazyLoadImages = useMemo(
-    () =>
-      safeImages
-        .map((img) => ({
-          id: img.id,
-          image: resolveMainImagePath(img),
-        }))
-        .filter((img) => Boolean(img.image)),
-    [resolveMainImagePath, safeImages]
-  );
   const thumbnailImages = useMemo(
     () =>
       safeImages.map((img) => ({
@@ -891,9 +963,6 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
       })),
     [resolveThumbnailPath, safeImages]
   );
-
-  // Lazy load images
-  useGalleryLazyLoad(lazyLoadImages, currentIndex, getImageUrl);
 
   useEffect(() => {
     if (safeImages.length === 0 && currentIndex !== 0) {
@@ -905,24 +974,188 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
     }
   }, [currentIndex, safeImages.length]);
 
+  const logDevMetric = useCallback(
+    (type: string, payload: Record<string, unknown>) => {
+      if (!isDevMode) return;
+      console.debug('[gallery-prefetch]', {
+        type,
+        listingId: listingId ?? 'unknown',
+        ...payload,
+      });
+    },
+    [isDevMode, listingId]
+  );
+
+  const processPrefetchQueue = useCallback(() => {
+    const generation = prefetchGenerationRef.current;
+    while (prefetchInFlightRef.current < 2 && prefetchQueueRef.current.length > 0) {
+      const nextTask = prefetchQueueRef.current.shift();
+      if (!nextTask) break;
+      if (
+        prefetchedUrlsRef.current.has(nextTask.url) ||
+        prefetchPendingUrlsRef.current.has(nextTask.url)
+      ) {
+        continue;
+      }
+
+      prefetchPendingUrlsRef.current.add(nextTask.url);
+      prefetchInFlightRef.current += 1;
+      const startedAt = performance.now();
+      logDevMetric('prefetch-start', {
+        index: nextTask.index,
+        reason: nextTask.reason,
+        queueSize: prefetchQueueRef.current.length,
+      });
+
+      prefetchImage(nextTask.url)
+        .then(() => {
+          if (generation !== prefetchGenerationRef.current) return;
+          prefetchedUrlsRef.current.add(nextTask.url);
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          if (generation !== prefetchGenerationRef.current) return;
+          prefetchPendingUrlsRef.current.delete(nextTask.url);
+          prefetchInFlightRef.current = Math.max(0, prefetchInFlightRef.current - 1);
+          logDevMetric('prefetch-end', {
+            index: nextTask.index,
+            reason: nextTask.reason,
+            durationMs: Math.round(performance.now() - startedAt),
+          });
+          processPrefetchQueue();
+        });
+    }
+  }, [logDevMetric]);
+
+  const queuePrefetchForIndices = useCallback(
+    (indices: number[], reason: string) => {
+      if (safeImages.length <= 1) return;
+      const normalized = indices
+        .map((index) => ((index % safeImages.length) + safeImages.length) % safeImages.length)
+        .filter((index, itemIndex, array) => array.indexOf(index) === itemIndex)
+        .slice(0, 2);
+
+      normalized.forEach((index) => {
+        const nextImage = safeImages[index];
+        if (!nextImage) return;
+        const previewPath = resolvePreviewImagePath(nextImage);
+        if (!previewPath) return;
+        const absoluteUrl = getImageUrl(previewPath);
+        if (!absoluteUrl) return;
+        if (
+          prefetchedUrlsRef.current.has(absoluteUrl) ||
+          prefetchPendingUrlsRef.current.has(absoluteUrl) ||
+          prefetchQueueRef.current.some((item) => item.url === absoluteUrl)
+        ) {
+          return;
+        }
+        prefetchQueueRef.current.push({
+          url: absoluteUrl,
+          index,
+          reason,
+        });
+      });
+
+      processPrefetchQueue();
+    },
+    [getImageUrl, processPrefetchQueue, resolvePreviewImagePath, safeImages]
+  );
+
+  const prefetchDirectional = useCallback(
+    (direction: 'forward' | 'backward', reason: string) => {
+      if (safeImages.length <= 1) return;
+      const offset = direction === 'forward' ? 1 : -1;
+      const nextIndex = (currentIndex + offset + safeImages.length) % safeImages.length;
+      queuePrefetchForIndices([nextIndex], reason);
+    },
+    [currentIndex, queuePrefetchForIndices, safeImages.length]
+  );
+
+  useEffect(() => {
+    prefetchGenerationRef.current += 1;
+    prefetchQueueRef.current = [];
+    prefetchPendingUrlsRef.current.clear();
+    prefetchedUrlsRef.current.clear();
+    prefetchInFlightRef.current = 0;
+    swipeDirectionRef.current = 'forward';
+    navigationStartRef.current = null;
+    galleryStartRef.current = performance.now();
+    setIsHeroLoaded(false);
+  }, [listingId]);
+
+  useEffect(() => {
+    return () => {
+      prefetchGenerationRef.current += 1;
+      prefetchQueueRef.current = [];
+      prefetchPendingUrlsRef.current.clear();
+      prefetchInFlightRef.current = 0;
+    };
+  }, []);
+
   const handlePrevious = useCallback(() => {
     if (safeImages.length <= 1) return;
-    setCurrentIndex((prev) => (prev === 0 ? safeImages.length - 1 : prev - 1));
-  }, [safeImages.length]);
+    swipeDirectionRef.current = 'backward';
+    setCurrentIndex((prev) => {
+      const next = prev === 0 ? safeImages.length - 1 : prev - 1;
+      if (isDevMode) {
+        navigationStartRef.current = {
+          index: next,
+          startedAt: performance.now(),
+          source: 'navigate-backward',
+        };
+      }
+      return next;
+    });
+  }, [isDevMode, safeImages.length]);
 
   const handleNext = useCallback(() => {
     if (safeImages.length <= 1) return;
-    setCurrentIndex((prev) => (prev === safeImages.length - 1 ? 0 : prev + 1));
-  }, [safeImages.length]);
+    swipeDirectionRef.current = 'forward';
+    setCurrentIndex((prev) => {
+      const next = prev === safeImages.length - 1 ? 0 : prev + 1;
+      if (isDevMode) {
+        navigationStartRef.current = {
+          index: next,
+          startedAt: performance.now(),
+          source: 'navigate-forward',
+        };
+      }
+      return next;
+    });
+  }, [isDevMode, safeImages.length]);
+
+  const handleSlideTo = useCallback(
+    (index: number, source: string) => {
+      if (safeImages.length <= 0) return;
+      const normalizedIndex = ((index % safeImages.length) + safeImages.length) % safeImages.length;
+      setCurrentIndex((prev) => {
+        if (prev === normalizedIndex) return prev;
+        swipeDirectionRef.current = normalizedIndex > prev ? 'forward' : 'backward';
+        if (isDevMode) {
+          navigationStartRef.current = {
+            index: normalizedIndex,
+            startedAt: performance.now(),
+            source,
+          };
+        }
+        return normalizedIndex;
+      });
+    },
+    [isDevMode, safeImages.length]
+  );
 
   // Throttle navigation
   const throttledPrevious = useThrottle(handlePrevious, 300);
   const throttledNext = useThrottle(handleNext, 300);
 
   // Touch swipe handling
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartRef.current = e.touches[0].clientX;
-  }, []);
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      touchStartRef.current = e.touches[0].clientX;
+      prefetchDirectional(swipeDirectionRef.current, 'touchstart');
+    },
+    [prefetchDirectional]
+  );
 
   const handleTouchEnd = useCallback(
     (e: React.TouchEvent) => {
@@ -931,8 +1164,10 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
 
       if (Math.abs(diff) > 50) {
         if (diff > 0) {
+          swipeDirectionRef.current = 'forward';
           throttledNext();
         } else {
+          swipeDirectionRef.current = 'backward';
           throttledPrevious();
         }
       }
@@ -944,8 +1179,10 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') {
+        swipeDirectionRef.current = 'backward';
         throttledPrevious();
       } else if (e.key === 'ArrowRight') {
+        swipeDirectionRef.current = 'forward';
         throttledNext();
       }
     };
@@ -953,6 +1190,43 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [throttledPrevious, throttledNext]);
+
+  useEffect(() => {
+    if (!isHeroLoaded || safeImages.length <= 1) return;
+    queuePrefetchForIndices([currentIndex + 1, currentIndex + 2], 'hero-decoded');
+  }, [currentIndex, isHeroLoaded, queuePrefetchForIndices, safeImages.length]);
+
+  useEffect(() => {
+    if (safeImages.length <= 1) return;
+    prefetchDirectional(swipeDirectionRef.current, `index-change:${swipeDirectionRef.current}`);
+  }, [currentIndex, prefetchDirectional, safeImages.length]);
+
+  const handleHeroDecoded = useCallback(
+    (_img: HTMLImageElement) => {
+      setIsHeroLoaded(true);
+      const now = performance.now();
+
+      logDevMetric('hero-loaded', {
+        index: currentIndex,
+        msFromGalleryStart: Math.round(now - galleryStartRef.current),
+      });
+
+      const pendingNavigation = navigationStartRef.current;
+      if (pendingNavigation && pendingNavigation.index === currentIndex) {
+        logDevMetric('next-visible', {
+          index: currentIndex,
+          source: pendingNavigation.source,
+          durationMs: Math.round(now - pendingNavigation.startedAt),
+        });
+        navigationStartRef.current = null;
+      }
+
+      if (onHeroImageLoad) {
+        onHeroImageLoad();
+      }
+    },
+    [currentIndex, logDevMetric, onHeroImageLoad]
+  );
 
   if (safeImages.length === 0) {
     return (
@@ -976,7 +1250,18 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
 
   const safeIndex = Math.min(Math.max(currentIndex, 0), safeImages.length - 1);
   const currentImage = safeImages[safeIndex];
-  const currentImageSrc = getImageUrl(resolveMainImagePath(currentImage));
+  const currentMainPath = resolveMainImagePath(currentImage);
+  const currentImageSrc = getImageUrl(currentMainPath);
+  const currentPlaceholderSrc = getImageUrl(resolveThumbnailPath(currentImage) || currentMainPath);
+  const shouldShowInitialPlaceholder = !isHeroLoaded && safeIndex === 0;
+  const heroWidth =
+    typeof currentImage.original_width === 'number' && currentImage.original_width > 0
+      ? Math.round(currentImage.original_width)
+      : 1200;
+  const heroHeight =
+    typeof currentImage.original_height === 'number' && currentImage.original_height > 0
+      ? Math.round(currentImage.original_height)
+      : 800;
 
   const styles = useMemo(
     () => ({
@@ -1101,6 +1386,44 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         boxShadow: '0 6px 14px rgba(5, 150, 105, 0.35)',
         zIndex: 19,
       } as React.CSSProperties,
+      heroPlaceholder: {
+        position: 'absolute' as const,
+        inset: 0,
+        zIndex: 0,
+        overflow: 'hidden',
+        pointerEvents: 'none' as const,
+      } as React.CSSProperties,
+      heroPlaceholderImage: {
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover' as const,
+        filter: 'none',
+        transform: 'none',
+        opacity: 1,
+      } as React.CSSProperties,
+      mobileDots: {
+        position: 'absolute' as const,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        bottom: isMobile ? 10 : 12,
+        display: 'inline-flex',
+        gap: 6,
+        zIndex: 14,
+        background: 'rgba(2, 6, 23, 0.34)',
+        border: '1px solid rgba(255,255,255,0.16)',
+        borderRadius: 999,
+        padding: '5px 8px',
+        backdropFilter: 'blur(4px)',
+      } as React.CSSProperties,
+      mobileDot: {
+        width: 8,
+        height: 8,
+        borderRadius: '50%',
+        border: 'none',
+        padding: 0,
+        cursor: 'pointer',
+        background: 'rgba(255,255,255,0.45)',
+      } as React.CSSProperties,
     }),
     [isMobile]
   );
@@ -1113,6 +1436,9 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
           style={styles.carouselWrapper}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
+          onPointerDown={() => {
+            prefetchDirectional(swipeDirectionRef.current, 'pointerdown');
+          }}
         >
           <div
             style={{ ...styles.carouselInner, ...(isMobile ? { cursor: 'zoom-in' } : {}) }}
@@ -1131,11 +1457,35 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
                 : undefined
             }
           >
+            {shouldShowInitialPlaceholder && currentPlaceholderSrc && (
+              <div
+                style={{
+                  ...styles.heroPlaceholder,
+                  opacity: 1,
+                  transition: 'opacity 220ms ease',
+                }}
+                aria-hidden="true"
+              >
+                <img
+                  src={currentPlaceholderSrc}
+                  alt=""
+                  width={heroWidth}
+                  height={heroHeight}
+                  loading="eager"
+                  decoding="async"
+                  style={styles.heroPlaceholderImage}
+                />
+              </div>
+            )}
             <MainCarouselImage
               photo={currentImage}
-              fallbackPath={resolveMainImagePath(currentImage)}
+              fallbackPath={currentMainPath}
               title={title}
-              isActive={true}
+              isActive={safeIndex === 0}
+              width={heroWidth}
+              height={heroHeight}
+              imageOpacity={shouldShowInitialPlaceholder ? 0 : 1}
+              onDecoded={handleHeroDecoded}
             />
           </div>
 
@@ -1244,6 +1594,27 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
               {safeIndex + 1} / {safeImages.length}
             </div>
           )}
+
+          {isMobile && safeImages.length > 1 && (
+            <div style={styles.mobileDots}>
+              {safeImages.map((img, index) => (
+                <button
+                  key={img.id}
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleSlideTo(index, 'dots');
+                  }}
+                  aria-label={`Image ${index + 1}`}
+                  style={{
+                    ...styles.mobileDot,
+                    background:
+                      index === safeIndex ? '#34d399' : (styles.mobileDot.background as string),
+                  }}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Thumbnail Strip */}
@@ -1251,7 +1622,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
           <ThumbnailStrip
             images={thumbnailImages}
             currentIndex={safeIndex}
-            onSlideTo={setCurrentIndex}
+            onSlideTo={(index) => handleSlideTo(index, 'thumbnails')}
             getImageUrl={getImageUrl}
             isMobile={isMobile}
           />

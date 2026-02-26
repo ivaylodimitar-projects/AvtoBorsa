@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import LandingPage from './components/landingPage'
@@ -13,11 +14,12 @@ import VerifyEmailPage from './components/VerifyEmailPage'
 import ForgotPasswordPage from './components/ForgotPasswordPage'
 import ResetPasswordPage from './components/ResetPasswordPage'
 import MyAdsPage from './components/MyAdsPage'
-import VehicleDetailsPage from './components/details/VehicleDetailsPage'
 import SearchPage from './components/SearchPage'
 import Footer from './components/footer'
 import AdminPage from './components/AdminPage'
 import { useAuth } from './context/AuthContext'
+
+const VehicleDetailsPage = lazy(() => import('./components/details/VehicleDetailsPage'))
 
 function App() {
   const location = useLocation()
@@ -50,7 +52,14 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/my-ads" element={<MyAdsPage />} />
-        <Route path="/details/:slug" element={<VehicleDetailsPage />} />
+        <Route
+          path="/details/:slug"
+          element={
+            <Suspense fallback={null}>
+              <VehicleDetailsPage />
+            </Suspense>
+          }
+        />
         <Route path="/admin" element={<AdminPage />} />
       </Routes>
       {showSharedFooter && <Footer />}

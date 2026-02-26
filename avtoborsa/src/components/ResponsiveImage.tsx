@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 import { useImageUrl } from "../hooks/useGalleryLazyLoad";
 
 export type PhotoRendition = {
@@ -37,6 +37,11 @@ type ResponsiveImageProps = {
   objectFit?: "cover" | "contain";
   strictKind?: boolean;
   preventUpscale?: boolean;
+  width?: number;
+  height?: number;
+  onLoad?: React.ReactEventHandler<HTMLImageElement>;
+  onError?: React.ReactEventHandler<HTMLImageElement>;
+  onDecoded?: (img: HTMLImageElement) => void;
 };
 
 const CARD_DISPLAY_WIDTH = 320;
@@ -121,6 +126,11 @@ const ResponsiveImage: React.FC<ResponsiveImageProps> = ({
   objectFit = "cover",
   strictKind = false,
   preventUpscale = true,
+  width,
+  height,
+  onLoad,
+  onError,
+  onDecoded,
 }) => {
   const getImageUrl = useImageUrl();
 
@@ -188,6 +198,26 @@ const ResponsiveImage: React.FC<ResponsiveImageProps> = ({
 
   if (!finalSrc && !srcSet) return null;
 
+  const handleImgLoad = useCallback(
+    (event: React.SyntheticEvent<HTMLImageElement>) => {
+      onLoad?.(event);
+      if (!onDecoded) return;
+
+      const img = event.currentTarget;
+      if (typeof img.decode === "function") {
+        img
+          .decode()
+          .catch(() => undefined)
+          .finally(() => {
+            onDecoded(img);
+          });
+        return;
+      }
+      onDecoded(img);
+    },
+    [onDecoded, onLoad]
+  );
+
   return (
     <div
       style={{
@@ -202,10 +232,14 @@ const ResponsiveImage: React.FC<ResponsiveImageProps> = ({
         <img
           src={finalSrc}
           alt={alt}
+          width={width}
+          height={height}
           loading={loading}
           decoding={decoding}
           fetchPriority={fetchPriority}
           sizes={sizes}
+          onLoad={handleImgLoad}
+          onError={onError}
           style={{
             width: "100%",
             height: "100%",

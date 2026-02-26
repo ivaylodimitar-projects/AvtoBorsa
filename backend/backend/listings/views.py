@@ -17,6 +17,7 @@ from django.db.models.functions import Substr, Coalesce
 from django.core.cache import cache
 from django.utils.cache import patch_cache_control, patch_vary_headers
 from django.utils import timezone
+from django.utils.http import http_date, parse_http_date_safe, quote_etag
 from backend.accounts.models import UserProfile
 from .models import (
     CarListing,
@@ -39,6 +40,7 @@ from .serializers import (
     CarListingListSerializer,
     CarListingSearchCompactSerializer,
     CarImageSerializer,
+    CarImageDetailSerializer,
     FavoriteSerializer,
 )
 from .realtime import broadcast_dealer_listings_updated
@@ -60,6 +62,25 @@ TOP_DEMOTION_MIN_INTERVAL_SECONDS = 60
 TOP_DEMOTION_LOCK_KEY = "listings:demote-expired-top:lock"
 LATEST_LISTINGS_CACHE_SECONDS = 30
 LATEST_LISTINGS_CACHE_KEY = "listings:latest:v5"
+DETAIL_PUBLIC_CACHE_SECONDS = 60
+DETAIL_PUBLIC_STALE_SECONDS = 120
+DETAIL_RELATED_SELECT_FIELDS = (
+    'cars_details',
+    'wheels_details',
+    'parts_details',
+    'buses_details',
+    'trucks_details',
+    'moto_details',
+    'agri_details',
+    'industrial_details',
+    'forklift_details',
+    'caravan_details',
+    'boats_details',
+    'trailers_details',
+    'accessories_details',
+    'buy_details',
+    'services_details',
+)
 
 
 class ListingsPagination(PageNumberPagination):
@@ -420,6 +441,98 @@ def _set_public_cache_headers(response, max_age=LISTINGS_PUBLIC_CACHE_SECONDS):
     response["Cache-Control"] = (
         f"public, max-age={max_age}, stale-while-revalidate={LISTINGS_PUBLIC_STALE_SECONDS}"
     )
+
+
+def _parse_positive_int(raw_value):
+    try:
+        parsed = int(str(raw_value))
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _is_detail_view_request(request):
+    mode = str(request.query_params.get("view") or "").strip().lower()
+    return mode in {"detail", "optimized"}
+
+
+def _set_detail_cache_headers(request, response):
+    patch_vary_headers(response, ("Authorization",))
+    if request.user.is_authenticated:
+        patch_cache_control(response, private=True, no_cache=True, no_store=True, max_age=0)
+        return
+    response["Cache-Control"] = (
+        f"public, max-age={DETAIL_PUBLIC_CACHE_SECONDS}, "
+        f"stale-while-revalidate={DETAIL_PUBLIC_STALE_SECONDS}"
+    )
+
+
+def _compute_listing_detail_etag(instance, images, *, photo_limit=None, detail_mode=False):
+    image_fragments = []
+    for image_obj in images:
+        renditions = getattr(image_obj, "renditions", None)
+        rendition_rows = renditions.get("webp") if isinstance(renditions, dict) else []
+        normalized_rendition_rows = []
+        if isinstance(rendition_rows, list):
+            for row in rendition_rows:
+                if not isinstance(row, dict):
+                    continue
+                normalized_rendition_rows.append(
+                    (
+                        str(row.get("kind") or "").strip().lower(),
+                        str(row.get("width") or "").strip(),
+                        str(row.get("path") or row.get("url") or "").strip(),
+                    )
+                )
+        normalized_rendition_rows.sort()
+
+        thumbnail_name = str(getattr(getattr(image_obj, "thumbnail", None), "name", "") or "").strip()
+        image_fragments.append(
+            (
+                int(getattr(image_obj, "id", 0) or 0),
+                int(getattr(image_obj, "order", 0) or 0),
+                1 if bool(getattr(image_obj, "is_cover", False)) else 0,
+                thumbnail_name,
+                tuple(normalized_rendition_rows),
+            )
+        )
+
+    updated_at = getattr(instance, "updated_at", None)
+    updated_at_stamp = f"{updated_at.timestamp():.6f}" if updated_at else ""
+    payload = (
+        str(getattr(instance, "pk", "")),
+        updated_at_stamp,
+        int(getattr(instance, "view_count", 0) or 0),
+        int(photo_limit or 0),
+        1 if detail_mode else 0,
+        tuple(image_fragments),
+    )
+    digest = hashlib.sha256(repr(payload).encode("utf-8")).hexdigest()
+    return quote_etag(digest[:32])
+
+
+def _if_none_match_matches(request, current_etag):
+    raw_header = request.headers.get("If-None-Match")
+    if not raw_header:
+        return False
+    token = raw_header.strip()
+    if token == "*":
+        return True
+
+    def _normalize_tag(value):
+        normalized = value.strip()
+        if normalized.startswith("W/"):
+            normalized = normalized[2:].strip()
+        return normalized.strip()
+
+    candidate = _normalize_tag(current_etag)
+    for raw in raw_header.split(","):
+        header_tag = _normalize_tag(raw)
+        if not header_tag:
+            continue
+        if header_tag == candidate:
+            return True
+    return False
 
 
 class CarListingViewSet(viewsets.ModelViewSet):
@@ -1101,7 +1214,8 @@ class CarListingViewSet(viewsets.ModelViewSet):
             queryset = queryset.select_related(
                 'user',
                 'user__business_profile',
-                'user__private_profile'
+                'user__private_profile',
+                *DETAIL_RELATED_SELECT_FIELDS,
             ).prefetch_related(
                 Prefetch(
                     'images',
@@ -1116,6 +1230,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
                         'order',
                         'is_cover',
                         'listing_id',
+                        'created_at',
                     ).order_by('order', 'id'),
                 )
             )
@@ -1124,6 +1239,41 @@ class CarListingViewSet(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
+        detail_mode = _is_detail_view_request(request)
+        photo_limit = _parse_positive_int(request.query_params.get("photo_limit"))
+        all_images = list(instance.images.all())
+        images_for_tag = all_images[:photo_limit] if photo_limit else all_images
+        detail_etag = _compute_listing_detail_etag(
+            instance,
+            images_for_tag,
+            photo_limit=photo_limit,
+            detail_mode=detail_mode,
+        )
+        updated_at = getattr(instance, "updated_at", None)
+        last_modified_value = http_date(updated_at.timestamp()) if updated_at else None
+
+        if not request.user.is_authenticated and detail_etag and _if_none_match_matches(request, detail_etag):
+            response = Response(status=status.HTTP_304_NOT_MODIFIED)
+            _set_detail_cache_headers(request, response)
+            response["ETag"] = detail_etag
+            if last_modified_value:
+                response["Last-Modified"] = last_modified_value
+            return response
+
+        if (
+            not request.user.is_authenticated
+            and updated_at is not None
+            and not request.headers.get("If-None-Match")
+        ):
+            if_modified_since = parse_http_date_safe(request.headers.get("If-Modified-Since") or "")
+            if if_modified_since is not None and int(updated_at.timestamp()) <= int(if_modified_since):
+                response = Response(status=status.HTTP_304_NOT_MODIFIED)
+                _set_detail_cache_headers(request, response)
+                response["ETag"] = detail_etag
+                if last_modified_value:
+                    response["Last-Modified"] = last_modified_value
+                return response
+
         should_increment = True
 
         if request.user.is_authenticated:
@@ -1161,16 +1311,21 @@ class CarListingViewSet(viewsets.ModelViewSet):
         if should_increment:
             CarListing.objects.filter(pk=instance.pk).update(view_count=F('view_count') + 1)
             instance.refresh_from_db(fields=['view_count'])
-
-        # Backfill legacy images so detail view does not load large originals by default.
-        for image_obj in instance.images.all():
-            try:
-                image_obj.ensure_renditions()
-            except Exception:
-                continue
+            detail_etag = _compute_listing_detail_etag(
+                instance,
+                images_for_tag,
+                photo_limit=photo_limit,
+                detail_mode=detail_mode,
+            )
 
         serializer = self.get_serializer(instance)
-        return Response(serializer.data)
+        response = Response(serializer.data)
+        _set_detail_cache_headers(request, response)
+        if detail_etag:
+            response["ETag"] = detail_etag
+        if last_modified_value:
+            response["Last-Modified"] = last_modified_value
+        return response
 
     def get_permissions(self):
         """Set permissions based on action"""
@@ -1823,6 +1978,136 @@ def get_user_favorites(request):
     ).select_related('listing').prefetch_related('listing__images')
     serializer = FavoriteSerializer(favorites, many=True, context={'request': request})
     return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def listing_photos(request, listing_id):
+    """Return full photo list for a listing using compact rendition payload."""
+    _demote_expired_top_listings()
+    anonymous_cache_key = None
+    if not request.user.is_authenticated:
+        anonymous_cache_key = f"listing:photos:detail:v1:{int(listing_id)}"
+        cached_payload = cache.get(anonymous_cache_key)
+        if isinstance(cached_payload, dict):
+            cached_etag = cached_payload.get("etag")
+            cached_last_modified = cached_payload.get("last_modified")
+            cached_modified_ts = cached_payload.get("modified_at_ts")
+
+            if cached_etag and _if_none_match_matches(request, cached_etag):
+                response = Response(status=status.HTTP_304_NOT_MODIFIED)
+                _set_detail_cache_headers(request, response)
+                response["ETag"] = cached_etag
+                if cached_last_modified:
+                    response["Last-Modified"] = cached_last_modified
+                return response
+
+            if not request.headers.get("If-None-Match") and cached_modified_ts is not None:
+                if_modified_since = parse_http_date_safe(request.headers.get("If-Modified-Since") or "")
+                if if_modified_since is not None and int(cached_modified_ts) <= int(if_modified_since):
+                    response = Response(status=status.HTTP_304_NOT_MODIFIED)
+                    _set_detail_cache_headers(request, response)
+                    if cached_etag:
+                        response["ETag"] = cached_etag
+                    if cached_last_modified:
+                        response["Last-Modified"] = cached_last_modified
+                    return response
+
+            response = Response(cached_payload.get("data", []), status=status.HTTP_200_OK)
+            _set_detail_cache_headers(request, response)
+            if cached_etag:
+                response["ETag"] = cached_etag
+            if cached_last_modified:
+                response["Last-Modified"] = cached_last_modified
+            return response
+
+    cutoff = get_expiry_cutoff()
+    visibility_filter = Q(
+        is_active=True,
+        is_draft=False,
+        is_archived=False,
+        created_at__gte=cutoff,
+    )
+    if request.user.is_authenticated:
+        listing_queryset = CarListing.objects.filter(visibility_filter | Q(user=request.user))
+    else:
+        listing_queryset = CarListing.objects.filter(visibility_filter)
+
+    listing = get_object_or_404(
+        listing_queryset.only('id', 'created_at', 'updated_at', 'view_count'),
+        pk=listing_id,
+    )
+    images = list(
+        CarImage.objects.filter(listing_id=listing.id).only(
+            'id',
+            'image',
+            'thumbnail',
+            'renditions',
+            'original_width',
+            'original_height',
+            'low_res',
+            'order',
+            'is_cover',
+            'listing_id',
+            'created_at',
+        ).order_by('order', 'id')
+    )
+
+    detail_etag = _compute_listing_detail_etag(
+        listing,
+        images,
+        detail_mode=True,
+    )
+    modified_at = listing.updated_at or listing.created_at
+    last_modified_value = http_date(modified_at.timestamp()) if modified_at else None
+
+    if not request.user.is_authenticated and detail_etag and _if_none_match_matches(request, detail_etag):
+        response = Response(status=status.HTTP_304_NOT_MODIFIED)
+        _set_detail_cache_headers(request, response)
+        response["ETag"] = detail_etag
+        if last_modified_value:
+            response["Last-Modified"] = last_modified_value
+        return response
+
+    if (
+        not request.user.is_authenticated
+        and modified_at is not None
+        and not request.headers.get("If-None-Match")
+    ):
+        if_modified_since = parse_http_date_safe(request.headers.get("If-Modified-Since") or "")
+        if if_modified_since is not None and int(modified_at.timestamp()) <= int(if_modified_since):
+            response = Response(status=status.HTTP_304_NOT_MODIFIED)
+            _set_detail_cache_headers(request, response)
+            response["ETag"] = detail_etag
+            if last_modified_value:
+                response["Last-Modified"] = last_modified_value
+            return response
+
+    serializer = CarImageDetailSerializer(
+        images,
+        many=True,
+        context={
+            'request': request,
+            'image_payload_mode': 'detail',
+        },
+    )
+    response = Response(serializer.data, status=status.HTTP_200_OK)
+    _set_detail_cache_headers(request, response)
+    response["ETag"] = detail_etag
+    if last_modified_value:
+        response["Last-Modified"] = last_modified_value
+    if anonymous_cache_key:
+        cache.set(
+            anonymous_cache_key,
+            {
+                "data": serializer.data,
+                "etag": detail_etag,
+                "last_modified": last_modified_value,
+                "modified_at_ts": modified_at.timestamp() if modified_at else None,
+            },
+            timeout=DETAIL_PUBLIC_CACHE_SECONDS,
+        )
+    return response
 
 
 @api_view(['GET'])
