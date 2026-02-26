@@ -4124,6 +4124,7 @@ const MyAdsPage: React.FC = () => {
                             }
                             alt={modalPreviewTitle}
                             kind="grid"
+                            preventUpscale={false}
                             sizes="320px"
                             loading="eager"
                             decoding="async"
@@ -4329,6 +4330,7 @@ const MyAdsPage: React.FC = () => {
                         fallbackPath={previewImage.fullFallbackPath || previewImage.full}
                         alt={previewListing.title || `${previewListing.brand} ${previewListing.model}`}
                         kind="detail"
+                        preventUpscale={false}
                         sizes="(max-width: 768px) 100vw, 658px"
                         loading="eager"
                         decoding="async"
@@ -4365,6 +4367,7 @@ const MyAdsPage: React.FC = () => {
                             fallbackPath={previewSource.thumbFallbackPath || previewSource.thumb}
                             alt={`Снимка ${idx + 1}`}
                             kind="grid"
+                            preventUpscale={false}
                             sizes="120px"
                             loading="lazy"
                             decoding="async"
@@ -4801,6 +4804,7 @@ const MyAdsPage: React.FC = () => {
                     fallbackPath={cardImage.fallbackPath || cardImage.display}
                     alt={listingTitle}
                     kind="grid"
+                    preventUpscale={false}
                     sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
                     loading="lazy"
                     decoding="async"

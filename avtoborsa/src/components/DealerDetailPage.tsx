@@ -1258,6 +1258,7 @@ const DealerDetailPage: React.FC = () => {
                           fallbackPath={mainImageFallbackPath}
                           alt={`${listing.brand} ${listing.model}`}
                           kind="grid"
+                          preventUpscale={false}
                           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
                           loading="lazy"
                           decoding="async"

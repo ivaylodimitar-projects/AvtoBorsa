@@ -286,6 +286,7 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
                 fallbackPath={coverFallbackPath}
                 alt="Cover"
                 kind="grid"
+                preventUpscale={false}
                 sizes="(max-width: 1024px) 90vw, 320px"
                 loading="eager"
                 decoding="async"

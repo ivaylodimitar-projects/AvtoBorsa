@@ -660,6 +660,7 @@ const AdvancedImageUpload: React.FC<AdvancedImageUploadProps> = ({
                     fallbackPath={fallbackPath}
                     alt={`Existing ${index + 1}`}
                     kind="grid"
+                    preventUpscale={false}
                     sizes="(max-width: 640px) 45vw, 180px"
                     loading="lazy"
                     decoding="async"
