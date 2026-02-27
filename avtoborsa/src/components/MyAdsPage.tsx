@@ -195,6 +195,8 @@ const VIP_PREPAY_ALLOWED_REMAINING_DAYS = 3;
 const LISTING_EXPIRY_DAYS = 30;
 const PAGE_SIZE = 21;
 const PROMOTE_LOADING_MIN_MS = 1100;
+const LISTING_DELETE_ANIMATION_MS = 240;
+const AUTH_REQUIRED_ERROR_CODE = "__AUTH_REQUIRED__";
 const QR_BRAND_TAG = "Kar.bg";
 const CATEGORY_AS_BRAND_MAIN_CATEGORIES = new Set(["6", "7", "8", "a", "b"]);
 const GENERIC_BRAND_TERMS = new Set([
@@ -237,6 +239,22 @@ const globalCss = `
   @keyframes myadsPromotionSpin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+  }
+  @keyframes myadsListingDeleteExit {
+    from {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      filter: blur(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(12px) scale(0.985);
+      filter: blur(1px);
+    }
+  }
+  .myads-listing-card.is-deleting {
+    animation: myadsListingDeleteExit ${LISTING_DELETE_ANIMATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    pointer-events: none;
   }
   .myads-icon-btn {
     position: relative;
@@ -526,7 +544,7 @@ const MyAdsPage: React.FC = () => {
   const location = useLocation();
   const navigationState = (location.state as MyAdsNavigationState | null) ?? null;
   const forceRefreshFromPublish = navigationState?.forceRefresh === true;
-  const { isAuthenticated, user, updateBalance } = useAuth();
+  const { isAuthenticated, user, updateBalance, ensureFreshAccessToken } = useAuth();
   const getImageUrl = useImageUrl();
   const isBusinessUser = user?.userType === "business";
   const [activeListings, setActiveListings] = useState<CarListing[]>([]);
@@ -536,6 +554,7 @@ const MyAdsPage: React.FC = () => {
   const [likedListings, setLikedListings] = useState<CarListing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [requiresAuthPrompt, setRequiresAuthPrompt] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>("active");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [brandFilter, setBrandFilter] = useState<string>("all");
@@ -543,6 +562,7 @@ const MyAdsPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+  const [deletingListingIds, setDeletingListingIds] = useState<Set<number>>(new Set());
   const [actionLoading, setActionLoading] = useState<number | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [showTopConfirm, setShowTopConfirm] = useState(false);
@@ -574,12 +594,14 @@ const MyAdsPage: React.FC = () => {
   const [qrGenerationError, setQrGenerationError] = useState<string | null>(null);
   const [isQrGenerating, setIsQrGenerating] = useState(false);
   const qrGenerationRequestRef = React.useRef(0);
+  const deleteAnimationTimeoutIdsRef = React.useRef<number[]>([]);
   const tabsSliderRef = React.useRef<HTMLDivElement | null>(null);
   const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
 
   useEffect(() => {
     if (!isAuthenticated) {
       invalidateMyAdsCache();
+      setRequiresAuthPrompt(false);
       setIsLoading(false);
       return;
     }
@@ -595,6 +617,7 @@ const MyAdsPage: React.FC = () => {
       setDraftListings(cachedPayload.draftListings);
       setExpiredListings(cachedPayload.expiredListings);
       setLikedListings(cachedPayload.likedListings);
+      setRequiresAuthPrompt(false);
       setError(null);
       setIsLoading(false);
       return;
@@ -602,9 +625,10 @@ const MyAdsPage: React.FC = () => {
 
     const fetchUserListings = async () => {
       try {
-        const token = localStorage.getItem("authToken");
+        setRequiresAuthPrompt(false);
+        const token = await ensureFreshAccessToken();
         if (!token) {
-          throw new Error("Липсва токен за достъп");
+          throw new Error(AUTH_REQUIRED_ERROR_CODE);
         }
 
         const normalizeArrayPayload = (payload: unknown): unknown[] => {
@@ -620,9 +644,23 @@ const MyAdsPage: React.FC = () => {
         };
 
         const fetchList = async (url: string): Promise<unknown[]> => {
-          const response = await fetch(url, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          const callEndpoint = async (accessToken: string) =>
+            fetch(url, {
+              headers: { Authorization: `Bearer ${accessToken}` },
+            });
+
+          let response = await callEndpoint(token);
+          if (response.status === 401 || response.status === 403) {
+            const refreshedToken = await ensureFreshAccessToken({ force: true });
+            if (!refreshedToken) {
+              throw new Error(AUTH_REQUIRED_ERROR_CODE);
+            }
+            response = await callEndpoint(refreshedToken);
+          }
+
+          if (response.status === 401 || response.status === 403) {
+            throw new Error(AUTH_REQUIRED_ERROR_CODE);
+          }
 
           if (!response.ok) {
             throw new Error(`${url} -> ${response.status}`);
@@ -649,6 +687,15 @@ const MyAdsPage: React.FC = () => {
         const allResults = [activeRes, archivedRes, draftsRes, expiredRes, favoritesRes];
         const hasAnySuccess = allResults.some((result) => result.status === "fulfilled");
         if (!hasAnySuccess) {
+          const allUnauthorized = allResults.every(
+            (result) =>
+              result.status === "rejected" &&
+              result.reason instanceof Error &&
+              (result.reason.message === AUTH_REQUIRED_ERROR_CODE || result.reason.message.includes("токен"))
+          );
+          if (allUnauthorized) {
+            throw new Error(AUTH_REQUIRED_ERROR_CODE);
+          }
           throw new Error("Failed to fetch listings");
         }
 
@@ -698,7 +745,13 @@ const MyAdsPage: React.FC = () => {
         setError(null);
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : "An error occurred";
-        setError(errorMsg);
+        if (errorMsg === AUTH_REQUIRED_ERROR_CODE) {
+          setRequiresAuthPrompt(true);
+          setError(null);
+        } else {
+          setRequiresAuthPrompt(false);
+          setError(errorMsg);
+        }
         invalidateMyAdsCache(user?.id);
         setActiveListings([]);
         setArchivedListings([]);
@@ -711,12 +764,21 @@ const MyAdsPage: React.FC = () => {
     };
 
     fetchUserListings();
-  }, [forceRefreshFromPublish, isAuthenticated, user?.id]);
+  }, [forceRefreshFromPublish, isAuthenticated, user?.id, ensureFreshAccessToken]);
 
   useEffect(() => {
     if (!navigationState?.publishMessage) return;
     setToast({ message: navigationState.publishMessage, type: "success" });
   }, [navigationState?.publishMessage]);
+
+  useEffect(() => {
+    return () => {
+      deleteAnimationTimeoutIdsRef.current.forEach((timeoutId) =>
+        window.clearTimeout(timeoutId)
+      );
+      deleteAnimationTimeoutIdsRef.current = [];
+    };
+  }, []);
 
   // Toast notification effect
   useEffect(() => {
@@ -1738,6 +1800,7 @@ const MyAdsPage: React.FC = () => {
     }
 
     setActionLoading(listingId);
+    let hasScheduledRemoval = false;
 
     try {
       const token = localStorage.getItem("authToken");
@@ -1748,20 +1811,41 @@ const MyAdsPage: React.FC = () => {
 
       if (!response.ok) throw new Error("Failed to delete listing");
 
-      // Optimistic UI update - remove from all lists
-      setActiveListings((prev) => prev.filter((l) => l.id !== listingId));
-      setArchivedListings((prev) => prev.filter((l) => l.id !== listingId));
-      setDraftListings((prev) => prev.filter((l) => l.id !== listingId));
-      setExpiredListings((prev) => prev.filter((l) => l.id !== listingId));
-      setLikedListings((prev) => prev.filter((l) => l.id !== listingId));
-      invalidateMyAdsCache(user?.id);
       setDeleteConfirm(null);
-      showToast("Обявата е изтрита успешно!");
+      setDeletingListingIds((prev) => {
+        const next = new Set(prev);
+        next.add(listingId);
+        return next;
+      });
+
+      hasScheduledRemoval = true;
+      const timeoutId = window.setTimeout(() => {
+        setActiveListings((prev) => prev.filter((l) => l.id !== listingId));
+        setArchivedListings((prev) => prev.filter((l) => l.id !== listingId));
+        setDraftListings((prev) => prev.filter((l) => l.id !== listingId));
+        setExpiredListings((prev) => prev.filter((l) => l.id !== listingId));
+        setLikedListings((prev) => prev.filter((l) => l.id !== listingId));
+        setDeletingListingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(listingId);
+          return next;
+        });
+        setActionLoading((prev) => (prev === listingId ? null : prev));
+        invalidateMyAdsCache(user?.id);
+        showToast("Обявата е изтрита успешно!");
+        deleteAnimationTimeoutIdsRef.current = deleteAnimationTimeoutIdsRef.current.filter(
+          (activeTimeoutId) => activeTimeoutId !== timeoutId
+        );
+      }, LISTING_DELETE_ANIMATION_MS);
+
+      deleteAnimationTimeoutIdsRef.current.push(timeoutId);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Failed to delete listing";
       showToast(errorMsg, "error");
     } finally {
-      setActionLoading(null);
+      if (!hasScheduledRemoval) {
+        setActionLoading(null);
+      }
     }
   };
 
@@ -3468,7 +3552,12 @@ const MyAdsPage: React.FC = () => {
     </div>
   );
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || requiresAuthPrompt) {
+    const loginPromptTitle = requiresAuthPrompt ? "Сесията е изтекла" : "Трябва да си логнат";
+    const loginPromptSubtitle = requiresAuthPrompt
+      ? "Логни се отново, за да видиш твоите обяви."
+      : "Логни се, за да видиш твоите обяви.";
+
     return (
       <div style={styles.page}>
         <style>{globalCss}</style>
@@ -3478,13 +3567,12 @@ const MyAdsPage: React.FC = () => {
             <div style={styles.emptyIconWrapper}>
               <Lock size={40} style={styles.emptyIcon} />
             </div>
-            <p style={styles.emptyText}>Трябва да си логнат</p>
-            <p style={styles.emptySubtext}>
-              Логни се, за да видиш твоите обяви
-            </p>
-            <a
-              href="/auth"
+            <p style={styles.emptyText}>{loginPromptTitle}</p>
+            <p style={styles.emptySubtext}>{loginPromptSubtitle}</p>
+            <button
+              type="button"
               style={styles.ctaButton}
+              onClick={() => navigate("/auth")}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = "translateY(-2px)";
                 e.currentTarget.style.boxShadow = "0 6px 20px rgba(15, 118, 110, 0.4)";
@@ -3496,7 +3584,7 @@ const MyAdsPage: React.FC = () => {
             >
               <Lock size={18} />
               Логни се
-            </a>
+            </button>
           </div>
         </div>
       </div>
@@ -4740,14 +4828,17 @@ const MyAdsPage: React.FC = () => {
                   const hasQrTarget = Boolean(listing.slug && listing.slug.trim());
                   const showQrTrigger =
                     activeTab === "active" || activeTab === "top" || activeTab === "vip";
+                  const isDeletingListing = deletingListingIds.has(listing.id);
 
             return (
             <div
               key={listing.id}
+              className={`myads-listing-card${isDeletingListing ? " is-deleting" : ""}`}
               style={{
                 ...styles.listingCard,
               }}
               onClick={() => {
+                if (isDeletingListing) return;
                 if (isPreviewTab) {
                   openPreview(listing);
                   return;
@@ -4755,9 +4846,11 @@ const MyAdsPage: React.FC = () => {
                 navigate(`/details/${listing.slug}`);
               }}
               onMouseEnter={(e) => {
+                if (isDeletingListing) return;
                 Object.assign(e.currentTarget.style, styles.listingCardHover);
               }}
               onMouseLeave={(e) => {
+                if (isDeletingListing) return;
                 e.currentTarget.style.transform = "";
                 e.currentTarget.style.boxShadow =
                   "0 2px 6px rgba(0,0,0,0.08)";

@@ -2,6 +2,7 @@
 import { useNavigate } from "react-router-dom";
 import { FiBell } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import {
   USER_FOLLOWED_DEALERS_UPDATED_EVENT,
   followDealer,
@@ -36,6 +37,7 @@ const globalCss = `
 const DealersPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [dealers, setDealers] = useState<Dealer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchCity, setSearchCity] = useState("Всички");
@@ -170,16 +172,25 @@ const DealersPage: React.FC = () => {
 
     if (isDealerFollowed(dealer.id)) {
       unfollowDealer(user.id, dealer.id);
+      showToast(`Спря да следваш ${dealer.dealer_name}.`, {
+        type: "info",
+      });
       return;
     }
 
-    followDealer(user.id, {
+    const followedDealer = followDealer(user.id, {
       id: dealer.id,
       dealer_name: dealer.dealer_name,
       city: dealer.city,
       profile_image_url: dealer.profile_image_url,
       listing_count: dealer.listing_count,
     });
+
+    if (followedDealer) {
+      showToast(`Последва ${dealer.dealer_name}. Ще получаваш известия за нови обяви.`, {
+        type: "success",
+      });
+    }
   };
 
   const styles: Record<string, React.CSSProperties> = {

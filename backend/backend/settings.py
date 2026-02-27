@@ -30,6 +30,17 @@ def _split_csv_env(name: str) -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
+def _normalize_samesite(value: str | None, default: str = "Lax") -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized == "none":
+        return "None"
+    if normalized == "strict":
+        return "Strict"
+    if normalized == "lax":
+        return "Lax"
+    return default
+
+
 # Load environment variables from backend/.env if present (local dev convenience).
 ENV_FILE = BASE_DIR / ".env"
 if ENV_FILE.exists():
@@ -52,6 +63,7 @@ _DEFAULT_LOCAL_SECRET_KEY = (
 SECRET_KEY = os.getenv("SECRET_KEY", _DEFAULT_LOCAL_SECRET_KEY)
 
 DEBUG = _env_flag("DEBUG", default=True)
+USE_HTTPS = _env_flag("USE_HTTPS", default=not DEBUG)
 
 if not DEBUG and SECRET_KEY == _DEFAULT_LOCAL_SECRET_KEY:
     raise ImproperlyConfigured(
@@ -70,7 +82,15 @@ if not ALLOWED_HOSTS:
             "ALLOWED_HOSTS must be set in production (comma-separated)."
         )
 
-FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173").rstrip("/")
+_raw_frontend_base_url = os.getenv("FRONTEND_BASE_URL", "").strip()
+if _raw_frontend_base_url:
+    FRONTEND_BASE_URL = _raw_frontend_base_url.rstrip("/")
+elif DEBUG:
+    FRONTEND_BASE_URL = "http://localhost:5173"
+else:
+    raise ImproperlyConfigured(
+        "FRONTEND_BASE_URL must be set when DEBUG=False."
+    )
 frontend_origin = urlparse(FRONTEND_BASE_URL)
 
 
@@ -188,19 +208,21 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
-CORS_ALLOWED_ORIGINS = sorted(
-    set(
-        [
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-	    "https://www.bwraap.com",
-            FRONTEND_BASE_URL,
-        ]
-        + _split_csv_env("CORS_ALLOWED_ORIGINS")
-    )
-)
+LOCAL_FRONTEND_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://localhost:5173",
+    "https://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://localhost:3000",
+    "https://127.0.0.1:3000",
+]
+
+cors_origins = [FRONTEND_BASE_URL] + _split_csv_env("CORS_ALLOWED_ORIGINS")
+if DEBUG:
+    cors_origins.extend(LOCAL_FRONTEND_ORIGINS)
+CORS_ALLOWED_ORIGINS = sorted(set(cors_origins))
 CORS_ALLOWED_ORIGIN_REGEXES = _split_csv_env("CORS_ALLOWED_ORIGIN_REGEXES")
 CORS_ALLOW_CREDENTIALS = True
 
@@ -208,21 +230,25 @@ csrf_origins = _split_csv_env("CSRF_TRUSTED_ORIGINS")
 if frontend_origin.scheme and frontend_origin.netloc:
     csrf_origins.append(f"{frontend_origin.scheme}://{frontend_origin.netloc}")
 if DEBUG:
-    csrf_origins.extend(["http://localhost:5173", "http://127.0.0.1:5173"])
+    csrf_origins.extend(LOCAL_FRONTEND_ORIGINS)
 CSRF_TRUSTED_ORIGINS = sorted(set(csrf_origins))
 
 
-#if not DEBUG:
-#    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
- #   SECURE_SSL_REDIRECT = _env_flag("SECURE_SSL_REDIRECT", default=True)
- #   SESSION_COOKIE_SECURE = True
- #   CSRF_COOKIE_SECURE = True
- #   SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000"))
- #   SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_flag(
- #       "SECURE_HSTS_INCLUDE_SUBDOMAINS",
- #       default=True,
- #   )
- #   SECURE_HSTS_PRELOAD = _env_flag("SECURE_HSTS_PRELOAD", default=True)
+if USE_HTTPS:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = _env_flag("SECURE_SSL_REDIRECT", default=True)
+    SESSION_COOKIE_SECURE = _env_flag("SESSION_COOKIE_SECURE", default=True)
+    CSRF_COOKIE_SECURE = _env_flag("CSRF_COOKIE_SECURE", default=True)
+    SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_flag(
+        "SECURE_HSTS_INCLUDE_SUBDOMAINS",
+        default=True,
+    )
+    SECURE_HSTS_PRELOAD = _env_flag("SECURE_HSTS_PRELOAD", default=True)
+else:
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
 
 
 REST_FRAMEWORK = {
@@ -243,11 +269,23 @@ SIMPLE_JWT = {
 
 JWT_REFRESH_COOKIE_NAME = os.getenv("JWT_REFRESH_COOKIE_NAME", "refreshToken")
 JWT_REFRESH_COOKIE_PATH = os.getenv("JWT_REFRESH_COOKIE_PATH", "/api/auth/")
-JWT_REFRESH_COOKIE_SAMESITE = os.getenv("JWT_REFRESH_COOKIE_SAMESITE", "Lax")
+JWT_REFRESH_COOKIE_SAMESITE = _normalize_samesite(
+    os.getenv("JWT_REFRESH_COOKIE_SAMESITE"),
+    default="None" if USE_HTTPS else "Lax",
+)
 JWT_REFRESH_COOKIE_SECURE = os.getenv(
     "JWT_REFRESH_COOKIE_SECURE",
-    "0" if DEBUG else "1",
+    "1" if USE_HTTPS else "0",
 ).lower() in ("1", "true", "yes")
+
+if JWT_REFRESH_COOKIE_SAMESITE == "None" and not JWT_REFRESH_COOKIE_SECURE:
+    if DEBUG:
+        JWT_REFRESH_COOKIE_SAMESITE = "Lax"
+    else:
+        raise ImproperlyConfigured(
+            "JWT refresh cookie with SameSite=None requires "
+            "JWT_REFRESH_COOKIE_SECURE=True."
+        )
 
 CAR_IMAGE_ASYNC_RENDITIONS = _env_flag("CAR_IMAGE_ASYNC_RENDITIONS", default=True)
 try:

@@ -13,10 +13,13 @@ const SavedSearchesMenu: React.FC<SavedSearchesMenuProps> = ({
   onDropdownOpenChange,
   closeRequestKey,
 }) => {
+  const REMOVE_ANIMATION_MS = 220;
   const navigate = useNavigate();
   const { savedSearches, removeSearch } = useSavedSearches();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [removingSearchIds, setRemovingSearchIds] = useState<Set<string>>(new Set());
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const removeTimeoutIdsRef = useRef<number[]>([]);
 
   const savedLabel = "Запазени";
   const savedSearchesLabel = "Запазени търсения";
@@ -36,6 +39,13 @@ const SavedSearchesMenu: React.FC<SavedSearchesMenuProps> = ({
       onDropdownOpenChange?.(false);
     };
   }, [onDropdownOpenChange]);
+
+  useEffect(() => {
+    return () => {
+      removeTimeoutIdsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+      removeTimeoutIdsRef.current = [];
+    };
+  }, []);
 
   useEffect(() => {
     if (closeRequestKey === undefined) return;
@@ -94,7 +104,27 @@ const SavedSearchesMenu: React.FC<SavedSearchesMenuProps> = ({
 
   const handleDeleteSearch = (event: React.MouseEvent, id: string) => {
     event.stopPropagation();
-    removeSearch(id);
+    if (removingSearchIds.has(id)) return;
+
+    setRemovingSearchIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+
+    const timeoutId = window.setTimeout(() => {
+      removeSearch(id);
+      setRemovingSearchIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      removeTimeoutIdsRef.current = removeTimeoutIdsRef.current.filter(
+        (activeTimeoutId) => activeTimeoutId !== timeoutId
+      );
+    }, REMOVE_ANIMATION_MS);
+
+    removeTimeoutIdsRef.current.push(timeoutId);
   };
 
   const styles: Record<string, React.CSSProperties> = {
@@ -279,6 +309,24 @@ const SavedSearchesMenu: React.FC<SavedSearchesMenuProps> = ({
           background: #f8fafc;
         }
 
+        @keyframes saved-searches-item-exit {
+          from {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+            filter: blur(0);
+          }
+          to {
+            opacity: 0;
+            transform: translateX(14px) scale(0.985);
+            filter: blur(1px);
+          }
+        }
+
+        .saved-searches-item.is-removing {
+          animation: saved-searches-item-exit ${REMOVE_ANIMATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+          pointer-events: none;
+        }
+
         .saved-searches-delete:hover {
           border-color: #fecaca;
           background: #fff1f2;
@@ -381,8 +429,11 @@ const SavedSearchesMenu: React.FC<SavedSearchesMenuProps> = ({
                 <div
                   key={search.id}
                   style={styles.searchItem}
-                  className="saved-searches-item"
-                  onClick={() => handleSearchClick(search.criteria)}
+                  className={`saved-searches-item ${removingSearchIds.has(search.id) ? "is-removing" : ""}`}
+                  onClick={() => {
+                    if (removingSearchIds.has(search.id)) return;
+                    handleSearchClick(search.criteria);
+                  }}
                 >
                   <div style={styles.searchItemContent}>
                     <div style={styles.searchName} className="saved-searches-name">
@@ -409,6 +460,7 @@ const SavedSearchesMenu: React.FC<SavedSearchesMenuProps> = ({
                     className="saved-searches-delete"
                     onClick={(event) => handleDeleteSearch(event, search.id)}
                     aria-label={deleteSearchLabel}
+                    disabled={removingSearchIds.has(search.id)}
                   >
                     <Trash2 size={16} />
                   </button>

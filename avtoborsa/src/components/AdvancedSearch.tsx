@@ -6,6 +6,7 @@ import { BULGARIAN_CITIES_BY_REGION } from "../constants/bulgarianCities";
 import { useRecentSearches } from "../hooks/useRecentSearches";
 import type { RecentSearch } from "../hooks/useRecentSearches";
 import { useSavedSearches } from "../hooks/useSavedSearches";
+import { useToast } from "../context/ToastContext";
 import { groupOptionsByInitial, sortUniqueOptions } from "../utils/alphabeticalOptions";
 import {
   getBrandOptionsByMainCategory,
@@ -717,6 +718,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   const navigate = useNavigate();
   const { addSearch } = useRecentSearches();
   const { saveSearch } = useSavedSearches();
+  const { showToast } = useToast();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showRecentSearches, setShowRecentSearches] = useState(false);
@@ -1636,10 +1638,14 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   const handleSaveSearch = () => {
     if (searchName.trim()) {
       const query = buildSearchQuery();
+      const trimmedName = searchName.trim();
 
-      saveSearch(searchName, query);
+      saveSearch(trimmedName, query);
       setShowSaveModal(false);
       setSearchName("");
+      showToast(`Търсенето "${trimmedName}" е запазено. Може да го видиш в "Запазени".`, {
+        type: "success",
+      });
     }
   };
 

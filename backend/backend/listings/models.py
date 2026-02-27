@@ -22,9 +22,8 @@ TOP_PLAN_7D = "7d"
 TOP_LISTING_DURATION_DAYS_1D = 1
 TOP_LISTING_DURATION_DAYS_7D = 7
 VIP_LISTING_DURATION_DAYS = 7
-CAR_IMAGE_DETAIL_WIDTHS = (800, 1200, 1600)
+CAR_IMAGE_DETAIL_WIDTHS = (1200, 1600)
 CAR_IMAGE_GRID_RENDITIONS = (
-    (300, 178),
     (600, 356),
 )
 CAR_IMAGE_WEBP_QUALITY = 82
@@ -775,7 +774,7 @@ class CarImage(models.Model):
                             'path': stored_path,
                         }
                     )
-                    if grid_width == 300:
+                    if thumbnail_path is None:
                         thumbnail_path = stored_path
 
                 renditions.sort(key=lambda item: (0 if item.get('kind') == 'grid' else 1, item.get('width') or 0))

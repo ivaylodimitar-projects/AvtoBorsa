@@ -7,7 +7,7 @@ from backend.public_api.views import public_api_docs
 
 
 def redirect_to_frontend_admin(request, path=""):
-    frontend_base = getattr(settings, "FRONTEND_BASE_URL", "http://localhost:5173").rstrip("/")
+    frontend_base = settings.FRONTEND_BASE_URL.rstrip("/")
     target = f"{frontend_base}/admin"
     if request.META.get("QUERY_STRING"):
         target = f"{target}?{request.META['QUERY_STRING']}"
@@ -29,5 +29,3 @@ urlpatterns = [
 # Serve media files in development
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-
-    

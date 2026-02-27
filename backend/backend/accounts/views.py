@@ -48,16 +48,38 @@ def _normalize_email(value: str) -> str:
     return str(value).strip().lower()
 
 
-def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
-    response.set_cookie(
-        key=settings.JWT_REFRESH_COOKIE_NAME,
-        value=refresh_token,
-        max_age=_refresh_cookie_max_age_seconds(),
-        httponly=True,
-        secure=settings.JWT_REFRESH_COOKIE_SECURE,
-        samesite=settings.JWT_REFRESH_COOKIE_SAMESITE,
-        path=settings.JWT_REFRESH_COOKIE_PATH,
-    )
+def _to_bool(value, default: bool = True) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {'1', 'true', 'yes', 'on'}:
+            return True
+        if normalized in {'0', 'false', 'no', 'off'}:
+            return False
+    return default
+
+
+def _set_refresh_cookie(
+    response: Response,
+    refresh_token: str,
+    remember_me: bool = True,
+) -> None:
+    cookie_kwargs = {
+        'key': settings.JWT_REFRESH_COOKIE_NAME,
+        'value': refresh_token,
+        'httponly': True,
+        'secure': settings.JWT_REFRESH_COOKIE_SECURE,
+        'samesite': settings.JWT_REFRESH_COOKIE_SAMESITE,
+        'path': settings.JWT_REFRESH_COOKIE_PATH,
+    }
+    if remember_me:
+        cookie_kwargs['max_age'] = _refresh_cookie_max_age_seconds()
+    response.set_cookie(**cookie_kwargs)
 
 
 def _clear_refresh_cookie(response: Response) -> None:
@@ -105,7 +127,11 @@ def _build_authenticated_user_payload(request, user: User) -> dict:
     return user_data
 
 
-def _build_auth_success_response(request, user: User) -> Response:
+def _build_auth_success_response(
+    request,
+    user: User,
+    remember_me: bool = True,
+) -> Response:
     refresh = RefreshToken.for_user(user)
     response = Response(
         {
@@ -114,7 +140,7 @@ def _build_auth_success_response(request, user: User) -> Response:
         },
         status=status.HTTP_200_OK,
     )
-    _set_refresh_cookie(response, str(refresh))
+    _set_refresh_cookie(response, str(refresh), remember_me=remember_me)
     return response
 
 
@@ -854,6 +880,7 @@ def login(request):
     """API endpoint for user login"""
     identifier = request.data.get('email')
     password = request.data.get('password')
+    remember_me = _to_bool(request.data.get('remember_me'), default=True)
     normalized_email = _normalize_email(identifier)
 
     if not normalized_email or not password:
@@ -888,7 +915,7 @@ def login(request):
             {'error': 'Invalid email or password'},
             status=status.HTTP_401_UNAUTHORIZED
         )
-    return _build_auth_success_response(request, user)
+    return _build_auth_success_response(request, user, remember_me=remember_me)
 
 
 @api_view(['POST'])
@@ -1084,6 +1111,7 @@ def admin_login_verify_code(request):
 @permission_classes([AllowAny])
 def token_refresh(request):
     """Refresh access token using HttpOnly refresh-token cookie."""
+    remember_me = _to_bool(request.data.get('remember_me'), default=True)
     refresh_token = request.COOKIES.get(settings.JWT_REFRESH_COOKIE_NAME)
     if not refresh_token:
         # Temporary fallback for older clients still sending refresh in body.
@@ -1114,7 +1142,7 @@ def token_refresh(request):
 
     response = Response({'access': next_access}, status=status.HTTP_200_OK)
     if next_refresh:
-        _set_refresh_cookie(response, next_refresh)
+        _set_refresh_cookie(response, next_refresh, remember_me=remember_me)
     return response
 
 

@@ -12,6 +12,7 @@ const AuthPage: React.FC = () => {
     email: "",
     password: "",
   });
+  const [rememberPassword, setRememberPassword] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
 
@@ -30,7 +31,9 @@ const AuthPage: React.FC = () => {
 
     try {
       if (isLogin) {
-        await login(formData.email, formData.password);
+        await login(formData.email, formData.password, {
+          remember: rememberPassword,
+        });
         showToast("Влизането е успешно.", { type: "success" });
         navigate("/");
       } else {
@@ -103,7 +106,6 @@ const AuthPage: React.FC = () => {
         {/* Form Card */}
         <form style={styles.formCard} className="auth-form-card" onSubmit={handleSubmit}>
           <div style={styles.header}>
-            <div style={styles.headerBadge}>Kar.bg</div>
             <h1 style={styles.headerTitle} className="auth-header-title">
               {isLogin ? "Вход" : "Регистрация"}
             </h1>
@@ -138,6 +140,7 @@ const AuthPage: React.FC = () => {
               placeholder="your@email.com"
               value={formData.email}
               onChange={handleChange}
+              autoComplete="username"
               required
             />
           </div>
@@ -155,12 +158,22 @@ const AuthPage: React.FC = () => {
               placeholder="Твоята парола"
               value={formData.password}
               onChange={handleChange}
+              autoComplete="current-password"
               required
             />
           </div>
 
           {isLogin && (
-            <div style={styles.forgotRow}>
+            <div style={styles.loginOptionsRow}>
+              <label style={styles.rememberLabel}>
+                <input
+                  type="checkbox"
+                  checked={rememberPassword}
+                  onChange={(event) => setRememberPassword(event.target.checked)}
+                  style={styles.rememberCheckbox}
+                />
+                <span>Запомни парола</span>
+              </label>
               <span
                 style={styles.forgotLink}
                 className="auth-toggle-link"
@@ -337,12 +350,32 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#111827",
   },
 
-  // Forgot password
-  forgotRow: {
+  // Login options
+  loginOptionsRow: {
     display: "flex",
-    justifyContent: "flex-end",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    flexWrap: "wrap",
     marginBottom: 20,
     marginTop: -4,
+  },
+  rememberLabel: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    fontSize: 13,
+    color: "#334155",
+    fontWeight: 600,
+    cursor: "pointer",
+    userSelect: "none",
+  },
+  rememberCheckbox: {
+    width: 16,
+    height: 16,
+    accentColor: "#0f766e",
+    margin: 0,
+    cursor: "pointer",
   },
   forgotLink: {
     fontSize: 13,

@@ -1,6 +1,7 @@
 ﻿import React from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import {
   FiCheck,
   FiBell,
@@ -42,6 +43,7 @@ import karBgLogo from "../assets/karbglogo.png";
 import { API_BASE_URL } from "../config/api";
 
 const DEALER_LISTINGS_SYNC_COOLDOWN_MS = 15_000;
+const DEALER_LISTINGS_FALLBACK_POLL_MS = 90_000;
 const DEALER_NOTIFICATIONS_STACK_WINDOW_MS = 60 * 60 * 1000;
 const DEALER_NOTIFICATIONS_WS_RECONNECT_MS = 5_000;
 const WS_BASE_URL = (import.meta.env.VITE_WS_BASE_URL || "").replace(/\/+$/, "");
@@ -172,6 +174,7 @@ const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, user } = useAuth();
+  const { showToast } = useToast();
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [showNotificationsMenu, setShowNotificationsMenu] = React.useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = React.useState(false);
@@ -189,6 +192,7 @@ const Navbar: React.FC = () => {
   const [notifications, setNotifications] = React.useState<AppNotification[]>([]);
   const [followedDealers, setFollowedDealers] = React.useState<FollowedDealer[]>([]);
   const [notificationsNowMs, setNotificationsNowMs] = React.useState(0);
+  const [isNotificationsWsOnline, setIsNotificationsWsOnline] = React.useState(false);
   const [expandedNotificationGroups, setExpandedNotificationGroups] = React.useState<
     Record<string, boolean>
   >({});
@@ -209,6 +213,7 @@ const Navbar: React.FC = () => {
   );
 
   const isActive = (path: string) => location.pathname === path;
+  const isAuthRoute = location.pathname === "/auth";
 
   React.useEffect(() => {
     setMobileOpen(false);
@@ -398,23 +403,25 @@ const Navbar: React.FC = () => {
     const handleSyncRequest = (event: Event) => {
       const { detail } = event as CustomEvent<{ userId?: number }>;
       if (detail?.userId && detail.userId !== user.id) return;
-      void syncNewDealerListings(true);
+      void syncNewDealerListings();
     };
 
     const handleWindowFocus = () => {
-      void syncNewDealerListings(true);
+      void syncNewDealerListings();
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState !== "visible") return;
-      void syncNewDealerListings(true);
+      void syncNewDealerListings();
     };
 
-    // Initial catch-up on login and a short fallback retry.
+    // Initial catch-up on login.
     void syncNewDealerListings(true);
-    const fallbackSyncTimer = window.setTimeout(() => {
-      void syncNewDealerListings(true);
-    }, 2000);
+    const fallbackPollInterval = window.setInterval(() => {
+      if (isNotificationsWsOnline) return;
+      if (document.visibilityState !== "visible") return;
+      void syncNewDealerListings();
+    }, DEALER_LISTINGS_FALLBACK_POLL_MS);
 
     window.addEventListener(DEALER_LISTINGS_SYNC_REQUEST_EVENT, handleSyncRequest);
     window.addEventListener("focus", handleWindowFocus);
@@ -422,12 +429,12 @@ const Navbar: React.FC = () => {
 
     return () => {
       isCancelled = true;
-      window.clearTimeout(fallbackSyncTimer);
+      window.clearInterval(fallbackPollInterval);
       window.removeEventListener(DEALER_LISTINGS_SYNC_REQUEST_EVENT, handleSyncRequest);
       window.removeEventListener("focus", handleWindowFocus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [user?.id]);
+  }, [isNotificationsWsOnline, user?.id]);
 
   React.useEffect(() => {
     if (!user?.id) return;
@@ -456,6 +463,7 @@ const Navbar: React.FC = () => {
       try {
         socket = new WebSocket(getNotificationsWebSocketUrl());
       } catch {
+        setIsNotificationsWsOnline(false);
         scheduleReconnect();
         return;
       }
@@ -471,17 +479,19 @@ const Navbar: React.FC = () => {
         }
       };
 
-      socket.onopen = () => {
-        requestDealerListingsSync(user.id);
-      };
-
       socket.onclose = () => {
+        setIsNotificationsWsOnline(false);
         socket = null;
         scheduleReconnect();
       };
 
       socket.onerror = () => {
+        setIsNotificationsWsOnline(false);
         socket?.close();
+      };
+
+      socket.onopen = () => {
+        setIsNotificationsWsOnline(true);
       };
     };
 
@@ -489,6 +499,7 @@ const Navbar: React.FC = () => {
 
     return () => {
       isDisposed = true;
+      setIsNotificationsWsOnline(false);
       clearReconnectTimer();
       if (socket && socket.readyState === WebSocket.OPEN) {
         socket.close();
@@ -707,9 +718,16 @@ const Navbar: React.FC = () => {
     navigate(`/dealers/${dealerId}`);
   };
 
-  const handleUnfollowDealer = (dealerId: number) => {
+  const handleUnfollowDealer = (dealerId: number, dealerName?: string) => {
     if (!user?.id) return;
     unfollowDealer(user.id, dealerId);
+    const normalizedName = typeof dealerName === "string" ? dealerName.trim() : "";
+    showToast(
+      normalizedName
+        ? `Спря да следваш ${normalizedName}.`
+        : "Спря да следваш дилъра.",
+      { type: "info" }
+    );
   };
 
   const hasMobileFocusPanel =
@@ -771,6 +789,22 @@ const Navbar: React.FC = () => {
 
     setMobileOpen(true);
   };
+
+  if (isAuthRoute) {
+    return (
+      <header style={styles.header} className="site-nav-header auth-minimal">
+        <style>{css}</style>
+        <div
+          style={{ ...styles.inner, justifyContent: "center", gap: 0 }}
+          className="nav-inner auth-minimal-inner"
+        >
+          <Link to="/" style={styles.brand} className="nav-brand-link" aria-label="Kar.bg">
+            <img src={karBgLogo} alt="Kar.bg logo" style={styles.logoImage} className="nav-logo-image" />
+          </Link>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header
@@ -1205,7 +1239,9 @@ const Navbar: React.FC = () => {
                                   <button
                                     type="button"
                                     className="subscription-remove-btn"
-                                    onClick={() => handleUnfollowDealer(dealer.dealerId)}
+                                    onClick={() =>
+                                      handleUnfollowDealer(dealer.dealerId, dealer.dealerName)
+                                    }
                                   >
                                     Премахни
                                   </button>

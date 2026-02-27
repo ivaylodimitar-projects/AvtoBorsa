@@ -202,6 +202,22 @@ const isVipListing = (listing: ListingWithPromoStatus) => {
   return false;
 };
 
+const TITLE_WITH_YEAR_MAIN_CATEGORIES = new Set(['1', '3', '4', '5', '6', '7', '8', '9', 'a', 'b']);
+
+const resolveListingDisplayTitle = (
+  listing: Pick<CarListing, 'title' | 'brand' | 'model' | 'main_category' | 'year_from'>
+) => {
+  const baseTitle = (listing.title || `${listing.brand} ${listing.model}`).trim() || 'Обява';
+  const hasLeadingYear = /^\d{4}\b/.test(baseTitle);
+  const includeYearInTitle = TITLE_WITH_YEAR_MAIN_CATEGORIES.has(String(listing.main_category || ''));
+
+  if (includeYearInTitle && listing.year_from && !hasLeadingYear) {
+    return `${listing.year_from} ${baseTitle}`;
+  }
+
+  return baseTitle;
+};
+
 const NEW_LISTING_BADGE_MINUTES = 10;
 const NEW_LISTING_BADGE_WINDOW_MS = NEW_LISTING_BADGE_MINUTES * 60 * 1000;
 const NEW_LISTING_BADGE_REFRESH_MS = 30_000;
@@ -800,6 +816,16 @@ const VehicleDetailsPage: React.FC = () => {
       controller.abort();
     };
   }, [listing?.id, listing?.brand, listing?.model, listing?.main_category]);
+
+  useEffect(() => {
+    if (isLoading || error || !listing) {
+      document.title = 'Kar.bg | Детайли на Обява';
+      return;
+    }
+
+    const listingTitle = resolveListingDisplayTitle(listing);
+    document.title = `Kar.bg | Детайли за ${listingTitle}`;
+  }, [isLoading, error, listing]);
 
   const scrollSimilar = useCallback((direction: 'left' | 'right') => {
     const container = similarScrollRef.current;

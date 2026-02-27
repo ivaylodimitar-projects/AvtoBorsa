@@ -118,13 +118,13 @@ def _parse_amount(amount_raw) -> Decimal:
 
 def _default_success_url() -> str:
     """Fallback success redirect when frontend does not provide one."""
-    frontend = getattr(settings, "FRONTEND_BASE_URL", "http://localhost:5173")
+    frontend = settings.FRONTEND_BASE_URL
     return f"{frontend}/?payment=success&session_id={{CHECKOUT_SESSION_ID}}"
 
 
 def _default_cancel_url() -> str:
     """Fallback cancel redirect when frontend does not provide one."""
-    frontend = getattr(settings, "FRONTEND_BASE_URL", "http://localhost:5173")
+    frontend = settings.FRONTEND_BASE_URL
     return f"{frontend}/?payment=cancelled"
 
 
