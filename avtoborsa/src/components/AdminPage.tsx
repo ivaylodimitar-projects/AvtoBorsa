@@ -1,9 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
 import { API_BASE_URL } from "../config/api";
 const ACCESS_TOKEN_KEY = "authToken";
+
+class HttpError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "HttpError";
+    this.status = status;
+  }
+}
 
 type TabKey = "dashboard" | "listings" | "users" | "transactions" | "extensionApi" | "reports";
 type Tone = "default" | "success" | "warning" | "danger" | "info";
@@ -47,6 +56,10 @@ interface AdminListing {
   price: number;
   view_count: number;
   listing_type: "normal" | "top" | "vip";
+  top_plan: "1d" | "7d" | null;
+  top_expires_at: string | null;
+  vip_plan: "7d" | "lifetime" | null;
+  vip_expires_at: string | null;
   is_draft: boolean;
   is_archived: boolean;
   is_expired: boolean;
@@ -318,15 +331,17 @@ const request = async <T,>(path: string, init: RequestInit = {}): Promise<T> => 
     ...init,
     headers,
     credentials: "include",
+    cache: "no-store",
   });
 
   const payload = await parseJson(response);
   if (!response.ok) {
     const data = payload as Record<string, unknown>;
-    throw new Error(
+    throw new HttpError(
       (typeof data.error === "string" && data.error) ||
         (typeof data.detail === "string" && data.detail) ||
-        `Request failed (${response.status})`
+        `Request failed (${response.status})`,
+      response.status
     );
   }
 
@@ -456,6 +471,18 @@ const resolveListingStatus = (item: AdminListing): { label: string; tone: Tone }
   return { label: "Active", tone: "success" };
 };
 
+const resolveListingTypeLabel = (item: AdminListing): string => {
+  if (item.listing_type === "top") return `TOP ${item.top_plan === "7d" ? "7d" : "1d"}`;
+  if (item.listing_type === "vip") return `VIP ${item.vip_plan === "lifetime" ? "lifetime" : "7d"}`;
+  return "NORMAL";
+};
+
+const resolveListingPromoExpiry = (item: AdminListing): string | null => {
+  if (item.listing_type === "top" && item.top_expires_at) return `Top expires: ${fmtDateTime(item.top_expires_at)}`;
+  if (item.listing_type === "vip" && item.vip_expires_at) return `VIP expires: ${fmtDateTime(item.vip_expires_at)}`;
+  return null;
+};
+
 const userName = (item: AdminUser) => {
   const fullName = `${item.first_name || ""} ${item.last_name || ""}`.trim();
   return fullName || item.username || item.email;
@@ -517,11 +544,11 @@ const extensionStatusTone = (statusCode: number, success: boolean): Tone => {
 };
 
 const AdminPage: React.FC = () => {
-  const navigate = useNavigate();
   const { user, isLoading, logout, setUserFromToken } = useAuth();
 
   const [tab, setTab] = useState<TabKey>("dashboard");
   const [error, setError] = useState("");
+  const [adminAccessDenied, setAdminAccessDenied] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
 
   const [email, setEmail] = useState("");
@@ -589,11 +616,26 @@ const AdminPage: React.FC = () => {
   const [extensionTopUsersPage, setExtensionTopUsersPage] = useState(1);
   const [extensionHostsPage, setExtensionHostsPage] = useState(1);
 
-  const isAdmin = Boolean(
-    user?.is_admin || user?.is_staff || user?.is_superuser || (user as { isAdmin?: boolean } | null)?.isAdmin
-  );
+  const isAdmin = Boolean(user?.is_staff || user?.is_superuser);
+  const shouldShowAdminLogin = !user || !isAdmin || adminAccessDenied;
   const isSuperuser = Boolean(user?.is_superuser);
   const currentUserId = user?.id || null;
+
+  const isForbiddenError = useCallback((err: unknown) => {
+    return err instanceof HttpError && err.status === 403;
+  }, []);
+
+  const handleAdminRequestError = useCallback(
+    (err: unknown, fallbackMessage = "Request failed") => {
+      if (isForbiddenError(err)) {
+        setAdminAccessDenied(true);
+        setError("Нямаш достъп до админ панела. Влез с админ акаунт.");
+        return;
+      }
+      setError(err instanceof Error ? err.message : fallbackMessage);
+    },
+    [isForbiddenError]
+  );
 
   const loadOverview = useCallback(async () => {
     if (!isAdmin) return;
@@ -681,19 +723,19 @@ const AdminPage: React.FC = () => {
       if (tab === "extensionApi") await loadExtensionUsage();
       if (tab === "reports") await loadReports();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Request failed");
+      handleAdminRequestError(err, "Request failed");
     }
-  }, [tab, loadOverview, loadListings, loadUsers, loadTransactions, loadSitePurchases, loadExtensionUsage, loadReports]);
+  }, [tab, loadOverview, loadListings, loadUsers, loadTransactions, loadSitePurchases, loadExtensionUsage, loadReports, handleAdminRequestError]);
 
   useEffect(() => {
-    if (!isAdmin) return;
-    void loadOverview();
-  }, [isAdmin, loadOverview]);
+    if (!isAdmin || adminAccessDenied) return;
+    void loadOverview().catch((err) => handleAdminRequestError(err, "Request failed"));
+  }, [isAdmin, adminAccessDenied, loadOverview, handleAdminRequestError]);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAdmin || adminAccessDenied) return;
     void loadByTab();
-  }, [isAdmin, loadByTab]);
+  }, [isAdmin, adminAccessDenied, loadByTab]);
 
   useEffect(() => {
     if (tab !== "transactions") return;
@@ -775,6 +817,8 @@ const AdminPage: React.FC = () => {
       }
 
       setUserFromToken(payload.user, payload.access);
+      setAdminAccessDenied(false);
+      setError("");
       setLoginStep("credentials");
       setLoginChallengeId("");
       setLoginCode("");
@@ -831,11 +875,37 @@ const AdminPage: React.FC = () => {
     try {
       await action();
     } catch (err) {
-      setError(err instanceof Error ? err.message : fallbackError);
+      handleAdminRequestError(err, fallbackError);
     } finally {
       setBusyId(null);
     }
-  }, []);
+  }, [handleAdminRequestError]);
+
+  const applyListingPatch = useCallback(
+    async (listingId: number, payload: Record<string, unknown>) => {
+      const updated = await request<AdminListing>(`/api/admin/listings/${listingId}/`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+
+      setListings((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          results: prev.results.map((row) => (row.id === updated.id ? updated : row)),
+        };
+      });
+
+      const requestedType =
+        typeof payload.listing_type === "string" ? payload.listing_type.trim().toLowerCase() : "";
+      if (requestedType && updated.listing_type !== requestedType) {
+        throw new Error(`Listing type mismatch: got "${updated.listing_type}", expected "${requestedType}".`);
+      }
+
+      await Promise.all([loadListings(), loadOverview()]);
+    },
+    [loadListings, loadOverview]
+  );
 
   const statsPageSize = 5;
   const topListings = sitePurchases?.summary.top.listings || [];
@@ -880,13 +950,28 @@ const AdminPage: React.FC = () => {
 
   if (isLoading) return <div style={{ padding: 24 }}>Loading session...</div>;
 
-  if (!user) {
+  if (shouldShowAdminLogin) {
     return (
       <section style={{ maxWidth: 430, margin: "40px auto", padding: 20, border: `1px solid ${color.border}`, borderRadius: 16, background: "#fff" }}>
         <h1 style={{ marginTop: 0 }}>Admin Login</h1>
         <p style={{ color: color.muted }}>
           Use staff/superuser account. After password check you will receive a code by email.
         </p>
+        {adminAccessDenied && (
+          <div
+            style={{
+              border: "1px solid #f4c2c7",
+              background: "#fff1f2",
+              color: color.danger,
+              borderRadius: 12,
+              padding: "8px 10px",
+              fontSize: 13,
+              marginBottom: 10,
+            }}
+          >
+            Нямаш достъп до админ панела. Влез с админ акаунт.
+          </div>
+        )}
 
         {loginStep === "credentials" ? (
           <form onSubmit={handleLogin} style={{ display: "grid", gap: 10 }}>
@@ -931,19 +1016,6 @@ const AdminPage: React.FC = () => {
     );
   }
 
-  if (!isAdmin) {
-    return (
-      <section style={{ maxWidth: 520, margin: "40px auto", padding: 20, border: `1px solid ${color.border}`, borderRadius: 16, background: "#fff" }}>
-        <h1 style={{ marginTop: 0 }}>Admin role required</h1>
-        <p style={{ color: color.muted }}>Your account is authenticated but has no admin rights.</p>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => navigate("/")} style={buttonStyle("neutral")}>Back</button>
-          <button onClick={() => void logout()} style={buttonStyle("danger")}>Logout</button>
-        </div>
-      </section>
-    );
-  }
-
   return (
     <div style={{ minHeight: "100vh", background: `linear-gradient(180deg, ${color.bg}, #e4edf6)`, padding: 16, fontFamily: "\"Space Grotesk\", \"Manrope\", sans-serif", color: color.text }}>
       <div style={{ maxWidth: 1420, margin: "0 auto", display: "grid", gap: 14 }}>
@@ -956,7 +1028,14 @@ const AdminPage: React.FC = () => {
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button onClick={() => void loadByTab()} style={buttonStyle("neutral")}>Refresh tab</button>
-            <button onClick={() => void loadOverview()} style={buttonStyle("neutral")}>Refresh totals</button>
+            <button
+              onClick={() => {
+                void loadOverview().catch((err) => handleAdminRequestError(err, "Request failed"));
+              }}
+              style={buttonStyle("neutral")}
+            >
+              Refresh totals
+            </button>
             <button onClick={() => void logout()} style={buttonStyle("danger")}>Logout</button>
           </div>
         </header>
@@ -1086,13 +1165,26 @@ const AdminPage: React.FC = () => {
                 <tbody>
                   {(listings?.results || []).map((item) => {
                     const status = resolveListingStatus(item);
+                    const promoExpiry = resolveListingPromoExpiry(item);
+                    const isTop1d = item.listing_type === "top" && item.top_plan === "1d";
+                    const isTop7d = item.listing_type === "top" && item.top_plan === "7d";
+                    const isVip7d = item.listing_type === "vip" && item.vip_plan === "7d";
+                    const isVipLifetime = item.listing_type === "vip" && item.vip_plan === "lifetime";
                     return (
                       <tr key={item.id}>
                         <td style={tdStyle}>#{item.id}</td>
                         <td style={tdStyle}>{item.brand} {item.model}<div style={{ fontSize: 12, color: color.muted }}>{item.title || "No title"} | {item.city}</div></td>
                         <td style={tdStyle}>{item.seller_name}<div style={{ fontSize: 12, color: color.muted }}>{item.user_email}</div></td>
                         <td style={tdStyle}>{fmtMoney(item.price)}</td>
-                        <td style={tdStyle}><div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}><span style={badgeStyle(status.tone)}>{status.label}</span><span style={badgeStyle("default")}>{item.listing_type}</span></div></td>
+                        <td style={tdStyle}>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <span style={badgeStyle(status.tone)}>{status.label}</span>
+                            <span style={badgeStyle(item.listing_type === "top" ? "info" : item.listing_type === "vip" ? "success" : "default")}>
+                              {resolveListingTypeLabel(item)}
+                            </span>
+                          </div>
+                          {promoExpiry && <div style={{ fontSize: 12, color: color.muted, marginTop: 4 }}>{promoExpiry}</div>}
+                        </td>
                         <td style={tdStyle}>{item.view_count}</td>
                         <td style={tdStyle}>
                           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -1100,8 +1192,10 @@ const AdminPage: React.FC = () => {
                               disabled={busyId === item.id}
                               onClick={async () => {
                                 await runBusyAction(item.id, async () => {
-                                  await request(`/api/admin/listings/${item.id}/`, { method: "PATCH", body: JSON.stringify({ is_archived: !item.is_archived, is_active: item.is_archived }) });
-                                  await Promise.all([loadListings(), loadOverview()]);
+                                  await applyListingPatch(item.id, {
+                                    is_archived: !item.is_archived,
+                                    is_active: item.is_archived,
+                                  });
                                 }, "Update failed");
                               }}
                               style={buttonStyle("neutral")}
@@ -1112,11 +1206,54 @@ const AdminPage: React.FC = () => {
                               disabled={busyId === item.id}
                               onClick={async () => {
                                 await runBusyAction(item.id, async () => {
-                                  await request(`/api/admin/listings/${item.id}/`, { method: "PATCH", body: JSON.stringify({ listing_type: "normal" }) });
-                                  await Promise.all([loadListings(), loadOverview()]);
+                                  await applyListingPatch(item.id, { listing_type: "top", top_plan: "1d" });
                                 }, "Update failed");
                               }}
-                              style={buttonStyle("neutral")}
+                              style={buttonStyle(isTop1d ? "primary" : "neutral")}
+                            >
+                              TOP 1d
+                            </button>
+                            <button
+                              disabled={busyId === item.id}
+                              onClick={async () => {
+                                await runBusyAction(item.id, async () => {
+                                  await applyListingPatch(item.id, { listing_type: "top", top_plan: "7d" });
+                                }, "Update failed");
+                              }}
+                              style={buttonStyle(isTop7d ? "primary" : "neutral")}
+                            >
+                              TOP 7d
+                            </button>
+                            <button
+                              disabled={busyId === item.id}
+                              onClick={async () => {
+                                await runBusyAction(item.id, async () => {
+                                  await applyListingPatch(item.id, { listing_type: "vip", vip_plan: "7d" });
+                                }, "Update failed");
+                              }}
+                              style={buttonStyle(isVip7d ? "primary" : "neutral")}
+                            >
+                              VIP 7d
+                            </button>
+                            <button
+                              disabled={busyId === item.id}
+                              onClick={async () => {
+                                await runBusyAction(item.id, async () => {
+                                  await applyListingPatch(item.id, { listing_type: "vip", vip_plan: "lifetime" });
+                                }, "Update failed");
+                              }}
+                              style={buttonStyle(isVipLifetime ? "primary" : "neutral")}
+                            >
+                              VIP lifetime
+                            </button>
+                            <button
+                              disabled={busyId === item.id}
+                              onClick={async () => {
+                                await runBusyAction(item.id, async () => {
+                                  await applyListingPatch(item.id, { listing_type: "normal" });
+                                }, "Update failed");
+                              }}
+                              style={buttonStyle(item.listing_type === "normal" ? "primary" : "neutral")}
                             >
                               Normal
                             </button>
