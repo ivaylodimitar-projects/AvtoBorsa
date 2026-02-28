@@ -18,6 +18,30 @@ import { API_BASE_URL } from "../config/api";
 import { buildPublicProfilePath } from "../utils/profilePaths";
 const STRIPE_SESSION_STORAGE_KEY = "stripe_checkout_session_id";
 const PAYMENT_SYNC_MIN_MS = 650;
+const PROCESSED_PAYMENT_SESSION_KEY_PREFIX = "karbg:processed-payment:v1:";
+const processedPaymentKeysInMemory = new Set<string>();
+
+const hasPaymentBeenProcessed = (paymentKey: string) => {
+  if (processedPaymentKeysInMemory.has(paymentKey)) {
+    return true;
+  }
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const storageKey = `${PROCESSED_PAYMENT_SESSION_KEY_PREFIX}${paymentKey}`;
+  return sessionStorage.getItem(storageKey) === "1";
+};
+
+const markPaymentAsProcessed = (paymentKey: string) => {
+  processedPaymentKeysInMemory.add(paymentKey);
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const storageKey = `${PROCESSED_PAYMENT_SESSION_KEY_PREFIX}${paymentKey}`;
+  sessionStorage.setItem(storageKey, "1");
+};
 
 type DealerProfile = {
   email?: string;
@@ -51,8 +75,12 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [isPaymentSyncing, setIsPaymentSyncing] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(
+    () => typeof window !== "undefined" && window.innerWidth <= 960
+  );
   const processedPaymentKeyRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const shouldHandlePaymentSync = compactTrigger ? isMobileViewport : !isMobileViewport;
 
   useEffect(() => {
     onDropdownOpenChange?.(isDropdownOpen);
@@ -79,7 +107,18 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
   }, [topUpModalCloseRequestKey]);
 
   useEffect(() => {
-    if (!user) return;
+    if (typeof window === "undefined") return;
+    const onResize = () => {
+      setIsMobileViewport(window.innerWidth <= 960);
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user || !shouldHandlePaymentSync) return;
 
     const params = new URLSearchParams(location.search);
     const paymentState = params.get("payment");
@@ -93,8 +132,11 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
 
     const sessionId = params.get("session_id") || localStorage.getItem(STRIPE_SESSION_STORAGE_KEY) || "";
     const paymentKey = `${paymentState}:${sessionId || "no-session"}`;
-    if (processedPaymentKeyRef.current === paymentKey) return;
+    if (processedPaymentKeyRef.current === paymentKey || hasPaymentBeenProcessed(paymentKey)) {
+      return;
+    }
     processedPaymentKeyRef.current = paymentKey;
+    markPaymentAsProcessed(paymentKey);
 
     const clearPaymentQueryParams = () => {
       navigate({ pathname: location.pathname, hash: location.hash }, { replace: true });
@@ -184,9 +226,11 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
             return;
           }
 
+          const depositReference = sessionId ? `stripe-session:${sessionId}` : paymentKey;
+
           if (previousBalance !== null && nextBalance > previousBalance) {
             const delta = nextBalance - previousBalance;
-            addDepositNotification(user.id, delta);
+            addDepositNotification(user.id, delta, "EUR", depositReference);
             showToast(
               `Балансът е обновен: €${nextBalance.toFixed(2)} (+€${delta.toFixed(2)}).`,
               { type: "success" }
@@ -195,7 +239,7 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
           }
 
           if (paymentAmount !== null) {
-            addDepositNotification(user.id, paymentAmount);
+            addDepositNotification(user.id, paymentAmount, "EUR", depositReference);
           }
 
           showToast(`Балансът е обновен: €${nextBalance.toFixed(2)}.`, { type: "success" });
@@ -219,7 +263,16 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
     };
 
     syncBalanceAfterPayment();
-  }, [location.hash, location.pathname, location.search, navigate, showToast, updateBalance, user]);
+  }, [
+    location.hash,
+    location.pathname,
+    location.search,
+    navigate,
+    shouldHandlePaymentSync,
+    showToast,
+    updateBalance,
+    user,
+  ]);
 
   // Fetch profile image for current user
   useEffect(() => {

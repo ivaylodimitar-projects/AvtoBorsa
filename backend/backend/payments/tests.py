@@ -3,12 +3,14 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.core import mail
 from django.test import override_settings
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
 from backend.accounts.models import UserProfile
 from backend.payments.models import PaymentTransaction
+from backend.payments.views import send_invoice_email
 
 
 @override_settings(
@@ -135,3 +137,34 @@ class PaymentsApiTests(APITestCase):
         self.assertTrue(tx.credited)
         self.assertEqual(profile.balance, Decimal("30.00"))
         self.assertEqual(mock_send_invoice_email.call_count, 1)
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        DEFAULT_FROM_EMAIL="support@kar.bg",
+        SUPPORT_FROM_EMAIL="support@kar.bg",
+    )
+    @patch("backend.payments.views._build_invoice_pdf_bytes")
+    def test_send_invoice_email_is_bulgarian_and_attaches_pdf(self, mock_build_invoice_pdf_bytes):
+        mock_build_invoice_pdf_bytes.return_value = b"%PDF-1.4\nmock-invoice"
+        tx = PaymentTransaction.objects.create(
+            user=self.user,
+            amount=Decimal("42.50"),
+            currency="EUR",
+            status=PaymentTransaction.Status.SUCCEEDED,
+            stripe_session_id="cs_invoice_123",
+            credited=True,
+        )
+
+        send_invoice_email(tx)
+
+        self.assertEqual(len(mail.outbox), 1)
+        message = mail.outbox[0]
+        self.assertIn("Фактура от Kar.bg", message.subject)
+        self.assertEqual(message.from_email, "support@kar.bg")
+        self.assertEqual(message.to, [self.user.email])
+        self.assertEqual(len(message.attachments), 1)
+
+        attachment_name, attachment_content, attachment_type = message.attachments[0]
+        self.assertEqual(attachment_type, "application/pdf")
+        self.assertTrue(attachment_name.startswith("invoice-AB-"))
+        self.assertEqual(attachment_content, b"%PDF-1.4\nmock-invoice")

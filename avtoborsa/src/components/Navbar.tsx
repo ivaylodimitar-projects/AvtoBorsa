@@ -214,7 +214,8 @@ const Navbar: React.FC = () => {
   );
 
   const isActive = (path: string) => location.pathname === path;
-  const isAuthRoute = location.pathname === "/auth";
+  const isAuthRoute =
+    location.pathname === "/auth" || location.pathname === "/forgot-password";
 
   React.useEffect(() => {
     setMobileOpen(false);

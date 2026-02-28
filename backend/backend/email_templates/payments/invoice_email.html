@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="bg">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Invoice {{ invoice_number }}</title>
+  <title>Фактура {{ invoice_number }}</title>
   <style>
     body {
       margin: 0;
@@ -203,13 +203,13 @@
                       <tr>
                         <td style="vertical-align: middle;">
                           <p class="brand-name">Kar.bg</p>
-                          <p class="brand-tagline">Automotive Marketplace</p>
+                          <p class="brand-tagline">Автомобилен маркетплейс</p>
                         </td>
                       </tr>
                     </table>
                   </td>
                   <td class="mobile-stack-right" style="text-align: right; vertical-align: top;">
-                    <span class="invoice-chip">Invoice {{ invoice_number }}</span>
+                    <span class="invoice-chip">Фактура {{ invoice_number }}</span>
                   </td>
                 </tr>
               </table>
@@ -218,23 +218,23 @@
 
           <tr>
             <td class="content">
-              <h1 class="title">Payment Confirmed</h1>
+              <h1 class="title">Плащането е потвърдено</h1>
               <p class="subtitle">
-                Hi {{ customer_name }}, thank you for topping up your Kar.bg balance.
-                Your invoice details are below.
+                Здравейте, {{ customer_name }}. Благодарим Ви за зареждането на баланс в Kar.bg.
+                Данните по фактурата са по-долу.
               </p>
 
               <div class="summary-box">
                 <p class="summary-row">
-                  <span class="summary-label">Issued at:</span>
+                  <span class="summary-label">Дата на издаване:</span>
                   <span class="summary-value"> {{ issued_at }}</span>
                 </p>
                 <p class="summary-row">
-                  <span class="summary-label">Customer email:</span>
+                  <span class="summary-label">Имейл на клиента:</span>
                   <span class="summary-value"> {{ customer_email }}</span>
                 </p>
                 <p class="summary-row">
-                  <span class="summary-label">Payment method:</span>
+                  <span class="summary-label">Начин на плащане:</span>
                   <span class="summary-value"> {{ payment_method }}</span>
                 </p>
               </div>
@@ -242,24 +242,24 @@
               <table role="presentation" class="items" cellpadding="0" cellspacing="0">
                 <thead>
                   <tr>
-                    <th>Description</th>
-                    <th>Reference</th>
-                    <th class="align-right">Amount</th>
+                    <th>Описание</th>
+                    <th>Референция</th>
+                    <th class="align-right">Сума</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td>Account balance top-up</td>
+                    <td>Зареждане на баланс в профила</td>
                     <td>
-                      TX {{ transaction_id }}<br>
+                      Транзакция {{ transaction_id }}<br>
                       <span style="font-size: 12px; color: #64748b; word-break: break-all;">
-                        Session: {{ stripe_session_id }}
+                        Сесия: {{ stripe_session_id }}
                       </span>
                     </td>
                     <td class="align-right">{{ amount }} {{ currency }}</td>
                   </tr>
                   <tr class="total-row">
-                    <td colspan="2">Total paid</td>
+                    <td colspan="2">Общо платено</td>
                     <td class="align-right">{{ amount }} {{ currency }}</td>
                   </tr>
                 </tbody>
@@ -269,10 +269,10 @@
 
           <tr>
             <td class="footer">
-              Need help? Contact us at
-              <a class="support-link" href="mailto:{{ support_email }}">support@kar.bg</a>.
+              Нуждаете се от съдействие? Свържете се с нас на
+              <a class="support-link" href="mailto:{{ support_email }}">{{ support_email }}</a>.
               <div class="small-muted">
-                Kar.bg &copy; {{ invoice_year }}. This email was generated automatically.
+                Kar.bg &copy; {{ invoice_year }}. Този имейл е генериран автоматично.
               </div>
             </td>
           </tr>

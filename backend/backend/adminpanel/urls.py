@@ -15,4 +15,6 @@ urlpatterns = [
     path("extension-usage/", views.admin_extension_usage, name="admin_extension_usage"),
     path("reports/", views.admin_reports, name="admin_reports"),
     path("reports/<int:report_id>/delete/", views.admin_report_delete, name="admin_report_delete"),
+    path("contact-inquiries/", views.admin_contact_inquiries, name="admin_contact_inquiries"),
+    path("contact-inquiries/<int:inquiry_id>/reply/", views.admin_contact_inquiry_reply, name="admin_contact_inquiry_reply"),
 ]

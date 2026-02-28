@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import karBgLogo from "../assets/karbglogo.png";
 import { API_BASE_URL } from "../config/api";
 
 const ForgotPasswordPage: React.FC = () => {
@@ -76,7 +75,6 @@ const ForgotPasswordPage: React.FC = () => {
       <div style={styles.container} className="forgot-container">
         <div style={styles.card} className="forgot-card">
           <div style={styles.header} className="forgot-header">
-            <img src={karBgLogo} alt="Kar.bg logo" style={styles.badge} />
             <h1 style={styles.title} className="forgot-title">Забравена парола</h1>
             <p style={styles.subtitle} className="forgot-subtitle">Ще ти изпратим линк за смяна на парола.</p>
           </div>
@@ -92,7 +90,7 @@ const ForgotPasswordPage: React.FC = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@email.com"
+                placeholder="Твоят регистриран E-mail"
                 required
               />
             </div>
@@ -121,14 +119,6 @@ const styles: Record<string, React.CSSProperties> = {
     padding: 28,
   },
   header: { marginBottom: 20, paddingBottom: 18, borderBottom: "1px solid #e2e8f0" },
-  badge: {
-    display: "block",
-    width: 92,
-    height: 42,
-    borderRadius: 16, objectFit: "cover",
-    marginBottom: 10,
-    boxShadow: "0 6px 14px rgba(15, 118, 110, 0.18)",
-  },
   title: {
     fontSize: 24,
     fontWeight: 800,

@@ -1,7 +1,9 @@
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
+from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.mail import EmailMessage
 from django.db.models import Avg, Case, Count, IntegerField, Max, Q, Sum, Value, When
 from django.db.models.functions import Coalesce, TruncDate
 from django.shortcuts import get_object_or_404
@@ -24,7 +26,8 @@ from backend.listings.models import (
     get_vip_short_expiry,
 )
 from backend.payments.models import PaymentTransaction
-from backend.reports.models import ListingReport
+from backend.reports.inbox_sync import sync_contact_inquiries_from_inbox
+from backend.reports.models import ContactInquiry, ListingReport
 
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
@@ -162,9 +165,31 @@ def _serialize_user(user):
     }
 
 
+def _serialize_contact_inquiry(inquiry):
+    replied_by = inquiry.replied_by
+    return {
+        "id": inquiry.id,
+        "name": inquiry.name,
+        "email": inquiry.email,
+        "topic": inquiry.topic,
+        "message": inquiry.message,
+        "status": inquiry.status,
+        "admin_reply": inquiry.admin_reply,
+        "customer_reply": inquiry.customer_reply,
+        "customer_replied_at": inquiry.customer_replied_at,
+        "replied_at": inquiry.replied_at,
+        "replied_by_id": replied_by.id if replied_by else None,
+        "replied_by_email": replied_by.email if replied_by else "",
+        "created_at": inquiry.created_at,
+        "updated_at": inquiry.updated_at,
+    }
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsAdminUser])
 def admin_overview(request):
+    sync_contact_inquiries_from_inbox()
+
     today = timezone.localdate()
     start_date = today - timedelta(days=13)
     day_keys = [start_date + timedelta(days=offset) for offset in range(14)]
@@ -202,6 +227,8 @@ def admin_overview(request):
     )["total"]
 
     views_total = CarListing.objects.aggregate(total=Coalesce(Sum("view_count"), Value(0)))["total"]
+    contact_inquiries_total = ContactInquiry.objects.count()
+    contact_inquiries_new = ContactInquiry.objects.filter(status=ContactInquiry.STATUS_NEW).count()
 
     authenticated_views = (
         ListingView.objects.filter(created_at__date__gte=start_date)
@@ -299,6 +326,8 @@ def admin_overview(request):
                 "site_purchases_total": site_purchases.count(),
                 "site_purchases_amount_total": float(site_purchases_amount_total or Decimal("0.00")),
                 "reports_total": ListingReport.objects.count(),
+                "contact_inquiries_total": contact_inquiries_total,
+                "contact_inquiries_new": contact_inquiries_new,
                 "favorites_total": Favorite.objects.count(),
                 "views_total": int(views_total or 0),
             },
@@ -1358,3 +1387,117 @@ def admin_report_delete(request, report_id):
     report = get_object_or_404(ListingReport, pk=report_id)
     report.delete()
     return Response({"message": "Report deleted."}, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def admin_contact_inquiries(request):
+    sync_contact_inquiries_from_inbox()
+
+    queryset = ContactInquiry.objects.select_related("replied_by")
+
+    search_query = (request.query_params.get("q") or "").strip()
+    if search_query:
+        queryset = queryset.filter(
+            Q(name__icontains=search_query)
+            | Q(email__icontains=search_query)
+            | Q(topic__icontains=search_query)
+            | Q(message__icontains=search_query)
+            | Q(admin_reply__icontains=search_query)
+            | Q(customer_reply__icontains=search_query)
+        )
+
+    status_filter = (request.query_params.get("status") or "all").strip().lower()
+    if status_filter in {ContactInquiry.STATUS_NEW, ContactInquiry.STATUS_REPLIED}:
+        queryset = queryset.filter(status=status_filter)
+
+    sort_mapping = {
+        "newest": "-created_at",
+        "oldest": "created_at",
+    }
+    sort_by = (request.query_params.get("sort") or "newest").strip().lower()
+    queryset = queryset.order_by(sort_mapping.get(sort_by, "-created_at"), "-id")
+
+    items, pagination = _paginate_queryset(queryset, request)
+    return Response(
+        {
+            "results": [_serialize_contact_inquiry(item) for item in items],
+            "pagination": pagination,
+            "summary": {
+                "total": ContactInquiry.objects.count(),
+                "new": ContactInquiry.objects.filter(status=ContactInquiry.STATUS_NEW).count(),
+                "replied": ContactInquiry.objects.filter(status=ContactInquiry.STATUS_REPLIED).count(),
+            },
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated, IsAdminUser])
+def admin_contact_inquiry_reply(request, inquiry_id):
+    inquiry = get_object_or_404(ContactInquiry.objects.select_related("replied_by"), pk=inquiry_id)
+    reply_message = str(request.data.get("reply_message") or "").strip()
+    if not reply_message:
+        return Response({"error": "Reply message is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    subject = str(request.data.get("subject") or "").strip()
+    if not subject:
+        topic_value = inquiry.topic.strip()
+        subject = f"Kar.bg support response{f' - {topic_value}' if topic_value else ''}"
+    inquiry_marker = f"[Inquiry #{inquiry.id}]"
+    if f"inquiry #{inquiry.id}" not in subject.lower():
+        subject = f"{subject} {inquiry_marker}".strip()
+
+    from_email = str(
+        getattr(settings, "SUPPORT_FROM_EMAIL", "")
+        or getattr(settings, "DEFAULT_FROM_EMAIL", "")
+        or ""
+    ).strip()
+    message_id_domain = from_email.split("@", 1)[1] if "@" in from_email else "localhost"
+    message_id_header = (
+        f"<kar-inquiry-{inquiry.id}-{timezone.now().strftime('%Y%m%d%H%M%S%f')}@{message_id_domain}>"
+    )
+    mail_text = (
+        "Hello,\n\n"
+        "You received a reply from Kar.bg support regarding your inquiry.\n\n"
+        f"Reference: Inquiry #{inquiry.id}\n\n"
+        f"{reply_message}\n\n"
+        "Original inquiry:\n"
+        f"{inquiry.message}\n\n"
+        "Regards,\n"
+        "Kar.bg support"
+    )
+
+    try:
+        email = EmailMessage(
+            subject=subject,
+            body=mail_text,
+            from_email=from_email,
+            to=[inquiry.email],
+            reply_to=[from_email],
+            headers={
+                "Message-ID": message_id_header,
+                "X-Kar-Inquiry-ID": str(inquiry.id),
+            },
+        )
+        email.send(fail_silently=False)
+    except Exception:
+        return Response(
+            {"error": "Failed to send reply email."},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    inquiry.admin_reply = reply_message
+    inquiry.status = ContactInquiry.STATUS_REPLIED
+    inquiry.replied_at = timezone.now()
+    inquiry.replied_by = request.user
+    inquiry.save(update_fields=["admin_reply", "status", "replied_at", "replied_by", "updated_at"])
+
+    return Response(
+        {
+            "message": "Reply sent successfully.",
+            "inquiry": _serialize_contact_inquiry(inquiry),
+        },
+        status=status.HTTP_200_OK,
+    )

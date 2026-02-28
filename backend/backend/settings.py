@@ -41,6 +41,16 @@ def _normalize_samesite(value: str | None, default: str = "Lax") -> str:
     return default
 
 
+def _resolve_env_alias(value: str | None) -> str:
+    normalized = str(value or "").strip().strip('"').strip("'")
+    if not normalized:
+        return ""
+    referenced_value = os.getenv(normalized)
+    if referenced_value:
+        return str(referenced_value).strip().strip('"').strip("'")
+    return normalized
+
+
 # Load environment variables from backend/.env if present (local dev convenience).
 ENV_FILE = BASE_DIR / ".env"
 if ENV_FILE.exists():
@@ -325,12 +335,42 @@ EMAIL_BACKEND = os.getenv(
     "EMAIL_BACKEND",
     "django.core.mail.backends.console.EmailBackend",
 )
-EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_HOST = _resolve_env_alias(os.getenv("EMAIL_HOST", ""))
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_HOST_USER = _resolve_env_alias(os.getenv("EMAIL_HOST_USER", ""))
+EMAIL_HOST_PASSWORD = _resolve_env_alias(os.getenv("EMAIL_HOST_PASSWORD", ""))
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "1").lower() in ("1", "true", "yes")
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@kar.bg")
+DEFAULT_FROM_EMAIL = (
+    _resolve_env_alias(os.getenv("DEFAULT_FROM_EMAIL", "")) or "no-reply@kar.bg"
+)
+SUPPORT_FROM_EMAIL = (
+    _resolve_env_alias(os.getenv("SUPPORT_FROM_EMAIL", "")) or DEFAULT_FROM_EMAIL
+)
+INVOICE_PDF_FONT_PATH = _resolve_env_alias(os.getenv("INVOICE_PDF_FONT_PATH", ""))
+
+SUPPORT_INBOX_SYNC_ENABLED = _env_flag("SUPPORT_INBOX_SYNC_ENABLED", default=False)
+SUPPORT_INBOX_IMAP_HOST = _resolve_env_alias(os.getenv("SUPPORT_INBOX_IMAP_HOST", ""))
+if SUPPORT_INBOX_IMAP_HOST.lower().startswith("smtp."):
+    SUPPORT_INBOX_IMAP_HOST = "imap." + SUPPORT_INBOX_IMAP_HOST[len("smtp."):]
+try:
+    SUPPORT_INBOX_IMAP_PORT = int(os.getenv("SUPPORT_INBOX_IMAP_PORT", "993"))
+except (TypeError, ValueError):
+    SUPPORT_INBOX_IMAP_PORT = 993
+SUPPORT_INBOX_IMAP_USE_SSL = os.getenv("SUPPORT_INBOX_IMAP_USE_SSL", "1").lower() in ("1", "true", "yes")
+SUPPORT_INBOX_IMAP_USER = _resolve_env_alias(os.getenv("SUPPORT_INBOX_IMAP_USER", ""))
+SUPPORT_INBOX_IMAP_PASSWORD = _resolve_env_alias(os.getenv("SUPPORT_INBOX_IMAP_PASSWORD", ""))
+SUPPORT_INBOX_IMAP_MAILBOX = os.getenv("SUPPORT_INBOX_IMAP_MAILBOX", "INBOX")
+SUPPORT_INBOX_ALLOW_SELF_REPLY = _env_flag("SUPPORT_INBOX_ALLOW_SELF_REPLY", default=False)
+try:
+    SUPPORT_INBOX_SYNC_MAX_MESSAGES = int(os.getenv("SUPPORT_INBOX_SYNC_MAX_MESSAGES", "100"))
+except (TypeError, ValueError):
+    SUPPORT_INBOX_SYNC_MAX_MESSAGES = 100
+try:
+    SUPPORT_INBOX_SYNC_MIN_INTERVAL_SECONDS = int(
+        os.getenv("SUPPORT_INBOX_SYNC_MIN_INTERVAL_SECONDS", "20")
+    )
+except (TypeError, ValueError):
+    SUPPORT_INBOX_SYNC_MIN_INTERVAL_SECONDS = 20
 
 
 PASSWORD_RESET_COOLDOWN_SECONDS = int(

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import ListingReport
+from .models import ContactInquiry, ListingReport
 
 
 class ListingReportCreateSerializer(serializers.ModelSerializer):
@@ -30,4 +30,29 @@ class ListingReportCreateSerializer(serializers.ModelSerializer):
             )
 
         attrs['message'] = message
+        return attrs
+
+
+class ContactInquiryCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContactInquiry
+        fields = ["name", "email", "topic", "message"]
+
+    def validate(self, attrs):
+        name = str(attrs.get("name") or "").strip()
+        email = str(attrs.get("email") or "").strip().lower()
+        topic = str(attrs.get("topic") or "").strip()
+        message = str(attrs.get("message") or "").strip()
+
+        if not name:
+            raise serializers.ValidationError({"detail": "Името е задължително."})
+        if not email:
+            raise serializers.ValidationError({"detail": "Имейлът е задължителен."})
+        if not message:
+            raise serializers.ValidationError({"detail": "Съобщението е задължително."})
+
+        attrs["name"] = name
+        attrs["email"] = email
+        attrs["topic"] = topic[:120]
+        attrs["message"] = message
         return attrs

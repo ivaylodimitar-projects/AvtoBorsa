@@ -137,7 +137,7 @@ const AuthPage: React.FC = () => {
               }}
               type="email"
               name="email"
-              placeholder="your@email.com"
+              placeholder="Твоят E-mail"
               value={formData.email}
               onChange={handleChange}
               autoComplete="username"

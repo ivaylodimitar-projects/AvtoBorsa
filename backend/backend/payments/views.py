@@ -1,4 +1,6 @@
 import logging
+import os
+from io import BytesIO
 from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
@@ -39,22 +41,210 @@ def _build_invoice_email_context(tx: PaymentTransaction) -> dict[str, str]:
         user.get_full_name().strip()
         or getattr(user, "username", "").strip()
         or user.email
-        or "Customer"
+        or "Клиент"
+    )
+
+    support_email = (
+        getattr(settings, "SUPPORT_FROM_EMAIL", "")
+        or getattr(settings, "DEFAULT_FROM_EMAIL", "")
     )
     return {
         "brand_name": "Kar.bg",
         "invoice_number": _invoice_number_for_transaction(tx),
-        "issued_at": issued_at.strftime("%Y-%m-%d %H:%M"),
+        "issued_at": issued_at.strftime("%d.%m.%Y %H:%M"),
         "invoice_year": f"{issued_at:%Y}",
         "customer_name": customer_name,
         "customer_email": user.email or "-",
         "transaction_id": str(tx.id),
         "stripe_session_id": tx.stripe_session_id or "-",
-        "payment_method": "Card via Stripe Checkout",
+        "payment_method": "Карта чрез Stripe Checkout",
         "amount": f"{tx.amount:.2f}",
         "currency": tx.currency,
-        "support_email": settings.DEFAULT_FROM_EMAIL,
+        "support_email": support_email,
     }
+
+
+def _resolve_invoice_font_path() -> str | None:
+    configured_path = str(getattr(settings, "INVOICE_PDF_FONT_PATH", "") or "").strip()
+    candidates = [
+        configured_path,
+        "C:/Windows/Fonts/arial.ttf",
+        "C:/Windows/Fonts/segoeui.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    ]
+    for candidate in candidates:
+        if candidate and os.path.exists(candidate):
+            return candidate
+    return None
+
+
+def _load_invoice_font(size: int):
+    from PIL import ImageFont
+
+    font_path = _resolve_invoice_font_path()
+    if font_path:
+        try:
+            return ImageFont.truetype(font_path, size=size)
+        except OSError:
+            logger.warning("Could not load invoice font from %s", font_path)
+
+    for fallback_name in ("arial.ttf", "DejaVuSans.ttf"):
+        try:
+            return ImageFont.truetype(fallback_name, size=size)
+        except OSError:
+            continue
+
+    return ImageFont.load_default()
+
+
+def _wrap_pdf_text(value: str, max_chars: int = 60) -> list[str]:
+    normalized = " ".join(str(value or "-").split())
+    if not normalized:
+        return ["-"]
+
+    lines: list[str] = []
+    remaining = normalized
+    while len(remaining) > max_chars:
+        split_index = remaining.rfind(" ", 0, max_chars + 1)
+        if split_index <= 0:
+            split_index = max_chars
+        lines.append(remaining[:split_index].strip())
+        remaining = remaining[split_index:].strip()
+    lines.append(remaining)
+    return lines
+
+
+def _draw_label_value_row(draw, x: int, y: int, label: str, value: str, label_font, value_font) -> int:
+    draw.text((x, y), label, fill="#64748b", font=label_font)
+    draw.text((x + 230, y), value, fill="#0f172a", font=value_font)
+    return y + 48
+
+
+def _build_invoice_pdf_bytes(context: dict[str, str]) -> bytes | None:
+    try:
+        from PIL import Image, ImageDraw
+    except Exception:
+        logger.exception("Pillow is unavailable, invoice PDF attachment was skipped.")
+        return None
+
+    page_width = 1240
+    page_height = 1754
+    image = Image.new("RGB", (page_width, page_height), "#ffffff")
+    draw = ImageDraw.Draw(image)
+
+    header_font = _load_invoice_font(56)
+    header_meta_font = _load_invoice_font(28)
+    section_title_font = _load_invoice_font(34)
+    label_font = _load_invoice_font(26)
+    value_font = _load_invoice_font(29)
+    table_header_font = _load_invoice_font(24)
+    table_value_font = _load_invoice_font(24)
+    total_font = _load_invoice_font(30)
+    footer_font = _load_invoice_font(22)
+
+    draw.rectangle((0, 0, page_width, 210), fill="#0f766e")
+    draw.text((78, 56), "Kar.bg", fill="#ffffff", font=header_font)
+    draw.text((78, 136), "Фактура за зареждане на баланс", fill="#dcfce7", font=header_meta_font)
+
+    draw.text(
+        (page_width - 520, 64),
+        f"Фактура № {context['invoice_number']}",
+        fill="#ffffff",
+        font=header_meta_font,
+    )
+    draw.text(
+        (page_width - 520, 116),
+        f"Дата: {context['issued_at']}",
+        fill="#dcfce7",
+        font=header_meta_font,
+    )
+
+    y = 265
+    draw.text((78, y), "Данни за клиента", fill="#0f172a", font=section_title_font)
+    y += 62
+
+    y = _draw_label_value_row(
+        draw,
+        78,
+        y,
+        "Име:",
+        context["customer_name"],
+        label_font,
+        value_font,
+    )
+    y = _draw_label_value_row(
+        draw,
+        78,
+        y,
+        "Имейл:",
+        context["customer_email"],
+        label_font,
+        value_font,
+    )
+    y = _draw_label_value_row(
+        draw,
+        78,
+        y,
+        "Начин на плащане:",
+        context["payment_method"],
+        label_font,
+        value_font,
+    )
+
+    y += 28
+    draw.text((78, y), "Детайли за плащането", fill="#0f172a", font=section_title_font)
+    y += 62
+
+    table_left = 78
+    table_right = page_width - 78
+    draw.rectangle((table_left, y, table_right, y + 62), fill="#ecfdf5")
+    draw.text((table_left + 18, y + 16), "Описание", fill="#0f766e", font=table_header_font)
+    draw.text((table_left + 510, y + 16), "Референция", fill="#0f766e", font=table_header_font)
+    draw.text((table_right - 190, y + 16), "Сума", fill="#0f766e", font=table_header_font)
+
+    y += 62
+    row_bottom = y + 116
+    draw.rectangle((table_left, y, table_right, row_bottom), outline="#d1d5db", width=2)
+    draw.text((table_left + 18, y + 22), "Зареждане на баланс в Kar.bg", fill="#0f172a", font=table_value_font)
+
+    reference_lines = _wrap_pdf_text(
+        f"TX {context['transaction_id']} | Сесия: {context['stripe_session_id']}",
+        max_chars=44,
+    )
+    reference_y = y + 18
+    for line in reference_lines[:3]:
+        draw.text((table_left + 510, reference_y), line, fill="#334155", font=table_value_font)
+        reference_y += 32
+
+    amount_value = f"{context['amount']} {context['currency']}"
+    draw.text((table_right - 190, y + 22), amount_value, fill="#0f172a", font=table_value_font)
+
+    y = row_bottom + 12
+    total_bottom = y + 74
+    draw.rectangle((table_left, y, table_right, total_bottom), fill="#f8fafc", outline="#d1d5db", width=2)
+    draw.text((table_left + 18, y + 20), "Общо платено", fill="#0f172a", font=total_font)
+    draw.text((table_right - 220, y + 20), amount_value, fill="#0f172a", font=total_font)
+
+    footer_y = page_height - 170
+    draw.line((78, footer_y, page_width - 78, footer_y), fill="#e2e8f0", width=2)
+    draw.text(
+        (78, footer_y + 26),
+        f"За въпроси: {context['support_email']}",
+        fill="#475569",
+        font=footer_font,
+    )
+    draw.text(
+        (78, footer_y + 66),
+        f"Kar.bg © {context['invoice_year']}. Документът е генериран автоматично.",
+        fill="#94a3b8",
+        font=footer_font,
+    )
+
+    buffer = BytesIO()
+    image.save(buffer, format="PDF", resolution=150.0)
+    return buffer.getvalue()
 
 
 def send_invoice_email(tx: PaymentTransaction) -> None:
@@ -62,17 +252,30 @@ def send_invoice_email(tx: PaymentTransaction) -> None:
         return
 
     context = _build_invoice_email_context(tx)
-    subject = f"Your Kar.bg invoice {context['invoice_number']}"
+    from_email = (
+        getattr(settings, "SUPPORT_FROM_EMAIL", "")
+        or getattr(settings, "DEFAULT_FROM_EMAIL", "")
+    )
+    subject = f"Фактура от Kar.bg № {context['invoice_number']}"
     html_message = render_to_string("payments/invoice_email.html", context)
     text_message = strip_tags(html_message)
 
     message = EmailMultiAlternatives(
         subject=subject,
         body=text_message,
-        from_email=settings.DEFAULT_FROM_EMAIL,
+        from_email=from_email,
         to=[tx.user.email],
     )
     message.attach_alternative(html_message, "text/html")
+
+    pdf_bytes = _build_invoice_pdf_bytes(context)
+    if pdf_bytes:
+        message.attach(
+            f"invoice-{context['invoice_number']}.pdf",
+            pdf_bytes,
+            "application/pdf",
+        )
+
     message.send(fail_silently=False)
 
 

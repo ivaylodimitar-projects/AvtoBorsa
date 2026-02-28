@@ -14,7 +14,14 @@ class HttpError extends Error {
   }
 }
 
-type TabKey = "dashboard" | "listings" | "users" | "transactions" | "extensionApi" | "reports";
+type TabKey =
+  | "dashboard"
+  | "listings"
+  | "users"
+  | "transactions"
+  | "extensionApi"
+  | "reports"
+  | "contactInquiries";
 type Tone = "default" | "success" | "warning" | "danger" | "info";
 type TransactionsInnerTab = "topups" | "sitePurchases";
 
@@ -40,6 +47,8 @@ interface Overview {
     site_purchases_total?: number;
     site_purchases_amount_total?: number;
     reports_total: number;
+    contact_inquiries_total?: number;
+    contact_inquiries_new?: number;
   };
   series: {
     views_last_14_days: Array<{ date: string; count: number }>;
@@ -256,6 +265,33 @@ interface AdminReport {
   created_at: string;
 }
 
+interface AdminContactInquiry {
+  id: number;
+  name: string;
+  email: string;
+  topic: string;
+  message: string;
+  status: "new" | "replied" | string;
+  admin_reply: string;
+  customer_reply: string;
+  customer_replied_at: string | null;
+  replied_at: string | null;
+  replied_by_id: number | null;
+  replied_by_email: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface AdminContactInquirySummary {
+  total: number;
+  new: number;
+  replied: number;
+}
+
+interface AdminContactInquiryResponse extends Paged<AdminContactInquiry> {
+  summary: AdminContactInquirySummary;
+}
+
 interface AuthUserPayload {
   id: number;
   email: string;
@@ -290,6 +326,7 @@ const tabs: Array<{ key: TabKey; label: string; hint: string }> = [
   { key: "transactions", label: "Transactions", hint: "payments" },
   { key: "extensionApi", label: "Extension API", hint: "usage" },
   { key: "reports", label: "Reports", hint: "issues" },
+  { key: "contactInquiries", label: "Contacts", hint: "inbox" },
 ];
 
 const color = {
@@ -543,6 +580,13 @@ const extensionStatusTone = (statusCode: number, success: boolean): Tone => {
   return "default";
 };
 
+const resolveContactInquiryStatus = (item: AdminContactInquiry): { label: string; tone: Tone } => {
+  if (item.status === "new" && item.customer_replied_at) return { label: "Customer replied", tone: "info" };
+  if (item.status === "new") return { label: "New", tone: "warning" };
+  if (item.status === "replied") return { label: "Replied", tone: "success" };
+  return { label: item.status || "Unknown", tone: "default" };
+};
+
 const AdminPage: React.FC = () => {
   const { user, isLoading, logout, setUserFromToken } = useAuth();
 
@@ -570,6 +614,7 @@ const AdminPage: React.FC = () => {
   const [sitePurchases, setSitePurchases] = useState<AdminSitePurchaseResponse | null>(null);
   const [extensionUsage, setExtensionUsage] = useState<AdminExtensionUsageResponse | null>(null);
   const [reports, setReports] = useState<Paged<AdminReport> | null>(null);
+  const [contactInquiries, setContactInquiries] = useState<AdminContactInquiryResponse | null>(null);
   const [transactionsInnerTab, setTransactionsInnerTab] = useState<TransactionsInnerTab>("topups");
 
   const [listingQ, setListingQ] = useState("");
@@ -603,6 +648,9 @@ const AdminPage: React.FC = () => {
     "newest" | "oldest" | "status_desc" | "status_asc" | "duration_desc" | "duration_asc"
   >("newest");
   const [reportQ, setReportQ] = useState("");
+  const [contactInquiryQ, setContactInquiryQ] = useState("");
+  const [contactInquiryStatusFilter, setContactInquiryStatusFilter] = useState<"" | "new" | "replied">("");
+  const [contactInquirySort, setContactInquirySort] = useState<"newest" | "oldest">("newest");
 
   const [listingPage, setListingPage] = useState(1);
   const [userPage, setUserPage] = useState(1);
@@ -610,11 +658,15 @@ const AdminPage: React.FC = () => {
   const [sitePurchasePage, setSitePurchasePage] = useState(1);
   const [extensionPage, setExtensionPage] = useState(1);
   const [reportPage, setReportPage] = useState(1);
+  const [contactInquiryPage, setContactInquiryPage] = useState(1);
   const [topListingsPage, setTopListingsPage] = useState(1);
   const [topBuyersPage, setTopBuyersPage] = useState(1);
   const [plansPage, setPlansPage] = useState(1);
   const [extensionTopUsersPage, setExtensionTopUsersPage] = useState(1);
   const [extensionHostsPage, setExtensionHostsPage] = useState(1);
+  const [replyModalInquiry, setReplyModalInquiry] = useState<AdminContactInquiry | null>(null);
+  const [replyModalSubject, setReplyModalSubject] = useState("");
+  const [replyModalMessage, setReplyModalMessage] = useState("");
 
   const isAdmin = Boolean(user?.is_staff || user?.is_superuser);
   const shouldShowAdminLogin = !user || !isAdmin || adminAccessDenied;
@@ -711,6 +763,17 @@ const AdminPage: React.FC = () => {
     setReports(await request<Paged<AdminReport>>(`/api/admin/reports/?${q.toString()}`));
   }, [isAdmin, reportPage, reportQ]);
 
+  const loadContactInquiries = useCallback(async () => {
+    if (!isAdmin) return;
+    const q = new URLSearchParams({ page: String(contactInquiryPage), page_size: "20" });
+    if (contactInquiryQ.trim()) q.set("q", contactInquiryQ.trim());
+    if (contactInquiryStatusFilter) q.set("status", contactInquiryStatusFilter);
+    q.set("sort", contactInquirySort);
+    setContactInquiries(
+      await request<AdminContactInquiryResponse>(`/api/admin/contact-inquiries/?${q.toString()}`)
+    );
+  }, [isAdmin, contactInquiryPage, contactInquiryQ, contactInquiryStatusFilter, contactInquirySort]);
+
   const loadByTab = useCallback(async () => {
     try {
       setError("");
@@ -722,10 +785,22 @@ const AdminPage: React.FC = () => {
       }
       if (tab === "extensionApi") await loadExtensionUsage();
       if (tab === "reports") await loadReports();
+      if (tab === "contactInquiries") await loadContactInquiries();
     } catch (err) {
       handleAdminRequestError(err, "Request failed");
     }
-  }, [tab, loadOverview, loadListings, loadUsers, loadTransactions, loadSitePurchases, loadExtensionUsage, loadReports, handleAdminRequestError]);
+  }, [
+    tab,
+    loadOverview,
+    loadListings,
+    loadUsers,
+    loadTransactions,
+    loadSitePurchases,
+    loadExtensionUsage,
+    loadReports,
+    loadContactInquiries,
+    handleAdminRequestError,
+  ]);
 
   useEffect(() => {
     if (!isAdmin || adminAccessDenied) return;
@@ -864,6 +939,8 @@ const AdminPage: React.FC = () => {
             ["Site purchases", overview.totals.site_purchases_total || 0],
             ["Site spend", `${fmtMoney(overview.totals.site_purchases_amount_total || 0)} EUR`],
             ["Reports", overview.totals.reports_total],
+            ["Contact inquiries", overview.totals.contact_inquiries_total || 0],
+            ["New inquiries", overview.totals.contact_inquiries_new || 0],
           ]
         : [],
     [overview]
@@ -880,6 +957,56 @@ const AdminPage: React.FC = () => {
       setBusyId(null);
     }
   }, [handleAdminRequestError]);
+
+  const openReplyModal = useCallback((inquiry: AdminContactInquiry) => {
+    setError("");
+    setReplyModalInquiry(inquiry);
+    setReplyModalSubject(
+      inquiry.topic ? `Re: ${inquiry.topic}` : "Kar.bg support response"
+    );
+    setReplyModalMessage(inquiry.admin_reply || "");
+  }, []);
+
+  const closeReplyModal = useCallback(() => {
+    if (replyModalInquiry && busyId === replyModalInquiry.id) return;
+    setReplyModalInquiry(null);
+    setReplyModalSubject("");
+    setReplyModalMessage("");
+  }, [replyModalInquiry, busyId]);
+
+  const sendContactInquiryReply = useCallback(async () => {
+    if (!replyModalInquiry) return;
+    const trimmedReply = replyModalMessage.trim();
+    if (!trimmedReply) {
+      setError("Reply message is required.");
+      return;
+    }
+
+    await runBusyAction(
+      replyModalInquiry.id,
+      async () => {
+        await request(`/api/admin/contact-inquiries/${replyModalInquiry.id}/reply/`, {
+          method: "POST",
+          body: JSON.stringify({
+            subject: replyModalSubject.trim(),
+            reply_message: trimmedReply,
+          }),
+        });
+        await Promise.all([loadContactInquiries(), loadOverview()]);
+        setReplyModalInquiry(null);
+        setReplyModalSubject("");
+        setReplyModalMessage("");
+      },
+      "Reply failed"
+    );
+  }, [
+    replyModalInquiry,
+    replyModalMessage,
+    replyModalSubject,
+    runBusyAction,
+    loadContactInquiries,
+    loadOverview,
+  ]);
 
   const applyListingPatch = useCallback(
     async (listingId: number, payload: Record<string, unknown>) => {
@@ -1023,7 +1150,7 @@ const AdminPage: React.FC = () => {
           <div>
             <div style={{ fontSize: 12, color: color.muted }}>KAR.BG</div>
             <h2 style={{ margin: "6px 0", fontSize: 24 }}>Admin Control Panel</h2>
-            <div style={{ fontSize: 13, color: color.muted }}>Manage listings, users, purchases and reports.</div>
+            <div style={{ fontSize: 13, color: color.muted }}>Manage listings, users, purchases, reports and contact inbox.</div>
             <div style={{ fontSize: 12, color: color.muted, marginTop: 4 }}>Signed in as {user.email}</div>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -2284,6 +2411,250 @@ const AdminPage: React.FC = () => {
               </div>
             </div>
           </section>
+        )}
+
+        {tab === "contactInquiries" && (
+          <section style={panelStyle}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8, flexWrap: "wrap" }}>
+              <h3 style={{ margin: 0 }}>Contact inquiries</h3>
+              <span style={{ fontSize: 13, color: color.muted }}>{pageLabel(contactInquiries?.pagination)}</span>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+              <span style={badgeStyle("default")}>Total: {contactInquiries?.summary.total || 0}</span>
+              <span style={badgeStyle("warning")}>New: {contactInquiries?.summary.new || 0}</span>
+              <span style={badgeStyle("success")}>Replied: {contactInquiries?.summary.replied || 0}</span>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+              <input
+                value={contactInquiryQ}
+                onChange={(e) => setContactInquiryQ(e.target.value)}
+                placeholder="Search name, email, topic, message, customer reply"
+                style={inputStyle}
+              />
+              <select
+                value={contactInquiryStatusFilter}
+                onChange={(e) => setContactInquiryStatusFilter(e.target.value as "" | "new" | "replied")}
+                style={{ ...inputStyle, minWidth: 150 }}
+              >
+                <option value="">All statuses</option>
+                <option value="new">New</option>
+                <option value="replied">Replied</option>
+              </select>
+              <select
+                value={contactInquirySort}
+                onChange={(e) => setContactInquirySort(e.target.value as "newest" | "oldest")}
+                style={{ ...inputStyle, minWidth: 130 }}
+              >
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+              </select>
+              <button
+                onClick={() => {
+                  setContactInquiryPage(1);
+                  void loadContactInquiries();
+                }}
+                style={buttonStyle("primary")}
+              >
+                Search
+              </button>
+              <button
+                onClick={() => {
+                  setContactInquiryQ("");
+                  setContactInquiryStatusFilter("");
+                  setContactInquirySort("newest");
+                  setContactInquiryPage(1);
+                }}
+                style={buttonStyle("neutral")}
+              >
+                Reset
+              </button>
+            </div>
+
+            <div style={tableWrap}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1280 }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>ID</th>
+                    <th style={thStyle}>Sender</th>
+                    <th style={thStyle}>Topic</th>
+                    <th style={thStyle}>Message</th>
+                    <th style={thStyle}>Status</th>
+                    <th style={thStyle}>Reply</th>
+                    <th style={thStyle}>Created</th>
+                    <th style={thStyle}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(contactInquiries?.results || []).map((item) => {
+                    const status = resolveContactInquiryStatus(item);
+                    return (
+                      <tr key={item.id}>
+                        <td style={tdStyle}>#{item.id}</td>
+                        <td style={tdStyle}>
+                          {item.name || "-"}
+                          <div style={{ fontSize: 12, color: color.muted }}>{item.email || "-"}</div>
+                        </td>
+                        <td style={tdStyle}>{item.topic || "-"}</td>
+                        <td style={tdStyle}>
+                          <div>{item.message || "-"}</div>
+                          {item.customer_reply ? (
+                            <div style={{ marginTop: 8 }}>
+                              <span style={badgeStyle("info")}>Latest customer reply</span>
+                              <div style={{ marginTop: 4, whiteSpace: "pre-wrap" }}>{item.customer_reply}</div>
+                              <div style={{ fontSize: 12, color: color.muted, marginTop: 4 }}>
+                                {item.customer_replied_at ? fmtDateTime(item.customer_replied_at) : "-"}
+                              </div>
+                            </div>
+                          ) : null}
+                        </td>
+                        <td style={tdStyle}>
+                          <span style={badgeStyle(status.tone)}>{status.label}</span>
+                        </td>
+                        <td style={tdStyle}>
+                          {item.admin_reply ? (
+                            <>
+                              {item.admin_reply}
+                              <div style={{ fontSize: 12, color: color.muted, marginTop: 4 }}>
+                                {item.replied_by_email || "-"} | {item.replied_at ? fmtDateTime(item.replied_at) : "-"}
+                              </div>
+                            </>
+                          ) : (
+                            <span style={{ color: color.muted }}>No reply yet</span>
+                          )}
+                        </td>
+                        <td style={tdStyle}>{fmtDateTime(item.created_at)}</td>
+                        <td style={tdStyle}>
+                          <button
+                            disabled={busyId === item.id}
+                            onClick={() => openReplyModal(item)}
+                            style={buttonStyle("primary")}
+                          >
+                            Reply by email
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, color: color.muted }}>{pageLabel(contactInquiries?.pagination)}</span>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  disabled={!contactInquiries || contactInquiries.pagination.page <= 1}
+                  onClick={() => setContactInquiryPage((v) => Math.max(1, v - 1))}
+                  style={buttonStyle("neutral")}
+                >
+                  Prev
+                </button>
+                <button
+                  disabled={!contactInquiries || contactInquiries.pagination.page >= contactInquiries.pagination.total_pages}
+                  onClick={() => setContactInquiryPage((v) => v + 1)}
+                  style={buttonStyle("neutral")}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {replyModalInquiry && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 4200,
+              background: "rgba(15, 23, 42, 0.5)",
+              display: "grid",
+              placeItems: "center",
+              padding: 16,
+            }}
+            onClick={closeReplyModal}
+          >
+            <div
+              style={{
+                width: "100%",
+                maxWidth: 760,
+                background: "#fff",
+                borderRadius: 16,
+                border: `1px solid ${color.border}`,
+                boxShadow: "0 20px 40px rgba(15, 23, 42, 0.22)",
+                padding: 16,
+              }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start", marginBottom: 12 }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 18 }}>Reply to inquiry #{replyModalInquiry.id}</h3>
+                  <div style={{ fontSize: 13, color: color.muted, marginTop: 4 }}>
+                    To: {replyModalInquiry.name || "-"} ({replyModalInquiry.email || "-"})
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeReplyModal}
+                  disabled={busyId === replyModalInquiry.id}
+                  style={buttonStyle("neutral")}
+                >
+                  Close
+                </button>
+              </div>
+
+              <div style={{ display: "grid", gap: 10 }}>
+                <label style={{ display: "grid", gap: 6 }}>
+                  <span style={{ fontSize: 12, color: color.muted }}>Subject</span>
+                  <input
+                    type="text"
+                    value={replyModalSubject}
+                    onChange={(event) => setReplyModalSubject(event.target.value)}
+                    style={{ ...inputStyle, minWidth: 0, width: "100%" }}
+                  />
+                </label>
+
+                <label style={{ display: "grid", gap: 6 }}>
+                  <span style={{ fontSize: 12, color: color.muted }}>Reply message</span>
+                  <textarea
+                    value={replyModalMessage}
+                    onChange={(event) => setReplyModalMessage(event.target.value)}
+                    rows={8}
+                    style={{
+                      width: "100%",
+                      borderRadius: 16,
+                      border: `1px solid ${color.borderStrong}`,
+                      padding: "12px 14px",
+                      fontFamily: "inherit",
+                      fontSize: 14,
+                      resize: "vertical",
+                    }}
+                    placeholder="Write a clear support reply..."
+                  />
+                </label>
+              </div>
+
+              <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={closeReplyModal}
+                  disabled={busyId === replyModalInquiry.id}
+                  style={buttonStyle("neutral")}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void sendContactInquiryReply()}
+                  disabled={busyId === replyModalInquiry.id}
+                  style={buttonStyle("primary")}
+                >
+                  {busyId === replyModalInquiry.id ? "Sending..." : "Send reply email"}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

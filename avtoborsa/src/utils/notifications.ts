@@ -18,6 +18,7 @@ export interface DepositNotification extends BaseNotification {
   type: "deposit";
   amount: number;
   currency: string;
+  reference?: string;
 }
 
 export interface DealerListingNotification extends BaseNotification {
@@ -74,11 +75,13 @@ const toValidNotification = (value: unknown): AppNotification | null => {
       return null;
     }
 
+    const reference = normalizeText(record.reference);
     return {
       id: record.id,
       type: "deposit",
       amount: normalizeAmount(record.amount),
       currency,
+      ...(reference ? { reference } : {}),
       createdAt: record.createdAt,
       isRead: Boolean(record.isRead),
     };
@@ -174,21 +177,36 @@ export const getUserNotifications = (
 export const addDepositNotification = (
   userId: number | null | undefined,
   amount: number,
-  currency = "EUR"
+  currency = "EUR",
+  reference?: string
 ): AppNotification | null => {
   if (!userId) return null;
   if (!Number.isFinite(amount) || amount <= 0) return null;
+
+  const normalizedReference = normalizeText(reference);
+  const current = getUserNotifications(userId);
+  if (normalizedReference) {
+    const alreadyExists = current.some(
+      (item) =>
+        item.type === "deposit" &&
+        typeof item.reference === "string" &&
+        item.reference === normalizedReference
+    );
+    if (alreadyExists) {
+      return null;
+    }
+  }
 
   const notification: DepositNotification = {
     id: `deposit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     type: "deposit",
     amount: normalizeAmount(amount),
     currency,
+    ...(normalizedReference ? { reference: normalizedReference } : {}),
     createdAt: new Date().toISOString(),
     isRead: false,
   };
 
-  const current = getUserNotifications(userId);
   persistUserNotifications(
     userId,
     [notification, ...current].slice(0, MAX_NOTIFICATIONS)

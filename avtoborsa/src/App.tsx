@@ -20,6 +20,7 @@ import AdminPage from './components/AdminPage'
 import ProfileRoutePage from './components/ProfileRoutePage'
 import LegalPage from './components/LegalPage'
 import ContactsPage from './components/ContactsPage'
+import CookieConsentWidget from './components/CookieConsentWidget'
 import { useAuth } from './context/AuthContext'
 
 const VehicleDetailsPage = lazy(() => import('./components/details/VehicleDetailsPage'))
@@ -135,6 +136,7 @@ function App() {
         <Route path="/:publicProfileSlug" element={<ProfileRoutePage />} />
       </Routes>
       {showSharedFooter && <Footer />}
+      {showSharedFooter && <CookieConsentWidget />}
       {showAuthTransitionScreen && (
         <div
           style={{
