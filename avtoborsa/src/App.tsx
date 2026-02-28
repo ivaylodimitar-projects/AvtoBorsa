@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect } from 'react'
-import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
+import { Routes, Route, useLocation, useNavigate, useNavigationType } from 'react-router-dom'
 import Navbar from './components/Navbar'
 import LandingPage from './components/landingPage'
 import PublishPage from './components/PublishPage'
@@ -17,6 +17,9 @@ import MyAdsPage from './components/MyAdsPage'
 import SearchPage from './components/SearchPage'
 import Footer from './components/footer'
 import AdminPage from './components/AdminPage'
+import ProfileRoutePage from './components/ProfileRoutePage'
+import LegalPage from './components/LegalPage'
+import ContactsPage from './components/ContactsPage'
 import { useAuth } from './context/AuthContext'
 
 const VehicleDetailsPage = lazy(() => import('./components/details/VehicleDetailsPage'))
@@ -36,14 +39,19 @@ const resolvePageTitle = (pathname: string): string => {
   if (pathname === '/forgot-password') return 'Kar.bg | Забравена Парола'
   if (pathname === '/reset-password') return 'Kar.bg | Нулиране на Парола'
   if (pathname === '/my-ads') return 'Kar.bg | Моите Обяви'
+  if (pathname === '/legal') return 'Kar.bg | Общи условия и GDPR'
+  if (pathname === '/contacts') return 'Kar.bg | Контакти'
   if (pathname.startsWith('/details/')) return 'Kar.bg | Детайли на Обява'
   if (pathname === '/admin' || pathname.startsWith('/admin/')) return 'Kar.bg | Админ Панел'
+  const isTopLevelProfileSlug = /^\/[^/]+$/.test(pathname) && pathname !== '/'
+  if (isTopLevelProfileSlug) return 'Kar.bg | Профил'
   return 'Kar.bg'
 }
 
 function App() {
   const location = useLocation()
   const navigate = useNavigate()
+  const navigationType = useNavigationType()
   const { authTransition, sessionExpiredMessage, clearSessionExpiredMessage } = useAuth()
   const isAdminRoute = location.pathname === '/admin' || location.pathname.startsWith('/admin/')
   const showSharedFooter = !isAdminRoute
@@ -53,6 +61,40 @@ function App() {
   useEffect(() => {
     document.title = resolvePageTitle(location.pathname)
   }, [location.pathname])
+
+  useEffect(() => {
+    if (!("scrollRestoration" in window.history)) return;
+    const previous = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
+    return () => {
+      window.history.scrollRestoration = previous;
+    };
+  }, []);
+
+  useEffect(() => {
+    const hasPendingSearchRestore = () => {
+      try {
+        for (let i = 0; i < sessionStorage.length; i += 1) {
+          const key = sessionStorage.key(i);
+          if (key && key.startsWith("searchScroll:")) {
+            return true;
+          }
+        }
+      } catch {
+        return false;
+      }
+      return false;
+    };
+
+    const shouldKeepScrollForSearchBack =
+      location.pathname === "/search" &&
+      navigationType === "POP" &&
+      hasPendingSearchRestore();
+
+    if (!shouldKeepScrollForSearchBack) {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    }
+  }, [location.pathname, location.search, navigationType]);
 
   const transitionTitle =
     authTransition === 'logout' ? 'Излизане от профила...' : 'Влизане в профила...'
@@ -69,7 +111,7 @@ function App() {
         <Route path="/search" element={<SearchPage />} />
         <Route path="/publish" element={<PublishPage />} />
         <Route path="/dealers" element={<DealersPage />} />
-        <Route path="/dealers/:id" element={<DealerDetailPage />} />
+        <Route path="/dealers/:dealerSlug" element={<DealerDetailPage />} />
         <Route path="/profile" element={<ProfileTypePage />} />
         <Route path="/profile/private" element={<PrivateProfilePage />} />
         <Route path="/profile/business" element={<BusinessProfilePage />} />
@@ -79,6 +121,8 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/my-ads" element={<MyAdsPage />} />
+        <Route path="/legal" element={<LegalPage />} />
+        <Route path="/contacts" element={<ContactsPage />} />
         <Route
           path="/details/:slug"
           element={
@@ -88,6 +132,7 @@ function App() {
           }
         />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/:publicProfileSlug" element={<ProfileRoutePage />} />
       </Routes>
       {showSharedFooter && <Footer />}
       {showAuthTransitionScreen && (

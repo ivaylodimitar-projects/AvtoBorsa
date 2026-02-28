@@ -1,6 +1,8 @@
 ﻿from decimal import Decimal
 from datetime import timedelta
 import hashlib
+import re
+import unicodedata
 
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view, permission_classes
@@ -18,7 +20,7 @@ from django.core.cache import cache
 from django.utils.cache import patch_cache_control, patch_vary_headers
 from django.utils import timezone
 from django.utils.http import http_date, parse_http_date_safe, quote_etag
-from backend.accounts.models import UserProfile
+from backend.accounts.models import UserProfile, PrivateUser, BusinessUser
 from .models import (
     CarListing,
     CarImage,
@@ -81,6 +83,14 @@ DETAIL_RELATED_SELECT_FIELDS = (
     'buy_details',
     'services_details',
 )
+
+
+def _slugify_public_segment(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", str(value or "")).strip().lower()
+    cleaned = re.sub(r"[^\w\s-]+", "", normalized, flags=re.UNICODE)
+    compact = re.sub(r"\s+", "-", cleaned)
+    compact = re.sub(r"-{2,}", "-", compact).strip("-")
+    return compact or "profile"
 
 
 class ListingsPagination(PageNumberPagination):
@@ -1589,6 +1599,86 @@ def get_user_expired(request):
     return Response(serializer.data)
 
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def get_public_profile_listings(request, profile_slug: str):
+    """Public listings by private username or business company-name slug."""
+    _demote_expired_top_listings()
+    raw_slug = str(profile_slug or "").strip()
+    normalized_slug = _slugify_public_segment(raw_slug)
+    if not raw_slug:
+        return Response({"detail": "Профилът не е намерен."}, status=status.HTTP_404_NOT_FOUND)
+
+    private_profile = (
+        PrivateUser.objects.select_related("user")
+        .filter(username__iexact=raw_slug)
+        .first()
+    )
+
+    profile_user = None
+    profile_type = "private"
+    profile_title = ""
+    profile_image_url = None
+    profile_city = ""
+
+    if private_profile is not None:
+        profile_user = private_profile.user
+        profile_title = private_profile.username
+        normalized_slug = _slugify_public_segment(private_profile.username)
+    else:
+        business_profiles = BusinessUser.objects.select_related("user").all()
+        business_profile = None
+        for candidate in business_profiles:
+            if _slugify_public_segment(candidate.dealer_name) == normalized_slug:
+                business_profile = candidate
+                break
+
+        if business_profile is not None:
+            profile_user = business_profile.user
+            profile_type = "business"
+            profile_title = business_profile.dealer_name
+            profile_city = business_profile.city or ""
+            if business_profile.profile_image:
+                profile_image_url = request.build_absolute_uri(business_profile.profile_image.url)
+
+    if profile_user is None:
+        return Response({"detail": "Профилът не е намерен."}, status=status.HTTP_404_NOT_FOUND)
+
+    cutoff = get_expiry_cutoff()
+    listings = (
+        CarListing.objects.filter(
+            user=profile_user,
+            is_active=True,
+            is_draft=False,
+            is_archived=False,
+            created_at__gte=cutoff,
+        )
+        .prefetch_related("images")
+        .order_by("-created_at")
+    )
+
+    serializer = CarListingSerializer(listings, many=True, context={"request": request})
+    response = Response(
+        {
+            "profile": {
+                "type": profile_type,
+                "slug": normalized_slug,
+                "title": profile_title,
+                "city": profile_city,
+                "profile_image_url": profile_image_url,
+            },
+            "listings": serializer.data,
+            "listing_count": len(serializer.data),
+            "is_owner": bool(
+                request.user.is_authenticated and request.user.id == profile_user.id
+            ),
+        },
+        status=status.HTTP_200_OK,
+    )
+    _set_public_cache_headers(response, max_age=LISTINGS_PUBLIC_CACHE_SECONDS)
+    return response
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def archive_listing(request, listing_id):
@@ -1844,7 +1934,7 @@ def upload_listing_images(request, listing_id):
     _invalidate_latest_listings_cache()
 
     return Response(
-        {'message': f'{len(images)} images uploaded successfully'},
+        {'message': f'Успешно качени изображения: {len(images)}'},
         status=status.HTTP_201_CREATED
     )
 
@@ -1858,7 +1948,7 @@ def update_listing_images(request, listing_id):
     images_data = request.data.get('images', [])
     if not isinstance(images_data, list):
         return Response(
-            {'error': 'Invalid images payload.'},
+            {'error': 'Невалиден payload за изображения.'},
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -1866,20 +1956,20 @@ def update_listing_images(request, listing_id):
     for index, image_data in enumerate(images_data):
         if not isinstance(image_data, dict):
             return Response(
-                {'error': 'Each image item must be an object.'},
+                {'error': 'Всеки елемент за изображение трябва да е обект.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         image_id = image_data.get('id')
         if image_id is None:
             return Response(
-                {'error': 'Image id is required.'},
+                {'error': 'ID на изображението е задължително.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         try:
             image_id = int(image_id)
         except (TypeError, ValueError):
             return Response(
-                {'error': f'Invalid image id: {image_id}'},
+                {'error': f'Невалидно ID на изображение: {image_id}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -1898,7 +1988,7 @@ def update_listing_images(request, listing_id):
             updated_image_ids.append(image_id)
         except CarImage.DoesNotExist:
             return Response(
-                {'error': f'Image {image_id} not found'},
+                {'error': f'Изображение {image_id} не е намерено'},
                 status=status.HTTP_404_NOT_FOUND
             )
 
@@ -1922,7 +2012,7 @@ def update_listing_images(request, listing_id):
     )
 
     return Response(
-        {'message': 'Images updated successfully', 'images': serializer.data},
+        {'message': 'Изображенията са обновени успешно.', 'images': serializer.data},
         status=status.HTTP_200_OK
     )
 
@@ -1940,12 +2030,12 @@ def add_favorite(request, listing_id):
 
     if created:
         return Response(
-            {'message': 'Listing added to favorites'},
+            {'message': 'Обявата е добавена в любими.'},
             status=status.HTTP_201_CREATED
         )
     else:
         return Response(
-            {'message': 'Listing already in favorites'},
+            {'message': 'Обявата вече е в любими.'},
             status=status.HTTP_200_OK
         )
 
@@ -1958,7 +2048,7 @@ def remove_favorite(request, listing_id):
     favorite.delete()
 
     return Response(
-        {'message': 'Listing removed from favorites'},
+        {'message': 'Обявата е премахната от любими.'},
         status=status.HTTP_204_NO_CONTENT
     )
 
@@ -2180,4 +2270,3 @@ def latest_listings(request):
     _set_public_cache_headers(response, max_age=LATEST_LISTINGS_CACHE_SECONDS)
     response["X-Latest-Listings-Cache"] = "MISS"
     return response
-

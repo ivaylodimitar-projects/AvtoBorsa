@@ -1,92 +1,76 @@
 import React from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "../config/api";
+import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
+import karBgLogo from "../assets/karbglogo.png";
 
 const PUBLIC_API_DOCS_URL = `${API_BASE_URL}/docs/api/`;
 
 export default function Footer() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const sectionHref = (sectionId: string) =>
-    location.pathname === "/" ? `#${sectionId}` : `/#${sectionId}`;
+  const { user } = useAuth();
+  const { showToast } = useToast();
+
+  const handleApiAccessClick = () => {
+    if (!user) {
+      showToast("Моля, влезте в бизнес профил, за да заявите API достъп.", { type: "error" });
+      return;
+    }
+    if (user.userType !== "business") {
+      showToast("API достъпът е наличен само за бизнес профили.", { type: "error" });
+      return;
+    }
+    window.location.assign(PUBLIC_API_DOCS_URL);
+  };
 
   return (
     <footer style={styles.footer}>
-      <style>{footerCss}</style>
-
       <div style={styles.footerInner} className="footer-grid">
         <div style={styles.footerCol}>
-          <div style={styles.footerBrand}>Kar.bg</div>
+          <img src={karBgLogo} alt="Kar.bg" style={styles.footerLogo} />
           <p style={styles.footerText}>
-            Платформа за бърза покупко-продажба на автомобили, части и услуги с фокус върху ясни
-            резултати и реални сделки.
+            Платформа за покупко-продажба на автомобили, части и услуги.
           </p>
+          <a href="mailto:sales@kar.bg" style={styles.footerLink}>
+            sales@kar.bg
+          </a>
+          <a href="mailto:support@kar.bg" style={styles.footerLink}>
+            support@kar.bg
+          </a>
         </div>
 
         <div style={styles.footerCol}>
-          <div style={styles.footerTitle}>Бърз достъп</div>
-          <button
-            type="button"
-            style={{ ...styles.footerLinkButton, ...styles.footerLinkButtonReset }}
-            onClick={() => navigate("/")}
-          >
-            Начало
-          </button>
-          <a href={sectionHref("search")} style={styles.footerLink}>
-            Търсене
+          <div style={styles.footerTitle}>Правна информация</div>
+          <a href="/legal" style={styles.footerLink}>
+            Общи условия
           </a>
-          <a href={sectionHref("latest")} style={styles.footerLink}>
-            Последни обяви
+          <a href="/legal#privacy" style={styles.footerLink}>
+            GDPR
           </a>
-          <a href={sectionHref("about")} style={styles.footerLink}>
-            За нас
-          </a>
-          <button
-            type="button"
-            style={{ ...styles.footerLinkButton, ...styles.footerLinkButtonReset }}
-            onClick={() => navigate("/dealers")}
-          >
-            Дилъри
-          </button>
-          <button
-            type="button"
-            style={{ ...styles.footerLinkButton, ...styles.footerLinkButtonReset }}
-            onClick={() => navigate("/publish")}
-          >
-            Публикуване
-          </button>
-          <button
-            type="button"
-            style={{ ...styles.footerLinkButton, ...styles.footerLinkButtonReset }}
-            onClick={() => navigate("/search")}
-          >
-            Всички обяви
-          </button>
-        </div>
-
-        <div style={styles.footerCol} id="api-footer">
-          <div style={styles.footerTitle}>Kar.bg API</div>
-          <p style={styles.footerText}>
-            Връзка за автоматичен импорт на обяви, обновяване на наличности и по-бързо управление
-            на инвентар.
-          </p>
-          <div style={styles.footerApiDealerBadge}>API само за дилъри</div>
           <button
             type="button"
             className="footer-api-btn"
             style={styles.footerApiButton}
-            onClick={() => {
-              window.location.assign(PUBLIC_API_DOCS_URL);
-            }}
+            onClick={handleApiAccessClick}
           >
             Заяви API достъп
           </button>
         </div>
+
+        <div style={styles.footerCol}>
+          <div style={styles.footerTitle}>Контакти</div>
+          <a href="/contacts" style={styles.footerLink}>
+            Контактна страница
+          </a>
+          <p style={styles.footerText}>Работно време по телефон: Понеделник - Петък, 09:00 - 18:00 ч.</p>
+          <p style={styles.footerText}>Поддръжка по имейл: 24/7 (по всяко време).</p>
+        </div>
       </div>
 
-      <div style={styles.bottomRow} className="footer-bottom">
+      <div style={styles.bottomRow}>
         <span>© {new Date().getFullYear()} Kar.bg. Всички права запазени.</span>
       </div>
+
+      <style>{footerCss}</style>
     </footer>
   );
 }
@@ -110,11 +94,9 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: "column",
     gap: 10,
   },
-  footerBrand: {
-    fontWeight: 700,
-    fontSize: 17,
-    color: "#0f766e",
-    fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+  footerLogo: {
+    width: 152,
+    height: "auto",
   },
   footerText: {
     color: "#666",
@@ -134,30 +116,6 @@ const styles: Record<string, React.CSSProperties> = {
     textDecoration: "none",
     fontSize: 14,
     padding: "4px 0",
-  },
-  footerLinkButtonReset: {
-    border: "none",
-    background: "transparent",
-    textAlign: "left",
-    cursor: "pointer",
-  },
-  footerLinkButton: {
-    color: "#666",
-    fontSize: 14,
-    padding: "4px 0",
-    fontFamily: "inherit",
-  },
-  footerApiDealerBadge: {
-    display: "inline-flex",
-    alignItems: "center",
-    width: "fit-content",
-    padding: "6px 10px",
-    borderRadius: 999,
-    fontSize: 12,
-    fontWeight: 700,
-    color: "#0f766e",
-    background: "#ecfdf5",
-    border: "1px solid #99f6e4",
   },
   footerApiButton: {
     marginTop: 8,
@@ -193,10 +151,6 @@ const footerCss = `
     transform: translateY(-1px);
   }
 
-  .footer-link:hover {
-    text-decoration: underline;
-  }
-
   @media (max-width: 1023px) {
     .footer-grid {
       grid-template-columns: 1fr !important;
@@ -204,10 +158,6 @@ const footerCss = `
   }
 
   @media (max-width: 767px) {
-    .footer-api-btn {
-      width: 100%;
-    }
-
     .footer-bottom {
       flex-direction: column;
       align-items: flex-start;

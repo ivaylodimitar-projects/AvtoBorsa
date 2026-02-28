@@ -9,6 +9,7 @@ class AuthFlowTests(APITestCase):
         register_response = self.client.post(
             "/api/auth/register/private/",
             {
+                "username": "mixedcaseuser",
                 "email": "MixedCaseUser@example.com",
                 "password": "StrongPass123!",
                 "confirm_password": "StrongPass123!",
@@ -74,6 +75,7 @@ class AuthFlowTests(APITestCase):
         first_register = self.client.post(
             "/api/auth/register/private/",
             {
+                "username": "duplicateone",
                 "email": "duplicate@example.com",
                 "password": "StrongPass123!",
                 "confirm_password": "StrongPass123!",
@@ -85,6 +87,7 @@ class AuthFlowTests(APITestCase):
         second_register = self.client.post(
             "/api/auth/register/private/",
             {
+                "username": "duplicatetwo",
                 "email": "DUPLICATE@example.com",
                 "password": "StrongPass123!",
                 "confirm_password": "StrongPass123!",
@@ -98,6 +101,7 @@ class AuthFlowTests(APITestCase):
         response = self.client.post(
             "/api/auth/register/private/",
             {
+                "username": "weak_private",
                 "email": "weak-private@example.com",
                 "password": "weakpass1",
                 "confirm_password": "weakpass1",
@@ -106,6 +110,32 @@ class AuthFlowTests(APITestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("Паролата", str(response.data))
+
+    def test_private_registration_rejects_duplicate_username_case_insensitive(self):
+        first_register = self.client.post(
+            "/api/auth/register/private/",
+            {
+                "username": "privatedemo",
+                "email": "private-demo-one@example.com",
+                "password": "StrongPass123!",
+                "confirm_password": "StrongPass123!",
+            },
+            format="json",
+        )
+        self.assertEqual(first_register.status_code, 201)
+
+        second_register = self.client.post(
+            "/api/auth/register/private/",
+            {
+                "username": "PRIVATEDEMO",
+                "email": "private-demo-two@example.com",
+                "password": "StrongPass123!",
+                "confirm_password": "StrongPass123!",
+            },
+            format="json",
+        )
+        self.assertEqual(second_register.status_code, 400)
+        self.assertIn("username", second_register.data)
 
     def test_business_registration_rejects_weak_password_policy(self):
         response = self.client.post(

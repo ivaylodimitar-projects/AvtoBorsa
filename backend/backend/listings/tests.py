@@ -3,7 +3,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase, APIClient
 
-from backend.accounts.models import BusinessUser
+from backend.accounts.models import BusinessUser, PrivateUser
 from .models import CarListing
 
 
@@ -186,3 +186,82 @@ class ListingKapariranoStatusTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.private_listing.refresh_from_db(fields=["is_kaparirano"])
         self.assertFalse(self.private_listing.is_kaparirano)
+
+
+class PublicProfileListingsTests(APITestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.private_user = user_model.objects.create_user(
+            username="private-owner-login",
+            email="private-profile@example.com",
+            password="testpass123",
+        )
+        self.business_user = user_model.objects.create_user(
+            username="business-owner-login",
+            email="business-profile@example.com",
+            password="testpass123",
+        )
+        PrivateUser.objects.create(
+            user=self.private_user,
+            email="private-profile@example.com",
+            username="private_profile",
+        )
+        BusinessUser.objects.create(
+            user=self.business_user,
+            dealer_name="Dealer Company One",
+            city="Sofia",
+            address="bul. Vitosha 1",
+            phone="+359888000001",
+            email="dealer-company-one@example.com",
+            website="https://dealer-company-one.example.com",
+            username="dealercompanyone",
+            company_name="Dealer Company One LTD",
+            registration_address="Sofia",
+            mol="Ivan Ivanov",
+            bulstat="123456789",
+            vat_number="BG123456789",
+            admin_name="Ivan Ivanov",
+            admin_phone="+359888000001",
+        )
+        CarListing.objects.create(
+            user=self.private_user,
+            brand="Toyota",
+            model="Corolla",
+            year_from=2019,
+            price="15000.00",
+            city="Sofia",
+            fuel="benzin",
+            gearbox="ruchna",
+            mileage=150000,
+            description="Private profile listing",
+            phone="+359888000111",
+            email="private-profile@example.com",
+        )
+        CarListing.objects.create(
+            user=self.business_user,
+            brand="BMW",
+            model="X3",
+            year_from=2021,
+            price="43000.00",
+            city="Sofia",
+            fuel="dizel",
+            gearbox="avtomatik",
+            mileage=90000,
+            description="Business profile listing",
+            phone="+359888000222",
+            email="business-profile@example.com",
+        )
+
+    def test_public_profile_listings_available_for_private_username_without_auth(self):
+        response = self.client.get("/api/profiles/private_profile/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["profile"]["type"], "private")
+        self.assertEqual(response.data["profile"]["title"], "private_profile")
+        self.assertEqual(response.data["listing_count"], 1)
+
+    def test_public_profile_listings_available_for_business_company_slug_without_auth(self):
+        response = self.client.get("/api/profiles/dealer-company-one/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["profile"]["type"], "business")
+        self.assertEqual(response.data["profile"]["title"], "Dealer Company One")
+        self.assertEqual(response.data["listing_count"], 1)

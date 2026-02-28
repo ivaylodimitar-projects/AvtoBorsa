@@ -17,6 +17,7 @@ import { invalidateMyAdsCache } from "../utils/myAdsCache";
 import { invalidateLatestListingsCache } from "../utils/latestListingsCache";
 import { requestDealerListingsSync } from "../utils/dealerSubscriptions";
 import { addBalanceUsageRecord } from "../utils/balanceUsageHistory";
+import { buildPublicProfilePath } from "../utils/profilePaths";
 import { BULGARIAN_CITIES_BY_REGION } from "../constants/bulgarianCities";
 import ListingFormStepper from "./ListingFormStepper";
 import AdvancedImageUpload, { type ExistingImageItem } from "./AdvancedImageUpload";
@@ -3819,7 +3820,7 @@ const PublishPage: React.FC = () => {
       if (isEditMode) {
         await new Promise((resolve) => setTimeout(resolve, EDIT_REDIRECT_LOADING_DELAY_MS));
       }
-      navigate("/my-ads", {
+      navigate(buildPublicProfilePath(user), {
         replace: true,
         state: {
           forceRefresh: true,
@@ -6768,5 +6769,4 @@ const PublishPage: React.FC = () => {
 };
 
 export default PublishPage;
-
 

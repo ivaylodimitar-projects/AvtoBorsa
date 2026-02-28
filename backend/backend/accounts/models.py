@@ -148,6 +148,7 @@ class PrivateUser(models.Model):
     """Model for private user accounts"""
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='private_profile')
     email = models.EmailField(unique=True, validators=[EmailValidator()])
+    username = models.CharField(max_length=32, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -164,7 +165,7 @@ class BusinessUser(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='business_profile')
 
     # Име и контакти (Name and Contacts)
-    dealer_name = models.CharField(max_length=80)
+    dealer_name = models.CharField(max_length=80, unique=True)
     city = models.CharField(max_length=50)
     address = models.CharField(max_length=80)
     phone = models.CharField(max_length=25)

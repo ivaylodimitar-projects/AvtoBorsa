@@ -122,7 +122,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
     try {
       const token = localStorage.getItem('authToken');
       if (!token || !listingId) {
-        alert('Трябва да си логнат за да запазиш обяви');
+        showToast('Трябва да сте влезли в профила си, за да запазвате обяви.', { type: 'error' });
         return;
       }
       setIsLoading(true);
@@ -142,11 +142,11 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
       if (response.ok) {
         setIsFavorite(!isFavorite);
       } else {
-        alert('Грешка при запазване на обявата');
+        showToast('Грешка при запазване на обявата.', { type: 'error' });
       }
     } catch (err) {
       console.error('Error toggling favorite:', err);
-      alert('Грешка при запазване на обявата');
+      showToast('Грешка при запазване на обявата.', { type: 'error' });
     } finally {
       setIsLoading(false);
     }

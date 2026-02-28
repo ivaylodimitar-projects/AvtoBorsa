@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   Archive,
   Trash2,
@@ -174,6 +174,13 @@ type MyAdsNavigationState = {
   forceRefresh?: boolean;
   publishMessage?: string;
   publishedListingId?: number | null;
+};
+
+type PublicProfilePayload = {
+  profile?: {
+    title?: string;
+  };
+  listings?: CarListing[];
 };
 
 type TabType = "active" | "archived" | "drafts" | "liked" | "top" | "vip" | "expired";
@@ -539,14 +546,22 @@ const globalCss = `
   }
 `;
 
-const MyAdsPage: React.FC = () => {
+type MyAdsPageProps = {
+  publicView?: boolean;
+  publicProfileSlug?: string;
+};
+
+const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfileSlug }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const routeParams = useParams<{ publicProfileSlug?: string }>();
   const navigationState = (location.state as MyAdsNavigationState | null) ?? null;
   const forceRefreshFromPublish = navigationState?.forceRefresh === true;
   const { isAuthenticated, user, updateBalance, ensureFreshAccessToken } = useAuth();
   const getImageUrl = useImageUrl();
-  const isBusinessUser = user?.userType === "business";
+  const resolvedPublicProfileSlug = (publicProfileSlug || routeParams.publicProfileSlug || "").trim();
+  const isPublicView = publicView && resolvedPublicProfileSlug.length > 0;
+  const isBusinessUser = !isPublicView && user?.userType === "business";
   const [activeListings, setActiveListings] = useState<CarListing[]>([]);
   const [archivedListings, setArchivedListings] = useState<CarListing[]>([]);
   const [draftListings, setDraftListings] = useState<CarListing[]>([]);
@@ -593,12 +608,65 @@ const MyAdsPage: React.FC = () => {
   const [qrTargetUrl, setQrTargetUrl] = useState("");
   const [qrGenerationError, setQrGenerationError] = useState<string | null>(null);
   const [isQrGenerating, setIsQrGenerating] = useState(false);
+  const [publicProfileTitle, setPublicProfileTitle] = useState<string>("");
   const qrGenerationRequestRef = React.useRef(0);
   const deleteAnimationTimeoutIdsRef = React.useRef<number[]>([]);
   const tabsSliderRef = React.useRef<HTMLDivElement | null>(null);
   const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
 
   useEffect(() => {
+    if (!isPublicView) return;
+
+    const fetchPublicProfile = async () => {
+      setIsLoading(true);
+      setError(null);
+      setRequiresAuthPrompt(false);
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/profiles/${encodeURIComponent(resolvedPublicProfileSlug)}/`,
+          { cache: "no-store" }
+        );
+
+        if (response.status === 404) {
+          setError("Профилът не е намерен.");
+          setActiveListings([]);
+          setArchivedListings([]);
+          setDraftListings([]);
+          setExpiredListings([]);
+          setLikedListings([]);
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(`Public profile fetch failed: ${response.status}`);
+        }
+
+        const payload = (await response.json()) as PublicProfilePayload;
+        setActiveListings(Array.isArray(payload.listings) ? payload.listings : []);
+        setArchivedListings([]);
+        setDraftListings([]);
+        setExpiredListings([]);
+        setLikedListings([]);
+        setPublicProfileTitle((payload.profile?.title || resolvedPublicProfileSlug).trim());
+        setError(null);
+      } catch {
+        setError("В момента профилът не може да бъде зареден.");
+        setActiveListings([]);
+        setArchivedListings([]);
+        setDraftListings([]);
+        setExpiredListings([]);
+        setLikedListings([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void fetchPublicProfile();
+  }, [isPublicView, resolvedPublicProfileSlug]);
+
+  useEffect(() => {
+    if (isPublicView) return;
+
     if (!isAuthenticated) {
       invalidateMyAdsCache();
       setRequiresAuthPrompt(false);
@@ -764,7 +832,7 @@ const MyAdsPage: React.FC = () => {
     };
 
     fetchUserListings();
-  }, [forceRefreshFromPublish, isAuthenticated, user?.id, ensureFreshAccessToken]);
+  }, [forceRefreshFromPublish, isPublicView, isAuthenticated, user?.id, ensureFreshAccessToken]);
 
   useEffect(() => {
     if (!navigationState?.publishMessage) return;
@@ -3518,14 +3586,20 @@ const MyAdsPage: React.FC = () => {
   },
 };
 
-  const activeCountLabel = `Моите активни обяви: ${activeListings.length}`;
+  const pageTitle =
+    isPublicView
+      ? `Обяви на ${publicProfileTitle || resolvedPublicProfileSlug}`
+      : "Моите Обяви";
+  const activeCountLabel = isPublicView
+    ? `Активни обяви: ${activeListings.length}`
+    : `Моите активни обяви: ${activeListings.length}`;
 
   const renderHeader = (subtitleText: string, showAddButton: boolean) => (
     <div style={styles.header}>
       <div style={styles.headerRow}>
         <div style={styles.titleContainer}>
           <List size={32} style={styles.titleIcon} />
-          <h1 style={styles.title}>Моите Обяви</h1>
+          <h1 style={styles.title}>{pageTitle}</h1>
         </div>
         {showAddButton && (
           <button
@@ -3552,7 +3626,7 @@ const MyAdsPage: React.FC = () => {
     </div>
   );
 
-  if (!isAuthenticated || requiresAuthPrompt) {
+  if (!isPublicView && (!isAuthenticated || requiresAuthPrompt)) {
     const loginPromptTitle = requiresAuthPrompt ? "Сесията е изтекла" : "Трябва да си логнат";
     const loginPromptSubtitle = requiresAuthPrompt
       ? "Логни се отново, за да видиш твоите обяви."
@@ -3596,7 +3670,7 @@ const MyAdsPage: React.FC = () => {
       <div style={styles.page}>
         <style>{globalCss}</style>
         <div style={styles.container}>
-          {renderHeader(activeCountLabel, true)}
+          {renderHeader(activeCountLabel, !isPublicView)}
           <div style={styles.loadingState}>
             <p>Зареждане...</p>
           </div>
@@ -3610,7 +3684,7 @@ const MyAdsPage: React.FC = () => {
       <div style={styles.page}>
         <style>{globalCss}</style>
         <div style={styles.container}>
-          {renderHeader(activeCountLabel, true)}
+          {renderHeader(activeCountLabel, !isPublicView)}
           <div style={styles.errorState}>
             <p>Грешка: {error}</p>
           </div>
@@ -3929,7 +4003,7 @@ const MyAdsPage: React.FC = () => {
       <div style={styles.page}>
         <style>{globalCss}</style>
         <div style={styles.container}>
-          {renderHeader(activeCountLabel, true)}
+          {renderHeader(activeCountLabel, !isPublicView)}
 
           <div style={styles.emptyState}>
             <div style={styles.emptyIconWrapper}>
@@ -3964,7 +4038,7 @@ const MyAdsPage: React.FC = () => {
     <div style={styles.page}>
       <style>{globalCss}</style>
       <div style={styles.container}>
-        {renderHeader(activeCountLabel, true)}
+        {renderHeader(activeCountLabel, !isPublicView)}
 
         {/* Toast Notification */}
         {toast && (
@@ -4548,15 +4622,46 @@ const MyAdsPage: React.FC = () => {
           ref={tabsSliderRef}
           onWheel={handleTabsWheel}
         >
-          {[
-          { id: "active", label: "Активни", Icon: List, count: activeListings.length },
-          { id: "top", label: "Топ обяви", Icon: PackageOpen, count: topListingsCount, promoBadge: "top" as const },
-          { id: "vip", label: "VIP обяви", Icon: Tag, count: vipListingsCount, promoBadge: "vip" as const },
-          { id: "archived", label: "Архивирани", Icon: Archive, count: archivedListings.length },
-          { id: "expired", label: "Изтекли", Icon: Clock, count: expiredListings.length },
-          { id: "drafts", label: "Чернови", Icon: FileText, count: draftListings.length },
-          { id: "liked", label: "Любими", Icon: Heart, count: likedListings.length },
-        ].map((tab) => {
+          {(isPublicView
+            ? [
+                { id: "active", label: "Обяви", Icon: List, count: activeListings.length },
+                {
+                  id: "top",
+                  label: "TOP обяви",
+                  Icon: PackageOpen,
+                  count: topListingsCount,
+                  promoBadge: "top" as const,
+                },
+                {
+                  id: "vip",
+                  label: "VIP обяви",
+                  Icon: Tag,
+                  count: vipListingsCount,
+                  promoBadge: "vip" as const,
+                },
+              ]
+            : [
+                { id: "active", label: "Активни", Icon: List, count: activeListings.length },
+                {
+                  id: "top",
+                  label: "Топ обяви",
+                  Icon: PackageOpen,
+                  count: topListingsCount,
+                  promoBadge: "top" as const,
+                },
+                {
+                  id: "vip",
+                  label: "VIP обяви",
+                  Icon: Tag,
+                  count: vipListingsCount,
+                  promoBadge: "vip" as const,
+                },
+                { id: "archived", label: "Архивирани", Icon: Archive, count: archivedListings.length },
+                { id: "expired", label: "Изтекли", Icon: Clock, count: expiredListings.length },
+                { id: "drafts", label: "Чернови", Icon: FileText, count: draftListings.length },
+                { id: "liked", label: "Любими", Icon: Heart, count: likedListings.length },
+              ]
+          ).map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
@@ -4713,7 +4818,7 @@ const MyAdsPage: React.FC = () => {
               {activeTab === "drafts" && "Начни да пишеш нова обява"}
               {activeTab === "liked" && "Добави обяви в любими"}
             </p>
-            {(activeTab === "active" || activeTab === "top" || activeTab === "vip") && (
+            {!isPublicView && (activeTab === "active" || activeTab === "top" || activeTab === "vip") && (
               <a
                 href="/publish"
                 style={styles.ctaButton}
@@ -4965,22 +5070,24 @@ const MyAdsPage: React.FC = () => {
                   </div>
                 )}
 
-                <div style={styles.listingContentSpacer} />
-                <div style={styles.listingActionsLabel}>Управление на обявата</div>
-                {(topRemainingLabel || vipRemainingLabel || nonPromotedLabel) && (
-                  <div style={styles.listingPromoStatusStack}>
-                    {topRemainingLabel && (
-                      <span style={styles.topTimer}>{topRemainingLabel}</span>
+                {!isPublicView && (
+                  <>
+                    <div style={styles.listingContentSpacer} />
+                    <div style={styles.listingActionsLabel}>Управление на обявата</div>
+                    {(topRemainingLabel || vipRemainingLabel || nonPromotedLabel) && (
+                      <div style={styles.listingPromoStatusStack}>
+                        {topRemainingLabel && (
+                          <span style={styles.topTimer}>{topRemainingLabel}</span>
+                        )}
+                        {vipRemainingLabel && (
+                          <span style={styles.vipTimer}>{vipRemainingLabel}</span>
+                        )}
+                        {nonPromotedLabel && (
+                          <span style={styles.nonPromotedTimer}>{nonPromotedLabel}</span>
+                        )}
+                      </div>
                     )}
-                    {vipRemainingLabel && (
-                      <span style={styles.vipTimer}>{vipRemainingLabel}</span>
-                    )}
-                    {nonPromotedLabel && (
-                      <span style={styles.nonPromotedTimer}>{nonPromotedLabel}</span>
-                    )}
-                  </div>
-                )}
-                <div style={styles.listingActions}>
+                    <div style={styles.listingActions}>
                   {/* Active Tab Actions: Edit, Archive, Delete */}
                   {(activeTab === "active" || activeTab === "top" || activeTab === "vip") && (
                     <>
@@ -5558,80 +5665,82 @@ const MyAdsPage: React.FC = () => {
                       {actionLoading === listing.id ? "..." : "Премахни от любими"}
                     </button>
                   )}
-                </div>
+                    </div>
 
-                <div
-                  style={{
-                    ...styles.deleteConfirmWrap,
-                    ...(deleteConfirm === listing.id
-                      ? styles.deleteConfirmWrapOpen
-                      : styles.deleteConfirmWrapClosed),
-                  }}
-                  aria-hidden={deleteConfirm === listing.id ? undefined : true}
-                >
-                  <div style={styles.deleteConfirmBox}>
-                    Сигурни ли сте, че искате да изтриете тази обява?
-                  </div>
-                </div>
-                {listingExpiryLabel && (
-                  <div style={styles.listingExpiryRow}>
-                    {showQrTrigger && (
-                      <button
-                        type="button"
-                        aria-label={`QR код за ${listingTitle}`}
-                        data-action="QR код"
-                        className="myads-icon-btn"
-                        style={{
-                          ...styles.qrTriggerButton,
-                          ...(hasQrTarget ? {} : styles.qrTriggerButtonDisabled),
-                        }}
-                        disabled={!hasQrTarget}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void openQrModal(listing);
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!hasQrTarget) return;
-                          e.currentTarget.style.transform = "translateY(-1px)";
-                          e.currentTarget.style.borderColor = "#0f766e";
-                          e.currentTarget.style.boxShadow = "0 4px 12px rgba(15, 118, 110, 0.28)";
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!hasQrTarget) return;
-                          e.currentTarget.style.transform = "translateY(0)";
-                          e.currentTarget.style.borderColor = "#cbd5e1";
-                          e.currentTarget.style.boxShadow = "0 2px 10px rgba(15, 23, 42, 0.1)";
-                        }}
-                      >
-                        <span style={styles.qrTriggerIconWrap}>
-                          <Lottie
-                            animationData={karBgQrCodeAnimation}
-                            loop
-                            autoplay
-                            style={styles.qrTriggerIcon}
-                          />
-                        </span>
-                      </button>
-                    )}
-                    <div style={styles.listingExpiryInfo}>
-                      {createdLabel && (
-                        <div style={{ ...styles.listingDateRow, ...styles.listingPublishedInfo }}>
-                          <Calendar size={13} style={{ ...styles.listingDateIcon, ...styles.listingPublishedIcon }} />
-                          <span>Публикувана на: {createdLabel}</span>
-                        </div>
-                      )}
-                      {updatedLabel && (
-                        <div style={{ ...styles.listingDateRow, ...styles.listingEditedInfo }}>
-                          <Edit2 size={13} style={{ ...styles.listingDateIcon, ...styles.listingEditedIcon }} />
-                          <span>Редактирана на: {updatedLabel}</span>
-                        </div>
-                      )}
-                      <div style={{ ...styles.listingDateRow, ...styles.listingExpiryMainInfo }}>
-                        <Clock size={13} style={{ ...styles.listingDateIcon, ...styles.listingExpiryIcon }} />
-                        <span>{listingExpiryLabel}</span>
+                    <div
+                      style={{
+                        ...styles.deleteConfirmWrap,
+                        ...(deleteConfirm === listing.id
+                          ? styles.deleteConfirmWrapOpen
+                          : styles.deleteConfirmWrapClosed),
+                      }}
+                      aria-hidden={deleteConfirm === listing.id ? undefined : true}
+                    >
+                      <div style={styles.deleteConfirmBox}>
+                        Сигурни ли сте, че искате да изтриете тази обява?
                       </div>
                     </div>
-                  </div>
+                    {listingExpiryLabel && (
+                      <div style={styles.listingExpiryRow}>
+                        {showQrTrigger && (
+                          <button
+                            type="button"
+                            aria-label={`QR код за ${listingTitle}`}
+                            data-action="QR код"
+                            className="myads-icon-btn"
+                            style={{
+                              ...styles.qrTriggerButton,
+                              ...(hasQrTarget ? {} : styles.qrTriggerButtonDisabled),
+                            }}
+                            disabled={!hasQrTarget}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void openQrModal(listing);
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!hasQrTarget) return;
+                              e.currentTarget.style.transform = "translateY(-1px)";
+                              e.currentTarget.style.borderColor = "#0f766e";
+                              e.currentTarget.style.boxShadow = "0 4px 12px rgba(15, 118, 110, 0.28)";
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!hasQrTarget) return;
+                              e.currentTarget.style.transform = "translateY(0)";
+                              e.currentTarget.style.borderColor = "#cbd5e1";
+                              e.currentTarget.style.boxShadow = "0 2px 10px rgba(15, 23, 42, 0.1)";
+                            }}
+                          >
+                            <span style={styles.qrTriggerIconWrap}>
+                              <Lottie
+                                animationData={karBgQrCodeAnimation}
+                                loop
+                                autoplay
+                                style={styles.qrTriggerIcon}
+                              />
+                            </span>
+                          </button>
+                        )}
+                        <div style={styles.listingExpiryInfo}>
+                          {createdLabel && (
+                            <div style={{ ...styles.listingDateRow, ...styles.listingPublishedInfo }}>
+                              <Calendar size={13} style={{ ...styles.listingDateIcon, ...styles.listingPublishedIcon }} />
+                              <span>Публикувана на: {createdLabel}</span>
+                            </div>
+                          )}
+                          {updatedLabel && (
+                            <div style={{ ...styles.listingDateRow, ...styles.listingEditedInfo }}>
+                              <Edit2 size={13} style={{ ...styles.listingDateIcon, ...styles.listingEditedIcon }} />
+                              <span>Редактирана на: {updatedLabel}</span>
+                            </div>
+                          )}
+                          <div style={{ ...styles.listingDateRow, ...styles.listingExpiryMainInfo }}>
+                            <Clock size={13} style={{ ...styles.listingDateIcon, ...styles.listingExpiryIcon }} />
+                            <span>{listingExpiryLabel}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>

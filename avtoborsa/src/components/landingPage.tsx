@@ -43,6 +43,8 @@ import { APP_MAIN_CATEGORY_OPTIONS, getMainCategoryLabel } from "../constants/mo
 import { formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 import { resolvePriceBadgeState } from "../utils/priceChangeBadge";
 import { API_BASE_URL } from "../config/api";
+import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 const PUBLIC_API_DOCS_URL = `${API_BASE_URL}/docs/api/`;
 
 type CarListing = {
@@ -397,6 +399,8 @@ const selectBase: React.CSSProperties = {
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { showToast } = useToast();
   const { searches } = useRecentSearches();
   const initialLatestListingsRef = useRef<CarListing[] | null>(
     readLatestListingsCache<CarListing>()
@@ -555,6 +559,18 @@ export default function LandingPage() {
 
     // Log the search query to console
     console.log("Advanced Search Criteria:", criteria);
+  };
+
+  const handleApiAccessClick = () => {
+    if (!user) {
+      showToast("Моля, влезте в бизнес профил, за да заявите API достъп.", { type: "error" });
+      return;
+    }
+    if (user.userType !== "business") {
+      showToast("API достъпът е наличен само за бизнес профили.", { type: "error" });
+      return;
+    }
+    window.location.assign(PUBLIC_API_DOCS_URL);
   };
 
   const resetFilters = () => {
@@ -2487,9 +2503,7 @@ export default function LandingPage() {
                 type="button"
                 className="about-api-btn"
                 style={styles.apiInfoButton}
-                onClick={() => {
-                  window.location.assign(PUBLIC_API_DOCS_URL);
-                }}
+                onClick={handleApiAccessClick}
               >
                 Научи повече за API
               </button>
@@ -3283,6 +3297,5 @@ const globalCss = `
     }
   }
 `;
-
 
 

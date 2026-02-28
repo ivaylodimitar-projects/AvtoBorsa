@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
+import re
 from backend.listings.models import get_expiry_cutoff
 from .models import PrivateUser, BusinessUser, UserProfile
 
@@ -22,13 +23,14 @@ def _validate_password_policy(password: str) -> None:
 
 class PrivateUserSerializer(serializers.ModelSerializer):
     """Serializer for private user registration"""
+    username = serializers.CharField(min_length=3, max_length=32)
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
     confirm_password = serializers.CharField(write_only=True, min_length=8)
 
     class Meta:
         model = PrivateUser
-        fields = ['email', 'password', 'confirm_password']
+        fields = ['username', 'email', 'password', 'confirm_password']
 
     def validate(self, data):
         _validate_password_policy(data['password'])
@@ -39,10 +41,23 @@ class PrivateUserSerializer(serializers.ModelSerializer):
     def validate_email(self, value):
         email = _normalize_email(value)
         if User.objects.filter(email__iexact=email).exists():
-            raise serializers.ValidationError("User with this email already exists.")
+            raise serializers.ValidationError("Потребител с този имейл вече съществува.")
         return email
 
+    def validate_username(self, value):
+        username = str(value).strip().lower()
+        if not re.fullmatch(r"[a-z0-9]{3,32}", username):
+            raise serializers.ValidationError(
+                "Потребителското име може да съдържа само малки латински букви и цифри."
+            )
+        if PrivateUser.objects.filter(username__iexact=username).exists():
+            raise serializers.ValidationError("Потребителското име вече съществува.")
+        if BusinessUser.objects.filter(username__iexact=username).exists():
+            raise serializers.ValidationError("Потребителското име вече съществува.")
+        return username
+
     def create(self, validated_data):
+        username = validated_data['username']
         email = validated_data['email']
         password = validated_data.pop('password')
         validated_data.pop('confirm_password', None)
@@ -58,7 +73,8 @@ class PrivateUserSerializer(serializers.ModelSerializer):
         # Create PrivateUser profile
         private_user = PrivateUser.objects.create(
             user=user,
-            email=email
+            email=email,
+            username=username,
         )
         
         return private_user
@@ -90,8 +106,14 @@ class BusinessUserSerializer(serializers.ModelSerializer):
     def validate_email(self, value):
         email = _normalize_email(value)
         if User.objects.filter(email__iexact=email).exists():
-            raise serializers.ValidationError("User with this email already exists.")
+            raise serializers.ValidationError("Потребител с този имейл вече съществува.")
         return email
+
+    def validate_dealer_name(self, value):
+        dealer_name = str(value).strip()
+        if BusinessUser.objects.filter(dealer_name__iexact=dealer_name).exists():
+            raise serializers.ValidationError("Името на дилъра вече съществува.")
+        return dealer_name
 
     def create(self, validated_data):
         email = validated_data['email']
@@ -190,4 +212,3 @@ class DealerDetailSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.profile_image.url)
             return obj.profile_image.url
         return None
-

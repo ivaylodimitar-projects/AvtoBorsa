@@ -6,6 +6,9 @@ interface User {
   id: number;
   email: string;
   username?: string;
+  dealer_name?: string;
+  public_profile_slug?: string;
+  public_profile_path?: string;
   userType: "private" | "business";
   balance?: number;
   first_name?: string;

@@ -14,6 +14,11 @@ import {
 import ListingPromoBadge from "./ListingPromoBadge";
 import ResponsiveImage, { type ApiPhoto } from "./ResponsiveImage";
 import { API_BASE_URL } from "../config/api";
+import {
+  buildDealerSlug,
+  buildDealerProfilePath,
+  extractDealerIdFromSlug,
+} from "../utils/slugify";
 
 type CarListing = {
   id: number;
@@ -105,9 +110,10 @@ const isVipListing = (listing: CarListing) => {
 const NEW_LISTING_BADGE_MINUTES = 10;
 const NEW_LISTING_BADGE_WINDOW_MS = NEW_LISTING_BADGE_MINUTES * 60 * 1000;
 const PAGE_SIZE = 30;
+const DEFAULT_SHARE_IMAGE_PATH = "/karbglogo.png";
 
 const DealerDetailPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { dealerSlug } = useParams<{ dealerSlug: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [dealer, setDealer] = useState<DealerDetail | null>(null);
@@ -127,23 +133,137 @@ const DealerDetailPage: React.FC = () => {
 
   useEffect(() => {
     const fetchDealer = async () => {
+      setLoading(true);
+      setDealer(null);
+
       try {
-        const res = await fetch(`${API_BASE_URL}/api/auth/dealers/${id}/`, {
+        const rawSlug = (dealerSlug || "").trim();
+        if (!rawSlug) {
+          setLoading(false);
+          return;
+        }
+
+        let resolvedDealerId = extractDealerIdFromSlug(rawSlug);
+
+        if (!resolvedDealerId) {
+          const dealersRes = await fetch(`${API_BASE_URL}/api/auth/dealers/`, {
+            cache: "no-store",
+          });
+          if (!dealersRes.ok) {
+            setLoading(false);
+            return;
+          }
+
+          const payload = await dealersRes.json();
+          const dealersList = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.results)
+              ? payload.results
+              : [];
+
+          const match = dealersList.find((item: unknown) => {
+            if (!item || typeof item !== "object") return false;
+            const record = item as { id?: unknown; dealer_name?: unknown };
+            if (typeof record.dealer_name !== "string" || !record.dealer_name.trim()) return false;
+            return buildDealerSlug(record.dealer_name) === rawSlug;
+          }) as { id?: unknown } | undefined;
+
+          const idValue = Number(match?.id);
+          if (Number.isFinite(idValue) && idValue > 0) {
+            resolvedDealerId = Math.floor(idValue);
+          }
+        }
+
+        if (!resolvedDealerId) {
+          setLoading(false);
+          return;
+        }
+
+        const res = await fetch(`${API_BASE_URL}/api/auth/dealers/${resolvedDealerId}/`, {
           cache: "no-store",
         });
         if (res.ok) {
           const data = await res.json();
           setDealer(data);
           setAboutDraft(data.about_text || "");
+        } else {
+          setDealer(null);
         }
       } catch (err) {
         console.error("Failed to fetch dealer:", err);
+        setDealer(null);
       } finally {
         setLoading(false);
       }
     };
     fetchDealer();
-  }, [id]);
+  }, [dealerSlug]);
+
+  useEffect(() => {
+    if (!dealer) return;
+
+    const canonicalPath = buildDealerProfilePath(dealer.dealer_name, dealer.id);
+    if (dealerSlug !== canonicalPath.replace("/dealers/", "")) {
+      navigate(canonicalPath, { replace: true });
+    }
+  }, [dealer, dealerSlug, navigate]);
+
+  useEffect(() => {
+    if (!dealer) return;
+
+    const resolveAbsoluteUrl = (rawUrl?: string | null) => {
+      const value = (rawUrl || "").trim();
+      if (!value) return "";
+      if (/^https?:\/\//i.test(value)) return value;
+      if (value.startsWith("//")) return `${window.location.protocol}${value}`;
+
+      if (value.startsWith("/")) {
+        const base = API_BASE_URL || window.location.origin;
+        try {
+          return new URL(value, base).href;
+        } catch {
+          return `${window.location.origin}${value}`;
+        }
+      }
+
+      try {
+        return new URL(value, API_BASE_URL || window.location.origin).href;
+      } catch {
+        return value;
+      }
+    };
+
+    const upsertMetaTag = (
+      selector: string,
+      attributeName: "property" | "name",
+      attributeValue: string,
+      content: string
+    ) => {
+      let tag = document.querySelector(selector) as HTMLMetaElement | null;
+      if (!tag) {
+        tag = document.createElement("meta");
+        tag.setAttribute(attributeName, attributeValue);
+        document.head.appendChild(tag);
+      }
+      tag.setAttribute("content", content);
+    };
+
+    const title = `Kar.bg | ${dealer.dealer_name}`;
+    const description = `Профил на дилър ${dealer.dealer_name} в ${dealer.city}. Общо ${dealer.listing_count} активни обяви в Kar.bg.`;
+    const shareImage = resolveAbsoluteUrl(dealer.profile_image_url) || `${window.location.origin}${DEFAULT_SHARE_IMAGE_PATH}`;
+    const canonicalUrl = `${window.location.origin}${buildDealerProfilePath(dealer.dealer_name, dealer.id)}`;
+
+    document.title = title;
+    upsertMetaTag("meta[property='og:title']", "property", "og:title", title);
+    upsertMetaTag("meta[property='og:description']", "property", "og:description", description);
+    upsertMetaTag("meta[property='og:type']", "property", "og:type", "profile");
+    upsertMetaTag("meta[property='og:url']", "property", "og:url", canonicalUrl);
+    upsertMetaTag("meta[property='og:image']", "property", "og:image", shareImage);
+    upsertMetaTag("meta[name='twitter:card']", "name", "twitter:card", "summary_large_image");
+    upsertMetaTag("meta[name='twitter:title']", "name", "twitter:title", title);
+    upsertMetaTag("meta[name='twitter:description']", "name", "twitter:description", description);
+    upsertMetaTag("meta[name='twitter:image']", "name", "twitter:image", shareImage);
+  }, [dealer]);
 
   useEffect(() => {
     setListingBrandFilter("all");

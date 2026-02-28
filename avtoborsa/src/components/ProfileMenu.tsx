@@ -15,6 +15,7 @@ import TopUpModal from "./TopUpModal";
 import { useToast } from "../context/ToastContext";
 import { addDepositNotification } from "../utils/notifications";
 import { API_BASE_URL } from "../config/api";
+import { buildPublicProfilePath } from "../utils/profilePaths";
 const STRIPE_SESSION_STORAGE_KEY = "stripe_checkout_session_id";
 const PAYMENT_SYNC_MIN_MS = 650;
 
@@ -42,6 +43,7 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
   const location = useLocation();
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const profilePath = buildPublicProfilePath(user);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isTopUpModalOpen, setIsTopUpModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -855,7 +857,7 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
               {/* Menu Items */}
               <div style={styles.menuSection} className="profile-menu-items">
                 <Link
-                  to="/my-ads"
+                  to={profilePath}
                   style={styles.menuItem}
                   className="profile-menu-item-link"
                   onMouseEnter={(e) => {

@@ -6,13 +6,21 @@ const PASSWORD_POLICY_MESSAGE =
   "Паролата трябва да е поне 8 символа, с поне 1 главна буква и 1 цифра";
 const EMAIL_CONFIRMATION_MESSAGE =
   "Ще изпратим линк за потвърждение на този имейл.";
+const PUBLIC_PROFILE_BASE_URL = "https://kar.bg";
 
 const isPasswordValid = (password: string) =>
   password.length >= 8 && /\p{Lu}/u.test(password) && /\d/.test(password);
 
+const normalizeUsername = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 32);
+
 const PrivateProfilePage: React.FC = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
+    username: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -24,7 +32,8 @@ const PrivateProfilePage: React.FC = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const nextValue = name === "username" ? normalizeUsername(value) : value;
+    setFormData((prev) => ({ ...prev, [name]: nextValue }));
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
@@ -32,6 +41,12 @@ const PrivateProfilePage: React.FC = () => {
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
+
+    if (!formData.username.trim()) {
+      newErrors.username = "Потребителското име е задължително";
+    } else if (!/^[a-z0-9]{3,32}$/.test(formData.username.trim().toLowerCase())) {
+      newErrors.username = "Позволени са само малки латински букви и цифри (3-32)";
+    }
 
     if (!formData.email.trim()) {
       newErrors.email = "Email е задължителен";
@@ -66,6 +81,7 @@ const PrivateProfilePage: React.FC = () => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            username: formData.username.trim().toLowerCase(),
             email: formData.email.trim().toLowerCase(),
             password: formData.password,
             confirm_password: formData.confirmPassword,
@@ -76,7 +92,7 @@ const PrivateProfilePage: React.FC = () => {
             const data = await response.json();
             setSuccessMessage(data.message || "Регистрацията е успешна. Изпратихме ти имейл за потвърждение.");
             setErrors({});
-            setFormData({ email: "", password: "", confirmPassword: "" });
+            setFormData({ username: "", email: "", password: "", confirmPassword: "" });
           } else {
           const errorData = await response.json();
           console.error("Backend error response:", errorData);
@@ -215,6 +231,28 @@ const PrivateProfilePage: React.FC = () => {
               </svg>
               Email адрес
             </h2>
+
+            <div style={styles.formRow}>
+              <label style={styles.label} className="priv-label">Потребителско име *</label>
+              <input
+                className="priv-input"
+                style={{
+                  ...styles.input,
+                  borderColor: errors.username ? "#fca5a5" : "#e2e8f0",
+                }}
+                type="text"
+                name="username"
+                placeholder="Потребителско име"
+                value={formData.username}
+                onChange={handleChange}
+                autoComplete="username"
+              />
+              {errors.username && <div style={styles.errorText}>{errors.username}</div>}
+              <p style={styles.hint}>
+                Ще се използва за споделяне на профила ти:{" "}
+                <strong>{PUBLIC_PROFILE_BASE_URL}/{normalizeUsername(formData.username || "Потребитлско име")}</strong>
+              </p>
+            </div>
 
             {errors.submit && (
               <div style={styles.errorBanner}>

@@ -7,6 +7,7 @@ router.register(r'listings', views.CarListingViewSet, basename='listing')
 
 urlpatterns = [
     path('listings/latest/', views.latest_listings, name='latest_listings'),
+    path('profiles/<slug:profile_slug>/', views.get_public_profile_listings, name='public_profile_listings'),
     path('', include(router.urls)),
     path('my-listings/', views.get_user_listings, name='my_listings'),
     path('my-drafts/', views.get_user_drafts, name='my_drafts'),
@@ -25,4 +26,3 @@ urlpatterns = [
     path('listings/<int:listing_id>/favorite/', views.add_favorite, name='add_favorite'),
     path('listings/<int:listing_id>/unfavorite/', views.remove_favorite, name='remove_favorite'),
 ]
-

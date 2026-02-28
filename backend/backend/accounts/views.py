@@ -2,6 +2,7 @@ import hashlib
 import re
 import secrets
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -46,6 +47,23 @@ def _refresh_cookie_max_age_seconds() -> int:
 
 def _normalize_email(value: str) -> str:
     return str(value).strip().lower()
+
+
+def _slugify_public_segment(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", str(value or "")).strip().lower()
+    cleaned = re.sub(r"[^\w\s-]+", "", normalized, flags=re.UNICODE)
+    compact = re.sub(r"\s+", "-", cleaned)
+    compact = re.sub(r"-{2,}", "-", compact).strip("-")
+    return compact or "profile"
+
+
+def _build_public_profile_slug(user: User) -> str:
+    if hasattr(user, "business_profile"):
+        return _slugify_public_segment(user.business_profile.dealer_name)
+    if hasattr(user, "private_profile"):
+        return _slugify_public_segment(user.private_profile.username)
+    fallback = user.username or user.email or f"user-{user.id}"
+    return _slugify_public_segment(fallback)
 
 
 def _to_bool(value, default: bool = True) -> bool:
@@ -111,10 +129,13 @@ def _build_authenticated_user_payload(request, user: User) -> dict:
     if hasattr(user, 'business_profile'):
         user_type = 'business'
         user_data['username'] = user.business_profile.username
+        user_data['dealer_name'] = user.business_profile.dealer_name
         if user.business_profile.profile_image:
             user_data['profile_image_url'] = request.build_absolute_uri(
                 user.business_profile.profile_image.url
             )
+    elif hasattr(user, 'private_profile'):
+        user_data['username'] = user.private_profile.username
 
     try:
         profile = UserProfile.objects.get(user=user)
@@ -124,6 +145,9 @@ def _build_authenticated_user_payload(request, user: User) -> dict:
 
     user_data['balance'] = balance
     user_data['userType'] = user_type
+    public_profile_slug = _build_public_profile_slug(user)
+    user_data['public_profile_slug'] = public_profile_slug
+    user_data['public_profile_path'] = f"/{public_profile_slug}"
     return user_data
 
 
@@ -862,6 +886,7 @@ def register_private_user(request):
                     {
                         'message': 'Регистрацията е успешна. Изпратихме ти имейл за потвърждение.',
                         'email': serializer.validated_data['email'],
+                        'username': serializer.validated_data['username'],
                         'verification_required': True,
                     },
                     status=status.HTTP_201_CREATED
@@ -885,7 +910,7 @@ def login(request):
 
     if not normalized_email or not password:
         return Response(
-            {'error': 'Email and password are required'},
+            {'error': 'Имейлът и паролата са задължителни.'},
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -912,7 +937,7 @@ def login(request):
 
     if user is None:
         return Response(
-            {'error': 'Invalid email or password'},
+            {'error': 'Невалиден имейл или парола.'},
             status=status.HTTP_401_UNAUTHORIZED
         )
     return _build_auth_success_response(request, user, remember_me=remember_me)
@@ -928,7 +953,7 @@ def admin_login_request_code(request):
 
     if not normalized_email or not password:
         return Response(
-            {'error': 'Email and password are required.'},
+            {'error': 'Имейлът и паролата са задължителни.'},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -944,7 +969,7 @@ def admin_login_request_code(request):
             continue
         if not user_obj.is_active:
             return Response(
-                {'error': 'Account is not verified.'},
+                {'error': 'Акаунтът не е потвърден.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -954,13 +979,13 @@ def admin_login_request_code(request):
 
     if user is None:
         return Response(
-            {'error': 'Invalid email or password.'},
+            {'error': 'Невалиден имейл или парола.'},
             status=status.HTTP_401_UNAUTHORIZED,
         )
 
     if not (user.is_staff or user.is_superuser):
         return Response(
-            {'error': 'Admin role required.'},
+            {'error': 'Нужни са администраторски права.'},
             status=status.HTTP_403_FORBIDDEN,
         )
 
@@ -968,7 +993,7 @@ def admin_login_request_code(request):
     if cache.get(cooldown_key):
         return Response(
             {
-                'error': 'Please wait before requesting a new code.',
+                'error': 'Моля, изчакайте преди нова заявка за код.',
                 'retry_after': ADMIN_LOGIN_SEND_COOLDOWN_SECONDS,
             },
             status=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -1006,7 +1031,7 @@ def admin_login_request_code(request):
     except Exception:
         cache.delete(challenge_key)
         return Response(
-            {'error': 'Failed to send the login code email.'},
+            {'error': 'Неуспешно изпращане на кода за вход.'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
@@ -1030,13 +1055,13 @@ def admin_login_verify_code(request):
 
     if not challenge_id or not code:
         return Response(
-            {'error': 'challenge_id and code are required.'},
+            {'error': 'challenge_id и кодът са задължителни.'},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
     if not code.isdigit() or len(code) != ADMIN_LOGIN_CODE_LENGTH:
         return Response(
-            {'error': 'Invalid code format.'},
+            {'error': 'Невалиден формат на кода.'},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -1044,7 +1069,7 @@ def admin_login_verify_code(request):
     challenge = cache.get(challenge_key)
     if not challenge:
         return Response(
-            {'error': 'Code expired or invalid challenge.'},
+            {'error': 'Кодът е изтекъл или challenge е невалиден.'},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -1053,7 +1078,7 @@ def admin_login_verify_code(request):
     if expires_at and now_ts >= expires_at:
         cache.delete(challenge_key)
         return Response(
-            {'error': 'Code expired. Request a new one.'},
+            {'error': 'Кодът е изтекъл. Поискайте нов.'},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -1061,7 +1086,7 @@ def admin_login_verify_code(request):
     if attempts_left <= 0:
         cache.delete(challenge_key)
         return Response(
-            {'error': 'Too many invalid attempts. Request a new code.'},
+            {'error': 'Твърде много неуспешни опити. Поискайте нов код.'},
             status=status.HTTP_429_TOO_MANY_REQUESTS,
         )
 
@@ -1072,7 +1097,7 @@ def admin_login_verify_code(request):
         if attempts_left <= 0:
             cache.delete(challenge_key)
             return Response(
-                {'error': 'Too many invalid attempts. Request a new code.'},
+                {'error': 'Твърде много неуспешни опити. Поискайте нов код.'},
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
@@ -1081,7 +1106,7 @@ def admin_login_verify_code(request):
         cache.set(challenge_key, challenge, timeout=remaining_seconds)
         return Response(
             {
-                'error': 'Invalid code.',
+                'error': 'Невалиден код.',
                 'attempts_left': attempts_left,
             },
             status=status.HTTP_401_UNAUTHORIZED,
@@ -1092,14 +1117,14 @@ def admin_login_verify_code(request):
     if not user or not user.is_active:
         cache.delete(challenge_key)
         return Response(
-            {'error': 'User account is invalid or inactive.'},
+            {'error': 'Потребителският акаунт е невалиден или неактивен.'},
             status=status.HTTP_401_UNAUTHORIZED,
         )
 
     if not (user.is_staff or user.is_superuser):
         cache.delete(challenge_key)
         return Response(
-            {'error': 'Admin role required.'},
+            {'error': 'Нужни са администраторски права.'},
             status=status.HTTP_403_FORBIDDEN,
         )
 
@@ -1119,7 +1144,7 @@ def token_refresh(request):
 
     if not refresh_token:
         response = Response(
-            {'error': 'Refresh token is missing.'},
+            {'error': 'Липсва refresh токен.'},
             status=status.HTTP_401_UNAUTHORIZED
         )
         _clear_refresh_cookie(response)
@@ -1130,7 +1155,7 @@ def token_refresh(request):
         serializer.is_valid(raise_exception=True)
     except Exception:
         response = Response(
-            {'error': 'Refresh token is invalid or expired.'},
+            {'error': 'Refresh токенът е невалиден или изтекъл.'},
             status=status.HTTP_401_UNAUTHORIZED
         )
         _clear_refresh_cookie(response)
@@ -1158,7 +1183,7 @@ def logout(request):
             pass
 
     response = Response(
-        {'message': 'Logout successful'},
+        {'message': 'Излизането е успешно.'},
         status=status.HTTP_200_OK
     )
     _clear_refresh_cookie(response)
@@ -1169,41 +1194,10 @@ def logout(request):
 @permission_classes([IsAuthenticated])
 def get_current_user(request):
     """API endpoint to get current user info"""
-    user = request.user
-    user_type = 'private'
-    user_data = {
-        'id': user.id,
-        'email': user.email,
-        'first_name': user.first_name,
-        'last_name': user.last_name,
-        'created_at': user.date_joined,
-    }
-
-    if hasattr(user, 'business_profile'):
-        user_type = 'business'
-        user_data['username'] = user.business_profile.username
-        if user.business_profile.profile_image:
-            user_data['profile_image_url'] = request.build_absolute_uri(
-                user.business_profile.profile_image.url
-            )
-
-    # Get user balance
-    try:
-        profile = UserProfile.objects.get(user=user)
-        balance = float(profile.balance)
-    except UserProfile.DoesNotExist:
-        balance = 0.0
-
-    return Response({
-        'id': user.id,
-        'email': user.email,
-        'userType': user_type,
-        'balance': balance,
-        'is_staff': user.is_staff,
-        'is_superuser': user.is_superuser,
-        'is_admin': bool(user.is_staff or user.is_superuser),
-        **user_data
-    }, status=status.HTTP_200_OK)
+    return Response(
+        _build_authenticated_user_payload(request, request.user),
+        status=status.HTTP_200_OK,
+    )
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -1231,7 +1225,7 @@ def register_business_user(request):
 def password_reset_request(request):
     email = request.data.get('email')
     if not email:
-        return Response({'error': 'Email е задължителен.'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': 'Имейлът е задължителен.'}, status=status.HTTP_400_BAD_REQUEST)
 
     email_normalized = str(email).strip().lower()
     cooldown_seconds = getattr(settings, 'PASSWORD_RESET_COOLDOWN_SECONDS', 60)
@@ -1333,7 +1327,7 @@ def get_user_balance(request):
         return Response(serializer.data, status=status.HTTP_200_OK)
     except UserProfile.DoesNotExist:
         return Response(
-            {'error': 'User profile not found'},
+            {'error': 'Потребителският профил не е намерен.'},
             status=status.HTTP_404_NOT_FOUND
         )
 
@@ -1406,7 +1400,7 @@ def get_import_api_key_status(request):
             {
                 'has_key': False,
                 'allowed': False,
-                'reason': 'Only business accounts can use the import API.',
+                'reason': 'Само бизнес акаунти могат да използват import API.',
             },
             status=status.HTTP_200_OK,
         )
@@ -1435,7 +1429,7 @@ def generate_import_api_key(request):
     """Generate or rotate import API key for the current user."""
     if not _has_business_profile(request.user):
         return Response(
-            {'error': 'Only business accounts can use the import API.'},
+            {'error': 'Само бизнес акаунти могат да използват import API.'},
             status=status.HTTP_403_FORBIDDEN,
         )
 
@@ -1466,7 +1460,7 @@ def generate_import_api_key(request):
             continue
 
     return Response(
-        {'error': 'Could not generate API key. Please try again.'},
+        {'error': 'Неуспешно генериране на API ключ. Опитайте отново.'},
         status=status.HTTP_500_INTERNAL_SERVER_ERROR,
     )
 
@@ -1475,6 +1469,11 @@ def generate_import_api_key(request):
 @permission_classes([IsAuthenticated])
 def revoke_import_api_key(request):
     """Delete the current user's import API key."""
+    if not _has_business_profile(request.user):
+        return Response(
+            {'error': 'Само бизнес акаунти могат да използват import API.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
     deleted_count, _ = UserImportApiKey.objects.filter(user=request.user).delete()
     return Response({'deleted': bool(deleted_count)}, status=status.HTTP_200_OK)
 
@@ -1495,9 +1494,9 @@ def import_copart_listing(request):
         raw_key = _extract_import_api_key(request)
         if not raw_key:
             status_code = status.HTTP_401_UNAUTHORIZED
-            error_message = 'API key is missing.'
+            error_message = 'Липсва API ключ.'
             return Response(
-                {'error': 'API key is missing.'},
+                {'error': 'Липсва API ключ.'},
                 status=status_code,
             )
 
@@ -1506,18 +1505,18 @@ def import_copart_listing(request):
         ).first()
         if not api_key or not api_key.user.is_active:
             status_code = status.HTTP_401_UNAUTHORIZED
-            error_message = 'API key is invalid.'
+            error_message = 'API ключът е невалиден.'
             return Response(
-                {'error': 'API key is invalid.'},
+                {'error': 'API ключът е невалиден.'},
                 status=status_code,
             )
 
         event_user = api_key.user
         if not _has_business_profile(api_key.user):
             status_code = status.HTTP_403_FORBIDDEN
-            error_message = 'Only business accounts can use the import API.'
+            error_message = 'Само бизнес акаунти могат да използват import API.'
             return Response(
-                {'error': 'Only business accounts can use the import API.'},
+                {'error': 'Само бизнес акаунти могат да използват import API.'},
                 status=status_code,
             )
 
@@ -1533,7 +1532,7 @@ def import_copart_listing(request):
             status_code = status.HTTP_400_BAD_REQUEST
             error_message = str(exc)
             return Response(
-                {'error': 'Could not import listing.', 'details': str(exc)},
+                {'error': 'Неуспешен импорт на обявата.', 'details': str(exc)},
                 status=status_code,
             )
 
@@ -1549,7 +1548,7 @@ def import_copart_listing(request):
                 'title': listing.title,
                 'is_draft': listing.is_draft,
                 'images_uploaded': uploaded_images,
-                'message': 'Listing imported as draft.',
+                'message': 'Обявата е импортирана като чернова.',
             },
             status=status_code,
         )
@@ -1557,7 +1556,7 @@ def import_copart_listing(request):
         status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         error_message = str(exc)
         return Response(
-            {'error': 'Unexpected import error.', 'details': str(exc)},
+            {'error': 'Неочаквана грешка при импорт.', 'details': str(exc)},
             status=status_code,
         )
     finally:
@@ -1584,7 +1583,7 @@ def topup_balance(request):
         # Validate amount
         if amount is None:
             return Response(
-                {'error': 'Amount is required'},
+                {'error': 'Сумата е задължителна.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -1592,17 +1591,17 @@ def topup_balance(request):
             amount = float(amount)
             if amount <= 0:
                 return Response(
-                    {'error': 'Amount must be greater than 0'},
+                    {'error': 'Сумата трябва да е по-голяма от 0.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             if amount > 999999.99:
                 return Response(
-                    {'error': 'Amount exceeds maximum limit'},
+                    {'error': 'Сумата надвишава максимално допустимата стойност.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
         except (ValueError, TypeError):
             return Response(
-                {'error': 'Invalid amount format'},
+                {'error': 'Невалиден формат на сумата.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -1617,7 +1616,7 @@ def topup_balance(request):
         serializer = UserProfileSerializer(profile)
         return Response(
             {
-                'message': 'Balance updated successfully',
+                'message': 'Балансът е обновен успешно.',
                 'data': serializer.data
             },
             status=status.HTTP_200_OK
@@ -1645,7 +1644,7 @@ def dealer_detail(request, pk):
     try:
         dealer = BusinessUser.objects.get(pk=pk)
     except BusinessUser.DoesNotExist:
-        return Response({'error': 'Dealer not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'Дилърът не е намерен.'}, status=status.HTTP_404_NOT_FOUND)
 
     serializer = DealerDetailSerializer(dealer, context={'request': request})
     data = serializer.data
@@ -1688,12 +1687,12 @@ def upload_profile_photo(request):
     user = request.user
     if not hasattr(user, 'business_profile'):
         return Response(
-            {'error': 'Only business users can upload a profile photo'},
+            {'error': 'Само бизнес потребители могат да качват профилна снимка.'},
             status=status.HTTP_403_FORBIDDEN
         )
     image = request.FILES.get('image')
     if not image:
-        return Response({'error': 'No image provided'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'error': 'Не е предоставено изображение.'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         business = user.business_profile
@@ -1707,7 +1706,7 @@ def upload_profile_photo(request):
         return Response({'profile_image_url': image_url}, status=status.HTTP_200_OK)
     except Exception as e:
         return Response(
-            {'error': f'Failed to upload image: {str(e)}'},
+            {'error': f'Неуспешно качване на изображение: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -1719,7 +1718,7 @@ def update_about(request):
     user = request.user
     if not hasattr(user, 'business_profile'):
         return Response(
-            {'error': 'Only business users can update about text'},
+            {'error': 'Само бизнес потребители могат да редактират текста „За нас“.'},
             status=status.HTTP_403_FORBIDDEN
         )
 
