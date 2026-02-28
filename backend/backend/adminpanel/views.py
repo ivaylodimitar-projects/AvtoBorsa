@@ -1450,7 +1450,8 @@ def admin_contact_inquiry_reply(request, inquiry_id):
         subject = f"{subject} {inquiry_marker}".strip()
 
     from_email = str(
-        getattr(settings, "SUPPORT_FROM_EMAIL", "")
+        getattr(settings, "ADMIN_REPLY_FROM_EMAIL", "")
+        or getattr(settings, "SUPPORT_FROM_EMAIL", "")
         or getattr(settings, "DEFAULT_FROM_EMAIL", "")
         or ""
     ).strip()

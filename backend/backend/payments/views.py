@@ -44,10 +44,7 @@ def _build_invoice_email_context(tx: PaymentTransaction) -> dict[str, str]:
         or "Клиент"
     )
 
-    support_email = (
-        getattr(settings, "SUPPORT_FROM_EMAIL", "")
-        or getattr(settings, "DEFAULT_FROM_EMAIL", "")
-    )
+    support_email = getattr(settings, "DEFAULT_FROM_EMAIL", "")
     return {
         "brand_name": "Kar.bg",
         "invoice_number": _invoice_number_for_transaction(tx),
@@ -252,10 +249,7 @@ def send_invoice_email(tx: PaymentTransaction) -> None:
         return
 
     context = _build_invoice_email_context(tx)
-    from_email = (
-        getattr(settings, "SUPPORT_FROM_EMAIL", "")
-        or getattr(settings, "DEFAULT_FROM_EMAIL", "")
-    )
+    from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "")
     subject = f"Фактура от Kar.bg № {context['invoice_number']}"
     html_message = render_to_string("payments/invoice_email.html", context)
     text_message = strip_tags(html_message)

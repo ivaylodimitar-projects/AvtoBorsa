@@ -346,6 +346,11 @@ DEFAULT_FROM_EMAIL = (
 SUPPORT_FROM_EMAIL = (
     _resolve_env_alias(os.getenv("SUPPORT_FROM_EMAIL", "")) or DEFAULT_FROM_EMAIL
 )
+ADMIN_REPLY_FROM_EMAIL = (
+    _resolve_env_alias(os.getenv("ADMIN_REPLY_FROM_EMAIL", ""))
+    or _resolve_env_alias(os.getenv("SUPPORT_FROM_EMAIL", ""))
+    or DEFAULT_FROM_EMAIL
+)
 INVOICE_PDF_FONT_PATH = _resolve_env_alias(os.getenv("INVOICE_PDF_FONT_PATH", ""))
 
 SUPPORT_INBOX_SYNC_ENABLED = _env_flag("SUPPORT_INBOX_SYNC_ENABLED", default=False)

@@ -140,7 +140,7 @@ class PaymentsApiTests(APITestCase):
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
-        DEFAULT_FROM_EMAIL="support@kar.bg",
+        DEFAULT_FROM_EMAIL="no-reply@kar.bg",
         SUPPORT_FROM_EMAIL="support@kar.bg",
     )
     @patch("backend.payments.views._build_invoice_pdf_bytes")
@@ -160,7 +160,7 @@ class PaymentsApiTests(APITestCase):
         self.assertEqual(len(mail.outbox), 1)
         message = mail.outbox[0]
         self.assertIn("Фактура от Kar.bg", message.subject)
-        self.assertEqual(message.from_email, "support@kar.bg")
+        self.assertEqual(message.from_email, "no-reply@kar.bg")
         self.assertEqual(message.to, [self.user.email])
         self.assertEqual(len(message.attachments), 1)
 

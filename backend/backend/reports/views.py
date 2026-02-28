@@ -46,7 +46,7 @@ def create_contact_inquiry(request):
 
     return Response(
         {
-            "message": "Inquiry submitted successfully.",
+            "message": "\u0417\u0430\u043f\u0438\u0442\u0432\u0430\u043d\u0435\u0442\u043e \u0435 \u0438\u0437\u043f\u0440\u0430\u0442\u0435\u043d\u043e \u0443\u0441\u043f\u0435\u0448\u043d\u043e, \u043e\u0447\u0430\u043a\u0432\u0430\u0439\u0442\u0435 \u043e\u0442\u0433\u043e\u0432\u043e\u0440.",
             "id": inquiry.id,
         },
         status=status.HTTP_201_CREATED,
