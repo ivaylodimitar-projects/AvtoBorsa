@@ -1439,12 +1439,12 @@ def admin_contact_inquiry_reply(request, inquiry_id):
     inquiry = get_object_or_404(ContactInquiry.objects.select_related("replied_by"), pk=inquiry_id)
     reply_message = str(request.data.get("reply_message") or "").strip()
     if not reply_message:
-        return Response({"error": "Reply message is required."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": "Текстът на отговора е задължителен."}, status=status.HTTP_400_BAD_REQUEST)
 
     subject = str(request.data.get("subject") or "").strip()
     if not subject:
         topic_value = inquiry.topic.strip()
-        subject = f"Kar.bg support response{f' - {topic_value}' if topic_value else ''}"
+        subject = f"Отговор от поддръжка на Kar.bg{f' - {topic_value}' if topic_value else ''}"
     inquiry_marker = f"[Inquiry #{inquiry.id}]"
     if f"inquiry #{inquiry.id}" not in subject.lower():
         subject = f"{subject} {inquiry_marker}".strip()
@@ -1460,14 +1460,16 @@ def admin_contact_inquiry_reply(request, inquiry_id):
         f"<kar-inquiry-{inquiry.id}-{timezone.now().strftime('%Y%m%d%H%M%S%f')}@{message_id_domain}>"
     )
     mail_text = (
-        "Hello,\n\n"
-        "You received a reply from Kar.bg support regarding your inquiry.\n\n"
-        f"Reference: Inquiry #{inquiry.id}\n\n"
+        "Здравейте,\n\n"
+        "Получихте отговор от екипа за поддръжка на Kar.bg по ваше запитване.\n\n"
+        f"Номер на запитване: #{inquiry.id}\n\n"
+        "Отговор от поддръжката:\n"
         f"{reply_message}\n\n"
-        "Original inquiry:\n"
+        "Вашето първоначално запитване:\n"
         f"{inquiry.message}\n\n"
-        "Regards,\n"
-        "Kar.bg support"
+        "Ако имате нужда от допълнително съдействие, може да отговорите директно на този имейл.\n\n"
+        "Поздрави,\n"
+        "Екипът на Kar.bg"
     )
 
     try:
@@ -1485,7 +1487,7 @@ def admin_contact_inquiry_reply(request, inquiry_id):
         email.send(fail_silently=False)
     except Exception:
         return Response(
-            {"error": "Failed to send reply email."},
+            {"error": "Неуспешно изпращане на имейла с отговор."},
             status=status.HTTP_502_BAD_GATEWAY,
         )
 
@@ -1497,7 +1499,7 @@ def admin_contact_inquiry_reply(request, inquiry_id):
 
     return Response(
         {
-            "message": "Reply sent successfully.",
+            "message": "Отговорът е изпратен успешно.",
             "inquiry": _serialize_contact_inquiry(inquiry),
         },
         status=status.HTTP_200_OK,

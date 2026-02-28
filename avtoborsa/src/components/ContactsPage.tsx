@@ -374,11 +374,7 @@ const ContactsPage: React.FC = () => {
         return;
       }
 
-      setSuccess(
-        typeof data.message === "string" && data.message
-          ? data.message
-          : "Запитването е изпратено успешно, очаквайте отговор."
-      );
+      setSuccess("Запитването е изпратено успешно, очаквайте отговор.");
       setFormData({
         name: "",
         email: "",
