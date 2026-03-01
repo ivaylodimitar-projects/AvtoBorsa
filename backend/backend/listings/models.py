@@ -209,6 +209,9 @@ class CarListing(models.Model):
     is_active = models.BooleanField(default=True)
     is_archived = models.BooleanField(default=False)
     is_kaparirano = models.BooleanField(default=False)
+    risk_score = models.PositiveSmallIntegerField(default=0)
+    risk_flags = models.JSONField(default=list, blank=True)
+    requires_moderation = models.BooleanField(default=False)
     listing_type = models.CharField(max_length=10, choices=LISTING_TYPE_CHOICES, default='normal')
     top_plan = models.CharField(max_length=12, choices=TOP_PLAN_CHOICES, null=True, blank=True)
     top_paid_at = models.DateTimeField(null=True, blank=True)
@@ -240,6 +243,7 @@ class CarListing(models.Model):
             models.Index(fields=['location_region'], name='carlist_region_idx'),
             models.Index(fields=['listing_type', 'top_expires_at'], name='carlist_top_exp_idx'),
             models.Index(fields=['listing_type', 'vip_expires_at'], name='carlist_vip_exp_idx'),
+            models.Index(fields=['requires_moderation', 'created_at'], name='carlist_mod_created_idx'),
         ]
 
     def __str__(self):

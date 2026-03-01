@@ -24,6 +24,13 @@ type TabKey =
   | "contactInquiries";
 type Tone = "default" | "success" | "warning" | "danger" | "info";
 type TransactionsInnerTab = "topups" | "sitePurchases";
+type ListingDeleteReason =
+  | "fraud_suspicion"
+  | "suspicious_links"
+  | "prohibited_content"
+  | "duplicate_listing"
+  | "wrong_category"
+  | "other";
 
 interface Pagination {
   page: number;
@@ -41,6 +48,7 @@ interface Overview {
   totals: {
     users_total: number;
     listings_active: number;
+    listings_requires_moderation?: number;
     views_total: number;
     transactions_total: number;
     transactions_amount_total: number;
@@ -72,6 +80,9 @@ interface AdminListing {
   is_draft: boolean;
   is_archived: boolean;
   is_expired: boolean;
+  risk_score: number;
+  risk_flags: string[];
+  requires_moderation: boolean;
   seller_name: string;
   user_email: string;
 }
@@ -385,6 +396,27 @@ const request = async <T,>(path: string, init: RequestInit = {}): Promise<T> => 
   return payload as T;
 };
 
+const _decodeJwtPayload = (token: string): Record<string, unknown> | null => {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    const json = atob(padded);
+    const payload = JSON.parse(json) as Record<string, unknown>;
+    return payload && typeof payload === "object" ? payload : null;
+  } catch {
+    return null;
+  }
+};
+
+const hasAdminPanelVerifiedClaim = (): boolean => {
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  if (!token) return false;
+  const payload = _decodeJwtPayload(token);
+  return Boolean(payload?.admin_panel_verified);
+};
+
 const fmtMoney = (value: number) =>
   new Intl.NumberFormat("bg-BG", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 
@@ -400,6 +432,15 @@ const pageLabel = (pagination: Pagination | null | undefined) => {
   const end = Math.min(pagination.page * pagination.page_size, pagination.total);
   return `${start}-${end} of ${pagination.total}`;
 };
+
+const LISTING_DELETE_REASON_OPTIONS: Array<{ value: ListingDeleteReason; label: string }> = [
+  { value: "fraud_suspicion", label: "Fraud / misleading info" },
+  { value: "suspicious_links", label: "Suspicious links / external contacts" },
+  { value: "prohibited_content", label: "Prohibited content" },
+  { value: "duplicate_listing", label: "Duplicate listing" },
+  { value: "wrong_category", label: "Wrong category / invalid data" },
+  { value: "other", label: "Other" },
+];
 
 const panelStyle: React.CSSProperties = {
   background: color.panel,
@@ -621,8 +662,18 @@ const AdminPage: React.FC = () => {
   const [listingStatusFilter, setListingStatusFilter] = useState<"all" | "active" | "draft" | "archived" | "expired">("all");
   const [listingTypeFilter, setListingTypeFilter] = useState<"" | "normal" | "top" | "vip">("");
   const [listingSellerTypeFilter, setListingSellerTypeFilter] = useState<"" | "private" | "business">("");
+  const [listingModerationFilter, setListingModerationFilter] = useState<"" | "review" | "clean">("");
   const [listingSort, setListingSort] = useState<
-    "newest" | "oldest" | "price_asc" | "price_desc" | "views_desc" | "views_asc" | "updated_desc" | "updated_asc"
+    | "newest"
+    | "oldest"
+    | "price_asc"
+    | "price_desc"
+    | "views_desc"
+    | "views_asc"
+    | "updated_desc"
+    | "updated_asc"
+    | "risk_desc"
+    | "risk_asc"
   >("newest");
   const [userQ, setUserQ] = useState("");
   const [userTypeFilter, setUserTypeFilter] = useState<"" | "private" | "business">("");
@@ -667,9 +718,13 @@ const AdminPage: React.FC = () => {
   const [replyModalInquiry, setReplyModalInquiry] = useState<AdminContactInquiry | null>(null);
   const [replyModalSubject, setReplyModalSubject] = useState("");
   const [replyModalMessage, setReplyModalMessage] = useState("");
+  const [deleteModalListing, setDeleteModalListing] = useState<AdminListing | null>(null);
+  const [deleteReason, setDeleteReason] = useState<ListingDeleteReason>("fraud_suspicion");
+  const [deleteCustomReason, setDeleteCustomReason] = useState("");
 
   const isAdmin = Boolean(user?.is_staff || user?.is_superuser);
-  const shouldShowAdminLogin = !user || !isAdmin || adminAccessDenied;
+  const isAdminSessionVerified = isAdmin ? hasAdminPanelVerifiedClaim() : false;
+  const shouldShowAdminLogin = !user || !isAdmin || !isAdminSessionVerified || adminAccessDenied;
   const isSuperuser = Boolean(user?.is_superuser);
   const currentUserId = user?.id || null;
 
@@ -701,9 +756,19 @@ const AdminPage: React.FC = () => {
     if (listingStatusFilter !== "all") q.set("status", listingStatusFilter);
     if (listingTypeFilter) q.set("listing_type", listingTypeFilter);
     if (listingSellerTypeFilter) q.set("seller_type", listingSellerTypeFilter);
+    if (listingModerationFilter) q.set("moderation", listingModerationFilter);
     q.set("sort", listingSort);
     setListings(await request<Paged<AdminListing>>(`/api/admin/listings/?${q.toString()}`));
-  }, [isAdmin, listingPage, listingQ, listingStatusFilter, listingTypeFilter, listingSellerTypeFilter, listingSort]);
+  }, [
+    isAdmin,
+    listingPage,
+    listingQ,
+    listingStatusFilter,
+    listingTypeFilter,
+    listingSellerTypeFilter,
+    listingModerationFilter,
+    listingSort,
+  ]);
 
   const loadUsers = useCallback(async () => {
     if (!isAdmin) return;
@@ -803,14 +868,14 @@ const AdminPage: React.FC = () => {
   ]);
 
   useEffect(() => {
-    if (!isAdmin || adminAccessDenied) return;
+    if (!isAdmin || adminAccessDenied || !isAdminSessionVerified) return;
     void loadOverview().catch((err) => handleAdminRequestError(err, "Request failed"));
-  }, [isAdmin, adminAccessDenied, loadOverview, handleAdminRequestError]);
+  }, [isAdmin, adminAccessDenied, isAdminSessionVerified, loadOverview, handleAdminRequestError]);
 
   useEffect(() => {
-    if (!isAdmin || adminAccessDenied) return;
+    if (!isAdmin || adminAccessDenied || !isAdminSessionVerified) return;
     void loadByTab();
-  }, [isAdmin, adminAccessDenied, loadByTab]);
+  }, [isAdmin, adminAccessDenied, isAdminSessionVerified, loadByTab]);
 
   useEffect(() => {
     if (tab !== "transactions") return;
@@ -933,6 +998,7 @@ const AdminPage: React.FC = () => {
         ? [
             ["Users", overview.totals.users_total],
             ["Active listings", overview.totals.listings_active],
+            ["Needs moderation", overview.totals.listings_requires_moderation || 0],
             ["Views", overview.totals.views_total],
             ["Transactions", overview.totals.transactions_total],
             ["Paid amount", `${fmtMoney(overview.totals.transactions_amount_total)} EUR`],
@@ -973,6 +1039,59 @@ const AdminPage: React.FC = () => {
     setReplyModalSubject("");
     setReplyModalMessage("");
   }, [replyModalInquiry, busyId]);
+
+  const openDeleteModal = useCallback((listing: AdminListing) => {
+    setError("");
+    setDeleteModalListing(listing);
+    setDeleteReason("fraud_suspicion");
+    setDeleteCustomReason("");
+  }, []);
+
+  const closeDeleteModal = useCallback(() => {
+    if (deleteModalListing && busyId === deleteModalListing.id) return;
+    setDeleteModalListing(null);
+    setDeleteReason("fraud_suspicion");
+    setDeleteCustomReason("");
+  }, [deleteModalListing, busyId]);
+
+  const confirmDeleteListing = useCallback(async () => {
+    if (!deleteModalListing) return;
+    if (deleteReason === "other" && deleteCustomReason.trim().length < 5) {
+      setError("Custom reason must be at least 5 characters.");
+      return;
+    }
+
+    await runBusyAction(
+      deleteModalListing.id,
+      async () => {
+        const response = await request<{ email_sent?: boolean }>(
+          `/api/admin/listings/${deleteModalListing.id}/delete/`,
+          {
+            method: "DELETE",
+            body: JSON.stringify({
+              reason: deleteReason,
+              custom_reason: deleteReason === "other" ? deleteCustomReason.trim() : "",
+            }),
+          }
+        );
+        await Promise.all([loadListings(), loadOverview()]);
+        if (response?.email_sent === false) {
+          setError("Listing was deleted, but notification email was not sent.");
+        }
+        setDeleteModalListing(null);
+        setDeleteReason("fraud_suspicion");
+        setDeleteCustomReason("");
+      },
+      "Delete failed"
+    );
+  }, [
+    deleteModalListing,
+    deleteReason,
+    deleteCustomReason,
+    runBusyAction,
+    loadListings,
+    loadOverview,
+  ]);
 
   const sendContactInquiryReply = useCallback(async () => {
     if (!replyModalInquiry) return;
@@ -1246,6 +1365,15 @@ const AdminPage: React.FC = () => {
                 <option value="business">Business</option>
               </select>
               <select
+                value={listingModerationFilter}
+                onChange={(e) => setListingModerationFilter(e.target.value as "" | "review" | "clean")}
+                style={{ ...inputStyle, minWidth: 150 }}
+              >
+                <option value="">All moderation</option>
+                <option value="review">Needs review</option>
+                <option value="clean">Clean</option>
+              </select>
+              <select
                 value={listingSort}
                 onChange={(e) =>
                   setListingSort(
@@ -1258,6 +1386,8 @@ const AdminPage: React.FC = () => {
                       | "views_asc"
                       | "updated_desc"
                       | "updated_asc"
+                      | "risk_desc"
+                      | "risk_asc"
                   )
                 }
                 style={{ ...inputStyle, minWidth: 150 }}
@@ -1270,6 +1400,8 @@ const AdminPage: React.FC = () => {
                 <option value="views_asc">Views asc</option>
                 <option value="updated_desc">Updated desc</option>
                 <option value="updated_asc">Updated asc</option>
+                <option value="risk_desc">Risk desc</option>
+                <option value="risk_asc">Risk asc</option>
               </select>
               <button onClick={() => { setListingPage(1); void loadListings(); }} style={buttonStyle("primary")}>Search</button>
               <button
@@ -1278,6 +1410,7 @@ const AdminPage: React.FC = () => {
                   setListingStatusFilter("all");
                   setListingTypeFilter("");
                   setListingSellerTypeFilter("");
+                  setListingModerationFilter("");
                   setListingSort("newest");
                   setListingPage(1);
                 }}
@@ -1287,16 +1420,34 @@ const AdminPage: React.FC = () => {
               </button>
             </div>
             <div style={tableWrap}>
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1120 }}>
-                <thead><tr><th style={thStyle}>ID</th><th style={thStyle}>Listing</th><th style={thStyle}>Seller</th><th style={thStyle}>Price</th><th style={thStyle}>Status</th><th style={thStyle}>Views</th><th style={thStyle}>Actions</th></tr></thead>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 1280 }}>
+                <thead><tr><th style={thStyle}>ID</th><th style={thStyle}>Listing</th><th style={thStyle}>Seller</th><th style={thStyle}>Price</th><th style={thStyle}>Status</th><th style={thStyle}>Moderation</th><th style={thStyle}>Views</th><th style={thStyle}>Actions</th></tr></thead>
                 <tbody>
-                  {(listings?.results || []).map((item) => {
+                  {(listings?.results || []).length === 0 ? (
+                    <tr>
+                      <td style={{ ...tdStyle, textAlign: "center", color: color.muted }} colSpan={8}>
+                        No listings found for current filters.
+                      </td>
+                    </tr>
+                  ) : (listings?.results || []).map((item) => {
                     const status = resolveListingStatus(item);
                     const promoExpiry = resolveListingPromoExpiry(item);
                     const isTop1d = item.listing_type === "top" && item.top_plan === "1d";
                     const isTop7d = item.listing_type === "top" && item.top_plan === "7d";
                     const isVip7d = item.listing_type === "vip" && item.vip_plan === "7d";
                     const isVipLifetime = item.listing_type === "vip" && item.vip_plan === "lifetime";
+                    const moderationTone: Tone =
+                      item.requires_moderation || item.risk_score >= 70
+                        ? "danger"
+                        : item.risk_score >= 35
+                          ? "warning"
+                          : "success";
+                    const moderationLabel =
+                      item.requires_moderation || item.risk_score >= 70
+                        ? "Needs review"
+                        : item.risk_score >= 35
+                          ? "Watch"
+                          : "Clean";
                     return (
                       <tr key={item.id}>
                         <td style={tdStyle}>#{item.id}</td>
@@ -1312,9 +1463,31 @@ const AdminPage: React.FC = () => {
                           </div>
                           {promoExpiry && <div style={{ fontSize: 12, color: color.muted, marginTop: 4 }}>{promoExpiry}</div>}
                         </td>
+                        <td style={tdStyle}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                            <span style={badgeStyle(moderationTone)}>{moderationLabel}</span>
+                            <span style={{ fontSize: 12, color: color.muted }}>Risk {item.risk_score || 0}/100</span>
+                          </div>
+                          {Array.isArray(item.risk_flags) && item.risk_flags.length > 0 && (
+                            <div style={{ marginTop: 4, fontSize: 12, color: color.muted }}>
+                              {item.risk_flags.join(", ")}
+                            </div>
+                          )}
+                        </td>
                         <td style={tdStyle}>{item.view_count}</td>
                         <td style={tdStyle}>
                           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <button
+                              disabled={busyId === item.id}
+                              onClick={async () => {
+                                await runBusyAction(item.id, async () => {
+                                  await applyListingPatch(item.id, { requires_moderation: !item.requires_moderation });
+                                }, "Update failed");
+                              }}
+                              style={buttonStyle(item.requires_moderation ? "danger" : "neutral")}
+                            >
+                              {item.requires_moderation ? "Approve" : "Flag review"}
+                            </button>
                             <button
                               disabled={busyId === item.id}
                               onClick={async () => {
@@ -1386,12 +1559,8 @@ const AdminPage: React.FC = () => {
                             </button>
                             <button
                               disabled={busyId === item.id}
-                              onClick={async () => {
-                                if (!window.confirm("Delete listing?")) return;
-                                await runBusyAction(item.id, async () => {
-                                  await request(`/api/admin/listings/${item.id}/delete/`, { method: "DELETE" });
-                                  await Promise.all([loadListings(), loadOverview()]);
-                                }, "Delete failed");
+                              onClick={() => {
+                                openDeleteModal(item);
                               }}
                               style={buttonStyle("danger")}
                             >
@@ -2560,6 +2729,112 @@ const AdminPage: React.FC = () => {
               </div>
             </div>
           </section>
+        )}
+
+        {deleteModalListing && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 4200,
+              background: "rgba(15, 23, 42, 0.5)",
+              display: "grid",
+              placeItems: "center",
+              padding: 16,
+            }}
+            onClick={closeDeleteModal}
+          >
+            <div
+              style={{
+                width: "100%",
+                maxWidth: 640,
+                background: "#fff",
+                borderRadius: 16,
+                border: `1px solid ${color.border}`,
+                boxShadow: "0 20px 40px rgba(15, 23, 42, 0.22)",
+                padding: 16,
+              }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "flex-start", marginBottom: 12 }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 18 }}>Delete listing #{deleteModalListing.id}</h3>
+                  <div style={{ fontSize: 13, color: color.muted, marginTop: 4 }}>
+                    {deleteModalListing.brand} {deleteModalListing.model} | {deleteModalListing.user_email}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeDeleteModal}
+                  disabled={busyId === deleteModalListing.id}
+                  style={buttonStyle("neutral")}
+                >
+                  Close
+                </button>
+              </div>
+
+              <div style={{ display: "grid", gap: 10 }}>
+                <label style={{ display: "grid", gap: 6 }}>
+                  <span style={{ fontSize: 12, color: color.muted }}>Delete reason (required)</span>
+                  <select
+                    value={deleteReason}
+                    onChange={(event) => setDeleteReason(event.target.value as ListingDeleteReason)}
+                    style={{ ...inputStyle, minWidth: 0, width: "100%" }}
+                  >
+                    {LISTING_DELETE_REASON_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {deleteReason === "other" && (
+                  <label style={{ display: "grid", gap: 6 }}>
+                    <span style={{ fontSize: 12, color: color.muted }}>Custom reason</span>
+                    <textarea
+                      value={deleteCustomReason}
+                      onChange={(event) => setDeleteCustomReason(event.target.value)}
+                      rows={4}
+                      style={{
+                        width: "100%",
+                        borderRadius: 16,
+                        border: `1px solid ${color.borderStrong}`,
+                        padding: "12px 14px",
+                        fontFamily: "inherit",
+                        fontSize: 14,
+                        resize: "vertical",
+                      }}
+                      placeholder="Write a clear reason for the seller (min 5 chars)."
+                    />
+                  </label>
+                )}
+
+                <div style={{ fontSize: 12, color: color.muted }}>
+                  This action will delete the listing and notify the seller by in-app notification and email.
+                </div>
+              </div>
+
+              <div style={{ marginTop: 12, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={closeDeleteModal}
+                  disabled={busyId === deleteModalListing.id}
+                  style={buttonStyle("neutral")}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void confirmDeleteListing()}
+                  disabled={busyId === deleteModalListing.id}
+                  style={buttonStyle("danger")}
+                >
+                  {busyId === deleteModalListing.id ? "Deleting..." : "Delete and notify"}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {replyModalInquiry && (

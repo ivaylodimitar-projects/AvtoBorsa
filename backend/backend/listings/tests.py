@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase, APIClient
@@ -186,6 +187,147 @@ class ListingKapariranoStatusTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.private_listing.refresh_from_db(fields=["is_kaparirano"])
         self.assertFalse(self.private_listing.is_kaparirano)
+
+
+class ListingAntiFraudValidationTests(APITestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.user = user_model.objects.create_user(
+            username="fraud-check-user",
+            email="fraud-check@example.com",
+            password="testpass123",
+        )
+        self.client.force_authenticate(user=self.user)
+        self.create_url = reverse("listing-list")
+
+    def _base_payload(self):
+        return {
+            "main_category": "1",
+            "brand": "BMW",
+            "model": "320d",
+            "year_from": 2020,
+            "price": "19999.00",
+            "city": "Sofia",
+            "fuel": "dizel",
+            "gearbox": "avtomatik",
+            "mileage": 120000,
+            "description": "Коректна обява без спам.",
+            "phone": "+359888123456",
+            "email": "owner@example.com",
+            "is_draft": True,
+            "listing_type": "normal",
+        }
+
+    def test_rejects_external_links_in_description(self):
+        payload = self._base_payload()
+        payload["description"] = "Вижте повече тук: https://scam-example.com/deal"
+
+        response = self.client.post(self.create_url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("description", response.data)
+
+    def test_blocks_high_risk_payload_on_publish(self):
+        payload = self._base_payload()
+        payload.update(
+            {
+                "main_category": "y",
+                "is_draft": False,
+                "description": (
+                    "Пиши в Telegram и WhatsApp. Капаро по Revolut или crypto веднага!!!! "
+                    "Контакти: +359888123456 и +359887654321"
+                ),
+            }
+        )
+
+        response = self.client.post(self.create_url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("non_field_errors", response.data)
+        self.assertIn("ръчна модерация", str(response.data["non_field_errors"][0]).lower())
+
+    def test_allows_high_risk_payload_as_draft_and_sets_flags(self):
+        payload = self._base_payload()
+        payload["description"] = (
+            "Пиши в Telegram и WhatsApp. Капаро по Revolut или crypto веднага!!!! "
+            "Контакти: +359888123456 и +359887654321"
+        )
+        payload["is_draft"] = True
+
+        response = self.client.post(self.create_url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data["is_draft"])
+        self.assertTrue(response.data["requires_moderation"])
+
+
+class AdminListingDeleteReasonTests(APITestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.admin = user_model.objects.create_user(
+            username="admin-user",
+            email="admin@example.com",
+            password="testpass123",
+            is_staff=True,
+        )
+        self.owner = user_model.objects.create_user(
+            username="listing-owner",
+            email="owner@example.com",
+            password="testpass123",
+        )
+        self.listing = CarListing.objects.create(
+            user=self.owner,
+            brand="Audi",
+            model="A4",
+            year_from=2020,
+            price="22000.00",
+            city="Plovdiv",
+            fuel="benzin",
+            gearbox="ruchna",
+            mileage=130000,
+            description="Owner listing",
+            phone="+359888000002",
+            email="owner@example.com",
+        )
+        self.url = reverse("admin_listing_delete", args=[self.listing.id])
+        self.client.force_authenticate(user=self.admin)
+
+    def test_delete_requires_reason(self):
+        response = self.client.delete(self.url, {}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(CarListing.objects.filter(pk=self.listing.id).exists())
+
+    def test_delete_with_reason_removes_listing_and_sends_email(self):
+        response = self.client.delete(
+            self.url,
+            {"reason": "duplicate_listing"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(CarListing.objects.filter(pk=self.listing.id).exists())
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("duplicate", mail.outbox[0].body.lower())
+        self.assertGreaterEqual(int(response.data["risk_score"]), 70)
+        self.assertIsInstance(response.data["risk_flags"], list)
+        self.assertGreater(len(response.data["risk_flags"]), 0)
+
+    def test_allows_clean_publish_without_moderation_flag(self):
+        payload = self._base_payload()
+        payload.update(
+            {
+                "main_category": "y",
+                "is_draft": False,
+                "description": "Отлично състояние, реални километри, без бартери.",
+            }
+        )
+
+        response = self.client.post(self.create_url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(response.data["requires_moderation"])
+        self.assertLess(int(response.data["risk_score"]), 70)
 
 
 class PublicProfileListingsTests(APITestCase):

@@ -1,4 +1,7 @@
+import re
+
 from django.contrib.auth.models import User
+from django.core import mail
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
@@ -160,3 +163,75 @@ class AuthFlowTests(APITestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("Паролата", str(response.data))
+
+@override_settings(
+    ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"],
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+)
+class AdminPanelOtpAccessTests(APITestCase):
+    def setUp(self):
+        self.password = "StrongPass123!"
+        self.admin_user = User.objects.create_user(
+            username="admin-otp-user",
+            email="admin-otp@example.com",
+            password=self.password,
+            is_staff=True,
+            is_superuser=True,
+            is_active=True,
+        )
+
+    def test_regular_admin_login_cannot_open_admin_panel_without_otp_claim(self):
+        login_response = self.client.post(
+            "/api/auth/login/",
+            {
+                "email": self.admin_user.email,
+                "password": self.password,
+            },
+            format="json",
+        )
+        self.assertEqual(login_response.status_code, 200)
+        access = login_response.data.get("access")
+        self.assertTrue(access)
+
+        admin_response = self.client.get(
+            "/api/admin/overview/",
+            HTTP_AUTHORIZATION=f"Bearer {access}",
+        )
+        self.assertEqual(admin_response.status_code, 403)
+
+    def test_admin_login_verify_code_grants_admin_panel_access(self):
+        request_code_response = self.client.post(
+            "/api/auth/admin-login/request-code/",
+            {
+                "email": self.admin_user.email,
+                "password": self.password,
+            },
+            format="json",
+        )
+        self.assertEqual(request_code_response.status_code, 200)
+        challenge_id = request_code_response.data.get("challenge_id")
+        self.assertTrue(challenge_id)
+        self.assertGreaterEqual(len(mail.outbox), 1)
+
+        email_body = mail.outbox[-1].body
+        match = re.search(r"\b(\d{6})\b", email_body)
+        self.assertIsNotNone(match, "Admin OTP code not found in email body.")
+        code = match.group(1)
+
+        verify_response = self.client.post(
+            "/api/auth/admin-login/verify-code/",
+            {
+                "challenge_id": challenge_id,
+                "code": code,
+            },
+            format="json",
+        )
+        self.assertEqual(verify_response.status_code, 200)
+        access = verify_response.data.get("access")
+        self.assertTrue(access)
+
+        admin_response = self.client.get(
+            "/api/admin/overview/",
+            HTTP_AUTHORIZATION=f"Bearer {access}",
+        )
+        self.assertEqual(admin_response.status_code, 200)

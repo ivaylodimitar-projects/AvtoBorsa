@@ -361,6 +361,10 @@ try:
     SUPPORT_INBOX_IMAP_PORT = int(os.getenv("SUPPORT_INBOX_IMAP_PORT", "993"))
 except (TypeError, ValueError):
     SUPPORT_INBOX_IMAP_PORT = 993
+try:
+    SUPPORT_INBOX_IMAP_TIMEOUT_SECONDS = int(os.getenv("SUPPORT_INBOX_IMAP_TIMEOUT_SECONDS", "12"))
+except (TypeError, ValueError):
+    SUPPORT_INBOX_IMAP_TIMEOUT_SECONDS = 12
 SUPPORT_INBOX_IMAP_USE_SSL = os.getenv("SUPPORT_INBOX_IMAP_USE_SSL", "1").lower() in ("1", "true", "yes")
 SUPPORT_INBOX_IMAP_USER = _resolve_env_alias(os.getenv("SUPPORT_INBOX_IMAP_USER", ""))
 SUPPORT_INBOX_IMAP_PASSWORD = _resolve_env_alias(os.getenv("SUPPORT_INBOX_IMAP_PASSWORD", ""))

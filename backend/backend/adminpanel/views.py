@@ -10,7 +10,6 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 
 from backend.accounts.models import BusinessUser, ImportApiUsageEvent, UserProfile
@@ -25,12 +24,33 @@ from backend.listings.models import (
     get_top_expiry,
     get_vip_short_expiry,
 )
+from backend.listings.realtime import (
+    broadcast_dealer_listings_updated,
+    broadcast_user_notification,
+)
 from backend.payments.models import PaymentTransaction
 from backend.reports.inbox_sync import sync_contact_inquiries_from_inbox
 from backend.reports.models import ContactInquiry, ListingReport
+from .permissions import AdminPanelAccessPermission
 
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
+LISTING_DELETE_REASON_LABELS = {
+    "fraud_suspicion": "Съмнение за измама или подвеждаща информация.",
+    "suspicious_links": "Съмнителни линкове или външни контакти в обявата.",
+    "prohibited_content": "Забранено или неподходящо съдържание.",
+    "duplicate_listing": "Дублирана обява.",
+    "wrong_category": "Неправилна категория или невалидни данни в обявата.",
+    "other": "Друга причина от модератор.",
+}
+
+
+def _safe_sync_contact_inquiries_from_inbox():
+    try:
+        sync_contact_inquiries_from_inbox()
+    except Exception:
+        # Inbox sync issues should not break admin pages.
+        pass
 
 
 def _parse_positive_int(raw_value, default_value, max_value):
@@ -61,6 +81,24 @@ def _to_decimal(value):
         return Decimal(str(value)).quantize(Decimal("0.01"))
     except (InvalidOperation, TypeError, ValueError):
         return None
+
+
+def _resolve_listing_delete_reason(data):
+    reason_key = str(data.get("reason") or "").strip().lower()
+    if reason_key not in LISTING_DELETE_REASON_LABELS:
+        return None, None, (
+            "Invalid delete reason. Choose one of: "
+            + ", ".join(LISTING_DELETE_REASON_LABELS.keys())
+            + "."
+        )
+
+    custom_reason = str(data.get("custom_reason") or "").strip()
+    if reason_key == "other":
+        if len(custom_reason) < 5:
+            return None, None, "Custom reason must be at least 5 characters."
+        return reason_key, custom_reason[:300], None
+
+    return reason_key, LISTING_DELETE_REASON_LABELS[reason_key], None
 
 
 def _paginate_queryset(queryset, request):
@@ -125,6 +163,9 @@ def _serialize_listing(listing):
         "is_archived": listing.is_archived,
         "is_expired": listing.created_at < get_expiry_cutoff(),
         "view_count": listing.view_count,
+        "risk_score": int(getattr(listing, "risk_score", 0) or 0),
+        "risk_flags": list(getattr(listing, "risk_flags", []) or []),
+        "requires_moderation": bool(getattr(listing, "requires_moderation", False)),
         "top_plan": listing.top_plan,
         "top_expires_at": listing.top_expires_at,
         "vip_plan": listing.vip_plan,
@@ -186,10 +227,8 @@ def _serialize_contact_inquiry(inquiry):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated, IsAdminUser])
+@permission_classes([AdminPanelAccessPermission])
 def admin_overview(request):
-    sync_contact_inquiries_from_inbox()
-
     today = timezone.localdate()
     start_date = today - timedelta(days=13)
     day_keys = [start_date + timedelta(days=offset) for offset in range(14)]
@@ -214,6 +253,9 @@ def admin_overview(request):
         is_draft=False,
         is_archived=False,
         created_at__lt=expiry_cutoff,
+    ).count()
+    listings_requires_moderation = CarListing.objects.filter(
+        requires_moderation=True
     ).count()
 
     tx_all = PaymentTransaction.objects.all()
@@ -320,6 +362,7 @@ def admin_overview(request):
                 "listings_archived": listings_archived,
                 "listings_drafts": listings_drafts,
                 "listings_expired": listings_expired,
+                "listings_requires_moderation": listings_requires_moderation,
                 "transactions_total": tx_all.count(),
                 "transactions_succeeded": tx_succeeded.count(),
                 "transactions_amount_total": float(tx_amount_total or Decimal("0.00")),
@@ -366,7 +409,7 @@ def admin_overview(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated, IsAdminUser])
+@permission_classes([AdminPanelAccessPermission])
 def admin_listings(request):
     queryset = CarListing.objects.select_related("user", "user__business_profile")
 
@@ -414,6 +457,12 @@ def admin_listings(request):
     elif seller_type == "private":
         queryset = queryset.filter(user__business_profile__isnull=True)
 
+    moderation_filter = (request.query_params.get("moderation") or "").strip().lower()
+    if moderation_filter in {"review", "high", "flagged"}:
+        queryset = queryset.filter(requires_moderation=True)
+    elif moderation_filter in {"clean", "ok"}:
+        queryset = queryset.filter(requires_moderation=False)
+
     sort_mapping = {
         "newest": "-created_at",
         "oldest": "created_at",
@@ -421,6 +470,8 @@ def admin_listings(request):
         "price_desc": "-price",
         "views_desc": "-view_count",
         "views_asc": "view_count",
+        "risk_desc": "-risk_score",
+        "risk_asc": "risk_score",
         "updated_desc": "-updated_at",
         "updated_asc": "updated_at",
     }
@@ -438,7 +489,7 @@ def admin_listings(request):
 
 
 @api_view(["PATCH"])
-@permission_classes([IsAuthenticated, IsAdminUser])
+@permission_classes([AdminPanelAccessPermission])
 def admin_listing_update(request, listing_id):
     listing = get_object_or_404(
         CarListing.objects.select_related("user", "user__business_profile"),
@@ -447,7 +498,7 @@ def admin_listing_update(request, listing_id):
     data = request.data
     has_changes = False
 
-    for field in ("is_active", "is_draft", "is_archived"):
+    for field in ("is_active", "is_draft", "is_archived", "requires_moderation"):
         if field not in data:
             continue
         parsed = _parse_bool(data.get(field))
@@ -540,15 +591,76 @@ def admin_listing_update(request, listing_id):
 
 
 @api_view(["DELETE"])
-@permission_classes([IsAuthenticated, IsAdminUser])
+@permission_classes([AdminPanelAccessPermission])
 def admin_listing_delete(request, listing_id):
     listing = get_object_or_404(CarListing, pk=listing_id)
+    reason_key, reason_text, reason_error = _resolve_listing_delete_reason(request.data or {})
+    if reason_error:
+        return Response({"error": reason_error}, status=status.HTTP_400_BAD_REQUEST)
+
+    listing_title = (listing.title or f"{listing.brand} {listing.model}").strip()[:200]
+    recipient_email = str(listing.user.email or "").strip()
+
+    from_email = str(
+        getattr(settings, "DEFAULT_FROM_EMAIL", "")
+        or getattr(settings, "SUPPORT_FROM_EMAIL", "")
+        or ""
+    ).strip()
+    if from_email and recipient_email:
+        subject = f"Обявата ви е премахната (#{listing.id})"
+        body = (
+            "Здравейте,\n\n"
+            "Вашата обява беше премахната от екипа по модерация на Kar.bg.\n\n"
+            f"Обява: {listing_title}\n"
+            f"Номер на обява: #{listing.id}\n"
+            f"Причина: {reason_text}\n\n"
+            "Ако смятате, че това е грешка, свържете се с поддръжката и посочете номера на обявата.\n\n"
+            "Поздрави,\n"
+            "Екип Модерация на Kar.bg"
+        )
+        email_message = EmailMessage(
+            subject=subject,
+            body=body,
+            from_email=from_email,
+            to=[recipient_email],
+            reply_to=[from_email],
+        )
+        email_sent = bool(email_message.send(fail_silently=True))
+    else:
+        email_sent = False
+
+    deleted_listing_id = listing.id
+    deleted_user_id = listing.user_id
     listing.delete()
-    return Response({"message": "Listing deleted."}, status=status.HTTP_200_OK)
+
+    notification_payload = {
+        "id": f"listing-deleted-{deleted_listing_id}-{timezone.now().strftime('%Y%m%d%H%M%S%f')}",
+        "type": "system",
+        "category": "Модерация",
+        "title": "Обявата е премахната",
+        "message": (
+            f"Вашата обява \"{listing_title}\" беше премахната от модератор. "
+            f"Причина: {reason_text}"
+        ),
+        "listingId": deleted_listing_id,
+        "reason": reason_text,
+        "createdAt": timezone.now().isoformat(),
+    }
+    broadcast_user_notification(deleted_user_id, notification_payload)
+    broadcast_dealer_listings_updated()
+
+    return Response(
+        {
+            "message": "Обявата е изтрита.",
+            "reason": reason_key,
+            "email_sent": email_sent,
+        },
+        status=status.HTTP_200_OK,
+    )
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated, IsAdminUser])
+@permission_classes([AdminPanelAccessPermission])
 def admin_users(request):
     queryset = (
         User.objects.select_related("profile", "business_profile")
@@ -608,7 +720,7 @@ def admin_users(request):
 
 
 @api_view(["PATCH"])
-@permission_classes([IsAuthenticated, IsAdminUser])
+@permission_classes([AdminPanelAccessPermission])
 def admin_user_update(request, user_id):
     target = get_object_or_404(User.objects.select_related("profile", "business_profile"), pk=user_id)
     data = request.data
@@ -696,7 +808,7 @@ def admin_user_update(request, user_id):
 
 
 @api_view(["DELETE"])
-@permission_classes([IsAuthenticated, IsAdminUser])
+@permission_classes([AdminPanelAccessPermission])
 def admin_user_delete(request, user_id):
     target = get_object_or_404(User, pk=user_id)
 
@@ -730,7 +842,7 @@ def admin_user_delete(request, user_id):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated, IsAdminUser])
+@permission_classes([AdminPanelAccessPermission])
 def admin_transactions(request):
     queryset = PaymentTransaction.objects.select_related("user")
 
@@ -792,7 +904,7 @@ def admin_transactions(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated, IsAdminUser])
+@permission_classes([AdminPanelAccessPermission])
 def admin_site_purchases(request):
     queryset = ListingPurchase.objects.select_related("user", "listing")
 
@@ -1031,7 +1143,7 @@ def admin_site_purchases(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated, IsAdminUser])
+@permission_classes([AdminPanelAccessPermission])
 def admin_extension_usage(request):
     queryset = ImportApiUsageEvent.objects.select_related(
         "user",
@@ -1331,7 +1443,7 @@ def admin_extension_usage(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated, IsAdminUser])
+@permission_classes([AdminPanelAccessPermission])
 def admin_reports(request):
     queryset = ListingReport.objects.select_related("user", "listing")
 
@@ -1382,7 +1494,7 @@ def admin_reports(request):
 
 
 @api_view(["DELETE"])
-@permission_classes([IsAuthenticated, IsAdminUser])
+@permission_classes([AdminPanelAccessPermission])
 def admin_report_delete(request, report_id):
     report = get_object_or_404(ListingReport, pk=report_id)
     report.delete()
@@ -1390,9 +1502,11 @@ def admin_report_delete(request, report_id):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated, IsAdminUser])
+@permission_classes([AdminPanelAccessPermission])
 def admin_contact_inquiries(request):
-    sync_contact_inquiries_from_inbox()
+    should_sync = str(request.query_params.get("sync") or "").strip().lower() in {"1", "true", "yes"}
+    if should_sync:
+        _safe_sync_contact_inquiries_from_inbox()
 
     queryset = ContactInquiry.objects.select_related("replied_by")
 
@@ -1434,7 +1548,7 @@ def admin_contact_inquiries(request):
 
 
 @api_view(["POST"])
-@permission_classes([IsAuthenticated, IsAdminUser])
+@permission_classes([AdminPanelAccessPermission])
 def admin_contact_inquiry_reply(request, inquiry_id):
     inquiry = get_object_or_404(ContactInquiry.objects.select_related("replied_by"), pk=inquiry_id)
     reply_message = str(request.data.get("reply_message") or "").strip()

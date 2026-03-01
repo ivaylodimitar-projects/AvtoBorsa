@@ -13,6 +13,7 @@ urlpatterns = [
     path('admin-login/verify-code/', views.admin_login_verify_code, name='admin_login_verify_code'),
     path('logout/', views.logout, name='logout'),
     path('me/', views.get_current_user, name='get_current_user'),
+    path('notifications/poll/', views.poll_user_notifications, name='poll_user_notifications'),
     path('balance/', views.get_user_balance, name='get_balance'),
     path('change-password/', views.change_password, name='change_password'),
     path('profile/update-names/', views.update_profile_names, name='update_profile_names'),

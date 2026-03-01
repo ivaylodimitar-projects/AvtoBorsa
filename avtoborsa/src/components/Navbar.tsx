@@ -21,6 +21,7 @@ import SavedSearchesMenu from "./SavedSearchesMenu";
 import BezplatnoBadge from "./BezplatnoBadge";
 import {
   USER_NOTIFICATIONS_UPDATED_EVENT,
+  addSystemNotification,
   getUserNotifications,
   getUserNotificationsStorageKey,
   markAllNotificationsRead,
@@ -47,6 +48,7 @@ const DEALER_LISTINGS_SYNC_COOLDOWN_MS = 15_000;
 const DEALER_LISTINGS_FALLBACK_POLL_MS = 90_000;
 const DEALER_NOTIFICATIONS_STACK_WINDOW_MS = 60 * 60 * 1000;
 const DEALER_NOTIFICATIONS_WS_RECONNECT_MS = 5_000;
+const ACCESS_TOKEN_KEY = "authToken";
 const WS_BASE_URL = (import.meta.env.VITE_WS_BASE_URL || "").replace(/\/+$/, "");
 
 type NotificationRenderItem =
@@ -157,17 +159,24 @@ const normalizeWsUrl = (rawValue: string) => {
   }
 };
 
-const getNotificationsWebSocketUrl = () => {
+const getNotificationsWebSocketUrl = (accessToken?: string | null) => {
+  const token = typeof accessToken === "string" ? accessToken.trim() : "";
+  const withToken = (baseUrl: string) => {
+    if (!token) return baseUrl;
+    const separator = baseUrl.includes("?") ? "&" : "?";
+    return `${baseUrl}${separator}token=${encodeURIComponent(token)}`;
+  };
+
   const preferredWsBase = normalizeWsUrl(WS_BASE_URL);
-  if (preferredWsBase) return `${preferredWsBase}/ws/notifications/`;
+  if (preferredWsBase) return withToken(`${preferredWsBase}/ws/notifications/`);
 
   try {
     const apiUrl = new URL(API_BASE_URL);
     const wsProtocol = apiUrl.protocol === "https:" ? "wss:" : "ws:";
-    return `${wsProtocol}//${apiUrl.host}/ws/notifications/`;
+    return withToken(`${wsProtocol}//${apiUrl.host}/ws/notifications/`);
   } catch {
     const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
-    return `${wsProtocol}://${window.location.host}/ws/notifications/`;
+    return withToken(`${wsProtocol}://${window.location.host}/ws/notifications/`);
   }
 };
 
@@ -199,6 +208,7 @@ const Navbar: React.FC = () => {
   >({});
   const notificationsRef = React.useRef<HTMLDivElement | null>(null);
   const mobileNotificationsTriggerRef = React.useRef<HTMLButtonElement | null>(null);
+  const isSystemNotificationsSyncInFlight = React.useRef(false);
   const isMobileViewport = React.useCallback(
     () => typeof window !== "undefined" && window.innerWidth <= 960,
     []
@@ -212,6 +222,83 @@ const Navbar: React.FC = () => {
     },
     [isMobileViewport]
   );
+
+  const syncSystemNotifications = React.useCallback(async () => {
+    if (!user?.id) return;
+    if (isSystemNotificationsSyncInFlight.current) return;
+    isSystemNotificationsSyncInFlight.current = true;
+
+    try {
+      const requestPoll = async (accessToken?: string | null) => {
+        const headers: HeadersInit = {};
+        if (accessToken) {
+          headers.Authorization = `Bearer ${accessToken}`;
+        }
+        return fetch(`${API_BASE_URL}/api/auth/notifications/poll/?limit=20`, {
+          method: "GET",
+          headers,
+          credentials: "include",
+          cache: "no-store",
+        });
+      };
+
+      let token = localStorage.getItem(ACCESS_TOKEN_KEY);
+      let response = await requestPoll(token);
+
+      if (response.status === 401) {
+        const refreshResponse = await fetch(`${API_BASE_URL}/api/auth/token/refresh/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({}),
+        });
+        if (refreshResponse.ok) {
+          const refreshPayload = (await refreshResponse.json()) as { access?: string };
+          const nextAccess =
+            typeof refreshPayload?.access === "string"
+              ? refreshPayload.access.trim()
+              : "";
+          if (nextAccess) {
+            localStorage.setItem(ACCESS_TOKEN_KEY, nextAccess);
+            token = nextAccess;
+            response = await requestPoll(token);
+          }
+        }
+      }
+
+      if (!response.ok) return;
+
+      const payload = (await response.json()) as { results?: unknown[] };
+      const results = Array.isArray(payload?.results) ? payload.results : [];
+      let hasNewNotifications = false;
+
+      results.forEach((item) => {
+        if (!item || typeof item !== "object") return;
+        const record = item as Record<string, unknown>;
+        if (record.type !== "system") return;
+
+        const notification = addSystemNotification(user.id, {
+          id: typeof record.id === "string" ? record.id : undefined,
+          title: typeof record.title === "string" ? record.title : "Системно известие",
+          message: typeof record.message === "string" ? record.message : "",
+          category: typeof record.category === "string" ? record.category : undefined,
+          link: typeof record.link === "string" ? record.link : undefined,
+          createdAt: typeof record.createdAt === "string" ? record.createdAt : undefined,
+        });
+        if (notification) {
+          hasNewNotifications = true;
+        }
+      });
+
+      if (hasNewNotifications) {
+        setNotifications(getUserNotifications(user.id));
+      }
+    } catch {
+      // ignore sync errors
+    } finally {
+      isSystemNotificationsSyncInFlight.current = false;
+    }
+  }, [user?.id]);
 
   const isActive = (path: string) => location.pathname === path;
   const isAuthRoute =
@@ -318,6 +405,26 @@ const Navbar: React.FC = () => {
       window.removeEventListener(USER_NOTIFICATIONS_UPDATED_EVENT, handleNotificationsUpdated);
     };
   }, [user?.id]);
+
+  React.useEffect(() => {
+    if (!user?.id) return;
+
+    void syncSystemNotifications();
+    const handleFocus = () => void syncSystemNotifications();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void syncSystemNotifications();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [syncSystemNotifications, user?.id]);
 
   React.useEffect(() => {
     if (!user?.id) {
@@ -463,7 +570,8 @@ const Navbar: React.FC = () => {
     const connect = () => {
       if (isDisposed) return;
       try {
-        socket = new WebSocket(getNotificationsWebSocketUrl());
+        const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+        socket = new WebSocket(getNotificationsWebSocketUrl(token));
       } catch {
         setIsNotificationsWsOnline(false);
         scheduleReconnect();
@@ -472,9 +580,35 @@ const Navbar: React.FC = () => {
 
       socket.onmessage = (event) => {
         try {
-          const payload = JSON.parse(event.data) as { type?: string };
+          const payload = JSON.parse(event.data) as {
+            type?: string;
+            notification?: {
+              id?: string;
+              type?: string;
+              title?: string;
+              message?: string;
+              category?: string;
+              link?: string;
+              createdAt?: string;
+            };
+          };
           if (payload?.type === "dealer_listings_updated") {
             requestDealerListingsSync(user.id);
+            return;
+          }
+
+          if (payload?.type === "user_notification" && payload.notification?.type === "system") {
+            const created = addSystemNotification(user.id, {
+              id: payload.notification.id,
+              title: payload.notification.title || "System notification",
+              message: payload.notification.message || "",
+              category: payload.notification.category,
+              link: payload.notification.link,
+              createdAt: payload.notification.createdAt,
+            });
+            if (created) {
+              setNotifications(getUserNotifications(user.id));
+            }
           }
         } catch {
           // ignore malformed ws payloads
@@ -494,6 +628,7 @@ const Navbar: React.FC = () => {
 
       socket.onopen = () => {
         setIsNotificationsWsOnline(true);
+        void syncSystemNotifications();
       };
     };
 
@@ -507,7 +642,7 @@ const Navbar: React.FC = () => {
         socket.close();
       }
     };
-  }, [user?.id]);
+  }, [syncSystemNotifications, user?.id]);
 
   React.useEffect(() => {
     if (!showNotificationsMenu) return;
@@ -658,6 +793,7 @@ const Navbar: React.FC = () => {
     setNotificationsTab("notifications");
     setExpandedNotificationGroups({});
     setNotificationsNowMs(Date.now());
+    void syncSystemNotifications();
   };
 
   const handleOpenNotificationsFromMobileHeader = () => {
@@ -676,6 +812,7 @@ const Navbar: React.FC = () => {
     setNotificationsTab("notifications");
     setExpandedNotificationGroups({});
     setNotificationsNowMs(Date.now());
+    void syncSystemNotifications();
   };
 
   const handleMarkAsRead = (notificationId: string) => {
@@ -1121,6 +1258,31 @@ const Navbar: React.FC = () => {
                                   notification.type === "dealer_listing"
                                     ? getDealerAvatarUrl(notification.dealerId)
                                     : null;
+                                const notificationTypeLabel =
+                                  notification.type === "deposit"
+                                    ? "Депозит"
+                                    : notification.type === "system"
+                                      ? notification.title
+                                      : `Дилър ${notification.dealerName}`;
+                                const notificationAmountLabel =
+                                  notification.type === "deposit"
+                                    ? `+${formatNotificationAmount(
+                                        notification.amount,
+                                        notification.currency
+                                      )}`
+                                    : notification.type === "dealer_listing"
+                                      ? `+${formatListingsAdded(notification.listingsAdded)}`
+                                      : notification.category
+                                        ? notification.category
+                                        : "Система";
+                                const notificationMainText =
+                                  notification.type === "deposit"
+                                    ? "Добавени средства в баланса."
+                                    : notification.type === "dealer_listing"
+                                      ? `${notification.dealerName} публикува ${formatListingsAdded(
+                                          notification.listingsAdded
+                                        )} (${formatTotalListings(notification.totalListings)}).`
+                                      : notification.message;
                                 return (
                                   <div
                                     key={notification.id}
@@ -1139,9 +1301,7 @@ const Navbar: React.FC = () => {
                                           </span>
                                         ) : null}
                                         <span className="notification-item-type">
-                                          {notification.type === "deposit"
-                                            ? "Депозит"
-                                            : `Дилър ${notification.dealerName}`}
+                                          {notificationTypeLabel}
                                         </span>
                                       </div>
                                       <span className="notification-item-time">
@@ -1150,19 +1310,10 @@ const Navbar: React.FC = () => {
                                     </div>
                                     <div className="notification-item-main">
                                       <span className="notification-item-amount">
-                                        {notification.type === "deposit"
-                                          ? `+${formatNotificationAmount(
-                                              notification.amount,
-                                              notification.currency
-                                            )}`
-                                          : `+${formatListingsAdded(notification.listingsAdded)}`}
+                                        {notificationAmountLabel}
                                       </span>
                                       <span className="notification-item-text">
-                                        {notification.type === "deposit"
-                                          ? "Добавени средства в баланса."
-                                          : `${notification.dealerName} публикува ${formatListingsAdded(
-                                              notification.listingsAdded
-                                            )} (${formatTotalListings(notification.totalListings)}).`}
+                                        {notificationMainText}
                                       </span>
                                     </div>
                                     <div className="notification-item-actions">
@@ -1173,6 +1324,23 @@ const Navbar: React.FC = () => {
                                           onClick={() => handleOpenDealerFromNotification(notification)}
                                           aria-label="Отвори профил"
                                           title="Отвори профил"
+                                        >
+                                          <FiExternalLink size={13} />
+                                        </button>
+                                      )}
+                                      {notification.type === "system" && notification.link && (
+                                        <button
+                                          type="button"
+                                          className="notification-link-btn"
+                                          onClick={() => {
+                                            if (user?.id && !notification.isRead) {
+                                              markNotificationRead(user.id, notification.id);
+                                            }
+                                            closeNotificationsMenu(true);
+                                            navigate(notification.link || "/");
+                                          }}
+                                          aria-label="Отвори"
+                                          title="Отвори"
                                         >
                                           <FiExternalLink size={13} />
                                         </button>

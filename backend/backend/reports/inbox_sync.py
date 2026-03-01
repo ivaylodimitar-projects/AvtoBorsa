@@ -189,6 +189,10 @@ def _sync_contact_inquiries_from_inbox():
     password = str(getattr(settings, "SUPPORT_INBOX_IMAP_PASSWORD", "") or "").strip()
     mailbox_name = str(getattr(settings, "SUPPORT_INBOX_IMAP_MAILBOX", "INBOX") or "INBOX").strip() or "INBOX"
     port = _to_positive_int(getattr(settings, "SUPPORT_INBOX_IMAP_PORT", 993), 993)
+    timeout_seconds = _to_positive_int(
+        getattr(settings, "SUPPORT_INBOX_IMAP_TIMEOUT_SECONDS", 12),
+        12,
+    )
     use_ssl = bool(getattr(settings, "SUPPORT_INBOX_IMAP_USE_SSL", True))
     max_messages = _to_positive_int(getattr(settings, "SUPPORT_INBOX_SYNC_MAX_MESSAGES", 100), 100)
     allow_self_reply = bool(getattr(settings, "SUPPORT_INBOX_ALLOW_SELF_REPLY", False))
@@ -204,9 +208,9 @@ def _sync_contact_inquiries_from_inbox():
     client = None
     try:
         if use_ssl:
-            client = imaplib.IMAP4_SSL(host, port)
+            client = imaplib.IMAP4_SSL(host, port, timeout=timeout_seconds)
         else:
-            client = imaplib.IMAP4(host, port)
+            client = imaplib.IMAP4(host, port, timeout=timeout_seconds)
 
         client.login(user, password)
         select_status, _ = client.select(mailbox_name)

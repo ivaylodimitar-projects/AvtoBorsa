@@ -28,6 +28,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework.parsers import MultiPartParser, FormParser
 from backend.listings.models import get_expiry_cutoff
+from backend.listings.realtime import drain_user_notifications
 from .serializers import (
     PrivateUserSerializer, BusinessUserSerializer, UserProfileSerializer,
     UserBalanceSerializer, DealerListSerializer, DealerDetailSerializer
@@ -155,8 +156,11 @@ def _build_auth_success_response(
     request,
     user: User,
     remember_me: bool = True,
+    admin_panel_verified: bool = False,
 ) -> Response:
     refresh = RefreshToken.for_user(user)
+    if admin_panel_verified:
+        refresh["admin_panel_verified"] = True
     response = Response(
         {
             'access': str(refresh.access_token),
@@ -808,8 +812,6 @@ def _build_copart_draft_payload(payload, user):
     description_lines = [
         "Imported automatically from Copart.",
     ]
-    if source_url:
-        description_lines.append(f"Source URL: {source_url}")
     if source_title and source_title.lower() != title.lower():
         description_lines.append(f"Original Copart title: {source_title}")
     append_if_value("Lot number", lot_number, max_length=80)
@@ -1129,7 +1131,11 @@ def admin_login_verify_code(request):
         )
 
     cache.delete(challenge_key)
-    return _build_auth_success_response(request, user)
+    return _build_auth_success_response(
+        request,
+        user,
+        admin_panel_verified=True,
+    )
 
 
 @api_view(['POST'])
@@ -1198,6 +1204,20 @@ def get_current_user(request):
         _build_authenticated_user_payload(request, request.user),
         status=status.HTTP_200_OK,
     )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def poll_user_notifications(request):
+    raw_limit = request.query_params.get("limit")
+    try:
+        limit = int(raw_limit) if raw_limit is not None else 20
+    except (TypeError, ValueError):
+        limit = 20
+    limit = max(1, min(limit, 50))
+
+    notifications = drain_user_notifications(request.user.id, limit=limit)
+    return Response({"results": notifications}, status=status.HTTP_200_OK)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])

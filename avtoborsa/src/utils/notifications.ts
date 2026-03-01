@@ -5,7 +5,7 @@ export const USER_NOTIFICATIONS_UPDATED_EVENT =
 
 const MAX_NOTIFICATIONS = 20;
 
-export type AppNotificationType = "deposit" | "dealer_listing";
+export type AppNotificationType = "deposit" | "dealer_listing" | "system";
 
 interface BaseNotification {
   id: string;
@@ -29,13 +29,33 @@ export interface DealerListingNotification extends BaseNotification {
   totalListings: number;
 }
 
-export type AppNotification = DepositNotification | DealerListingNotification;
+export interface SystemNotification extends BaseNotification {
+  type: "system";
+  title: string;
+  message: string;
+  category?: string;
+  link?: string;
+}
+
+export type AppNotification =
+  | DepositNotification
+  | DealerListingNotification
+  | SystemNotification;
 
 interface DealerListingNotificationInput {
   dealerId: number;
   dealerName: string;
   listingsAdded: number;
   totalListings: number;
+}
+
+interface SystemNotificationInput {
+  id?: string;
+  title: string;
+  message: string;
+  category?: string;
+  link?: string;
+  createdAt?: string;
 }
 
 const toStorageKey = (userId: number) =>
@@ -125,6 +145,27 @@ const toValidNotification = (value: unknown): AppNotification | null => {
       dealerName,
       listingsAdded,
       totalListings,
+      createdAt: record.createdAt,
+      isRead: Boolean(record.isRead),
+    };
+  }
+
+  if (record.type === "system") {
+    const title = normalizeText(record.title);
+    const message = normalizeText(record.message);
+    const category = normalizeText(record.category);
+    const link = normalizeText(record.link);
+    if (!title || !message) {
+      return null;
+    }
+
+    return {
+      id: record.id,
+      type: "system",
+      title: title.slice(0, 120),
+      message: message.slice(0, 500),
+      ...(category ? { category: category.slice(0, 60) } : {}),
+      ...(link ? { link: link.slice(0, 500) } : {}),
       createdAt: record.createdAt,
       isRead: Boolean(record.isRead),
     };
@@ -242,6 +283,52 @@ export const addDealerListingNotification = (
     listingsAdded,
     totalListings,
     createdAt: new Date().toISOString(),
+    isRead: false,
+  };
+
+  persistUserNotifications(
+    userId,
+    [notification, ...current].slice(0, MAX_NOTIFICATIONS)
+  );
+  return notification;
+};
+
+export const addSystemNotification = (
+  userId: number | null | undefined,
+  input: SystemNotificationInput
+): AppNotification | null => {
+  if (!userId) return null;
+
+  const title = normalizeText(input.title).slice(0, 120);
+  const message = normalizeText(input.message).slice(0, 500);
+  const category = normalizeText(input.category).slice(0, 60);
+  const link = normalizeText(input.link).slice(0, 500);
+
+  if (!title || !message) return null;
+
+  const current = getUserNotifications(userId);
+  const normalizedId = normalizeText(input.id);
+  const notificationId =
+    normalizedId ||
+    `system-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  if (current.some((item) => item.id === notificationId)) {
+    return null;
+  }
+
+  const createdAt =
+    typeof input.createdAt === "string" && input.createdAt.trim()
+      ? input.createdAt.trim()
+      : new Date().toISOString();
+
+  const notification: SystemNotification = {
+    id: notificationId,
+    type: "system",
+    title,
+    message,
+    ...(category ? { category } : {}),
+    ...(link ? { link } : {}),
+    createdAt,
     isRead: false,
   };
 

@@ -22,6 +22,10 @@ from .models import (
     ServicesListing,
 )
 from decimal import Decimal, InvalidOperation
+from .risk_scoring import (
+    describe_risk_flags_bg,
+    evaluate_listing_risk,
+)
 
 
 def _normalize_media_path(raw_path):
@@ -408,6 +412,44 @@ MAIN_CATEGORIES_WITH_OPTIONAL_IMAGES = {"y", "z"}
 LIST_IMAGE_RENDITION_WIDTHS = {600}
 DETAIL_IMAGE_RENDITION_WIDTHS = {600, 1200, 1600}
 DETAIL_IMAGE_MAX_WIDTH = 1600
+RISK_TEXT_FIELDS = (
+    "title",
+    "description",
+    "brand",
+    "model",
+    "city",
+    "location_country",
+    "location_region",
+    "wheel_for",
+    "offer_type",
+    "tire_brand",
+    "tire_width",
+    "tire_height",
+    "tire_diameter",
+    "tire_season",
+    "tire_speed_index",
+    "tire_load_index",
+    "tire_tread",
+    "wheel_brand",
+    "material",
+    "pcd",
+    "center_bore",
+    "offset",
+    "width",
+    "diameter",
+    "wheel_type",
+    "part_for",
+    "part_category",
+    "part_element",
+    "transmission",
+    "engine_type",
+    "equipment_type",
+    "boat_category",
+    "trailer_category",
+    "classified_for",
+    "accessory_category",
+    "buy_service_category",
+)
 
 
 def _resolve_photo_limit(context):
@@ -963,7 +1005,9 @@ class CarListingSerializer(serializers.ModelSerializer):
             'power', 'displacement', 'euro_standard',
             'description', 'phone', 'email', 'features', 'listing_type', 'listing_type_display',
             'top_plan', 'vip_plan', 'top_expires_at', 'vip_expires_at',
-            'view_count', 'is_draft', 'is_active', 'is_archived', 'is_kaparirano', 'created_at', 'updated_at', 'images', 'image_url', 'photo',
+            'view_count', 'is_draft', 'is_active', 'is_archived', 'is_kaparirano',
+            'risk_score', 'risk_flags', 'requires_moderation',
+            'created_at', 'updated_at', 'images', 'image_url', 'photo',
             'is_favorited', 'seller_name', 'seller_type', 'seller_created_at', 'price_history', 'images_upload',
             'wheel_for', 'offer_type',
             'tire_brand', 'tire_width', 'tire_height', 'tire_diameter',
@@ -981,7 +1025,8 @@ class CarListingSerializer(serializers.ModelSerializer):
             'id', 'slug', 'user', 'user_email', 'created_at', 'updated_at', 'images', 'image_url', 'is_favorited',
             'is_active', 'fuel_display', 'gearbox_display', 'condition_display', 'category_display',
             'listing_type_display', 'seller_name', 'seller_type', 'seller_created_at', 'price_history', 'photo',
-            'top_expires_at', 'vip_expires_at', 'view_count', 'is_kaparirano'
+            'top_expires_at', 'vip_expires_at', 'view_count', 'is_kaparirano',
+            'risk_score', 'risk_flags', 'requires_moderation',
         ]
 
     def get_fuel_display(self, obj):
@@ -1089,6 +1134,26 @@ class CarListingSerializer(serializers.ModelSerializer):
             for entry in history
         ]
 
+    def _next_field_value(self, attrs, field_name, default=""):
+        if field_name in attrs:
+            return attrs.get(field_name)
+        if self.instance is not None:
+            return getattr(self.instance, field_name, default)
+        return default
+
+    def _build_risk_text_payload(self, attrs):
+        payload = {}
+        for field_name in RISK_TEXT_FIELDS:
+            raw_value = self._next_field_value(attrs, field_name, "")
+            if raw_value is None:
+                payload[field_name] = ""
+                continue
+            if isinstance(raw_value, (list, tuple)):
+                payload[field_name] = " ".join(str(item) for item in raw_value if item is not None).strip()
+                continue
+            payload[field_name] = str(raw_value).strip()
+        return payload
+
     def validate(self, attrs):
         main_category = str(
             attrs.get("main_category", self.instance.main_category if self.instance else "1")
@@ -1122,6 +1187,50 @@ class CarListingSerializer(serializers.ModelSerializer):
 
         if attrs.get("description") is None:
             attrs["description"] = ""
+
+        risk_assessment = evaluate_listing_risk(
+            text_fields=self._build_risk_text_payload(attrs),
+            phone=str(self._next_field_value(attrs, "phone", "") or ""),
+            email=str(self._next_field_value(attrs, "email", "") or ""),
+        )
+
+        if risk_assessment.has_links:
+            link_errors = {}
+            for field_name in sorted(risk_assessment.link_hits_by_field.keys()):
+                if field_name in self.fields:
+                    link_errors[field_name] = (
+                        "Линкове в обявите не са позволени. "
+                        "Премахнете URL адресите и опитайте отново."
+                    )
+            if not link_errors:
+                link_errors["description"] = (
+                    "Линкове в обявите не са позволени. "
+                    "Премахнете URL адресите и опитайте отново."
+                )
+            raise serializers.ValidationError(link_errors)
+
+        attrs["risk_score"] = risk_assessment.score
+        attrs["risk_flags"] = risk_assessment.flags
+        attrs["requires_moderation"] = risk_assessment.is_high_risk
+
+        if will_publish and risk_assessment.is_high_risk:
+            reason_text = ", ".join(describe_risk_flags_bg(risk_assessment.flags))
+            details = (
+                f"Причини: {reason_text}."
+                if reason_text
+                else "Причини: засечено високорисково съдържание."
+            )
+            raise serializers.ValidationError(
+                {
+                    "non_field_errors": [
+                        (
+                            f"Обявата е маркирана за ръчна модерация "
+                            f"({risk_assessment.score}/100). {details} "
+                            "Запазете я като чернова и редактирайте съдържанието."
+                        )
+                    ]
+                }
+            )
 
         return attrs
 
