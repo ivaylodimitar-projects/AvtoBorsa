@@ -1,4 +1,4 @@
-﻿import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 import { API_BASE_URL } from "../config/api";
 
@@ -29,7 +29,7 @@ interface AuthContextType {
   login: (
     email: string,
     password: string,
-    options?: { remember?: boolean }
+    options?: { remember?: boolean; recaptchaToken?: string }
   ) => Promise<void>;
   logout: () => Promise<void>;
   setUserFromToken: (userData: User, accessToken: string) => void;
@@ -276,7 +276,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (
     email: string,
     password: string,
-    options?: { remember?: boolean }
+    options?: { remember?: boolean; recaptchaToken?: string }
   ) => {
     const transitionStartedAt = Date.now();
     setAuthTransition("login");
@@ -286,15 +286,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem(REMEMBER_LOGIN_KEY, rememberMe ? "1" : "0");
 
     try {
+      const requestBody: Record<string, unknown> = {
+        email: normalizedEmail,
+        password,
+        remember_me: rememberMe,
+      };
+      if (options?.recaptchaToken) {
+        requestBody.recaptcha_token = options.recaptchaToken;
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/auth/login/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          email: normalizedEmail,
-          password,
-          remember_me: rememberMe,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {

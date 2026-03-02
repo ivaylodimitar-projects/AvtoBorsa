@@ -293,6 +293,20 @@ if JWT_REFRESH_COOKIE_SAMESITE == "None" and not JWT_REFRESH_COOKIE_SECURE:
             "JWT_REFRESH_COOKIE_SECURE=True."
         )
 
+
+RECAPTCHA_SITE_KEY = os.getenv("RECAPTCHA_SITE_KEY", "").strip()
+RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY", "").strip()
+RECAPTCHA_VERIFY_URL = (
+    os.getenv("RECAPTCHA_VERIFY_URL", "https://www.google.com/recaptcha/api/siteverify").strip()
+    or "https://www.google.com/recaptcha/api/siteverify"
+)
+RECAPTCHA_ENABLED = _env_flag("RECAPTCHA_ENABLED", default=False)
+if RECAPTCHA_ENABLED and (not RECAPTCHA_SITE_KEY or not RECAPTCHA_SECRET_KEY):
+    raise ImproperlyConfigured(
+        "RECAPTCHA_ENABLED=True requires both RECAPTCHA_SITE_KEY and RECAPTCHA_SECRET_KEY."
+    )
+
+
 CAR_IMAGE_ASYNC_RENDITIONS = _env_flag("CAR_IMAGE_ASYNC_RENDITIONS", default=True)
 try:
     CAR_IMAGE_RENDITION_WORKERS = max(1, int(os.getenv("CAR_IMAGE_RENDITION_WORKERS", "2")))

@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { API_BASE_URL } from "../config/api";
+
+import { API_BASE_URL, RECAPTCHA_ENABLED, RECAPTCHA_SITE_KEY } from "../config/api";
+import RecaptchaField from "./RecaptchaField";
 
 const PASSWORD_POLICY_MESSAGE =
   "Паролата трябва да е поне 8 символа, с поне 1 главна буква и 1 цифра";
@@ -29,6 +31,8 @@ const PrivateProfilePage: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const [recaptchaResetKey, setRecaptchaResetKey] = useState(0);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -66,48 +70,75 @@ const PrivateProfilePage: React.FC = () => {
       newErrors.confirmPassword = "Паролите не съвпадат";
     }
 
+    if (RECAPTCHA_ENABLED) {
+      if (!RECAPTCHA_SITE_KEY) {
+        newErrors.recaptcha = "Липсва VITE_RECAPTCHA_SITE_KEY във frontend .env.";
+      } else if (!recaptchaToken) {
+        newErrors.recaptcha = "Моля, потвърди, че не си робот.";
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (validateForm()) {
-      setLoading(true);
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/auth/register/private/`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            username: formData.username.trim().toLowerCase(),
-            email: formData.email.trim().toLowerCase(),
-            password: formData.password,
-            confirm_password: formData.confirmPassword,
-          }),
-        });
 
-          if (response.ok) {
-            const data = await response.json();
-            setSuccessMessage(data.message || "Регистрацията е успешна. Изпратихме ти имейл за потвърждение.");
-            setErrors({});
-            setFormData({ username: "", email: "", password: "", confirmPassword: "" });
-          } else {
-          const errorData = await response.json();
-          console.error("Backend error response:", errorData);
-          if (errorData?.error) {
-            setErrors({ submit: errorData.error });
-          } else {
-            setErrors(errorData);
-          }
-        }
-      } catch (error) {
-        setErrors({ submit: "Грешка при свързване със сървъра" });
-        console.error("Error:", error);
-      } finally {
-        setLoading(false);
+    if (!validateForm()) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const payload: Record<string, unknown> = {
+        username: formData.username.trim().toLowerCase(),
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password,
+        confirm_password: formData.confirmPassword,
+      };
+
+      if (RECAPTCHA_ENABLED) {
+        payload.recaptcha_token = recaptchaToken;
       }
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/register/private/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSuccessMessage(data.message || "Регистрацията е успешна. Изпратихме ти имейл за потвърждение.");
+        setErrors({});
+        setFormData({ username: "", email: "", password: "", confirmPassword: "" });
+        setRecaptchaToken(null);
+        setRecaptchaResetKey((prev) => prev + 1);
+      } else {
+        const errorData = await response.json();
+        console.error("Backend error response:", errorData);
+        if (errorData?.error) {
+          setErrors({ submit: errorData.error });
+        } else {
+          setErrors(errorData);
+        }
+        if (RECAPTCHA_ENABLED) {
+          setRecaptchaToken(null);
+          setRecaptchaResetKey((prev) => prev + 1);
+        }
+      }
+    } catch (error) {
+      setErrors({ submit: "Грешка при свързване със сървъра" });
+      if (RECAPTCHA_ENABLED) {
+        setRecaptchaToken(null);
+        setRecaptchaResetKey((prev) => prev + 1);
+      }
+      console.error("Error:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -349,6 +380,17 @@ const PrivateProfilePage: React.FC = () => {
 
             <p style={styles.hint}>{PASSWORD_POLICY_MESSAGE}</p>
           </div>
+
+          <RecaptchaField
+            error={errors.recaptcha}
+            onChange={(token) => {
+              setRecaptchaToken(token);
+              if (errors.recaptcha) {
+                setErrors((prev) => ({ ...prev, recaptcha: "" }));
+              }
+            }}
+            resetKey={recaptchaResetKey}
+          />
 
           {/* Actions */}
           <div style={styles.actions} className="priv-actions">
@@ -644,3 +686,5 @@ const styles: Record<string, React.CSSProperties> = {
 };
 
 export default PrivateProfilePage;
+
+

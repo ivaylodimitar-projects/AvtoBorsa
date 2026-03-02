@@ -1,4 +1,5 @@
 import hashlib
+import json
 import re
 import secrets
 import time
@@ -81,6 +82,81 @@ def _to_bool(value, default: bool = True) -> bool:
         if normalized in {'0', 'false', 'no', 'off'}:
             return False
     return default
+
+
+def _extract_client_ip(request) -> str:
+    forwarded_for = str(request.META.get('HTTP_X_FORWARDED_FOR') or '').strip()
+    if forwarded_for:
+        return forwarded_for.split(',', 1)[0].strip()
+    return str(request.META.get('REMOTE_ADDR') or '').strip()
+
+
+def _verify_recaptcha_token(token: str, remote_ip: str = '') -> tuple[bool, str]:
+    if not getattr(settings, 'RECAPTCHA_ENABLED', False):
+        return True, ''
+
+    secret_key = str(getattr(settings, 'RECAPTCHA_SECRET_KEY', '') or '').strip()
+    verify_url = str(getattr(settings, 'RECAPTCHA_VERIFY_URL', '') or '').strip()
+    if not verify_url:
+        verify_url = 'https://www.google.com/recaptcha/api/siteverify'
+
+    if not secret_key:
+        return False, 'reCAPTCHA не е конфигурирана на сървъра.'
+
+    if not token:
+        return False, 'Моля, потвърди, че не си робот.'
+
+    payload = {
+        'secret': secret_key,
+        'response': token,
+    }
+    if remote_ip:
+        payload['remoteip'] = remote_ip
+
+    encoded_payload = urllib.parse.urlencode(payload).encode('utf-8')
+    request_obj = urllib.request.Request(
+        verify_url,
+        data=encoded_payload,
+        method='POST',
+        headers={'Content-Type': 'application/x-www-form-urlencoded'},
+    )
+
+    try:
+        with urllib.request.urlopen(request_obj, timeout=8) as response:
+            raw_body = response.read().decode('utf-8')
+            verification_result = json.loads(raw_body)
+    except (
+        urllib.error.HTTPError,
+        urllib.error.URLError,
+        TimeoutError,
+        ValueError,
+        json.JSONDecodeError,
+    ):
+        return False, 'Неуспешна проверка на reCAPTCHA. Опитай отново.'
+
+    if bool(verification_result.get('success')):
+        return True, ''
+
+    error_codes = verification_result.get('error-codes') or []
+    if isinstance(error_codes, str):
+        error_codes = [error_codes]
+    if 'timeout-or-duplicate' in error_codes:
+        return False, 'reCAPTCHA токенът изтече. Моля, потвърди отново.'
+
+    return False, 'Неуспешна reCAPTCHA проверка. Опитай отново.'
+
+
+def _validate_recaptcha_request(request):
+    token = str(
+        request.data.get('recaptcha_token')
+        or request.data.get('g-recaptcha-response')
+        or request.data.get('captcha_token')
+        or ''
+    ).strip()
+    is_valid, message = _verify_recaptcha_token(token, remote_ip=_extract_client_ip(request))
+    if is_valid:
+        return None
+    return Response({'error': message}, status=status.HTTP_400_BAD_REQUEST)
 
 
 def _set_refresh_cookie(
@@ -879,6 +955,10 @@ def _build_copart_draft_payload(payload, user):
 def register_private_user(request):
     """API endpoint for private user registration"""
     if request.method == 'POST':
+        recaptcha_error_response = _validate_recaptcha_request(request)
+        if recaptcha_error_response is not None:
+            return recaptcha_error_response
+
         serializer = PrivateUserSerializer(data=request.data)
         if serializer.is_valid():
             try:
@@ -905,6 +985,10 @@ def register_private_user(request):
 @permission_classes([AllowAny])
 def login(request):
     """API endpoint for user login"""
+    recaptcha_error_response = _validate_recaptcha_request(request)
+    if recaptcha_error_response is not None:
+        return recaptcha_error_response
+
     identifier = request.data.get('email')
     password = request.data.get('password')
     remember_me = _to_bool(request.data.get('remember_me'), default=True)
@@ -1224,6 +1308,10 @@ def poll_user_notifications(request):
 def register_business_user(request):
     """API endpoint for business user registration"""
     if request.method == 'POST':
+        recaptcha_error_response = _validate_recaptcha_request(request)
+        if recaptcha_error_response is not None:
+            return recaptcha_error_response
+
         serializer = BusinessUserSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()

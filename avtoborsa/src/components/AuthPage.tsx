@@ -1,7 +1,10 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+
+import { RECAPTCHA_ENABLED, RECAPTCHA_SITE_KEY } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+import RecaptchaField from "./RecaptchaField";
 
 const AuthPage: React.FC = () => {
   const navigate = useNavigate();
@@ -15,6 +18,8 @@ const AuthPage: React.FC = () => {
   const [rememberPassword, setRememberPassword] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const [recaptchaResetKey, setRecaptchaResetKey] = useState(0);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -26,13 +31,26 @@ const AuthPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setErrors({});
+
+    if (isLogin && RECAPTCHA_ENABLED) {
+      if (!RECAPTCHA_SITE_KEY) {
+        setErrors({ recaptcha: "Липсва VITE_RECAPTCHA_SITE_KEY във frontend .env." });
+        return;
+      }
+      if (!recaptchaToken) {
+        setErrors({ recaptcha: "Моля, потвърди, че не си робот." });
+        return;
+      }
+    }
+
+    setLoading(true);
 
     try {
       if (isLogin) {
         await login(formData.email, formData.password, {
           remember: rememberPassword,
+          recaptchaToken: recaptchaToken ?? undefined,
         });
         showToast("Влизането е успешно.", { type: "success" });
         navigate("/");
@@ -45,6 +63,10 @@ const AuthPage: React.FC = () => {
           ? error.message || "Грешка при свързване със сървъра"
           : "Грешка при свързване със сървъра";
       setErrors({ submit: message });
+      if (RECAPTCHA_ENABLED) {
+        setRecaptchaToken(null);
+        setRecaptchaResetKey((prev) => prev + 1);
+      }
       console.error("Error:", error);
     } finally {
       setLoading(false);
@@ -185,6 +207,19 @@ const AuthPage: React.FC = () => {
                 Забравена парола?
               </span>
             </div>
+          )}
+
+          {isLogin && (
+            <RecaptchaField
+              error={errors.recaptcha}
+              onChange={(token) => {
+                setRecaptchaToken(token);
+                if (errors.recaptcha) {
+                  setErrors((prev) => ({ ...prev, recaptcha: "" }));
+                }
+              }}
+              resetKey={recaptchaResetKey}
+            />
           )}
 
           <button
@@ -447,3 +482,4 @@ const styles: Record<string, React.CSSProperties> = {
 };
 
 export default AuthPage;
+

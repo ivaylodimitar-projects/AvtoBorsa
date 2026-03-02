@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { API_BASE_URL } from "../config/api";
+
+import { API_BASE_URL, RECAPTCHA_ENABLED, RECAPTCHA_SITE_KEY } from "../config/api";
+import RecaptchaField from "./RecaptchaField";
 
 const PASSWORD_POLICY_MESSAGE =
   "Паролата трябва да е поне 8 символа, с поне 1 главна буква и 1 цифра";
@@ -43,6 +45,8 @@ const BusinessProfilePage: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const [recaptchaResetKey, setRecaptchaResetKey] = useState(0);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -56,7 +60,6 @@ const BusinessProfilePage: React.FC = () => {
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    // Име и контакти
     if (!formData.dealerName.trim()) {
       newErrors.dealerName = "Име на дилъра е задължително";
     }
@@ -75,7 +78,6 @@ const BusinessProfilePage: React.FC = () => {
       newErrors.email = "Невалиден email адрес";
     }
 
-    // Потребителско име и парола
     if (!formData.username.trim()) {
       newErrors.username = "Потребителско име е задължително";
     } else if (formData.username.length < 3) {
@@ -92,7 +94,6 @@ const BusinessProfilePage: React.FC = () => {
       newErrors.confirmPassword = "Паролите не съвпадат";
     }
 
-    // Фирмени данни
     if (!formData.companyName.trim()) {
       newErrors.companyName = "Фирма е задължителна";
     }
@@ -106,12 +107,19 @@ const BusinessProfilePage: React.FC = () => {
       newErrors.bulstat = "БУЛСТАТ е задължителен";
     }
 
-    // Администратор
     if (!formData.adminName.trim()) {
       newErrors.adminName = "Име и Фамилия на администратор е задължително";
     }
     if (!formData.adminPhone.trim()) {
       newErrors.adminPhone = "Мобилен телефон на администратор е задължителен";
+    }
+
+    if (RECAPTCHA_ENABLED) {
+      if (!RECAPTCHA_SITE_KEY) {
+        newErrors.recaptcha = "Липсва VITE_RECAPTCHA_SITE_KEY във frontend .env.";
+      } else if (!recaptchaToken) {
+        newErrors.recaptcha = "Моля, потвърди, че не си робот.";
+      }
     }
 
     setErrors(newErrors);
@@ -120,79 +128,94 @@ const BusinessProfilePage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (validateForm()) {
-      setLoading(true);
-      try {
-        const payloadData: any = {
-          dealer_name: formData.dealerName,
-          city: formData.city,
-          address: formData.address,
-          phone: formData.phone,
-          email: formData.email.trim().toLowerCase(),
-          username: formData.username,
-          password: formData.password,
-          confirm_password: formData.confirmPassword,
-          company_name: formData.companyName,
-          registration_address: formData.registrationAddress,
-          mol: formData.mol,
-          bulstat: formData.bulstat,
-          vat_number: formData.vatNumber,
-          admin_name: formData.adminName,
-          admin_phone: formData.adminPhone,
-          description: formData.description,
-        };
+    if (!validateForm()) {
+      return;
+    }
 
-        // Only include website if it's provided and non-empty
-        if (formData.website.trim()) {
-          payloadData.website = formData.website.trim();
-        }
+    setLoading(true);
+    try {
+      const payloadData: Record<string, unknown> = {
+        dealer_name: formData.dealerName,
+        city: formData.city,
+        address: formData.address,
+        phone: formData.phone,
+        email: formData.email.trim().toLowerCase(),
+        username: formData.username,
+        password: formData.password,
+        confirm_password: formData.confirmPassword,
+        company_name: formData.companyName,
+        registration_address: formData.registrationAddress,
+        mol: formData.mol,
+        bulstat: formData.bulstat,
+        vat_number: formData.vatNumber,
+        admin_name: formData.adminName,
+        admin_phone: formData.adminPhone,
+        description: formData.description,
+      };
 
-        const response = await fetch(`${API_BASE_URL}/api/auth/register/business/`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payloadData),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setSuccessMessage(data.message || "Регистрацията е успешна. Изпратихме ти имейл за потвърждение.");
-          setErrors({});
-          setFormData({
-            dealerName: "",
-            city: "",
-            address: "",
-            phone: "",
-            email: "",
-            website: "",
-            username: "",
-            password: "",
-            confirmPassword: "",
-            companyName: "",
-            registrationAddress: "",
-            mol: "",
-            bulstat: "",
-            vatNumber: "",
-            adminName: "",
-            adminPhone: "",
-            description: "",
-          });
-        } else {
-          const errorData = await response.json();
-          console.error("Backend error response:", errorData);
-          if (errorData?.error) {
-            setErrors({ submit: errorData.error });
-          } else {
-            setErrors(errorData);
-          }
-        }
-      } catch (error) {
-        setErrors({ submit: "Грешка при свързване със сървъра" });
-        console.error("Error:", error);
-      } finally {
-        setLoading(false);
+      if (formData.website.trim()) {
+        payloadData.website = formData.website.trim();
       }
+
+      if (RECAPTCHA_ENABLED) {
+        payloadData.recaptcha_token = recaptchaToken;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/register/business/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payloadData),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSuccessMessage(data.message || "Регистрацията е успешна. Изпратихме ти имейл за потвърждение.");
+        setErrors({});
+        setFormData({
+          dealerName: "",
+          city: "",
+          address: "",
+          phone: "",
+          email: "",
+          website: "",
+          username: "",
+          password: "",
+          confirmPassword: "",
+          companyName: "",
+          registrationAddress: "",
+          mol: "",
+          bulstat: "",
+          vatNumber: "",
+          adminName: "",
+          adminPhone: "",
+          description: "",
+        });
+        setRecaptchaToken(null);
+        setRecaptchaResetKey((prev) => prev + 1);
+      } else {
+        const errorData = await response.json();
+        console.error("Backend error response:", errorData);
+        if (errorData?.error) {
+          setErrors({ submit: errorData.error });
+        } else {
+          setErrors(errorData);
+        }
+        if (RECAPTCHA_ENABLED) {
+          setRecaptchaToken(null);
+          setRecaptchaResetKey((prev) => prev + 1);
+        }
+      }
+    } catch (error) {
+      setErrors({ submit: "Грешка при свързване със сървъра" });
+      if (RECAPTCHA_ENABLED) {
+        setRecaptchaToken(null);
+        setRecaptchaResetKey((prev) => prev + 1);
+      }
+      console.error("Error:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -637,9 +660,50 @@ const BusinessProfilePage: React.FC = () => {
             </div>
           </div>
 
+          <RecaptchaField
+            error={errors.recaptcha}
+            onChange={(token) => {
+              setRecaptchaToken(token);
+              if (errors.recaptcha) {
+                setErrors((prev) => ({ ...prev, recaptcha: "" }));
+              }
+            }}
+            resetKey={recaptchaResetKey}
+          />
+
           <div style={styles.submitRow} className="business-submit-row">
             <button type="submit" className="business-primary-btn" style={styles.primaryButton}>{loading ? "Създавам..." : "Създай профил"}</button>
-            <button type="button" onClick={() => { setFormData({ dealerName: "", city: "", address: "", phone: "", email: "", website: "", username: "", password: "", confirmPassword: "", companyName: "", registrationAddress: "", mol: "", bulstat: "", vatNumber: "", adminName: "", adminPhone: "", description: "" }); setErrors({}); }} className="business-ghost-btn" style={styles.ghostButton}>Изчисти</button>
+            <button
+              type="button"
+              onClick={() => {
+                setFormData({
+                  dealerName: "",
+                  city: "",
+                  address: "",
+                  phone: "",
+                  email: "",
+                  website: "",
+                  username: "",
+                  password: "",
+                  confirmPassword: "",
+                  companyName: "",
+                  registrationAddress: "",
+                  mol: "",
+                  bulstat: "",
+                  vatNumber: "",
+                  adminName: "",
+                  adminPhone: "",
+                  description: "",
+                });
+                setErrors({});
+                setRecaptchaToken(null);
+                setRecaptchaResetKey((prev) => prev + 1);
+              }}
+              className="business-ghost-btn"
+              style={styles.ghostButton}
+            >
+              Изчисти
+            </button>
             <p className="business-required-note" style={{ ...styles.smallNote, marginLeft: 8 }}>* Задължителни полета</p>
           </div>
         </form>
@@ -649,3 +713,5 @@ const BusinessProfilePage: React.FC = () => {
 };
 
 export default BusinessProfilePage;
+
+
