@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import re
 import secrets
 import time
@@ -41,6 +42,8 @@ from .models import (
     UserImportApiKey,
     ImportApiUsageEvent,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _refresh_cookie_max_age_seconds() -> int:
@@ -131,7 +134,8 @@ def _verify_recaptcha_token(token: str, remote_ip: str = '') -> tuple[bool, str]
         TimeoutError,
         ValueError,
         json.JSONDecodeError,
-    ):
+    ) as exc:
+        logger.warning("reCAPTCHA verification request failed: %s", exc)
         return False, 'Неуспешна проверка на reCAPTCHA. Опитай отново.'
 
     if bool(verification_result.get('success')):
@@ -140,6 +144,15 @@ def _verify_recaptcha_token(token: str, remote_ip: str = '') -> tuple[bool, str]
     error_codes = verification_result.get('error-codes') or []
     if isinstance(error_codes, str):
         error_codes = [error_codes]
+    if 'missing-input-secret' in error_codes or 'invalid-input-secret' in error_codes:
+        logger.error("reCAPTCHA secret key is invalid or missing. codes=%s", error_codes)
+        return False, 'reCAPTCHA конфигурацията на сървъра е невалидна.'
+    if 'missing-input-response' in error_codes:
+        return False, 'Моля, потвърди, че не си робот.'
+    if 'invalid-input-response' in error_codes:
+        return False, 'Невалиден reCAPTCHA токен. Презареди страницата и опитай отново.'
+    if 'bad-request' in error_codes:
+        return False, 'Невалидна reCAPTCHA заявка. Опитай отново.'
     if 'timeout-or-duplicate' in error_codes:
         return False, 'reCAPTCHA токенът изтече. Моля, потвърди отново.'
 

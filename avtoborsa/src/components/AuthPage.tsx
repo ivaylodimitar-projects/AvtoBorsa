@@ -62,7 +62,8 @@ const AuthPage: React.FC = () => {
         error instanceof Error
           ? error.message || "Грешка при свързване със сървъра"
           : "Грешка при свързване със сървъра";
-      setErrors({ submit: message });
+      const isRecaptchaError = /recaptcha|captcha|робот/i.test(message);
+      setErrors(isRecaptchaError ? { recaptcha: message } : { submit: message });
       if (RECAPTCHA_ENABLED) {
         setRecaptchaToken(null);
         setRecaptchaResetKey((prev) => prev + 1);

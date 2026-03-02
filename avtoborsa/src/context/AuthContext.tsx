@@ -303,12 +303,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (!response.ok) {
-        try {
-          const errorData = await response.json();
-          throw new Error(errorData?.error || "Невалиден email или парола");
-        } catch {
-          throw new Error("Невалиден email или парола");
-        }
+        const errorData = (await response
+          .json()
+          .catch(() => ({}))) as { error?: unknown; detail?: unknown; message?: unknown };
+        const backendMessage =
+          (typeof errorData.error === "string" && errorData.error) ||
+          (typeof errorData.detail === "string" && errorData.detail) ||
+          (typeof errorData.message === "string" && errorData.message) ||
+          "";
+        throw new Error(backendMessage || "Невалиден email или парола");
       }
 
       const data = await response.json();
