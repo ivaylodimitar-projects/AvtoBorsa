@@ -9,11 +9,6 @@ from urllib.parse import urlparse
 
 from django.core.exceptions import ImproperlyConfigured
 
-try:
-    import dj_database_url
-except Exception:  # pragma: no cover - dependency check at runtime
-    dj_database_url = None
-
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -164,26 +159,27 @@ CHANNEL_LAYERS = {
 }
 
 
-DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
-if DATABASE_URL:
-    if dj_database_url is None:
-        raise ImproperlyConfigured(
-            "DATABASE_URL is set but dj-database-url is not installed."
-        )
-    DATABASES = {
-        "default": dj_database_url.parse(
-            DATABASE_URL,
-            conn_max_age=int(os.getenv("DATABASE_CONN_MAX_AGE", "600")),
-            ssl_require=_env_flag("DATABASE_SSL_REQUIRE", default=not DEBUG),
-        )
+DATABASES = {
+    "default": {
+        "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.postgresql"),
+        "NAME": os.getenv("DB_NAME", "postgres"),
+        "USER": os.getenv("DB_USER", ""),
+        "PASSWORD": os.getenv("DB_PASSWORD", ""),
+        "HOST": os.getenv("DB_HOST", "localhost"),
+        "PORT": os.getenv("DB_PORT", "5432"),
+        "CONN_MAX_AGE": int(os.getenv("DATABASE_CONN_MAX_AGE", "600")),
     }
-else:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-        }
-    }
+}
+
+_db_sslmode = os.getenv("DB_SSLMODE", "").strip()
+_db_sslrootcert = os.getenv("DB_SSLROOTCERT", "").strip()
+if _db_sslmode or _db_sslrootcert:
+    db_options = {}
+    if _db_sslmode:
+        db_options["sslmode"] = _db_sslmode
+    if _db_sslrootcert:
+        db_options["sslrootcert"] = _db_sslrootcert
+    DATABASES["default"]["OPTIONS"] = db_options
 
 
 AUTH_PASSWORD_VALIDATORS = [

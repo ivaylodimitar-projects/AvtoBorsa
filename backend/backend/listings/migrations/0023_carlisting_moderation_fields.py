@@ -3,6 +3,18 @@
 from django.db import migrations, models
 
 
+def _build_moderation_field(model, field_name):
+    field_map = {
+        "risk_score": models.PositiveSmallIntegerField(default=0),
+        "risk_flags": models.JSONField(blank=True, default=list),
+        "requires_moderation": models.BooleanField(default=False),
+    }
+    field = field_map[field_name]
+    field.set_attributes_from_name(field_name)
+    field.model = model
+    return field
+
+
 def ensure_moderation_schema(apps, schema_editor):
     CarListing = apps.get_model("listings", "CarListing")
     connection = schema_editor.connection
@@ -49,19 +61,20 @@ def ensure_moderation_schema(apps, schema_editor):
     for field_name in required_columns:
         if field_name in existing_columns:
             continue
-        field = CarListing._meta.get_field(field_name)
+        field = _build_moderation_field(CarListing, field_name)
         schema_editor.add_field(CarListing, field)
         existing_columns.add(field.column)
 
     with connection.cursor() as cursor:
         constraints = connection.introspection.get_constraints(cursor, table_name)
     if "carlist_mod_created_idx" not in constraints:
-        schema_editor.add_index(
-            CarListing,
-            models.Index(
-                fields=["requires_moderation", "created_at"],
-                name="carlist_mod_created_idx",
-            ),
+        schema_editor.execute(
+            "CREATE INDEX {index_name} ON {table_name} ({field_one}, {field_two})".format(
+                index_name=schema_editor.quote_name("carlist_mod_created_idx"),
+                table_name=schema_editor.quote_name(table_name),
+                field_one=schema_editor.quote_name("requires_moderation"),
+                field_two=schema_editor.quote_name("created_at"),
+            )
         )
 
 
