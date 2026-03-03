@@ -107,12 +107,6 @@ const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features, mainCateg
       fontWeight: 500,
       wordBreak: 'break-word',
     },
-    emptyMessage: {
-      padding: isMobile ? '12px 16px' : '16px 20px',
-      color: '#999',
-      fontSize: isMobile ? 12 : 13,
-      fontStyle: 'italic',
-    },
   };
 
   const normalizedFeatures = Array.isArray(features)
@@ -144,18 +138,26 @@ const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features, mainCateg
           group.items.includes(f)
         );
         categoryFeaturesList.forEach((feature) => usedFeatures.add(feature));
-        const isExpanded = expandedCategories[group.key] ?? true;
+        const hasFeatures = categoryFeaturesList.length > 0;
+        const isExpanded = hasFeatures && (expandedCategories[group.key] ?? true);
 
         return (
           <div key={group.key}>
             <div
-              style={styles.categoryHeader}
-              onClick={() => toggleCategory(group.key)}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.background = '#f0f0f0')
+              style={{
+                ...styles.categoryHeader,
+                cursor: hasFeatures ? 'pointer' : 'default',
+              }}
+              onClick={hasFeatures ? () => toggleCategory(group.key) : undefined}
+              onMouseEnter={
+                hasFeatures
+                  ? (e) => (e.currentTarget.style.background = '#f0f0f0')
+                  : undefined
               }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.background = '#f9f9f9')
+              onMouseLeave={
+                hasFeatures
+                  ? (e) => (e.currentTarget.style.background = '#f9f9f9')
+                  : undefined
               }
             >
               <span style={styles.categoryTitle}>{group.title}</span>
@@ -175,33 +177,29 @@ const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features, mainCateg
                 >
                   {categoryFeaturesList.length}
                 </span>
-                <ChevronDown
-                  size={20}
-                  style={{
-                    transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                    transition: 'transform 0.2s',
-                    color: '#666',
-                  }}
-                />
+                {hasFeatures && (
+                  <ChevronDown
+                    size={20}
+                    style={{
+                      transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: 'transform 0.2s',
+                      color: '#666',
+                    }}
+                  />
+                )}
               </div>
             </div>
 
             {isExpanded && (
               <div style={styles.categoryContent}>
-                {categoryFeaturesList.length > 0 ? (
-                  categoryFeaturesList.map((feature) => (
-                    <div key={feature} style={styles.featureItem}>
-                      <div style={styles.featureCheckbox}>
-                        <Check size={16} color="#fff" />
-                      </div>
-                      <span style={styles.featureLabel}>{feature}</span>
+                {categoryFeaturesList.map((feature) => (
+                  <div key={feature} style={styles.featureItem}>
+                    <div style={styles.featureCheckbox}>
+                      <Check size={16} color="#fff" />
                     </div>
-                  ))
-                ) : (
-                  <div style={styles.emptyMessage}>
-                    Няма характеристики в тази категория
+                    <span style={styles.featureLabel}>{feature}</span>
                   </div>
-                )}
+                ))}
               </div>
             )}
           </div>

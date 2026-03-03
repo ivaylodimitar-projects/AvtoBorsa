@@ -599,7 +599,7 @@ class BoatsListing(models.Model):
 
     def __str__(self):
         return f"Boats details for listing {self.listing_id}"
-
+    
 
 class TrailersListing(models.Model):
     listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='trailers_details')

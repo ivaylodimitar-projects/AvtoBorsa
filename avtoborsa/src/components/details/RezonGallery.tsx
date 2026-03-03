@@ -930,7 +930,10 @@ const FullscreenModal = memo<{
           {totalImages > 1 && (
             <>
               <button
-                onClick={onPrevious}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onPrevious();
+                }}
                 style={{
                   position: 'absolute',
                   left: isMobile ? 8 : 20,
@@ -945,6 +948,9 @@ const FullscreenModal = memo<{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  zIndex: 26,
+                  boxShadow: '0 8px 20px rgba(0,0,0,0.35)',
+                  backdropFilter: 'blur(4px)',
                   transition: 'background 0.2s',
                 }}
                 onMouseEnter={(e) =>
@@ -953,11 +959,15 @@ const FullscreenModal = memo<{
                 onMouseLeave={(e) =>
                   (e.currentTarget.style.background = 'rgba(255,255,255,0.2)')
                 }
+                aria-label="Предишна снимка"
               >
                 <ChevronLeft size={isMobile ? 20 : 28} />
               </button>
               <button
-                onClick={onNext}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onNext();
+                }}
                 style={{
                   position: 'absolute',
                   right: isMobile ? 8 : 20,
@@ -972,6 +982,9 @@ const FullscreenModal = memo<{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  zIndex: 26,
+                  boxShadow: '0 8px 20px rgba(0,0,0,0.35)',
+                  backdropFilter: 'blur(4px)',
                   transition: 'background 0.2s',
                 }}
                 onMouseEnter={(e) =>
@@ -980,6 +993,7 @@ const FullscreenModal = memo<{
                 onMouseLeave={(e) =>
                   (e.currentTarget.style.background = 'rgba(255,255,255,0.2)')
                 }
+                aria-label="Следваща снимка"
               >
                 <ChevronRight size={isMobile ? 20 : 28} />
               </button>

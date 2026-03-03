@@ -1,6 +1,7 @@
 import React, { Suspense, useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Clock, ImageOff, MapPin } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import TechnicalDataSection from './TechnicalDataSection';
 import EquipmentSection from './EquipmentSection';
 import ContactSidebar from './ContactSidebar';
@@ -64,6 +65,7 @@ interface CarListing {
   listing_type?: 'top' | 'vip' | 'normal' | string | number;
   listing_type_display?: string;
   is_kaparirano?: boolean;
+  is_favorited?: boolean;
   is_top?: boolean;
   is_top_listing?: boolean;
   is_top_ad?: boolean;
@@ -401,6 +403,7 @@ const RezonGallery = React.lazy(() => import('./RezonGallery'));
 const VehicleDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const { slug } = useParams<{ slug: string }>();
+  const { ensureFreshAccessToken } = useAuth();
   const [id, setId] = useState<number | null>(null);
   const [listing, setListing] = useState<CarListing | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -522,7 +525,7 @@ const VehicleDetailsPage: React.FC = () => {
       }
 
       try {
-        const token = localStorage.getItem('authToken');
+        const token = await ensureFreshAccessToken();
         const headers: Record<string, string> = {};
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
@@ -627,7 +630,7 @@ const VehicleDetailsPage: React.FC = () => {
       isCancelled = true;
       controller.abort();
     };
-  }, [id, isDevPerfMode, logPerfIfReady]);
+  }, [id, isDevPerfMode, logPerfIfReady, ensureFreshAccessToken]);
 
   useEffect(() => {
     if (!isDevPerfMode || !listing) return;
@@ -1543,6 +1546,7 @@ const VehicleDetailsPage: React.FC = () => {
             updatedAt={listing.updated_at}
             priceHistory={priceHistory}
             viewCount={listing.view_count ?? 0}
+            initialIsFavorite={Boolean(listing.is_favorited)}
           />
         )}
       </div>
@@ -1565,6 +1569,7 @@ const VehicleDetailsPage: React.FC = () => {
           updatedAt={listing.updated_at}
           priceHistory={priceHistory}
           viewCount={listing.view_count ?? 0}
+          initialIsFavorite={Boolean(listing.is_favorited)}
         />
       )}
     </div>

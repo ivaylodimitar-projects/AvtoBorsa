@@ -20,6 +20,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import { useToast } from '../../context/ToastContext';
+import { useAuth } from '../../context/AuthContext';
 import { resolvePriceBadgeState } from '../../utils/priceChangeBadge';
 
 import { API_BASE_URL } from '../../config/api';
@@ -48,12 +49,14 @@ interface ContactSidebarProps {
   title?: string;
   city?: string;
   createdAt?: string;
+  initialIsFavorite?: boolean;
 }
 
 type FavoriteResponseItem = {
   listing?: {
-    id?: number;
+    id?: number | string;
   };
+  listing_id?: number | string;
 };
 
 type ReportResponsePayload = {
@@ -78,9 +81,11 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
   title = '',
   city = '',
   createdAt,
+  initialIsFavorite = false,
 }) => {
   const { showToast } = useToast();
-  const [isFavorite, setIsFavorite] = useState(false);
+  const { isAuthenticated, isLoading: isAuthLoading, ensureFreshAccessToken } = useAuth();
+  const [isFavorite, setIsFavorite] = useState(Boolean(initialIsFavorite));
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
@@ -96,10 +101,16 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
   const shareButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
+    setIsFavorite(Boolean(initialIsFavorite));
+  }, [initialIsFavorite, listingId]);
+
+  useEffect(() => {
+    let isCancelled = false;
     const checkFavorite = async () => {
       try {
-        const token = localStorage.getItem('authToken');
-        if (!token || !listingId) return;
+        if (!listingId) return;
+        const token = await ensureFreshAccessToken();
+        if (!token) return;
 
         const response = await fetch(
           `${API_BASE_URL}/api/my-favorites/`,
@@ -107,22 +118,39 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
         );
         if (response.ok) {
           const data = await response.json();
-          const favorites = Array.isArray(data) ? (data as FavoriteResponseItem[]) : [];
-          const isFav = favorites.some((fav) => fav.listing?.id === listingId);
-          setIsFavorite(isFav);
+          const favorites = Array.isArray(data)
+            ? (data as FavoriteResponseItem[])
+            : Array.isArray((data as { results?: unknown }).results)
+              ? ((data as { results: FavoriteResponseItem[] }).results)
+              : [];
+          const isFav = favorites.some((fav) => {
+            const nestedId = Number(fav.listing?.id);
+            const directId = Number(fav.listing_id);
+            return nestedId === listingId || directId === listingId;
+          });
+          if (!isCancelled) {
+            setIsFavorite(isFav);
+          }
         }
       } catch (err) {
         console.error('Error checking favorite status:', err);
       }
     };
     checkFavorite();
-  }, [listingId]);
+    return () => {
+      isCancelled = true;
+    };
+  }, [listingId, isAuthenticated, isAuthLoading, ensureFreshAccessToken]);
 
   const handleToggleFavorite = async () => {
     try {
-      const token = localStorage.getItem('authToken');
-      if (!token || !listingId) {
+      if (!listingId) {
         showToast('Трябва да сте влезли в профила си, за да запазвате обяви.', { type: 'error' });
+        return;
+      }
+      const token = await ensureFreshAccessToken();
+      if (!token) {
+        showToast('Сесията ви е изтекла. Влезте отново, за да запазвате обяви.', { type: 'error' });
         return;
       }
       setIsLoading(true);
@@ -140,7 +168,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
       });
 
       if (response.ok) {
-        setIsFavorite(!isFavorite);
+        setIsFavorite((prev) => !prev);
       } else {
         showToast('Грешка при запазване на обявата.', { type: 'error' });
       }

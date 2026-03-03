@@ -173,7 +173,11 @@ const PAGE_SIZE = 20;
 const SearchPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const {
+    isAuthenticated,
+    isLoading: isAuthLoading,
+    ensureFreshAccessToken,
+  } = useAuth();
   const [pageCache, setPageCache] = useState<Record<number, CarListing[]>>({});
   const pageCacheRef = useRef<Record<number, CarListing[]>>({});
   const prefetchCacheRef = useRef<Record<number, CarListing[]>>({});
@@ -360,7 +364,7 @@ const SearchPage: React.FC = () => {
     setHasLoadedPrimary(false);
     setError(null);
     setIsLoading(true);
-  }, [queryKey]);
+  }, [queryKey, isAuthenticated]);
 
   const buildListingsUrl = useCallback(
     (page: number) => {
@@ -393,7 +397,14 @@ const SearchPage: React.FC = () => {
 
       const url = buildListingsUrl(page);
 
-      const response = await fetch(url, { signal: options.signal });
+      const headers: Record<string, string> = {};
+      if (isAuthenticated) {
+        const token = await ensureFreshAccessToken();
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+      }
+      const response = await fetch(url, { signal: options.signal, headers });
       if (!response.ok) throw new Error("Failed to fetch listings");
       const data = await response.json();
 
@@ -414,10 +425,11 @@ const SearchPage: React.FC = () => {
       }
       return listingsData;
     },
-    [buildListingsUrl]
+    [buildListingsUrl, ensureFreshAccessToken, isAuthenticated]
   );
 
   useEffect(() => {
+    if (isAuthLoading) return;
     let isCancelled = false;
     const controller = new AbortController();
     const hasCached = !!pageCacheRef.current[currentPage] || !!prefetchCacheRef.current[currentPage];
@@ -450,7 +462,7 @@ const SearchPage: React.FC = () => {
       isCancelled = true;
       controller.abort();
     };
-  }, [currentPage, queryKey, loadPage]);
+  }, [currentPage, queryKey, loadPage, isAuthLoading]);
 
   useEffect(() => {
     if (!hasLoadedPrimary || totalPages <= 1) return;
@@ -541,7 +553,11 @@ const SearchPage: React.FC = () => {
     }
 
     try {
-      const token = localStorage.getItem("authToken");
+      const token = await ensureFreshAccessToken();
+      if (!token) {
+        navigate("/auth");
+        return;
+      }
       const endpoint = isFavorited ? "unfavorite" : "favorite";
       const response = await fetch(`${API_BASE_URL}/api/listings/${listingId}/${endpoint}/`, {
         method: isFavorited ? "DELETE" : "POST",
