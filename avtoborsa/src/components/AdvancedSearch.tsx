@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+﻿import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronDown, ChevronLeft, Circle, Search, Bookmark, Lock } from "lucide-react";
 import { BrandSelector } from "./BrandSelector";
@@ -3590,7 +3590,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
 
             {/* Step 4: Location */}
             <div className="adv-field">
-              <label className="adv-label">ОБЛАСТ</label>
+              <label className="adv-label">НАМИРА СЕ В</label>
               <select
                 value={searchCriteria.region}
                 onChange={(e) => {
