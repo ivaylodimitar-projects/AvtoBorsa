@@ -19,6 +19,7 @@ import { buildPublicProfilePath } from "../utils/profilePaths";
 const STRIPE_SESSION_STORAGE_KEY = "stripe_checkout_session_id";
 const PAYMENT_SYNC_MIN_MS = 650;
 const PROCESSED_PAYMENT_SESSION_KEY_PREFIX = "karbg:processed-payment:v1:";
+const TOP_UP_TEMP_DISABLED = true;
 const processedPaymentKeysInMemory = new Set<string>();
 
 const hasPaymentBeenProcessed = (paymentKey: string) => {
@@ -105,6 +106,12 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
     if (topUpModalCloseRequestKey === undefined) return;
     setIsTopUpModalOpen(false);
   }, [topUpModalCloseRequestKey]);
+
+  useEffect(() => {
+    if (!TOP_UP_TEMP_DISABLED) return;
+    if (!isTopUpModalOpen) return;
+    setIsTopUpModalOpen(false);
+  }, [isTopUpModalOpen]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -781,7 +788,7 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
           onMouseEnter={() => setHoveredIcon(true)}
           onMouseLeave={() => setHoveredIcon(false)}
           onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-          title="Профилен меню"
+          title="Профил"
           aria-label={profileTriggerLabel}
         >
           {profileImageUrl ? (
@@ -887,20 +894,34 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
                 </div>
 
                 <button
-                  style={styles.topupButton}
+                  style={{
+                    ...styles.topupButton,
+                    ...(TOP_UP_TEMP_DISABLED
+                      ? {
+                          opacity: 0.55,
+                          cursor: "not-allowed",
+                          boxShadow: "none",
+                        }
+                      : {}),
+                  }}
                   className="profile-menu-topup-btn"
                   onMouseEnter={(e) => {
+                    if (TOP_UP_TEMP_DISABLED) return;
                     (e.target as HTMLElement).style.transform = "translateY(-2px)";
                     (e.target as HTMLElement).style.boxShadow = "0 4px 12px rgba(15,118,110,0.25)";
                   }}
                   onMouseLeave={(e) => {
+                    if (TOP_UP_TEMP_DISABLED) return;
                     (e.target as HTMLElement).style.transform = "translateY(0)";
                     (e.target as HTMLElement).style.boxShadow = "0 2px 8px rgba(15,118,110,0.18)";
                   }}
                   onClick={() => {
+                    if (TOP_UP_TEMP_DISABLED) return;
                     setIsTopUpModalOpen(true);
                     setIsDropdownOpen(false);
                   }}
+                  disabled={TOP_UP_TEMP_DISABLED}
+                  title={TOP_UP_TEMP_DISABLED ? "Временно недостъпно за тестове" : undefined}
                 >
                   <Plus size={16} />
                   Добави средства

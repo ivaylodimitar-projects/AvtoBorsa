@@ -47,6 +47,7 @@ import {
   readMyAdsCache,
   writeMyAdsCache,
   invalidateMyAdsCache,
+  type MyAdsCachePayload,
 } from "../utils/myAdsCache";
 import { requestDealerListingsSync } from "../utils/dealerSubscriptions";
 import { addBalanceUsageRecord } from "../utils/balanceUsageHistory";
@@ -205,6 +206,7 @@ const PROMOTE_LOADING_MIN_MS = 1100;
 const LISTING_DELETE_ANIMATION_MS = 240;
 const AUTH_REQUIRED_ERROR_CODE = "__AUTH_REQUIRED__";
 const QR_BRAND_TAG = "Kar.bg";
+const QR_HEADER_LOGO_PATH = "/karbglogo.png";
 const CATEGORY_AS_BRAND_MAIN_CATEGORIES = new Set(["6", "7", "8", "a", "b"]);
 const GENERIC_BRAND_TERMS = new Set([
   "трактор",
@@ -611,8 +613,43 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
   const [publicProfileTitle, setPublicProfileTitle] = useState<string>("");
   const qrGenerationRequestRef = React.useRef(0);
   const deleteAnimationTimeoutIdsRef = React.useRef<number[]>([]);
+  const deletedListingIdsRef = React.useRef<Set<number>>(new Set());
   const tabsSliderRef = React.useRef<HTMLDivElement | null>(null);
   const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
+
+  const sanitizeListingsArray = (items: unknown[], excludedListingIds: ReadonlySet<number>) => {
+    const byId = new Map<number, CarListing>();
+
+    items.forEach((item) => {
+      if (!item || typeof item !== "object") return;
+      const listing = item as { id?: unknown };
+      const numericId = Number(listing.id);
+      if (!Number.isInteger(numericId) || numericId <= 0) return;
+      if (excludedListingIds.has(numericId)) return;
+      byId.set(numericId, item as CarListing);
+    });
+
+    return Array.from(byId.values());
+  };
+
+  const sanitizeListingsPayload = (
+    payload: MyAdsCachePayload<CarListing>,
+    excludedListingIds: ReadonlySet<number>
+  ): MyAdsCachePayload<CarListing> => ({
+    activeListings: sanitizeListingsArray(payload.activeListings, excludedListingIds),
+    archivedListings: sanitizeListingsArray(payload.archivedListings, excludedListingIds),
+    draftListings: sanitizeListingsArray(payload.draftListings, excludedListingIds),
+    expiredListings: sanitizeListingsArray(payload.expiredListings, excludedListingIds),
+    likedListings: sanitizeListingsArray(payload.likedListings, excludedListingIds),
+  });
+
+  const applyListingsPayload = (payload: MyAdsCachePayload<CarListing>) => {
+    setActiveListings(payload.activeListings);
+    setArchivedListings(payload.archivedListings);
+    setDraftListings(payload.draftListings);
+    setExpiredListings(payload.expiredListings);
+    setLikedListings(payload.likedListings);
+  };
 
   useEffect(() => {
     if (!isPublicView) return;
@@ -678,17 +715,19 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
       invalidateMyAdsCache(user?.id);
     }
 
-    const cachedPayload = forceRefreshFromPublish ? null : readMyAdsCache<CarListing>(user?.id);
+    const cachedPayloadRaw = forceRefreshFromPublish ? null : readMyAdsCache<CarListing>(user?.id);
+    const cachedPayload = cachedPayloadRaw
+      ? sanitizeListingsPayload(cachedPayloadRaw, deletedListingIdsRef.current)
+      : null;
+    const hasCachedPayload = Boolean(cachedPayload);
+
     if (cachedPayload) {
-      setActiveListings(cachedPayload.activeListings);
-      setArchivedListings(cachedPayload.archivedListings);
-      setDraftListings(cachedPayload.draftListings);
-      setExpiredListings(cachedPayload.expiredListings);
-      setLikedListings(cachedPayload.likedListings);
+      applyListingsPayload(cachedPayload);
       setRequiresAuthPrompt(false);
       setError(null);
       setIsLoading(false);
-      return;
+    } else {
+      setIsLoading(true);
     }
 
     const fetchUserListings = async () => {
@@ -712,9 +751,11 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
         };
 
         const fetchList = async (url: string): Promise<unknown[]> => {
+          const cacheBustedUrl = `${url}${url.includes("?") ? "&" : "?"}_ts=${Date.now()}`;
           const callEndpoint = async (accessToken: string) =>
-            fetch(url, {
+            fetch(cacheBustedUrl, {
               headers: { Authorization: `Bearer ${accessToken}` },
+              cache: "no-store",
             });
 
           let response = await callEndpoint(token);
@@ -790,21 +831,22 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
               Boolean(listing && typeof listing === "object" && "id" in listing)
           );
 
-        setActiveListings(activeData);
-        setArchivedListings(archivedData);
-        setDraftListings(draftsData);
-        setExpiredListings(expiredData);
-        setLikedListings(likedFromFavorites);
-
-        const hasFailedRequests = allResults.some((result) => result.status === "rejected");
-        if (!hasFailedRequests) {
-          writeMyAdsCache<CarListing>(user?.id, {
+        const sanitizedPayload = sanitizeListingsPayload(
+          {
             activeListings: activeData,
             archivedListings: archivedData,
             draftListings: draftsData,
             expiredListings: expiredData,
             likedListings: likedFromFavorites,
-          });
+          },
+          deletedListingIdsRef.current
+        );
+
+        applyListingsPayload(sanitizedPayload);
+
+        const hasFailedRequests = allResults.some((result) => result.status === "rejected");
+        if (!hasFailedRequests) {
+          writeMyAdsCache<CarListing>(user?.id, sanitizedPayload);
         } else {
           invalidateMyAdsCache(user?.id);
           console.warn("MyAds: partial fetch failure", allResults);
@@ -816,22 +858,33 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
         if (errorMsg === AUTH_REQUIRED_ERROR_CODE) {
           setRequiresAuthPrompt(true);
           setError(null);
+          setActiveListings([]);
+          setArchivedListings([]);
+          setDraftListings([]);
+          setExpiredListings([]);
+          setLikedListings([]);
+        } else if (hasCachedPayload) {
+          setRequiresAuthPrompt(false);
+          setError(null);
+          console.warn("MyAds: background refresh failed, keeping cached data", err);
         } else {
           setRequiresAuthPrompt(false);
           setError(errorMsg);
+          setActiveListings([]);
+          setArchivedListings([]);
+          setDraftListings([]);
+          setExpiredListings([]);
+          setLikedListings([]);
         }
         invalidateMyAdsCache(user?.id);
-        setActiveListings([]);
-        setArchivedListings([]);
-        setDraftListings([]);
-        setExpiredListings([]);
-        setLikedListings([]);
       } finally {
-        setIsLoading(false);
+        if (!hasCachedPayload) {
+          setIsLoading(false);
+        }
       }
     };
 
-    fetchUserListings();
+    void fetchUserListings();
   }, [forceRefreshFromPublish, isPublicView, isAuthenticated, user?.id, ensureFreshAccessToken]);
 
   useEffect(() => {
@@ -945,13 +998,15 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     return url.toString();
   };
 
-  const loadImageFromDataUrl = (dataUrl: string) =>
+  const loadImageFromSource = (src: string) =>
     new Promise<HTMLImageElement>((resolve, reject) => {
       const image = new Image();
       image.onload = () => resolve(image);
       image.onerror = () => reject(new Error("Failed to load QR image."));
-      image.src = dataUrl;
+      image.src = src;
     });
+
+  const loadImageFromDataUrl = (dataUrl: string) => loadImageFromSource(dataUrl);
 
   const generateBrandedQrDataUrl = async (targetUrl: string) => {
     const baseQrDataUrl = await QRCode.toDataURL(targetUrl, {
@@ -1060,6 +1115,12 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     try {
       const listingTitle = getListingDisplayTitle(qrListing);
       const qrImage = await loadImageFromDataUrl(qrCodeDataUrl);
+      let headerLogo: HTMLImageElement | null = null;
+      try {
+        headerLogo = await loadImageFromSource(QR_HEADER_LOGO_PATH);
+      } catch {
+        headerLogo = null;
+      }
 
       const canvas = document.createElement("canvas");
       const canvasWidth = 1240;
@@ -1120,9 +1181,28 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
 
-      ctx.fillStyle = "#0f766e";
-      ctx.font = '800 56px "Manrope", "Segoe UI", sans-serif';
-      ctx.fillText(QR_BRAND_TAG, canvasWidth / 2, cardY + 56);
+      if (headerLogo) {
+        const naturalWidth = headerLogo.naturalWidth || headerLogo.width || 1;
+        const naturalHeight = headerLogo.naturalHeight || headerLogo.height || 1;
+        const logoMaxWidth = Math.round(cardWidth * 0.42);
+        const logoMaxHeight = 96;
+        const logoRatio = naturalWidth / naturalHeight;
+
+        let logoDrawWidth = logoMaxWidth;
+        let logoDrawHeight = logoDrawWidth / logoRatio;
+        if (logoDrawHeight > logoMaxHeight) {
+          logoDrawHeight = logoMaxHeight;
+          logoDrawWidth = logoDrawHeight * logoRatio;
+        }
+
+        const logoX = Math.round((canvasWidth - logoDrawWidth) / 2);
+        const logoY = cardY + 34;
+        ctx.drawImage(headerLogo, logoX, logoY, logoDrawWidth, logoDrawHeight);
+      } else {
+        ctx.fillStyle = "#0f766e";
+        ctx.font = '800 56px "Manrope", "Segoe UI", sans-serif';
+        ctx.fillText(QR_BRAND_TAG, canvasWidth / 2, cardY + 56);
+      }
 
       ctx.fillStyle = "#0f172a";
       ctx.font = '800 48px "Manrope", "Segoe UI", sans-serif';
@@ -1150,10 +1230,6 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
         qrBoxSize - qrPadding * 2,
         qrBoxSize - qrPadding * 2
       );
-
-      ctx.fillStyle = "#475569";
-      ctx.font = '600 20px "Manrope", "Segoe UI", sans-serif';
-      drawWrappedCenteredText(qrTargetUrl, qrBoxY + qrBoxSize + 44, cardWidth - 120, 28, 4);
 
       const pdf = new jsPDF({
         orientation: "portrait",
@@ -1880,6 +1956,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
       if (!response.ok) throw new Error("Failed to delete listing");
 
       setDeleteConfirm(null);
+      deletedListingIdsRef.current.add(listingId);
       setDeletingListingIds((prev) => {
         const next = new Set(prev);
         next.add(listingId);
@@ -5073,8 +5150,10 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                 {!isPublicView && (
                   <>
                     <div style={styles.listingContentSpacer} />
-                    <div style={styles.listingActionsLabel}>Управление на обявата</div>
-                    {(topRemainingLabel || vipRemainingLabel || nonPromotedLabel) && (
+                    {activeTab !== "liked" && (
+                      <div style={styles.listingActionsLabel}>Управление на обявата</div>
+                    )}
+                    {activeTab !== "liked" && (topRemainingLabel || vipRemainingLabel || nonPromotedLabel) && (
                       <div style={styles.listingPromoStatusStack}>
                         {topRemainingLabel && (
                           <span style={styles.topTimer}>{topRemainingLabel}</span>
@@ -5680,7 +5759,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                         Сигурни ли сте, че искате да изтриете тази обява?
                       </div>
                     </div>
-                    {listingExpiryLabel && (
+                    {activeTab !== "liked" && listingExpiryLabel && (
                       <div style={styles.listingExpiryRow}>
                         {showQrTrigger && (
                           <button

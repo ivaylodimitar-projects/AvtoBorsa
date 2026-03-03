@@ -756,10 +756,10 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     agriDriveType: "",
     condition: "",
     sortBy: "Марка/Модел/Цена",
-    isNew: false,
+    isNew: mainCategory === "1",
     isUsed: true,
-    isPartial: false,
-    isParts: false,
+    isPartial: mainCategory === "1",
+    isParts: mainCategory === "1",
     priceFrom: "",
     priceTo: "",
     mileageFrom: "",
@@ -1377,6 +1377,15 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     if (searchCriteria.city) query.city = searchCriteria.city;
     if (searchCriteria.category) query.category = searchCriteria.category;
     if (searchCriteria.sortBy) query.sortBy = searchCriteria.sortBy;
+    if (!searchCriteria.condition) {
+      const nup = [
+        searchCriteria.isNew ? "1" : "",
+        searchCriteria.isUsed ? "0" : "",
+        searchCriteria.isPartial ? "3" : "",
+        searchCriteria.isParts ? "2" : "",
+      ].join("");
+      if (nup) query.nup = nup;
+    }
 
     return query;
   }, [
@@ -1510,6 +1519,23 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     setShowStickyCategoryMenu(false);
   }, [mainCategory]);
 
+  React.useEffect(() => {
+    if (mainCategory !== "1") return;
+    setSearchCriteria((prev) => {
+      if (prev.isNew && prev.isUsed && prev.isPartial && prev.isParts && !prev.condition) {
+        return prev;
+      }
+      return {
+        ...prev,
+        condition: "",
+        isNew: true,
+        isUsed: true,
+        isPartial: true,
+        isParts: true,
+      };
+    });
+  }, [mainCategory]);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const query = buildSearchQuery();
@@ -1552,10 +1578,10 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       agriDriveType: "",
       condition: "",
       sortBy: "Марка/Модел/Цена",
-      isNew: false,
+      isNew: mainCategory === "1",
       isUsed: true,
-      isPartial: false,
-      isParts: false,
+      isPartial: mainCategory === "1",
+      isParts: mainCategory === "1",
       priceFrom: "",
       priceTo: "",
       mileageFrom: "",

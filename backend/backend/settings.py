@@ -7,6 +7,7 @@ from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 
+from corsheaders.defaults import default_headers
 from django.core.exceptions import ImproperlyConfigured
 
 
@@ -367,10 +368,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOCAL_FRONTEND_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://localhost:5173",
+    "http://localhost:5173",
     "https://127.0.0.1:5173",
     "http://localhost:3000",
-    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8000",
     "https://localhost:3000",
     "https://127.0.0.1:3000",
 ]
@@ -381,6 +382,10 @@ if DEBUG:
 CORS_ALLOWED_ORIGINS = sorted(set(cors_origins))
 CORS_ALLOWED_ORIGIN_REGEXES = _split_csv_env("CORS_ALLOWED_ORIGIN_REGEXES")
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "cache-control",
+    "pragma",
+]
 
 csrf_origins = _split_csv_env("CSRF_TRUSTED_ORIGINS")
 if frontend_origin.scheme and frontend_origin.netloc:

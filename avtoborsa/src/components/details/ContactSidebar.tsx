@@ -456,7 +456,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
               position: 'fixed',
               left: 12,
               right: 12,
-              bottom: 86,
+              bottom: 76,
               borderRadius: 16,
               border: '1px solid #e2e8f0',
               background: '#fff',
@@ -544,14 +544,15 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
         <div
         style={{
           position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
+          bottom: 8,
+          left: 56,
+          right: 10,
           background: '#fff',
-          borderTop: '1px solid #eef2f7',
-          padding: '12px 16px',
+          border: '1px solid #eef2f7',
+          borderRadius: 14,
+          padding: '6px 8px',
           display: 'flex',
-          gap: 10,
+          gap: 7,
           zIndex: 100,
           boxShadow: '0 -4px 16px rgba(0,0,0,0.06)',
         }}
@@ -559,22 +560,23 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
         <button
           style={{
             flex: 1,
-            padding: '12px 16px',
+            minHeight: 41,
+            padding: '10px 12px',
             background: '#0f766e',
             color: '#fff',
             border: 'none',
-            borderRadius: 16,
+            borderRadius: 13,
             fontSize: 14,
             fontWeight: 700,
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 8,
+            gap: 7,
           }}
           onClick={() => window.open(`tel:${phone}`)}
         >
-          <Phone size={16} />
+          <Phone size={15} />
           Позвъни
         </button>
         <button
@@ -585,12 +587,13 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
           }}
           disabled={!hasPriceHistory}
           style={{
-            padding: '12px 12px',
-            minWidth: 86,
+            flex: 1,
+            minHeight: 41,
+            padding: '10px 11px',
             background: hasPriceHistory ? '#ecfdf5' : '#f8fafc',
             color: hasPriceHistory ? '#0f766e' : '#94a3b8',
             border: `1px solid ${hasPriceHistory ? '#99f6e4' : '#eef2f7'}`,
-            borderRadius: 16,
+            borderRadius: 13,
             fontSize: 12,
             fontWeight: 700,
             cursor: hasPriceHistory ? 'pointer' : 'not-allowed',
@@ -602,25 +605,29 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
           }}
           title={hasPriceHistory ? 'Разлики в цената' : 'Няма промени в цената'}
         >
-          <PriceDeltaIcon size={15} />
-          Разлики
+          <PriceDeltaIcon size={14} />
+          Цена
         </button>
         <button
           style={{
-            padding: '12px 16px',
+            flex: 1,
+            minHeight: 41,
+            padding: '10px 11px',
             background: isFavorite ? '#fff1f7' : '#f8fafc',
             color: isFavorite ? SAVE_ACCENT_COLOR : '#374151',
             border: `1px solid ${isFavorite ? '#f8bbd0' : '#eef2f7'}`,
-            borderRadius: 16,
-            fontSize: 14,
+            borderRadius: 13,
+            fontSize: 12,
             fontWeight: 600,
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
+            justifyContent: 'center',
+            gap: 0,
           }}
           onClick={handleToggleFavorite}
           disabled={isLoading}
+          aria-label={isFavorite ? 'Saved' : 'Save'}
         >
           <Heart size={16} fill={isFavorite ? 'currentColor' : 'none'} />
         </button>
@@ -1062,7 +1069,6 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
             }}
           >
             <Heart size={15} fill={isFavorite ? 'currentColor' : 'none'} />
-            {isFavorite ? 'Запазено' : 'Запази'}
           </button>
           <div style={{ flex: 1 }}>
             <button
@@ -1397,3 +1403,4 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
 };
 
 export default ContactSidebar;
+

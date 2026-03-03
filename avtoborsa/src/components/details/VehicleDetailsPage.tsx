@@ -4,7 +4,6 @@ import { Clock, ImageOff, MapPin } from 'lucide-react';
 import TechnicalDataSection from './TechnicalDataSection';
 import EquipmentSection from './EquipmentSection';
 import ContactSidebar from './ContactSidebar';
-import SellerCard from './SellerCard';
 import SkeletonLoader from './SkeletonLoader';
 import { extractIdFromSlug } from '../../utils/slugify';
 import ListingPromoBadge from '../ListingPromoBadge';
@@ -1524,15 +1523,6 @@ const VehicleDetailsPage: React.FC = () => {
             )}
           </div>
 
-          {isMobile && (
-            <SellerCard
-              sellerName={sellerName}
-              sellerEmail={listing.user_email}
-              phone={listing.phone}
-              city={listing.city}
-              showAvatar={isBusinessSeller}
-            />
-          )}
         </div>
 
         {!isMobile && (
