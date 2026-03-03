@@ -9,7 +9,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
 from django.shortcuts import get_object_or_404
 from django.db import transaction as db_transaction, IntegrityError
@@ -1541,9 +1541,10 @@ class CarListingViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         """Delete listing - only owner can delete"""
         if instance.user != self.request.user:
-            raise PermissionError("You can only delete your own listings")
+            raise PermissionDenied("You can only delete your own listings")
         instance.delete()
         _invalidate_latest_listings_cache()
+        broadcast_dealer_listings_updated()
 
 
 @api_view(['GET'])
@@ -1710,14 +1711,14 @@ def unarchive_listing(request, listing_id):
 @permission_classes([IsAuthenticated])
 def delete_listing(request, listing_id):
     """Delete a listing"""
-    listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
+    listing = CarListing.objects.filter(id=listing_id, user=request.user).first()
+    if listing is None:
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     listing.delete()
     _invalidate_latest_listings_cache()
-    return Response(
-        {
-            'message': 'Listing deleted successfully'},
-            status=status.HTTP_204_NO_CONTENT
-        )
+    broadcast_dealer_listings_updated()
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @api_view(['POST'])

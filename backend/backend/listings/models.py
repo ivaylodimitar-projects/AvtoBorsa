@@ -1,9 +1,11 @@
 from datetime import timedelta
 from concurrent.futures import ThreadPoolExecutor
 import io
+import logging
 import os
 import posixpath
 from threading import Lock
+from urllib.parse import unquote, urlparse
 
 from PIL import Image as PILImage, ImageOps
 from django.conf import settings
@@ -29,6 +31,8 @@ CAR_IMAGE_GRID_RENDITIONS = (
 CAR_IMAGE_WEBP_QUALITY = 82
 CAR_IMAGE_WEBP_METHOD = 4
 CAR_IMAGE_LOW_RES_MIN_WIDTH = 800
+
+logger = logging.getLogger(__name__)
 
 
 def _resolve_rendition_worker_count():
@@ -667,7 +671,7 @@ class CarImage(models.Model):
             for item in items:
                 if not isinstance(item, dict):
                     continue
-                path = str(item.get('path') or '').strip()
+                path = str(item.get('path') or item.get('url') or '').strip()
                 if path:
                     paths.add(path)
         return paths
@@ -972,20 +976,66 @@ class CarImage(models.Model):
 
 
 def _delete_storage_path_safely(storage, name):
-    normalized = str(name or '').strip()
-    if not normalized:
+    candidates = _collect_storage_delete_candidates(storage, name)
+    if not candidates:
         return
-    try:
-        if storage.exists(normalized):
-            storage.delete(normalized)
-            return
-    except Exception:
-        pass
+    deleted_any = False
+    last_error = None
+    for candidate in candidates:
+        try:
+            storage.delete(candidate)
+            deleted_any = True
+        except Exception as exc:
+            last_error = exc
+    if not deleted_any and last_error is not None:
+        logger.warning(
+            "Failed to delete storage object '%s' after trying candidates: %s (%s)",
+            name,
+            ", ".join(candidates),
+            last_error,
+        )
 
-    try:
-        storage.delete(normalized)
-    except Exception:
-        pass
+
+def _collect_storage_delete_candidates(storage, raw_name):
+    normalized = str(raw_name or '').strip()
+    if not normalized:
+        return []
+
+    candidates = set()
+
+    def _add_candidate(value):
+        candidate = str(value or '').strip()
+        if not candidate:
+            return
+        candidate = unquote(candidate).strip().lstrip("/")
+        if not candidate:
+            return
+        candidates.add(candidate)
+        if candidate.startswith("media/"):
+            candidates.add(candidate[len("media/"):])
+
+    _add_candidate(normalized)
+    if normalized.startswith("//"):
+        parsed = urlparse(f"https:{normalized}")
+        _add_candidate(parsed.path)
+    elif "://" in normalized:
+        parsed = urlparse(normalized)
+        _add_candidate(parsed.path)
+        path_without_slash = unquote(parsed.path or "").lstrip("/")
+        bucket_name = str(getattr(storage, "bucket_name", "") or "").strip()
+        if bucket_name and path_without_slash.startswith(f"{bucket_name}/"):
+            _add_candidate(path_without_slash[len(bucket_name) + 1:])
+
+    location_prefix = str(getattr(storage, "location", "") or "").strip().strip("/")
+    if location_prefix:
+        snapshot = list(candidates)
+        for candidate in snapshot:
+            if candidate.startswith(f"{location_prefix}/"):
+                _add_candidate(candidate[len(location_prefix) + 1:])
+            else:
+                _add_candidate(f"{location_prefix}/{candidate}")
+
+    return sorted(candidates)
 
 
 def _delete_file_field_safely(file_field):
