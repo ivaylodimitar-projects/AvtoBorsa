@@ -1,14 +1,15 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { API_BASE_URL, RECAPTCHA_ENABLED, RECAPTCHA_SITE_KEY } from "../config/api";
 import RecaptchaField from "./RecaptchaField";
+import { getPublicBaseUrl } from "../utils/slugify";
 
 const PASSWORD_POLICY_MESSAGE =
-  "Паролата трябва да е поне 8 символа, с поне 1 главна буква и 1 цифра";
+  "ÐŸÐ°Ñ€Ð¾Ð»Ð°Ñ‚Ð° Ñ‚Ñ€ÑÐ±Ð²Ð° Ð´Ð° Ðµ Ð¿Ð¾Ð½Ðµ 8 ÑÐ¸Ð¼Ð²Ð¾Ð»Ð°, Ñ Ð¿Ð¾Ð½Ðµ 1 Ð³Ð»Ð°Ð²Ð½Ð° Ð±ÑƒÐºÐ²Ð° Ð¸ 1 Ñ†Ð¸Ñ„Ñ€Ð°";
 const EMAIL_CONFIRMATION_MESSAGE =
-  "Ще изпратим линк за потвърждение на този имейл.";
-const PUBLIC_PROFILE_BASE_URL = "https://kar.bg";
+  "Ð©Ðµ Ð¸Ð·Ð¿Ñ€Ð°Ñ‚Ð¸Ð¼ Ð»Ð¸Ð½Ðº Ð·Ð° Ð¿Ð¾Ñ‚Ð²ÑŠÑ€Ð¶Ð´ÐµÐ½Ð¸Ðµ Ð½Ð° Ñ‚Ð¾Ð·Ð¸ Ð¸Ð¼ÐµÐ¹Ð».";
+const PUBLIC_PROFILE_BASE_URL = getPublicBaseUrl();
 
 const isPasswordValid = (password: string) =>
   password.length >= 8 && /\p{Lu}/u.test(password) && /\d/.test(password);
@@ -47,34 +48,34 @@ const PrivateProfilePage: React.FC = () => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.username.trim()) {
-      newErrors.username = "Потребителското име е задължително";
+      newErrors.username = "ÐŸÐ¾Ñ‚Ñ€ÐµÐ±Ð¸Ñ‚ÐµÐ»ÑÐºÐ¾Ñ‚Ð¾ Ð¸Ð¼Ðµ Ðµ Ð·Ð°Ð´ÑŠÐ»Ð¶Ð¸Ñ‚ÐµÐ»Ð½Ð¾";
     } else if (!/^[a-z0-9]{3,32}$/.test(formData.username.trim().toLowerCase())) {
-      newErrors.username = "Позволени са само малки латински букви и цифри (3-32)";
+      newErrors.username = "ÐŸÐ¾Ð·Ð²Ð¾Ð»ÐµÐ½Ð¸ ÑÐ° ÑÐ°Ð¼Ð¾ Ð¼Ð°Ð»ÐºÐ¸ Ð»Ð°Ñ‚Ð¸Ð½ÑÐºÐ¸ Ð±ÑƒÐºÐ²Ð¸ Ð¸ Ñ†Ð¸Ñ„Ñ€Ð¸ (3-32)";
     }
 
     if (!formData.email.trim()) {
-      newErrors.email = "Email е задължителен";
+      newErrors.email = "Email Ðµ Ð·Ð°Ð´ÑŠÐ»Ð¶Ð¸Ñ‚ÐµÐ»ÐµÐ½";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Невалиден email адрес";
+      newErrors.email = "ÐÐµÐ²Ð°Ð»Ð¸Ð´ÐµÐ½ email Ð°Ð´Ñ€ÐµÑ";
     }
 
     if (!formData.password.trim()) {
-      newErrors.password = "Паролата е задължителна";
+      newErrors.password = "ÐŸÐ°Ñ€Ð¾Ð»Ð°Ñ‚Ð° Ðµ Ð·Ð°Ð´ÑŠÐ»Ð¶Ð¸Ñ‚ÐµÐ»Ð½Ð°";
     } else if (!isPasswordValid(formData.password)) {
       newErrors.password = PASSWORD_POLICY_MESSAGE;
     }
 
     if (!formData.confirmPassword.trim()) {
-      newErrors.confirmPassword = "Потвърждението на паролата е задължително";
+      newErrors.confirmPassword = "ÐŸÐ¾Ñ‚Ð²ÑŠÑ€Ð¶Ð´ÐµÐ½Ð¸ÐµÑ‚Ð¾ Ð½Ð° Ð¿Ð°Ñ€Ð¾Ð»Ð°Ñ‚Ð° Ðµ Ð·Ð°Ð´ÑŠÐ»Ð¶Ð¸Ñ‚ÐµÐ»Ð½Ð¾";
     } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Паролите не съвпадат";
+      newErrors.confirmPassword = "ÐŸÐ°Ñ€Ð¾Ð»Ð¸Ñ‚Ðµ Ð½Ðµ ÑÑŠÐ²Ð¿Ð°Ð´Ð°Ñ‚";
     }
 
     if (RECAPTCHA_ENABLED) {
       if (!RECAPTCHA_SITE_KEY) {
-        newErrors.recaptcha = "Липсва VITE_RECAPTCHA_SITE_KEY във frontend .env.";
+        newErrors.recaptcha = "Ð›Ð¸Ð¿ÑÐ²Ð° VITE_RECAPTCHA_SITE_KEY Ð²ÑŠÐ² frontend .env.";
       } else if (!recaptchaToken) {
-        newErrors.recaptcha = "Моля, потвърди, че не си робот.";
+        newErrors.recaptcha = "ÐœÐ¾Ð»Ñ, Ð¿Ð¾Ñ‚Ð²ÑŠÑ€Ð´Ð¸, Ñ‡Ðµ Ð½Ðµ ÑÐ¸ Ñ€Ð¾Ð±Ð¾Ñ‚.";
       }
     }
 
@@ -112,7 +113,7 @@ const PrivateProfilePage: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setSuccessMessage(data.message || "Регистрацията е успешна. Изпратихме ти имейл за потвърждение.");
+        setSuccessMessage(data.message || "Ð ÐµÐ³Ð¸ÑÑ‚Ñ€Ð°Ñ†Ð¸ÑÑ‚Ð° Ðµ ÑƒÑÐ¿ÐµÑˆÐ½Ð°. Ð˜Ð·Ð¿Ñ€Ð°Ñ‚Ð¸Ñ…Ð¼Ðµ Ñ‚Ð¸ Ð¸Ð¼ÐµÐ¹Ð» Ð·Ð° Ð¿Ð¾Ñ‚Ð²ÑŠÑ€Ð¶Ð´ÐµÐ½Ð¸Ðµ.");
         setErrors({});
         setFormData({ username: "", email: "", password: "", confirmPassword: "" });
         setRecaptchaToken(null);
@@ -131,7 +132,7 @@ const PrivateProfilePage: React.FC = () => {
         }
       }
     } catch (error) {
-      setErrors({ submit: "Грешка при свързване със сървъра" });
+      setErrors({ submit: "Ð“Ñ€ÐµÑˆÐºÐ° Ð¿Ñ€Ð¸ ÑÐ²ÑŠÑ€Ð·Ð²Ð°Ð½Ðµ ÑÑŠÑ ÑÑŠÑ€Ð²ÑŠÑ€Ð°" });
       if (RECAPTCHA_ENABLED) {
         setRecaptchaToken(null);
         setRecaptchaResetKey((prev) => prev + 1);
@@ -243,9 +244,9 @@ const PrivateProfilePage: React.FC = () => {
               </svg>
             </div>
             <div className="priv-hero-copy">
-              <h1 style={styles.heroTitle} className="priv-hero-title">Частен профил</h1>
+              <h1 style={styles.heroTitle} className="priv-hero-title">Ð§Ð°ÑÑ‚ÐµÐ½ Ð¿Ñ€Ð¾Ñ„Ð¸Ð»</h1>
               <p style={styles.heroSubtitle} className="priv-hero-subtitle">
-                Създай акаунт, за да публикуваш и управляваш обяви
+                Ð¡ÑŠÐ·Ð´Ð°Ð¹ Ð°ÐºÐ°ÑƒÐ½Ñ‚, Ð·Ð° Ð´Ð° Ð¿ÑƒÐ±Ð»Ð¸ÐºÑƒÐ²Ð°Ñˆ Ð¸ ÑƒÐ¿Ñ€Ð°Ð²Ð»ÑÐ²Ð°Ñˆ Ð¾Ð±ÑÐ²Ð¸
               </p>
             </div>
           </div>
@@ -260,11 +261,11 @@ const PrivateProfilePage: React.FC = () => {
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                 <polyline points="22,6 12,13 2,6" />
               </svg>
-              Email адрес
+              Email Ð°Ð´Ñ€ÐµÑ
             </h2>
 
             <div style={styles.formRow}>
-              <label style={styles.label} className="priv-label">Потребителско име *</label>
+              <label style={styles.label} className="priv-label">ÐŸÐ¾Ñ‚Ñ€ÐµÐ±Ð¸Ñ‚ÐµÐ»ÑÐºÐ¾ Ð¸Ð¼Ðµ *</label>
               <input
                 className="priv-input"
                 style={{
@@ -273,15 +274,15 @@ const PrivateProfilePage: React.FC = () => {
                 }}
                 type="text"
                 name="username"
-                placeholder="Потребителско име"
+                placeholder="ÐŸÐ¾Ñ‚Ñ€ÐµÐ±Ð¸Ñ‚ÐµÐ»ÑÐºÐ¾ Ð¸Ð¼Ðµ"
                 value={formData.username}
                 onChange={handleChange}
                 autoComplete="username"
               />
               {errors.username && <div style={styles.errorText}>{errors.username}</div>}
               <p style={styles.hint}>
-                Ще се използва за споделяне на профила ти:{" "}
-                <strong>{PUBLIC_PROFILE_BASE_URL}/{normalizeUsername(formData.username || "Потребитлско име")}</strong>
+                Ð©Ðµ ÑÐµ Ð¸Ð·Ð¿Ð¾Ð»Ð·Ð²Ð° Ð·Ð° ÑÐ¿Ð¾Ð´ÐµÐ»ÑÐ½Ðµ Ð½Ð° Ð¿Ñ€Ð¾Ñ„Ð¸Ð»Ð° Ñ‚Ð¸:{" "}
+                <strong>{PUBLIC_PROFILE_BASE_URL}/{normalizeUsername(formData.username || "ÐŸÐ¾Ñ‚Ñ€ÐµÐ±Ð¸Ñ‚Ð»ÑÐºÐ¾ Ð¸Ð¼Ðµ")}</strong>
               </p>
             </div>
 
@@ -304,11 +305,11 @@ const PrivateProfilePage: React.FC = () => {
                   </svg>
                 </div>
                 <div style={{ flex: 1 }} className="priv-success-main">
-                  <div style={styles.successTitle}>Провери пощата си</div>
+                  <div style={styles.successTitle}>ÐŸÑ€Ð¾Ð²ÐµÑ€Ð¸ Ð¿Ð¾Ñ‰Ð°Ñ‚Ð° ÑÐ¸</div>
                   <div style={styles.successText}>{successMessage}</div>
                 </div>
                 <button type="button" style={styles.successButton} onClick={() => navigate("/auth")}>
-                  Вход
+                  Ð’Ñ…Ð¾Ð´
                 </button>
               </div>
             )}
@@ -339,12 +340,12 @@ const PrivateProfilePage: React.FC = () => {
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
-              Парола
+              ÐŸÐ°Ñ€Ð¾Ð»Ð°
             </h2>
 
             <div style={styles.passwordGrid} className="priv-password-grid">
               <div style={styles.formRow}>
-                <label style={styles.label} className="priv-label">Парола *</label>
+                <label style={styles.label} className="priv-label">ÐŸÐ°Ñ€Ð¾Ð»Ð° *</label>
                 <input
                   className="priv-input"
                   style={{
@@ -353,7 +354,7 @@ const PrivateProfilePage: React.FC = () => {
                   }}
                   type="password"
                   name="password"
-                  placeholder="Въведи парола"
+                  placeholder="Ð’ÑŠÐ²ÐµÐ´Ð¸ Ð¿Ð°Ñ€Ð¾Ð»Ð°"
                   value={formData.password}
                   onChange={handleChange}
                 />
@@ -361,7 +362,7 @@ const PrivateProfilePage: React.FC = () => {
               </div>
 
               <div style={styles.formRow}>
-                <label style={styles.label} className="priv-label">Потвърди парола *</label>
+                <label style={styles.label} className="priv-label">ÐŸÐ¾Ñ‚Ð²ÑŠÑ€Ð´Ð¸ Ð¿Ð°Ñ€Ð¾Ð»Ð° *</label>
                 <input
                   className="priv-input"
                   style={{
@@ -370,7 +371,7 @@ const PrivateProfilePage: React.FC = () => {
                   }}
                   type="password"
                   name="confirmPassword"
-                  placeholder="Потвърди паролата"
+                  placeholder="ÐŸÐ¾Ñ‚Ð²ÑŠÑ€Ð´Ð¸ Ð¿Ð°Ñ€Ð¾Ð»Ð°Ñ‚Ð°"
                   value={formData.confirmPassword}
                   onChange={handleChange}
                 />
@@ -400,9 +401,9 @@ const PrivateProfilePage: React.FC = () => {
               type="submit"
               disabled={loading}
             >
-              {loading ? "Създавам..." : (
+              {loading ? "Ð¡ÑŠÐ·Ð´Ð°Ð²Ð°Ð¼..." : (
                 <>
-                  Създай профил
+                  Ð¡ÑŠÐ·Ð´Ð°Ð¹ Ð¿Ñ€Ð¾Ñ„Ð¸Ð»
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 8 }}>
                     <path d="M5 12h14" />
                     <path d="m12 5 7 7-7 7" />
@@ -417,15 +418,15 @@ const PrivateProfilePage: React.FC = () => {
               style={styles.ghostBtn}
               onClick={() => navigate("/profile")}
             >
-              Назад
+              ÐÐ°Ð·Ð°Ð´
             </button>
           </div>
 
-          <p style={styles.requiredNote}>* Задължителни полета</p>
+          <p style={styles.requiredNote}>* Ð—Ð°Ð´ÑŠÐ»Ð¶Ð¸Ñ‚ÐµÐ»Ð½Ð¸ Ð¿Ð¾Ð»ÐµÑ‚Ð°</p>
 
           {/* Login link */}
           <div style={styles.footerNote} className="priv-footer-note">
-            <span style={{ color: "#6b7280" }}>Вече имаш акаунт?</span>{" "}
+            <span style={{ color: "#6b7280" }}>Ð’ÐµÑ‡Ðµ Ð¸Ð¼Ð°Ñˆ Ð°ÐºÐ°ÑƒÐ½Ñ‚?</span>{" "}
             <span
               style={styles.loginLink}
               role="button"
@@ -433,7 +434,7 @@ const PrivateProfilePage: React.FC = () => {
               onClick={() => navigate("/auth")}
               onKeyDown={(e) => e.key === "Enter" && navigate("/auth")}
             >
-              Влез тук
+              Ð’Ð»ÐµÐ· Ñ‚ÑƒÐº
             </span>
           </div>
         </form>
@@ -686,5 +687,6 @@ const styles: Record<string, React.CSSProperties> = {
 };
 
 export default PrivateProfilePage;
+
 
 

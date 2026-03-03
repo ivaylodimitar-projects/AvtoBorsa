@@ -33,7 +33,7 @@ const parseEnvFlag = (value: unknown, defaultValue = false): boolean => {
 const normalizeHostname = (value: string): string =>
   value.trim().toLowerCase().replace(/:\d+$/, "").replace(/^\.+|\.+$/g, "");
 
-const resolvePublicBaseUrl = (): string => {
+export const getPublicBaseUrl = (): string => {
   const envValue =
     (import.meta.env.VITE_PUBLIC_BASE_URL || import.meta.env.VITE_APP_BASE_URL || "").toString().trim();
   if (envValue) return envValue.replace(/\/+$/, "");
@@ -41,11 +41,11 @@ const resolvePublicBaseUrl = (): string => {
   return "";
 };
 
-const resolveDealerRootDomain = (): string => {
+export const getDealerRootDomain = (): string => {
   const explicitDomain = (import.meta.env.VITE_DEALER_ROOT_DOMAIN || "").toString().trim().toLowerCase();
   if (explicitDomain) return normalizeHostname(explicitDomain);
 
-  const baseUrl = resolvePublicBaseUrl();
+  const baseUrl = getPublicBaseUrl();
   if (!baseUrl) return "";
 
   try {
@@ -58,7 +58,7 @@ const resolveDealerRootDomain = (): string => {
 };
 
 const resolveDealerProtocol = (): string => {
-  const baseUrl = resolvePublicBaseUrl();
+  const baseUrl = getPublicBaseUrl();
   if (baseUrl) {
     try {
       const protocol = new URL(baseUrl).protocol.replace(":", "");
@@ -133,7 +133,7 @@ export const buildDealerProfileUrl = (dealerName: string, dealerId: number): str
   const fallbackPath = buildDealerProfilePath(dealerName, dealerId);
   if (!isDealerSubdomainRoutingEnabled()) return fallbackPath;
 
-  const rootDomain = resolveDealerRootDomain();
+  const rootDomain = getDealerRootDomain();
   const slug = buildDealerSlug(dealerName, dealerId);
   if (!rootDomain || !slug) return fallbackPath;
 
@@ -146,7 +146,7 @@ export const toAbsoluteUrl = (value: string): string => {
   if (!normalizedValue) return normalizedValue;
   if (ABSOLUTE_URL_PATTERN.test(normalizedValue)) return normalizedValue;
 
-  const baseUrl = resolvePublicBaseUrl();
+  const baseUrl = getPublicBaseUrl();
   if (!baseUrl) return normalizedValue;
 
   try {
@@ -160,7 +160,7 @@ export const resolveDealerSlugFromHostname = (hostname: string): string | null =
   if (!isDealerSubdomainRoutingEnabled()) return null;
 
   const normalizedHost = normalizeHostname(hostname);
-  const rootDomain = resolveDealerRootDomain();
+  const rootDomain = getDealerRootDomain();
   if (!normalizedHost || !rootDomain) return null;
   if (normalizedHost === rootDomain) return null;
   if (!normalizedHost.endsWith(`.${rootDomain}`)) return null;
