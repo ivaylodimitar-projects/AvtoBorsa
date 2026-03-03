@@ -1587,8 +1587,8 @@ export default function LandingPage() {
             .brand-cinema-track {
               position: relative;
               height: 408px;
-              perspective: 1600px;
-              transform-style: preserve-3d;
+              perspective: none;
+              transform-style: flat;
               isolation: isolate;
               --brand-step: clamp(142px, 16.2vw, 238px);
               --brand-far-step: calc(var(--brand-step) * 1.9);
@@ -1616,23 +1616,23 @@ export default function LandingPage() {
               margin: 0;
               cursor: pointer;
               transition: transform 620ms cubic-bezier(0.2, 0.78, 0.2, 1), opacity 460ms ease, box-shadow 460ms ease;
-              transform-style: preserve-3d;
-              backface-visibility: hidden;
-              -webkit-backface-visibility: hidden;
-              will-change: transform, opacity;
+              transform-style: flat;
+              backface-visibility: visible;
+              -webkit-backface-visibility: visible;
+              will-change: transform;
               touch-action: manipulation;
             }
             .brand-cinema-card[data-distance="-2"] {
-              transform: translate3d(calc(-50% - var(--brand-far-step)), calc(-50% + 14px), -260px) rotateY(25deg) scale(0.68);
-              opacity: 0.18;
+              transform: translate(calc(-50% - var(--brand-far-step)), calc(-50% + 8px)) scale(0.82);
+              opacity: 0.22;
               filter: none;
               box-shadow: none;
             }
             .brand-cinema-card[data-distance="-1"] {
-              transform: translate3d(calc(-50% - var(--brand-step)), calc(-50% + 9px), -132px) rotateY(16deg) scale(0.84);
-              opacity: 0.62;
+              transform: translate(calc(-50% - var(--brand-step)), calc(-50% + 4px)) scale(0.92);
+              opacity: 0.66;
               filter: none;
-              box-shadow: 0 14px 28px rgba(2, 6, 23, 0.34);
+              box-shadow: 0 12px 24px rgba(2, 6, 23, 0.34);
             }
             .brand-cinema-card[data-distance="0"] {
               transform: translate(-50%, calc(-50% - 2px)) scale(1);
@@ -1644,14 +1644,14 @@ export default function LandingPage() {
               will-change: auto;
             }
             .brand-cinema-card[data-distance="1"] {
-              transform: translate3d(calc(-50% + var(--brand-step)), calc(-50% + 9px), -132px) rotateY(-16deg) scale(0.84);
-              opacity: 0.62;
+              transform: translate(calc(-50% + var(--brand-step)), calc(-50% + 4px)) scale(0.92);
+              opacity: 0.66;
               filter: none;
-              box-shadow: 0 14px 28px rgba(2, 6, 23, 0.34);
+              box-shadow: 0 12px 24px rgba(2, 6, 23, 0.34);
             }
             .brand-cinema-card[data-distance="2"] {
-              transform: translate3d(calc(-50% + var(--brand-far-step)), calc(-50% + 14px), -260px) rotateY(-25deg) scale(0.68);
-              opacity: 0.18;
+              transform: translate(calc(-50% + var(--brand-far-step)), calc(-50% + 8px)) scale(0.82);
+              opacity: 0.22;
               filter: none;
               box-shadow: none;
             }
@@ -1697,9 +1697,10 @@ export default function LandingPage() {
               width: 100%;
               height: 100%;
               object-fit: cover;
+              object-position: center;
               transform: none;
-              backface-visibility: visible;
-              -webkit-backface-visibility: visible;
+              backface-visibility: hidden;
+              -webkit-backface-visibility: hidden;
               will-change: auto;
               image-rendering: auto;
               transition: none;
@@ -2006,7 +2007,7 @@ export default function LandingPage() {
                 pointer-events: none;
               }
               #popular-brands .brand-cinema-card[data-distance="0"] {
-                transform: translate(-50%, -50%) scale(0.94);
+                transform: translate(-50%, -50%) scale(1);
                 box-shadow: 0 18px 42px rgba(15, 118, 110, 0.24), 0 0 0 1px rgba(110, 231, 183, 0.2) inset;
               }
               #popular-brands .brand-cinema-meta {
@@ -2068,7 +2069,7 @@ export default function LandingPage() {
                 pointer-events: none;
               }
               #popular-brands .brand-cinema-card[data-distance="0"] {
-                transform: translate(-50%, -50%) scale(0.9);
+                transform: translate(-50%, -50%) scale(1);
               }
               #popular-brands .brand-cinema-meta { padding: 6px 7px; gap: 5px; }
               #popular-brands .brand-cinema-logo { width: 20px; height: 20px; }
