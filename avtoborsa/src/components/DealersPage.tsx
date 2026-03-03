@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiBell } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
@@ -11,7 +11,7 @@ import {
   unfollowDealer,
 } from "../utils/dealerSubscriptions";
 import { API_BASE_URL } from "../config/api";
-import { navigateToDealerProfile } from "../utils/slugify";
+import { buildDealerProfilePath } from "../utils/slugify";
 
 type Dealer = {
   id: number;
@@ -701,7 +701,7 @@ const DealersPage: React.FC = () => {
                       style={{ ...styles.podiumCard, minHeight }}
                       onMouseEnter={() => setHoveredCard(dealer.id)}
                       onMouseLeave={() => setHoveredCard(null)}
-                      onClick={() => navigateToDealerProfile(navigate, dealer.dealer_name, dealer.id)}
+                      onClick={() => navigate(buildDealerProfilePath(dealer.dealer_name, dealer.id))}
                     >
                       <div style={{ ...styles.podiumRank, ...rankStyles }}>#{slot.rank}</div>
                       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -753,7 +753,7 @@ const DealersPage: React.FC = () => {
                           style={styles.podiumButton}
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigateToDealerProfile(navigate, dealer.dealer_name, dealer.id);
+                            navigate(buildDealerProfilePath(dealer.dealer_name, dealer.id));
                           }}
                         >
                           Виж профил
@@ -776,7 +776,7 @@ const DealersPage: React.FC = () => {
                       }}
                       onMouseEnter={() => setHoveredCard(dealer.id)}
                       onMouseLeave={() => setHoveredCard(null)}
-                      onClick={() => navigateToDealerProfile(navigate, dealer.dealer_name, dealer.id)}
+                      onClick={() => navigate(buildDealerProfilePath(dealer.dealer_name, dealer.id))}
                     >
                       <div style={styles.mobileRankTop}>
                         <div style={styles.mobileRankLeft}>
@@ -832,7 +832,7 @@ const DealersPage: React.FC = () => {
                           style={styles.rankButton}
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigateToDealerProfile(navigate, dealer.dealer_name, dealer.id);
+                            navigate(buildDealerProfilePath(dealer.dealer_name, dealer.id));
                           }}
                         >
                           Профил
@@ -865,7 +865,7 @@ const DealersPage: React.FC = () => {
                       }}
                       onMouseEnter={() => setHoveredCard(dealer.id)}
                       onMouseLeave={() => setHoveredCard(null)}
-                      onClick={() => navigateToDealerProfile(navigate, dealer.dealer_name, dealer.id)}
+                      onClick={() => navigate(buildDealerProfilePath(dealer.dealer_name, dealer.id))}
                     >
                       <div style={styles.rankIndex}>#{rank}</div>
                       <div style={styles.rankAvatar}>
@@ -921,7 +921,7 @@ const DealersPage: React.FC = () => {
                           style={styles.rankButton}
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigateToDealerProfile(navigate, dealer.dealer_name, dealer.id);
+                            navigate(buildDealerProfilePath(dealer.dealer_name, dealer.id));
                           }}
                         >
                           Профил
@@ -945,7 +945,7 @@ const DealersPage: React.FC = () => {
                       }}
                       onMouseEnter={() => setHoveredCard(dealer.id)}
                       onMouseLeave={() => setHoveredCard(null)}
-                      onClick={() => navigateToDealerProfile(navigate, dealer.dealer_name, dealer.id)}
+                      onClick={() => navigate(buildDealerProfilePath(dealer.dealer_name, dealer.id))}
                     >
                       <div style={styles.mobileRankTop}>
                         <div style={styles.mobileRankLeft}>
@@ -1001,7 +1001,7 @@ const DealersPage: React.FC = () => {
                           style={styles.rankButton}
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigateToDealerProfile(navigate, dealer.dealer_name, dealer.id);
+                            navigate(buildDealerProfilePath(dealer.dealer_name, dealer.id));
                           }}
                         >
                           Профил
@@ -1030,3 +1030,4 @@ const DealersPage: React.FC = () => {
 };
 
 export default DealersPage;
+

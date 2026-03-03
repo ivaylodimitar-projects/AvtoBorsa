@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 
 import { API_BASE_URL, RECAPTCHA_ENABLED, RECAPTCHA_SITE_KEY } from "../config/api";
 import RecaptchaField from "./RecaptchaField";
-import { getDealerRootDomain } from "../utils/slugify";
 
 const PASSWORD_POLICY_MESSAGE =
   "Паролата трябва да е поне 8 символа, с поне 1 главна буква и 1 цифра";
@@ -23,8 +22,7 @@ const CITIES = [
 
 const BusinessProfilePage: React.FC = () => {
   const navigate = useNavigate();
-  const dealerRootDomain = getDealerRootDomain() || "kar.bg";
-  const dealerUsernameSuffix = `.${dealerRootDomain}`;
+  const dealerUsernameSuffix = ".kar.bg";
   const [formData, setFormData] = useState({
     dealerName: "",
     city: "",
@@ -716,5 +714,4 @@ const BusinessProfilePage: React.FC = () => {
 };
 
 export default BusinessProfilePage;
-
 

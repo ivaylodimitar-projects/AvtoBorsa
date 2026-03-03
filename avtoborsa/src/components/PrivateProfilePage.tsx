@@ -1,15 +1,14 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { API_BASE_URL, RECAPTCHA_ENABLED, RECAPTCHA_SITE_KEY } from "../config/api";
 import RecaptchaField from "./RecaptchaField";
-import { getPublicBaseUrl } from "../utils/slugify";
 
 const PASSWORD_POLICY_MESSAGE =
   "ÐŸÐ°Ñ€Ð¾Ð»Ð°Ñ‚Ð° Ñ‚Ñ€ÑÐ±Ð²Ð° Ð´Ð° Ðµ Ð¿Ð¾Ð½Ðµ 8 ÑÐ¸Ð¼Ð²Ð¾Ð»Ð°, Ñ Ð¿Ð¾Ð½Ðµ 1 Ð³Ð»Ð°Ð²Ð½Ð° Ð±ÑƒÐºÐ²Ð° Ð¸ 1 Ñ†Ð¸Ñ„Ñ€Ð°";
 const EMAIL_CONFIRMATION_MESSAGE =
   "Ð©Ðµ Ð¸Ð·Ð¿Ñ€Ð°Ñ‚Ð¸Ð¼ Ð»Ð¸Ð½Ðº Ð·Ð° Ð¿Ð¾Ñ‚Ð²ÑŠÑ€Ð¶Ð´ÐµÐ½Ð¸Ðµ Ð½Ð° Ñ‚Ð¾Ð·Ð¸ Ð¸Ð¼ÐµÐ¹Ð».";
-const PUBLIC_PROFILE_BASE_URL = getPublicBaseUrl();
+const PUBLIC_PROFILE_BASE_URL = "https://kar.bg";
 
 const isPasswordValid = (password: string) =>
   password.length >= 8 && /\p{Lu}/u.test(password) && /\d/.test(password);
@@ -687,6 +686,7 @@ const styles: Record<string, React.CSSProperties> = {
 };
 
 export default PrivateProfilePage;
+
 
 
 

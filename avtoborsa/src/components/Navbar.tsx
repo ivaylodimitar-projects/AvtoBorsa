@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -40,7 +40,7 @@ import {
   type DealerListingSnapshot,
   type FollowedDealer,
 } from "../utils/dealerSubscriptions";
-import { navigateToDealerProfile } from "../utils/slugify";
+import { buildDealerProfilePath } from "../utils/slugify";
 import karBgLogo from "../assets/karbglogo.png";
 import { API_BASE_URL } from "../config/api";
 
@@ -849,12 +849,12 @@ const Navbar: React.FC = () => {
       markNotificationRead(user.id, notification.id);
     }
     closeNotificationsMenu(true);
-    navigateToDealerProfile(navigate, notification.dealerName, notification.dealerId);
+    navigate(buildDealerProfilePath(notification.dealerName, notification.dealerId));
   };
 
   const handleOpenFollowedDealer = (dealerId: number, dealerName: string) => {
     closeNotificationsMenu(true);
-    navigateToDealerProfile(navigate, dealerName, dealerId);
+    navigate(buildDealerProfilePath(dealerName, dealerId));
   };
 
   const handleUnfollowDealer = (dealerId: number, dealerName?: string) => {
@@ -3129,3 +3129,4 @@ const css = `
   }
 }
 `;
+
