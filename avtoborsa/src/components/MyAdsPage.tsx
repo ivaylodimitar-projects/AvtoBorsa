@@ -89,6 +89,7 @@ interface CarListing {
   photo?: ApiPhoto | null;
   created_at: string;
   updated_at?: string;
+  favorites_count?: number | null;
   is_archived: boolean;
   is_draft: boolean;
   is_kaparirano?: boolean;
@@ -3411,6 +3412,27 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     justifyContent: "space-between",
     gap: 12,
   },
+  listingTitleMeta: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    flexShrink: 0,
+    marginTop: 1,
+  },
+  listingFavoritesInline: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 5,
+    padding: "4px 8px",
+    borderRadius: 999,
+    border: "1px solid #fbcfe8",
+    background: "#fff1f7",
+    color: "#be185d",
+    fontSize: 12,
+    fontWeight: 800,
+    lineHeight: 1,
+    whiteSpace: "nowrap" as const,
+  },
   listingTitle: {
     fontSize: 17,
     fontWeight: 700,
@@ -5007,6 +5029,13 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                   const cardImage = getCardImageSources(listing);
                   const categoryBadgeLabel = getListingCategoryBadge(listing);
                   const listingExpiryLabel = getListingExpiryLabel(listing);
+                  const normalizedFavoritesCount = Number(listing.favorites_count);
+                  const favoriteCount =
+                    Number.isFinite(normalizedFavoritesCount) && normalizedFavoritesCount >= 0
+                      ? Math.round(normalizedFavoritesCount)
+                      : 0;
+                  const shouldShowFavoritesCount =
+                    !isPublicView && activeTab !== "liked" && activeTab !== "drafts";
                   const hasQrTarget = Boolean(listing.slug && listing.slug.trim());
                   const showQrTrigger =
                     activeTab === "active" || activeTab === "top" || activeTab === "vip";
@@ -5120,6 +5149,14 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
               <div style={styles.listingContent}>
                 <div style={styles.listingTitleRow}>
                   <h3 style={styles.listingTitle}>{listingTitle}</h3>
+                  {shouldShowFavoritesCount && (
+                    <div style={styles.listingTitleMeta}>
+                      <span style={styles.listingFavoritesInline}>
+                        <Heart size={12} />
+                        {favoriteCount}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {subtitle && (

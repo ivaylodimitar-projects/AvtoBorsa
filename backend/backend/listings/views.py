@@ -13,7 +13,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
 from django.shortcuts import get_object_or_404
 from django.db import transaction as db_transaction, IntegrityError
-from django.db.models import Q, OuterRef, Subquery, Case, When, Value, IntegerField, F
+from django.db.models import Q, OuterRef, Subquery, Case, When, Value, IntegerField, F, Count
 from django.db.models import Prefetch
 from django.db.models.functions import Substr, Coalesce
 from django.core.cache import cache
@@ -1559,8 +1559,12 @@ def get_user_listings(request):
         is_draft=False,
         is_archived=False,
         created_at__gte=cutoff
-    ).prefetch_related('images')
-    serializer = CarListingSerializer(listings, many=True, context={'request': request})
+    ).annotate(favorites_count=Count('favorited_by', distinct=True)).prefetch_related('images')
+    serializer = CarListingSerializer(
+        listings,
+        many=True,
+        context={'request': request, 'include_favorites_count': True},
+    )
     return Response(serializer.data)
 
 
@@ -1569,8 +1573,16 @@ def get_user_listings(request):
 def get_user_drafts(request):
     """Get current user's draft listings"""
     _demote_expired_top_listings()
-    drafts = CarListing.objects.filter(user=request.user, is_draft=True).prefetch_related('images')
-    serializer = CarListingSerializer(drafts, many=True, context={'request': request})
+    drafts = (
+        CarListing.objects.filter(user=request.user, is_draft=True)
+        .annotate(favorites_count=Count('favorited_by', distinct=True))
+        .prefetch_related('images')
+    )
+    serializer = CarListingSerializer(
+        drafts,
+        many=True,
+        context={'request': request, 'include_favorites_count': True},
+    )
     return Response(serializer.data)
 
 
@@ -1579,8 +1591,16 @@ def get_user_drafts(request):
 def get_user_archived(request):
     """Get current user's archived listings"""
     _demote_expired_top_listings()
-    archived = CarListing.objects.filter(user=request.user, is_archived=True).prefetch_related('images')
-    serializer = CarListingSerializer(archived, many=True, context={'request': request})
+    archived = (
+        CarListing.objects.filter(user=request.user, is_archived=True)
+        .annotate(favorites_count=Count('favorited_by', distinct=True))
+        .prefetch_related('images')
+    )
+    serializer = CarListingSerializer(
+        archived,
+        many=True,
+        context={'request': request, 'include_favorites_count': True},
+    )
     return Response(serializer.data)
 
 
@@ -1595,8 +1615,12 @@ def get_user_expired(request):
         is_draft=False,
         is_archived=False,
         created_at__lt=cutoff
-    ).prefetch_related('images')
-    serializer = CarListingSerializer(expired, many=True, context={'request': request})
+    ).annotate(favorites_count=Count('favorited_by', distinct=True)).prefetch_related('images')
+    serializer = CarListingSerializer(
+        expired,
+        many=True,
+        context={'request': request, 'include_favorites_count': True},
+    )
     return Response(serializer.data)
 
 

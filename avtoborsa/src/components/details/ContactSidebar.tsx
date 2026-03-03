@@ -3,7 +3,6 @@ import {
   Phone,
   Heart,
   Share2,
-  Printer,
   Flag,
   MapPin,
   Mail,
@@ -50,12 +49,14 @@ interface ContactSidebarProps {
   city?: string;
   createdAt?: string;
   initialIsFavorite?: boolean;
+  onFavoriteChange?: (nextIsFavorite: boolean) => void;
 }
 
 type FavoriteResponseItem = {
+  id?: number | string;
   listing?: {
     id?: number | string;
-  };
+  } | null;
   listing_id?: number | string;
 };
 
@@ -63,6 +64,33 @@ type ReportResponsePayload = {
   detail?: string;
   message?: string;
   non_field_errors?: string[];
+};
+
+const toFiniteNumber = (value: unknown): number | null => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const resolveFavoriteListingId = (favorite: FavoriteResponseItem): number | null => {
+  const nestedListingId = toFiniteNumber(favorite.listing?.id);
+  if (nestedListingId !== null) return nestedListingId;
+
+  const directListingId = toFiniteNumber(favorite.listing_id);
+  if (directListingId !== null) return directListingId;
+
+  // Some API variants return listing objects directly instead of wrapper favorite objects.
+  const hasFavoriteWrapperKeys =
+    Object.prototype.hasOwnProperty.call(favorite, 'listing') ||
+    Object.prototype.hasOwnProperty.call(favorite, 'listing_id');
+  if (hasFavoriteWrapperKeys) return null;
+
+  return toFiniteNumber(favorite.id);
 };
 
 const ContactSidebar: React.FC<ContactSidebarProps> = ({
@@ -82,6 +110,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
   city = '',
   createdAt,
   initialIsFavorite = false,
+  onFavoriteChange,
 }) => {
   const { showToast } = useToast();
   const { isAuthenticated, isLoading: isAuthLoading, ensureFreshAccessToken } = useAuth();
@@ -101,16 +130,31 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
   const shareButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setIsFavorite(false);
+      return;
+    }
     setIsFavorite(Boolean(initialIsFavorite));
-  }, [initialIsFavorite, listingId]);
+  }, [initialIsFavorite, listingId, isAuthenticated]);
 
   useEffect(() => {
     let isCancelled = false;
     const checkFavorite = async () => {
       try {
         if (!listingId) return;
+        if (isAuthLoading) return;
+        if (!isAuthenticated) {
+          if (!isCancelled) setIsFavorite(false);
+          return;
+        }
+        const normalizedListingId = toFiniteNumber(listingId);
+        if (normalizedListingId === null) return;
+
         const token = await ensureFreshAccessToken();
-        if (!token) return;
+        if (!token) {
+          if (!isCancelled) setIsFavorite(false);
+          return;
+        }
 
         const response = await fetch(
           `${API_BASE_URL}/api/my-favorites/`,
@@ -123,14 +167,14 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
             : Array.isArray((data as { results?: unknown }).results)
               ? ((data as { results: FavoriteResponseItem[] }).results)
               : [];
-          const isFav = favorites.some((fav) => {
-            const nestedId = Number(fav.listing?.id);
-            const directId = Number(fav.listing_id);
-            return nestedId === listingId || directId === listingId;
-          });
+          const isFav = favorites.some(
+            (fav) => resolveFavoriteListingId(fav) === normalizedListingId
+          );
           if (!isCancelled) {
-            setIsFavorite(isFav);
+            setIsFavorite((prev) => (isFav ? true : prev));
           }
+        } else if (!isCancelled && (response.status === 401 || response.status === 403)) {
+          setIsFavorite(false);
         }
       } catch (err) {
         console.error('Error checking favorite status:', err);
@@ -168,7 +212,11 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
       });
 
       if (response.ok) {
-        setIsFavorite((prev) => !prev);
+        setIsFavorite((prev) => {
+          const next = !prev;
+          onFavoriteChange?.(next);
+          return next;
+        });
       } else {
         showToast('Грешка при запазване на обявата.', { type: 'error' });
       }
@@ -1107,7 +1155,6 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                 padding: '14px 8px',
                 background: 'none',
                 border: 'none',
-                borderRight: '1px solid #eef2f7',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
@@ -1131,35 +1178,6 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
               Сподели
             </button>
           </div>
-          <button
-            onClick={() => window.print()}
-            style={{
-              flex: 1,
-              padding: '14px 8px',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6,
-              fontSize: 12,
-              fontWeight: 600,
-              color: '#6b7280',
-              transition: 'all 0.2s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = '#0f766e';
-              e.currentTarget.style.background = '#f8fafc';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = '#6b7280';
-              e.currentTarget.style.background = 'none';
-            }}
-          >
-            <Printer size={15} />
-            Принтирай
-          </button>
           <div
             ref={shareMenuRef}
             style={{
@@ -1431,4 +1449,5 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
 };
 
 export default ContactSidebar;
+
 

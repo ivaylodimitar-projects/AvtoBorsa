@@ -1113,6 +1113,31 @@ export default function LandingPage() {
             padding-left: max(12px, env(safe-area-inset-left, 0px)) !important;
             padding-right: max(12px, env(safe-area-inset-right, 0px)) !important;
           }
+
+          /* Mobile/touch: avoid sticky hover states and hard-reset non-active icons */
+          .category-pill-btn:not(.category-pill-btn--active) .category-image-icon {
+            animation: none !important;
+            transform: none !important;
+            filter: drop-shadow(0 2px 5px rgba(15, 23, 42, 0.2)) !important;
+          }
+          .category-pill-btn:not(.category-pill-btn--active) .category-material-icon {
+            animation: none !important;
+            transform: none !important;
+          }
+        }
+        @media (hover: none) and (pointer: coarse) {
+          .category-pill-btn:hover {
+            background: transparent !important;
+            transform: none !important;
+            box-shadow: none !important;
+          }
+          .category-pill-btn:hover .category-material-icon {
+            transform: none !important;
+          }
+          .category-pill-btn:hover .category-image-icon {
+            transform: none !important;
+            filter: drop-shadow(0 2px 5px rgba(15, 23, 42, 0.2)) !important;
+          }
         }
       `}</style>
 
@@ -1962,17 +1987,17 @@ export default function LandingPage() {
               }
 
               #popular-brands .brand-cinema {
-                padding: 12px 8px 14px;
+                padding: 10px 6px 12px;
                 border-radius: 14px;
                 border-color: rgba(148, 163, 184, 0.55);
                 box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 12px 30px rgba(2, 6, 23, 0.42);
               }
               #popular-brands .brand-cinema-track {
-                height: clamp(246px, 66vw, 294px);
-                --brand-step: clamp(64px, 16.5vw, 90px);
+                height: clamp(210px, 58vw, 250px);
+                --brand-step: clamp(56px, 14.5vw, 76px);
                 --brand-far-step: calc(var(--brand-step) * 1.45);
               }
-              #popular-brands .brand-cinema-card { width: min(90vw, 430px); border-radius: 14px; }
+              #popular-brands .brand-cinema-card { width: min(82vw, 360px); border-radius: 14px; }
               #popular-brands .brand-cinema-card[data-distance="-2"],
               #popular-brands .brand-cinema-card[data-distance="2"],
               #popular-brands .brand-cinema-card[data-distance="-1"],
@@ -1981,7 +2006,7 @@ export default function LandingPage() {
                 pointer-events: none;
               }
               #popular-brands .brand-cinema-card[data-distance="0"] {
-                transform: translate(-50%, -50%) scale(1);
+                transform: translate(-50%, -50%) scale(0.94);
                 box-shadow: 0 18px 42px rgba(15, 118, 110, 0.24), 0 0 0 1px rgba(110, 231, 183, 0.2) inset;
               }
               #popular-brands .brand-cinema-meta {
@@ -1989,12 +2014,12 @@ export default function LandingPage() {
                 bottom: 8px;
                 width: fit-content;
                 max-width: calc(100% - 16px);
-                padding: 7px 9px;
-                gap: 6px;
+                padding: 6px 8px;
+                gap: 5px;
                 border-radius: 12px;
               }
-              #popular-brands .brand-cinema-logo { width: 22px; height: 22px; padding: 0; border-radius: 0; }
-              #popular-brands .brand-cinema-name { font-size: 12px; letter-spacing: 0.01em; }
+              #popular-brands .brand-cinema-logo { width: 20px; height: 20px; padding: 0; border-radius: 0; }
+              #popular-brands .brand-cinema-name { font-size: 11px; letter-spacing: 0.01em; }
               #popular-brands .brand-cinema-state { font-size: 9px; padding: 4px 7px; letter-spacing: 0; }
               #popular-brands .brand-logo-dots {
                 position: static;
@@ -2017,30 +2042,33 @@ export default function LandingPage() {
               }
               #popular-brands .brand-logo-dots::after { display: none; }
               #popular-brands .brand-logo-dot {
-                width: 28px;
-                height: 28px;
-                padding: 4px;
+                width: 26px;
+                height: 26px;
+                padding: 3px;
                 scroll-snap-align: none;
               }
-              #popular-brands .brand-nav { width: 44px; height: 44px; top: 45%; }
+              #popular-brands .brand-nav { width: 38px; height: 38px; top: 45%; }
               #popular-brands .brand-nav::after { inset: -2px; }
-              #popular-brands .brand-nav svg { width: 19px; height: 19px; }
+              #popular-brands .brand-nav svg { width: 17px; height: 17px; }
               #popular-brands .brand-nav--left { left: 4px; }
               #popular-brands .brand-nav--right { right: 4px; }
               #popular-brands .brand-autoplay-meter { margin-top: 10px; height: 3px; }
             }
             @media (max-width: 480px) {
-              #popular-brands .brand-cinema { padding: 10px 6px 12px; }
+              #popular-brands .brand-cinema { padding: 8px 5px 10px; }
               #popular-brands .brand-cinema-track {
-                height: 232px;
-                --brand-step: 54px;
-                --brand-far-step: 86px;
+                height: 188px;
+                --brand-step: 46px;
+                --brand-far-step: 70px;
               }
-              #popular-brands .brand-cinema-card { width: min(88vw, 336px); }
+              #popular-brands .brand-cinema-card { width: min(78vw, 300px); }
               #popular-brands .brand-cinema-card[data-distance="-1"],
               #popular-brands .brand-cinema-card[data-distance="1"] {
                 opacity: 0;
                 pointer-events: none;
+              }
+              #popular-brands .brand-cinema-card[data-distance="0"] {
+                transform: translate(-50%, -50%) scale(0.9);
               }
               #popular-brands .brand-cinema-meta { padding: 6px 7px; gap: 5px; }
               #popular-brands .brand-cinema-logo { width: 20px; height: 20px; }

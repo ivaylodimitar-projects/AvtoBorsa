@@ -933,6 +933,7 @@ class CarListingSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
     photo = serializers.SerializerMethodField()
     is_favorited = serializers.SerializerMethodField()
+    favorites_count = serializers.SerializerMethodField()
     seller_name = serializers.SerializerMethodField()
     seller_type = serializers.SerializerMethodField()
     seller_created_at = serializers.SerializerMethodField()
@@ -1015,7 +1016,7 @@ class CarListingSerializer(serializers.ModelSerializer):
             'view_count', 'is_draft', 'is_active', 'is_archived', 'is_kaparirano',
             'risk_score', 'risk_flags', 'requires_moderation',
             'created_at', 'updated_at', 'images', 'image_url', 'photo',
-            'is_favorited', 'seller_name', 'seller_type', 'seller_created_at', 'price_history', 'images_upload',
+            'is_favorited', 'favorites_count', 'seller_name', 'seller_type', 'seller_created_at', 'price_history', 'images_upload',
             'wheel_for', 'offer_type',
             'tire_brand', 'tire_width', 'tire_height', 'tire_diameter',
             'tire_season', 'tire_speed_index', 'tire_load_index', 'tire_tread',
@@ -1029,7 +1030,7 @@ class CarListingSerializer(serializers.ModelSerializer):
             'classified_for', 'accessory_category', 'buy_service_category',
         ]
         read_only_fields = [
-            'id', 'slug', 'user', 'user_email', 'created_at', 'updated_at', 'images', 'image_url', 'is_favorited',
+            'id', 'slug', 'user', 'user_email', 'created_at', 'updated_at', 'images', 'image_url', 'is_favorited', 'favorites_count',
             'is_active', 'fuel_display', 'gearbox_display', 'condition_display', 'category_display',
             'listing_type_display', 'seller_name', 'seller_type', 'seller_created_at', 'price_history', 'photo',
             'top_expires_at', 'vip_expires_at', 'view_count', 'is_kaparirano',
@@ -1106,6 +1107,26 @@ class CarListingSerializer(serializers.ModelSerializer):
                 self.context['favorite_listing_ids'] = favorite_ids
             return obj.id in favorite_ids
         return False
+
+    def get_favorites_count(self, obj):
+        request = self.context.get('request')
+        include_favorites_count = bool(self.context.get('include_favorites_count'))
+        if not include_favorites_count or not request or not request.user.is_authenticated:
+            return None
+        if getattr(obj, 'user_id', None) != request.user.id:
+            return None
+
+        annotated_count = getattr(obj, 'favorites_count', None)
+        if isinstance(annotated_count, int):
+            return max(0, annotated_count)
+        if annotated_count is not None:
+            try:
+                parsed_count = int(annotated_count)
+                return max(0, parsed_count)
+            except (TypeError, ValueError):
+                pass
+
+        return Favorite.objects.filter(listing_id=obj.id).count()
 
     def get_seller_name(self, obj):
         user = obj.user

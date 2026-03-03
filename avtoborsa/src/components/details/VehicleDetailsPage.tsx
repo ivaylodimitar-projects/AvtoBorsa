@@ -883,6 +883,34 @@ const VehicleDetailsPage: React.FC = () => {
     return 'току-що';
   }, [currentTimeMs]);
 
+  const handleFavoriteChange = useCallback(
+    (nextIsFavorite: boolean) => {
+      if (!id) return;
+
+      setListing((prev) =>
+        prev && prev.id === id
+          ? {
+              ...prev,
+              is_favorited: nextIsFavorite,
+            }
+          : prev
+      );
+
+      const cachedDetail = listingDetailCache.get(id);
+      if (!cachedDetail) return;
+
+      updateDetailCache(
+        id,
+        {
+          ...cachedDetail.payload,
+          is_favorited: nextIsFavorite,
+        },
+        cachedDetail.etag
+      );
+    },
+    [id]
+  );
+
   const styles: Record<string, React.CSSProperties> = {
     container: {
       minHeight: '100vh',
@@ -1547,6 +1575,7 @@ const VehicleDetailsPage: React.FC = () => {
             priceHistory={priceHistory}
             viewCount={listing.view_count ?? 0}
             initialIsFavorite={Boolean(listing.is_favorited)}
+            onFavoriteChange={handleFavoriteChange}
           />
         )}
       </div>
@@ -1570,6 +1599,7 @@ const VehicleDetailsPage: React.FC = () => {
           priceHistory={priceHistory}
           viewCount={listing.view_count ?? 0}
           initialIsFavorite={Boolean(listing.is_favorited)}
+          onFavoriteChange={handleFavoriteChange}
         />
       )}
     </div>
