@@ -16,8 +16,10 @@ import ResponsiveImage, { type ApiPhoto } from "./ResponsiveImage";
 import { API_BASE_URL } from "../config/api";
 import {
   buildDealerSlug,
+  buildDealerProfileUrl,
   buildDealerProfilePath,
   extractDealerIdFromSlug,
+  toAbsoluteUrl,
 } from "../utils/slugify";
 
 type CarListing = {
@@ -112,8 +114,13 @@ const NEW_LISTING_BADGE_WINDOW_MS = NEW_LISTING_BADGE_MINUTES * 60 * 1000;
 const PAGE_SIZE = 30;
 const DEFAULT_SHARE_IMAGE_PATH = "/karbglogo.png";
 
-const DealerDetailPage: React.FC = () => {
-  const { dealerSlug } = useParams<{ dealerSlug: string }>();
+type DealerDetailPageProps = {
+  dealerSlugOverride?: string;
+};
+
+const DealerDetailPage: React.FC<DealerDetailPageProps> = ({ dealerSlugOverride }) => {
+  const { dealerSlug: dealerSlugFromRoute } = useParams<{ dealerSlug: string }>();
+  const dealerSlug = (dealerSlugOverride || dealerSlugFromRoute || "").trim();
   const navigate = useNavigate();
   const { user } = useAuth();
   const [dealer, setDealer] = useState<DealerDetail | null>(null);
@@ -201,12 +208,13 @@ const DealerDetailPage: React.FC = () => {
 
   useEffect(() => {
     if (!dealer) return;
+    if (dealerSlugOverride) return;
 
     const canonicalPath = buildDealerProfilePath(dealer.dealer_name, dealer.id);
     if (dealerSlug !== canonicalPath.replace("/dealers/", "")) {
       navigate(canonicalPath, { replace: true });
     }
-  }, [dealer, dealerSlug, navigate]);
+  }, [dealer, dealerSlug, dealerSlugOverride, navigate]);
 
   useEffect(() => {
     if (!dealer) return;
@@ -251,7 +259,7 @@ const DealerDetailPage: React.FC = () => {
     const title = `Kar.bg | ${dealer.dealer_name}`;
     const description = `Профил на дилър ${dealer.dealer_name} в ${dealer.city}. Общо ${dealer.listing_count} активни обяви в Kar.bg.`;
     const shareImage = resolveAbsoluteUrl(dealer.profile_image_url) || `${window.location.origin}${DEFAULT_SHARE_IMAGE_PATH}`;
-    const canonicalUrl = `${window.location.origin}${buildDealerProfilePath(dealer.dealer_name, dealer.id)}`;
+    const canonicalUrl = toAbsoluteUrl(buildDealerProfileUrl(dealer.dealer_name, dealer.id));
 
     document.title = title;
     upsertMetaTag("meta[property='og:title']", "property", "og:title", title);

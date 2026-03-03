@@ -22,6 +22,7 @@ import LegalPage from './components/LegalPage'
 import ContactsPage from './components/ContactsPage'
 import CookieConsentWidget from './components/CookieConsentWidget'
 import { useAuth } from './context/AuthContext'
+import { resolveDealerSlugFromCurrentHost } from './utils/slugify'
 
 const VehicleDetailsPage = lazy(() => import('./components/details/VehicleDetailsPage'))
 
@@ -53,6 +54,7 @@ function App() {
   const location = useLocation()
   const navigate = useNavigate()
   const navigationType = useNavigationType()
+  const dealerSlugFromHost = resolveDealerSlugFromCurrentHost()
   const { authTransition, sessionExpiredMessage, clearSessionExpiredMessage } = useAuth()
   const isAdminRoute = location.pathname === '/admin' || location.pathname.startsWith('/admin/')
   const showSharedFooter = !isAdminRoute
@@ -108,7 +110,16 @@ function App() {
     <>
       {!isAdminRoute && <Navbar />}
       <Routes>
-        <Route path="/" element={<LandingPage />} />
+        <Route
+          path="/"
+          element={
+            dealerSlugFromHost ? (
+              <DealerDetailPage dealerSlugOverride={dealerSlugFromHost} />
+            ) : (
+              <LandingPage />
+            )
+          }
+        />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/publish" element={<PublishPage />} />
         <Route path="/dealers" element={<DealersPage />} />

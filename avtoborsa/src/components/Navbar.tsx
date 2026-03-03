@@ -40,7 +40,7 @@ import {
   type DealerListingSnapshot,
   type FollowedDealer,
 } from "../utils/dealerSubscriptions";
-import { buildDealerProfilePath } from "../utils/slugify";
+import { navigateToDealerProfile } from "../utils/slugify";
 import karBgLogo from "../assets/karbglogo.png";
 import { API_BASE_URL } from "../config/api";
 
@@ -849,12 +849,12 @@ const Navbar: React.FC = () => {
       markNotificationRead(user.id, notification.id);
     }
     closeNotificationsMenu(true);
-    navigate(buildDealerProfilePath(notification.dealerName, notification.dealerId));
+    navigateToDealerProfile(navigate, notification.dealerName, notification.dealerId);
   };
 
   const handleOpenFollowedDealer = (dealerId: number, dealerName: string) => {
     closeNotificationsMenu(true);
-    navigate(buildDealerProfilePath(dealerName, dealerId));
+    navigateToDealerProfile(navigate, dealerName, dealerId);
   };
 
   const handleUnfollowDealer = (dealerId: number, dealerName?: string) => {
