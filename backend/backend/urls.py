@@ -27,5 +27,5 @@ urlpatterns = [
 ]
 
 # Serve media files in development
-if settings.DEBUG:
+if settings.DEBUG and str(getattr(settings, "MEDIA_URL", "")).startswith("/"):
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -1,5 +1,6 @@
 import io
 import hashlib
+import os
 import secrets
 from PIL import Image as PILImage
 from django.db import models
@@ -199,17 +200,62 @@ class BusinessUser(models.Model):
     def __str__(self):
         return f"Business User: {self.dealer_name}"
 
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        if self.profile_image:
+    def _optimize_profile_image(self):
+        if not self.profile_image:
+            return
+        original_file = self.profile_image
+        try:
+            original_file.open("rb")
+            with PILImage.open(original_file) as source:
+                if source.width <= 160 and source.height <= 160:
+                    return
+
+                resized = source.convert("RGB")
+                resized.thumbnail((160, 160), PILImage.LANCZOS)
+
+                original_name = os.path.basename(str(self.profile_image.name or "dealer-photo.jpg"))
+                base_name, extension = os.path.splitext(original_name)
+                extension = extension.lower()
+
+                output_format = "JPEG"
+                content_type = "image/jpeg"
+                output_extension = ".jpg"
+                save_kwargs = {"quality": 90}
+
+                if extension == ".png":
+                    output_format = "PNG"
+                    content_type = "image/png"
+                    output_extension = ".png"
+                    save_kwargs = {}
+                elif extension == ".webp":
+                    output_format = "WEBP"
+                    content_type = "image/webp"
+                    output_extension = ".webp"
+
+                buffer = io.BytesIO()
+                resized.save(buffer, format=output_format, **save_kwargs)
+                buffer.seek(0)
+
+                self.profile_image = InMemoryUploadedFile(
+                    file=buffer,
+                    field_name="profile_image",
+                    name=f"{base_name or 'dealer-photo'}{output_extension}",
+                    content_type=content_type,
+                    size=buffer.getbuffer().nbytes,
+                    charset=None,
+                )
+        except Exception:
+            pass
+        finally:
             try:
-                img = PILImage.open(self.profile_image.path)
-                if img.width > 160 or img.height > 160:
-                    img = img.convert('RGB')
-                    img.thumbnail((160, 160), PILImage.LANCZOS)
-                    img.save(self.profile_image.path, quality=90)
+                original_file.close()
             except Exception:
                 pass
+
+    def save(self, *args, **kwargs):
+        if self.profile_image:
+            self._optimize_profile_image()
+        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = "Business User"

@@ -1,4 +1,5 @@
 from django.conf import settings
+from urllib.parse import urlparse
 
 
 IMMUTABLE_MEDIA_CACHE_CONTROL = "public, max-age=31536000, immutable"
@@ -11,6 +12,8 @@ class MediaCacheControlMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
         media_url = getattr(settings, "MEDIA_URL", "/media/")
+        if media_url.startswith("http://") or media_url.startswith("https://") or media_url.startswith("//"):
+            media_url = urlparse(media_url).path or "/media/"
         if not media_url.startswith("/"):
             media_url = f"/{media_url}"
         self.media_url_prefix = f"{media_url.rstrip('/')}/"

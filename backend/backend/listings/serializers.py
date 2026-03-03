@@ -35,16 +35,23 @@ def _normalize_media_path(raw_path):
     path = str(raw_path).strip()
     if not path:
         return None
-    if path.startswith("http://") or path.startswith("https://"):
+    if path.startswith("http://") or path.startswith("https://") or path.startswith("//"):
         return path
     if path.startswith("/"):
         return path
 
-    media_url = settings.MEDIA_URL if settings.MEDIA_URL.startswith("/") else f"/{settings.MEDIA_URL}"
+    normalized_path = path
+    if normalized_path.startswith("media/"):
+        normalized_path = normalized_path[len("media/"):]
+
+    media_url = str(getattr(settings, "MEDIA_URL", "/media/") or "/media/").strip()
+    if media_url.startswith("http://") or media_url.startswith("https://") or media_url.startswith("//"):
+        return f"{media_url.rstrip('/')}/{normalized_path.lstrip('/')}"
+
+    if not media_url.startswith("/"):
+        media_url = f"/{media_url.lstrip('/')}"
     media_url = media_url.rstrip("/")
-    if path.startswith("media/"):
-        return f"/{path}"
-    return f"{media_url}/{path.lstrip('/')}"
+    return f"{media_url}/{normalized_path.lstrip('/')}"
 
 
 def _to_positive_int(value):

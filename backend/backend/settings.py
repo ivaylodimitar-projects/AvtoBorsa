@@ -46,6 +46,38 @@ def _resolve_env_alias(value: str | None) -> str:
     return normalized
 
 
+def _normalize_endpoint_url(value: str | None, default_scheme: str = "https") -> str:
+    raw_value = _resolve_env_alias(value)
+    if not raw_value:
+        return ""
+    if raw_value.startswith("//"):
+        return f"{default_scheme}:{raw_value}".rstrip("/")
+    if raw_value.startswith("http://") or raw_value.startswith("https://"):
+        return raw_value.rstrip("/")
+    return f"{default_scheme}://{raw_value.lstrip('/')}".rstrip("/")
+
+
+def _extract_domain(value: str) -> str:
+    if not value:
+        return ""
+    parsed = urlparse(value if "://" in value else f"https://{value}")
+    if parsed.netloc:
+        return parsed.netloc.strip()
+    return parsed.path.strip().strip("/")
+
+
+def _ensure_media_url(value: str | None, default: str = "/media/") -> str:
+    raw_value = str(value or "").strip()
+    if not raw_value:
+        raw_value = default
+    if not raw_value:
+        return ""
+    if raw_value.startswith("http://") or raw_value.startswith("https://") or raw_value.startswith("//"):
+        return f"{raw_value.rstrip('/')}/"
+    normalized = f"/{raw_value.lstrip('/')}"
+    return f"{normalized.rstrip('/')}/"
+
+
 # Load environment variables from backend/.env if present (local dev convenience).
 ENV_FILE = BASE_DIR / ".env"
 if ENV_FILE.exists():
@@ -208,8 +240,126 @@ STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-MEDIA_URL = "/media/"
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
+MEDIA_URL = _ensure_media_url(os.getenv("MEDIA_URL", "/media/"))
 MEDIA_ROOT = BASE_DIR / "media"
+
+MEDIA_STORAGE_BACKEND = str(os.getenv("MEDIA_STORAGE_BACKEND", "local") or "local").strip().lower()
+if MEDIA_STORAGE_BACKEND == "spaces":
+    INSTALLED_APPS.append("storages")
+
+    spaces_key = _resolve_env_alias(
+        os.getenv("DO_SPACES_KEY") or os.getenv("AWS_ACCESS_KEY_ID", "")
+    )
+    spaces_secret = _resolve_env_alias(
+        os.getenv("DO_SPACES_SECRET") or os.getenv("AWS_SECRET_ACCESS_KEY", "")
+    )
+    spaces_bucket = _resolve_env_alias(
+        os.getenv("DO_SPACES_BUCKET") or os.getenv("AWS_STORAGE_BUCKET_NAME", "")
+    )
+    spaces_region = _resolve_env_alias(
+        os.getenv("DO_SPACES_REGION") or os.getenv("AWS_S3_REGION_NAME", "")
+    )
+    spaces_origin_endpoint = _normalize_endpoint_url(
+        os.getenv("DO_SPACES_ENDPOINT") or os.getenv("AWS_S3_ENDPOINT_URL", "")
+    )
+    spaces_cdn_endpoint = _normalize_endpoint_url(
+        os.getenv("DO_SPACES_CDN_ENDPOINT") or os.getenv("AWS_S3_CUSTOM_DOMAIN", "")
+    )
+    spaces_media_url_override = _ensure_media_url(
+        _normalize_endpoint_url(os.getenv("DO_SPACES_MEDIA_URL", "")),
+        default="",
+    )
+    spaces_location = str(
+        os.getenv("DO_SPACES_LOCATION") or os.getenv("AWS_LOCATION", "")
+    ).strip().strip("/")
+    spaces_default_acl = str(
+        os.getenv("DO_SPACES_DEFAULT_ACL", "public-read")
+    ).strip()
+    spaces_querystring_auth = _env_flag("DO_SPACES_QUERYSTRING_AUTH", default=False)
+    spaces_file_overwrite = _env_flag("DO_SPACES_FILE_OVERWRITE", default=False)
+    spaces_cache_control = str(
+        os.getenv("DO_SPACES_CACHE_CONTROL", "public, max-age=31536000, immutable")
+    ).strip()
+    spaces_addressing_style = str(
+        os.getenv("DO_SPACES_ADDRESSING_STYLE", "virtual")
+    ).strip()
+
+    missing_spaces_values = []
+    if not spaces_key:
+        missing_spaces_values.append("DO_SPACES_KEY")
+    if not spaces_secret:
+        missing_spaces_values.append("DO_SPACES_SECRET")
+    if not spaces_bucket:
+        missing_spaces_values.append("DO_SPACES_BUCKET")
+    if not spaces_origin_endpoint:
+        missing_spaces_values.append("DO_SPACES_ENDPOINT")
+
+    if missing_spaces_values:
+        raise ImproperlyConfigured(
+            "MEDIA_STORAGE_BACKEND=spaces requires: "
+            + ", ".join(missing_spaces_values)
+        )
+
+    spaces_custom_domain = _extract_domain(spaces_cdn_endpoint)
+    if not spaces_custom_domain:
+        origin_domain = _extract_domain(spaces_origin_endpoint)
+        if origin_domain:
+            if origin_domain.startswith(f"{spaces_bucket}."):
+                spaces_custom_domain = origin_domain
+            else:
+                spaces_custom_domain = f"{spaces_bucket}.{origin_domain}"
+
+    protocol_source = spaces_cdn_endpoint or spaces_origin_endpoint
+    parsed_protocol_source = urlparse(protocol_source)
+    spaces_url_scheme = parsed_protocol_source.scheme or "https"
+    spaces_url_protocol = f"{spaces_url_scheme}:"
+
+    spaces_storage_options = {
+        "access_key": spaces_key,
+        "secret_key": spaces_secret,
+        "bucket_name": spaces_bucket,
+        "endpoint_url": spaces_origin_endpoint,
+        "querystring_auth": spaces_querystring_auth,
+        "file_overwrite": spaces_file_overwrite,
+        "default_acl": spaces_default_acl or None,
+        "addressing_style": spaces_addressing_style or "virtual",
+        "url_protocol": spaces_url_protocol,
+    }
+    if spaces_region:
+        spaces_storage_options["region_name"] = spaces_region
+    if spaces_location:
+        spaces_storage_options["location"] = spaces_location
+    if spaces_custom_domain:
+        spaces_storage_options["custom_domain"] = spaces_custom_domain
+    if spaces_cache_control:
+        spaces_storage_options["object_parameters"] = {
+            "CacheControl": spaces_cache_control,
+        }
+
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": spaces_storage_options,
+    }
+
+    if spaces_media_url_override:
+        MEDIA_URL = spaces_media_url_override
+    elif spaces_custom_domain:
+        media_base = f"{spaces_url_scheme}://{spaces_custom_domain}"
+        if spaces_location:
+            MEDIA_URL = f"{media_base}/{spaces_location}/"
+        else:
+            MEDIA_URL = f"{media_base}/"
+    else:
+        MEDIA_URL = _ensure_media_url(MEDIA_URL)
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
