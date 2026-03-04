@@ -299,24 +299,43 @@ def _render_dealer_card_image(request, dealer, dealer_slug, listing_count):
     desc_font = _load_font(22, bold=False)
     badge_font = _load_font(23, bold=True)
 
-    logo_url = f"{frontend_base_url}/karbglogo.png"
-    logo = _fetch_image_from_url(logo_url, mode="RGBA")
+    left_x = _CARD_PADDING + 36
+    logo_bottom_y = _CARD_PADDING + 24
+    logo = None
+    for logo_url in (f"{frontend_base_url}/karbglogo.png", "https://www.kar.bg/karbglogo.png"):
+        logo = _fetch_image_from_url(logo_url, mode="RGBA")
+        if logo is not None:
+            break
+
     if logo is not None:
-        max_logo_width = 270
-        max_logo_height = 96
+        max_logo_width = 250
+        max_logo_height = 92
         scale = min(max_logo_width / logo.width, max_logo_height / logo.height, 1.0)
         logo_size = (
             max(1, int(logo.width * scale)),
             max(1, int(logo.height * scale)),
         )
         logo = logo.resize(logo_size, _LANCZOS)
-        logo_x = _CARD_WIDTH - _CARD_PADDING - logo_size[0] - 18
+        logo_x = left_x
         logo_y = _CARD_PADDING + 18
+        logo_box = [logo_x - 12, logo_y - 8, logo_x + logo_size[0] + 12, logo_y + logo_size[1] + 8]
+        draw.rounded_rectangle(
+            logo_box,
+            radius=14,
+            fill=(248, 250, 252, 255),
+            outline=(226, 232, 240, 255),
+            width=1,
+        )
         canvas.paste(logo, (logo_x, logo_y), logo if logo.mode == "RGBA" else None)
+        logo_bottom_y = logo_y + logo_size[1]
+    else:
+        logo_fallback_font = _load_font(44, bold=True)
+        logo_fallback_y = _CARD_PADDING + 24
+        draw.text((left_x, logo_fallback_y), "kar.bg", font=logo_fallback_font, fill=(15, 118, 110, 255))
+        logo_bottom_y = logo_fallback_y + logo_fallback_font.size
 
-    left_x = _CARD_PADDING + 36
     title_lines = _wrap_text(draw, dealer.dealer_name, title_font, max_width=610, max_lines=2)
-    title_y = _CARD_PADDING + 40
+    title_y = max(_CARD_PADDING + 78, logo_bottom_y + 16)
     for line in title_lines:
         draw.text((left_x, title_y), line, font=title_font, fill=(15, 23, 42, 255))
         title_y += title_font.size + 10
@@ -330,7 +349,7 @@ def _render_dealer_card_image(request, dealer, dealer_slug, listing_count):
         fill=(71, 85, 105, 255),
     )
 
-    info_y = title_y + 62
+    info_y = title_y + 72
 
     def _draw_info_chip(text_value, x, y):
         chip_bbox = draw.textbbox((0, 0), text_value, font=badge_font)
@@ -398,7 +417,7 @@ def _render_dealer_card_image(request, dealer, dealer_slug, listing_count):
     )
     draw.text((badge_x + 17, badge_y + 9), badge_text, font=badge_font, fill=(255, 255, 255, 255))
 
-    photo_box = (770, 142, 1118, 518)
+    photo_box = (772, 172, 1074, 506)
     draw.rounded_rectangle(
         photo_box,
         radius=28,
@@ -424,7 +443,7 @@ def _render_dealer_card_image(request, dealer, dealer_slug, listing_count):
             photo_box[3] - 10,
         )
         draw.rounded_rectangle(fallback_box, radius=22, fill=(226, 232, 240, 255))
-        initial_font = _load_font(132, bold=True)
+        initial_font = _load_font(112, bold=True)
         initial = _trim_to_value(dealer.dealer_name, fallback="D")[0].upper()
         initial_bbox = draw.textbbox((0, 0), initial, font=initial_font)
         initial_w = initial_bbox[2] - initial_bbox[0]
