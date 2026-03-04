@@ -22,7 +22,7 @@
           "value": ".*(facebookexternalhit|twitterbot|linkedinbot|whatsapp|slackbot|discordbot|googlebot|bingbot|duckduckbot|applebot|perplexitybot|gptbot|claudebot).*"
         }
       ],
-      "destination": "https://api.bwraap.com/prerender/listing/:id/"
+      "destination": "https://api.kar.com/prerender/listing/:id/"
     },
 
     {
