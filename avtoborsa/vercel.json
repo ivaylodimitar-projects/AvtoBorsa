@@ -2,15 +2,15 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://api.bwraap.com/api/:path*"
+      "destination": "https://api.kar.bg/api/:path*"
     },
     {
       "source": "/media/:path*",
-      "destination": "https://api.bwraap.com/media/:path*"
+      "destination": "https://api.kar.bg/media/:path*"
     },
     {
       "source": "/docs/api",
-      "destination": "https://api.bwraap.com/docs/api/"
+      "destination": "https://api.kar.bg/docs/api/"
     },
 
     {
@@ -22,7 +22,7 @@
           "value": ".*(facebookexternalhit|twitterbot|linkedinbot|whatsapp|slackbot|discordbot|googlebot|bingbot|duckduckbot|applebot|perplexitybot|gptbot|claudebot).*"
         }
       ],
-      "destination": "https://api.kar.com/prerender/listing/:id/"
+      "destination": "https://api.kar.bg/prerender/listing/:id/"
     },
 
     {
