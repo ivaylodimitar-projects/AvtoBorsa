@@ -42,6 +42,7 @@ const BusinessProfilePage: React.FC = () => {
     adminPhone: "",
     description: "",
   });
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
@@ -123,6 +124,10 @@ const BusinessProfilePage: React.FC = () => {
       }
     }
 
+    if (!acceptedTerms) {
+      newErrors.acceptedTerms = "Трябва да приемете Общите условия.";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -144,6 +149,7 @@ const BusinessProfilePage: React.FC = () => {
         username: formData.username,
         password: formData.password,
         confirm_password: formData.confirmPassword,
+        accepted_terms: acceptedTerms,
         company_name: formData.companyName,
         registration_address: formData.registrationAddress,
         mol: formData.mol,
@@ -193,6 +199,7 @@ const BusinessProfilePage: React.FC = () => {
           adminPhone: "",
           description: "",
         });
+        setAcceptedTerms(false);
         setRecaptchaToken(null);
         setRecaptchaResetKey((prev) => prev + 1);
       } else {
@@ -250,6 +257,9 @@ const BusinessProfilePage: React.FC = () => {
     input: { padding: "12px 14px", border: "1px solid #e2e8f0", borderRadius: 16, fontSize: 14, width: "100%", boxSizing: "border-box", outline: "none", transition: "box-shadow 0.15s, border-color 0.15s", background: "#fff", color: "#111827" },
     errorText: { fontSize: 12, color: "#ef4444", marginTop: 6 },
     footNote: { fontSize: 12, color: "#64748b", marginTop: 10 },
+    termsRow: { marginTop: 12, marginBottom: 4 },
+    termsLabel: { display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: "#334155", lineHeight: 1.45, cursor: "pointer" },
+    termsLink: { color: "#0f766e", fontWeight: 700, textDecoration: "underline" },
     submitRow: { display: "flex", gap: 12, marginTop: 14, alignItems: "center", flexWrap: "wrap" },
     primaryButton: { padding: "12px 22px", background: "#0f766e", color: "#fff", border: "none", borderRadius: 16, fontSize: 15, fontWeight: 700, cursor: "pointer", boxShadow: "0 8px 24px rgba(15,118,110,0.24)" },
     ghostButton: { padding: "10px 18px", background: "transparent", border: "1px solid #cbd5f5", borderRadius: 16, fontSize: 14, cursor: "pointer", color: "#0f766e" },
@@ -672,6 +682,29 @@ const BusinessProfilePage: React.FC = () => {
             resetKey={recaptchaResetKey}
           />
 
+          <div style={styles.termsRow}>
+            <label style={styles.termsLabel}>
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => {
+                  setAcceptedTerms(e.target.checked);
+                  if (errors.acceptedTerms) {
+                    setErrors((prev) => ({ ...prev, acceptedTerms: "" }));
+                  }
+                }}
+              />
+              <span>
+                Приемам{" "}
+                <a href="/legal" target="_blank" rel="noopener noreferrer" style={styles.termsLink}>
+                  Общите условия
+                </a>{" "}
+                *
+              </span>
+            </label>
+            {errors.acceptedTerms && <span style={styles.errorText}>{errors.acceptedTerms}</span>}
+          </div>
+
           <div style={styles.submitRow} className="business-submit-row">
             <button type="submit" className="business-primary-btn" style={styles.primaryButton}>{loading ? "Създавам..." : "Създай профил"}</button>
             <button
@@ -696,6 +729,7 @@ const BusinessProfilePage: React.FC = () => {
                   adminPhone: "",
                   description: "",
                 });
+                setAcceptedTerms(false);
                 setErrors({});
                 setRecaptchaToken(null);
                 setRecaptchaResetKey((prev) => prev + 1);

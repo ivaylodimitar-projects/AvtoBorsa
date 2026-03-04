@@ -16,6 +16,7 @@ class AuthFlowTests(APITestCase):
                 "email": "MixedCaseUser@example.com",
                 "password": "StrongPass123!",
                 "confirm_password": "StrongPass123!",
+                "accepted_terms": True,
             },
             format="json",
         )
@@ -48,6 +49,7 @@ class AuthFlowTests(APITestCase):
                 "username": "dealer_demo",
                 "password": "StrongPass123!",
                 "confirm_password": "StrongPass123!",
+                "accepted_terms": True,
                 "company_name": "Demo LTD",
                 "registration_address": "Sofia",
                 "mol": "Demo MOL",
@@ -82,6 +84,7 @@ class AuthFlowTests(APITestCase):
                 "email": "duplicate@example.com",
                 "password": "StrongPass123!",
                 "confirm_password": "StrongPass123!",
+                "accepted_terms": True,
             },
             format="json",
         )
@@ -94,6 +97,7 @@ class AuthFlowTests(APITestCase):
                 "email": "DUPLICATE@example.com",
                 "password": "StrongPass123!",
                 "confirm_password": "StrongPass123!",
+                "accepted_terms": True,
             },
             format="json",
         )
@@ -104,10 +108,11 @@ class AuthFlowTests(APITestCase):
         response = self.client.post(
             "/api/auth/register/private/",
             {
-                "username": "weak_private",
+                "username": "weakprivate",
                 "email": "weak-private@example.com",
                 "password": "weakpass1",
                 "confirm_password": "weakpass1",
+                "accepted_terms": True,
             },
             format="json",
         )
@@ -122,6 +127,7 @@ class AuthFlowTests(APITestCase):
                 "email": "private-demo-one@example.com",
                 "password": "StrongPass123!",
                 "confirm_password": "StrongPass123!",
+                "accepted_terms": True,
             },
             format="json",
         )
@@ -134,6 +140,7 @@ class AuthFlowTests(APITestCase):
                 "email": "private-demo-two@example.com",
                 "password": "StrongPass123!",
                 "confirm_password": "StrongPass123!",
+                "accepted_terms": True,
             },
             format="json",
         )
@@ -152,6 +159,7 @@ class AuthFlowTests(APITestCase):
                 "username": "weak_dealer",
                 "password": "weakpass1",
                 "confirm_password": "weakpass1",
+                "accepted_terms": True,
                 "company_name": "Weak LTD",
                 "registration_address": "Sofia",
                 "mol": "Weak MOL",
@@ -163,6 +171,46 @@ class AuthFlowTests(APITestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("Паролата", str(response.data))
+
+    def test_private_registration_requires_terms_acceptance(self):
+        response = self.client.post(
+            "/api/auth/register/private/",
+            {
+                "username": "termsprivate",
+                "email": "terms-private@example.com",
+                "password": "StrongPass123!",
+                "confirm_password": "StrongPass123!",
+                "accepted_terms": False,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("accepted_terms", response.data)
+
+    def test_business_registration_requires_terms_acceptance(self):
+        response = self.client.post(
+            "/api/auth/register/business/",
+            {
+                "dealer_name": "Terms Dealer",
+                "city": "Sofia",
+                "address": "Terms Street 1",
+                "phone": "+359881112233",
+                "email": "terms-business@example.com",
+                "username": "terms_dealer",
+                "password": "StrongPass123!",
+                "confirm_password": "StrongPass123!",
+                "accepted_terms": False,
+                "company_name": "Terms LTD",
+                "registration_address": "Sofia",
+                "mol": "Terms MOL",
+                "bulstat": "123456789",
+                "admin_name": "Terms Admin",
+                "admin_phone": "+359881112244",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("accepted_terms", response.data)
 
 @override_settings(
     ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"],

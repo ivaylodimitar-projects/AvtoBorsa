@@ -27,15 +27,18 @@ class PrivateUserSerializer(serializers.ModelSerializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
     confirm_password = serializers.CharField(write_only=True, min_length=8)
+    accepted_terms = serializers.BooleanField(write_only=True)
 
     class Meta:
         model = PrivateUser
-        fields = ['username', 'email', 'password', 'confirm_password']
+        fields = ['username', 'email', 'password', 'confirm_password', 'accepted_terms']
 
     def validate(self, data):
         _validate_password_policy(data['password'])
         if data['password'] != data['confirm_password']:
             raise serializers.ValidationError({"confirm_password": "Паролите не съвпадат"})
+        if not data.get('accepted_terms'):
+            raise serializers.ValidationError({"accepted_terms": "Трябва да приемете Общите условия."})
         return data
 
     def validate_email(self, value):
@@ -61,6 +64,7 @@ class PrivateUserSerializer(serializers.ModelSerializer):
         email = validated_data['email']
         password = validated_data.pop('password')
         validated_data.pop('confirm_password', None)
+        validated_data.pop('accepted_terms', None)
 
         # Create Django User
         user = User.objects.create_user(
@@ -85,12 +89,13 @@ class BusinessUserSerializer(serializers.ModelSerializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
     confirm_password = serializers.CharField(write_only=True, min_length=8)
+    accepted_terms = serializers.BooleanField(write_only=True)
 
     class Meta:
         model = BusinessUser
         fields = [
             'dealer_name', 'city', 'address', 'phone', 'email', 'website',
-            'username', 'password', 'confirm_password',
+            'username', 'password', 'confirm_password', 'accepted_terms',
             'company_name', 'registration_address', 'mol', 'bulstat', 'vat_number',
             'admin_name', 'admin_phone', 'description'
         ]
@@ -99,6 +104,8 @@ class BusinessUserSerializer(serializers.ModelSerializer):
         _validate_password_policy(data['password'])
         if data['password'] != data['confirm_password']:
             raise serializers.ValidationError({"confirm_password": "Паролите не съвпадат"})
+        if not data.get('accepted_terms'):
+            raise serializers.ValidationError({"accepted_terms": "Трябва да приемете Общите условия."})
         if len(data['username']) < 3:
             raise serializers.ValidationError({"username": "Потребителското име трябва да е поне 3 символа"})
         return data
@@ -120,6 +127,7 @@ class BusinessUserSerializer(serializers.ModelSerializer):
         username = str(validated_data['username']).strip()
         password = validated_data.pop('password')
         validated_data.pop('confirm_password', None)
+        validated_data.pop('accepted_terms', None)
 
         # Create Django User
         user = User.objects.create_user(
