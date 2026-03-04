@@ -1039,18 +1039,25 @@ export default function LandingPage() {
           }
         }
         .category-pill-btn.category-pill-btn--active .category-material-icon {
-          transform: scale(1.08);
-          animation: categoryIconPopIn 0.34s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+          transform: scale(1.08) !important;
+          animation: none !important;
         }
         .category-pill-btn.category-pill-btn--active .category-image-icon {
-          transform: scale(1.08) translateY(0);
-          animation:
-            categoryIconPopIn 0.34s cubic-bezier(0.2, 0.9, 0.3, 1) both,
-            categoryIconDrift 2.2s ease-in-out 0.34s infinite;
+          transform: scale(1.08) translateY(0) !important;
+          animation: none !important;
           filter:
             brightness(0) saturate(100%)
             invert(37%) sepia(55%) saturate(540%) hue-rotate(125deg) brightness(92%) contrast(95%)
-            drop-shadow(0 3px 9px rgba(15, 118, 110, 0.3));
+            drop-shadow(0 3px 9px rgba(15, 118, 110, 0.3)) !important;
+        }
+        .category-pill-btn:not(.category-pill-btn--active) .category-image-icon {
+          animation: none !important;
+          transform: none !important;
+          filter: drop-shadow(0 2px 5px rgba(15, 23, 42, 0.2)) !important;
+        }
+        .category-pill-btn:not(.category-pill-btn--active) .category-material-icon {
+          animation: none !important;
+          transform: none !important;
         }
         .category-pill-btn:active {
           transform: translateY(0);
@@ -1068,28 +1075,6 @@ export default function LandingPage() {
         .category-pill-btn.category-pill-btn--active {
           background: transparent !important;
           box-shadow: none;
-        }
-        @keyframes categoryIconPopIn {
-          0% {
-            transform: scale(1);
-          }
-          55% {
-            transform: scale(1.11);
-          }
-          100% {
-            transform: scale(1.08);
-          }
-        }
-        @keyframes categoryIconDrift {
-          0% {
-            transform: scale(1.08) translateY(0);
-          }
-          50% {
-            transform: scale(1.08) translateY(-1.1px);
-          }
-          100% {
-            transform: scale(1.08) translateY(0);
-          }
         }
         .main-category-grid {
           scrollbar-width: none;
@@ -1187,7 +1172,7 @@ export default function LandingPage() {
                         type="button"
                         data-title={mainCategory.label}
                         data-category-value={mainCategory.value}
-                        className={`category-pill-btn cat${mainCategory.value}${isActive ? " active category-pill-btn--active" : ""}`}
+                        className={`category-pill-btn cat${mainCategory.value}${isActive ? " category-pill-btn--active" : ""}`}
                         style={{
                           ...styles.mainCategoryButton,
                           ...(isActive ? styles.mainCategoryButtonActive : {}),
