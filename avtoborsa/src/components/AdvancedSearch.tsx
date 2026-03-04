@@ -2819,7 +2819,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
             </div>
 
             <div className="adv-field">
-              <label className="adv-label">ГРАД / ОБЩИНА</label>
+              <label className="adv-label">ГРАД / ОБЛАСT</label>
               <select
                 value={searchCriteria.city}
                 onChange={(e) => handleInputChange("city", e.target.value)}
@@ -2923,7 +2923,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
             </div>
 
             <div className="adv-field">
-              <label className="adv-label">ГРАД / ОБЩИНА</label>
+              <label className="adv-label">ГРАД / ОБЛАСТ</label>
               <select
                 value={searchCriteria.city}
                 onChange={(e) => handleInputChange("city", e.target.value)}
@@ -3063,7 +3063,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
             </div>
 
             <div className="adv-field">
-              <label className="adv-label">ГРАД / ОБЩИНА</label>
+              <label className="adv-label">ГРАД / ОБЛАСТ</label>
               <select
                 value={searchCriteria.city}
                 onChange={(e) => handleInputChange("city", e.target.value)}
@@ -3284,7 +3284,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
             </div>
 
             <div className="adv-field">
-              <label className="adv-label">ГРАД / ОБЩИНА</label>
+              <label className="adv-label">ГРАД / ОБЛАСТ</label>
               <select
                 value={searchCriteria.city}
                 onChange={(e) => handleInputChange("city", e.target.value)}
@@ -3401,7 +3401,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
             </div>
 
             <div className="adv-field">
-              <label className="adv-label">ГРАД / ОБЩИНА</label>
+              <label className="adv-label">ГРАД / ОБЛАСТ</label>
               <select
                 value={searchCriteria.city}
                 onChange={(e) => handleInputChange("city", e.target.value)}
@@ -3486,7 +3486,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
             </div>
 
             <div className="adv-field">
-              <label className="adv-label">ГРАД / ОБЩИНА</label>
+              <label className="adv-label">ГРАД / ОБЛАСТ</label>
               <select
                 value={searchCriteria.city}
                 onChange={(e) => handleInputChange("city", e.target.value)}
@@ -3607,7 +3607,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
             </div>
 
             <div className="adv-field">
-              <label className="adv-label">ГРАД / ОБЩИНА</label>
+              <label className="adv-label">ГРАД / ОБЛАСТ</label>
               <select
                 value={searchCriteria.city}
                 onChange={(e) => handleInputChange("city", e.target.value)}
