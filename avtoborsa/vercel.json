@@ -12,13 +12,14 @@
       "source": "/docs/api",
       "destination": "https://api.bwraap.com/docs/api/"
     },
+
     {
-      "source": "/details/obiava-:id(\\d+)-:slug*",
+      "source": "/details/obiava-:id-:slug*",
       "has": [
         {
           "type": "header",
           "key": "user-agent",
-          "value": "(googlebot|Googlebot|bingbot|Bingbot|duckduckbot|DuckDuckBot|applebot|Applebot|perplexitybot|PerplexityBot|gptbot|GPTBot|claudebot|ClaudeBot|facebookexternalhit|Twitterbot|twitterbot|LinkedInBot|linkedinbot|WhatsApp|whatsapp)"
+          "value": ".*(facebookexternalhit|twitterbot|linkedinbot|whatsapp|slackbot|discordbot|googlebot|bingbot|duckduckbot|applebot|perplexitybot|gptbot|claudebot).*"
         }
       ],
       "destination": "https://api.bwraap.com/prerender/listing/:id/"
