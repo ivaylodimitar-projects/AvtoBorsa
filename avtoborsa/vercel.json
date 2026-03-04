@@ -12,6 +12,17 @@
       "source": "/docs/api",
       "destination": "https://api.bwraap.com/docs/api/"
     },
+    {
+      "source": "/details/obiava-:id(\\d+)-:slug*",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(googlebot|Googlebot|bingbot|Bingbot|duckduckbot|DuckDuckBot|applebot|Applebot|perplexitybot|PerplexityBot|gptbot|GPTBot|claudebot|ClaudeBot|facebookexternalhit|Twitterbot|twitterbot|LinkedInBot|linkedinbot|WhatsApp|whatsapp)"
+        }
+      ],
+      "destination": "https://api.bwraap.com/prerender/listing/:id/"
+    },
 
     {
       "source": "/(.*)",

@@ -11,6 +11,7 @@ interface ThumbnailStripProps {
   currentIndex: number;
   onSlideTo: (index: number) => void;
   getImageUrl: (path: string) => string;
+  thumbnailAlt: string;
   isMobile: boolean;
 }
 
@@ -105,7 +106,7 @@ const LazyThumbnailImage = memo<LazyThumbnailImageProps>(
 LazyThumbnailImage.displayName = 'LazyThumbnailImage';
 
 const ThumbnailStrip = memo<ThumbnailStripProps>(
-  ({ images, currentIndex, onSlideTo, getImageUrl, isMobile }) => {
+  ({ images, currentIndex, onSlideTo, getImageUrl, thumbnailAlt, isMobile }) => {
     const thumbSize = isMobile ? 64 : 80;
     const gap = isMobile ? 8 : 8;
     const minThumbnails = 5;
@@ -236,7 +237,7 @@ const ThumbnailStrip = memo<ThumbnailStripProps>(
           >
             <LazyThumbnailImage
               src={getImageUrl(img.image)}
-              alt={`Thumbnail ${idx + 1}`}
+              alt={thumbnailAlt}
               width={thumbSize}
               height={thumbSize}
               borderRadius={14}

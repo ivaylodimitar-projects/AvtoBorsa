@@ -18,6 +18,7 @@ interface RezonGalleryProps {
   listingId?: number | string;
   images: Image[];
   title: string;
+  imageAlt: string;
   isMobile: boolean;
   promoLabel?: string;
   showTopBadge?: boolean;
@@ -50,17 +51,17 @@ const prefetchImage = (url: string): Promise<void> => {
 const MainCarouselImage = memo<{
   photo: Image;
   fallbackPath?: string | null;
-  title: string;
+  imageAlt: string;
   isActive: boolean;
   width?: number;
   height?: number;
   imageOpacity?: number;
   onDecoded?: (img: HTMLImageElement) => void;
-}>(({ photo, fallbackPath, title, isActive, width, height, imageOpacity = 1, onDecoded }) => (
+}>(({ photo, fallbackPath, imageAlt, isActive, width, height, imageOpacity = 1, onDecoded }) => (
   <ResponsiveImage
     photo={photo}
     fallbackPath={fallbackPath}
-    alt={title}
+    alt={imageAlt}
     kind="detail"
     strictKind
     preventUpscale={false}
@@ -96,6 +97,7 @@ const FullscreenModal = memo<{
   imageOriginalSrc?: string;
   imageOriginalWidth?: number | null;
   title: string;
+  imageAlt: string;
   currentIndex: number;
   totalImages: number;
   onClose: () => void;
@@ -114,6 +116,7 @@ const FullscreenModal = memo<{
     imageOriginalSrc,
     imageOriginalWidth = null,
     title,
+    imageAlt,
     currentIndex,
     totalImages,
     onClose,
@@ -882,7 +885,7 @@ const FullscreenModal = memo<{
               <img
                 ref={imageRef}
                 src={activeImageSrc}
-                alt={title}
+                alt={imageAlt}
                 draggable={false}
                 style={{
                   width: 'auto',
@@ -1086,6 +1089,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
   listingId,
   images,
   title,
+  imageAlt,
   isMobile,
   promoLabel,
   showTopBadge = false,
@@ -1792,7 +1796,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
             <MainCarouselImage
               photo={currentImage}
               fallbackPath={currentMainPath}
-              title={title}
+              imageAlt={imageAlt}
               isActive={safeIndex === 0}
               width={heroWidth}
               height={heroHeight}
@@ -1936,6 +1940,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
             currentIndex={safeIndex}
             onSlideTo={(index) => handleSlideTo(index, 'thumbnails')}
             getImageUrl={getImageUrl}
+            thumbnailAlt={imageAlt}
             isMobile={isMobile}
           />
         )}
@@ -1949,6 +1954,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
         imageOriginalSrc={currentFullscreenOriginalPath}
         imageOriginalWidth={currentFullscreenOriginalWidth}
         title={title}
+        imageAlt={imageAlt}
         currentIndex={safeIndex}
         totalImages={safeImages.length}
         onClose={() => setIsFullscreenOpen(false)}

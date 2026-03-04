@@ -10,7 +10,9 @@ import { extractIdFromSlug } from '../../utils/slugify';
 import ListingPromoBadge from '../ListingPromoBadge';
 import KapariranoBadge from '../KapariranoBadge';
 import ResponsiveImage, { type ApiPhoto, type PhotoRendition } from '../ResponsiveImage';
+import ListingSeo from '../seo/ListingSeo';
 import { API_BASE_URL } from '../../config/api';
+import { buildListingSeoPayload } from '../../seo/listingSeo';
 
 interface CarImage extends ApiPhoto {
   id: number;
@@ -41,7 +43,9 @@ interface CarListing {
   location_region: string;
   city: string;
   fuel: string;
+  fuel_display?: string;
   gearbox: string;
+  gearbox_display?: string;
   mileage: number;
   color: string;
   condition: string;
@@ -819,16 +823,6 @@ const VehicleDetailsPage: React.FC = () => {
     };
   }, [listing?.id, listing?.brand, listing?.model, listing?.main_category]);
 
-  useEffect(() => {
-    if (isLoading || error || !listing) {
-      document.title = 'Kar.bg | Детайли на Обява';
-      return;
-    }
-
-    const listingTitle = resolveListingDisplayTitle(listing);
-    document.title = `Kar.bg | Детайли за ${listingTitle}`;
-  }, [isLoading, error, listing]);
-
   const scrollSimilar = useCallback((direction: 'left' | 'right') => {
     const container = similarScrollRef.current;
     if (!container) return;
@@ -911,6 +905,12 @@ const VehicleDetailsPage: React.FC = () => {
     [id]
   );
 
+  useEffect(() => {
+    if (!slug || !listing?.slug) return;
+    if (slug === listing.slug) return;
+    navigate(`/details/${listing.slug}`, { replace: true });
+  }, [listing?.slug, navigate, slug]);
+
   const styles: Record<string, React.CSSProperties> = {
     container: {
       minHeight: '100vh',
@@ -988,6 +988,91 @@ const VehicleDetailsPage: React.FC = () => {
       flexDirection: 'column',
       gap: isMobile ? 12 : 24,
       minWidth: 0,
+    },
+    seoIntro: {
+      background: '#fff',
+      borderRadius: 16,
+      border: '1px solid #e2e8f0',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+      padding: isMobile ? '12px 14px' : '14px 16px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 10,
+    },
+    breadcrumbNav: {
+      display: 'flex',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: 6,
+    },
+    breadcrumbLink: {
+      color: '#0f766e',
+      fontSize: 12,
+      fontWeight: 600,
+      textDecoration: 'none',
+      lineHeight: 1.4,
+    },
+    breadcrumbCurrent: {
+      color: '#475569',
+      fontSize: 12,
+      fontWeight: 700,
+      lineHeight: 1.4,
+    },
+    breadcrumbSeparator: {
+      color: '#94a3b8',
+      fontSize: 12,
+      lineHeight: 1.4,
+    },
+    listingH1: {
+      margin: 0,
+      color: '#0f172a',
+      fontSize: isMobile ? 21 : 28,
+      fontWeight: 800,
+      lineHeight: 1.25,
+      fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
+      wordBreak: 'break-word',
+    },
+    aiSummarySection: {
+      background: '#f8fafc',
+      border: '1px solid #e2e8f0',
+      borderRadius: 16,
+      padding: isMobile ? 14 : 16,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 10,
+    },
+    aiSummaryTitle: {
+      margin: 0,
+      fontSize: isMobile ? 15 : 16,
+      fontWeight: 800,
+      color: '#0f172a',
+      fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
+    },
+    aiSummaryList: {
+      margin: 0,
+      display: 'grid',
+      gridTemplateColumns: '1fr',
+      gap: 8,
+    },
+    aiSummaryRow: {
+      margin: 0,
+      display: 'grid',
+      gridTemplateColumns: isMobile ? '1fr' : '190px 1fr',
+      gap: 6,
+    },
+    aiSummaryLabel: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: '#334155',
+      textTransform: 'uppercase',
+      letterSpacing: 0.2,
+    },
+    aiSummaryValue: {
+      margin: 0,
+      fontSize: 13,
+      fontWeight: 600,
+      color: '#0f172a',
+      lineHeight: 1.45,
     },
     galleryFallback: {
       width: '100%',
@@ -1263,15 +1348,21 @@ const VehicleDetailsPage: React.FC = () => {
     );
   }
 
-  const baseTitle = (listing.title || `${listing.brand} ${listing.model}`).trim() || "Обява";
-  const hasLeadingYear = /^\d{4}\b/.test(baseTitle);
-  const includeYearInTitle = new Set(['1', '3', '4', '5', '6', '7', '8', '9', 'a', 'b']).has(
-    String(listing.main_category || '')
-  );
-  const title =
-    includeYearInTitle && listing.year_from && !hasLeadingYear
-      ? `${listing.year_from} ${baseTitle}`
-      : baseTitle;
+  const seoPayload = buildListingSeoPayload(listing);
+  const title = resolveListingDisplayTitle(listing);
+  const listingImageAlt = seoPayload.imageAlt;
+  const buildCardImageAlt = (
+    brand: string,
+    model: string,
+    year?: number | string | null,
+    city?: string
+  ) => {
+    const yearPart = year ? `${year}` : 'обява';
+    const cityPart = (city || 'България').trim();
+    return `${brand} ${model} ${yearPart} - ${cityPart} - обява в ${seoPayload.siteName}`
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
   const sellerName = listing.seller_name || 'Частно лице';
   const isBusinessSeller = listing.seller_type === 'business';
   const cityLabel = listing.city || listing.location_region || 'Град';
@@ -1296,6 +1387,7 @@ const VehicleDetailsPage: React.FC = () => {
   return (
     <div style={styles.container}>
       <style>{globalCss}</style>
+      <ListingSeo seo={seoPayload} />
       <div style={styles.navbar}>
         <div style={styles.navbarContent}>
           <button style={styles.backButton} onClick={() => window.history.back()}>
@@ -1317,6 +1409,27 @@ const VehicleDetailsPage: React.FC = () => {
 
       <div style={styles.content}>
         <div style={styles.mainContent}>
+          <section style={styles.seoIntro}>
+            <nav style={styles.breadcrumbNav} aria-label="Breadcrumb">
+              {seoPayload.breadcrumbs.map((item, index) => {
+                const isLast = index === seoPayload.breadcrumbs.length - 1;
+                return (
+                  <React.Fragment key={`${item.name}-${item.path}-${index}`}>
+                    {isLast ? (
+                      <span style={styles.breadcrumbCurrent}>{item.name}</span>
+                    ) : (
+                      <a style={styles.breadcrumbLink} href={item.path}>
+                        {item.name}
+                      </a>
+                    )}
+                    {!isLast && <span style={styles.breadcrumbSeparator}>/</span>}
+                  </React.Fragment>
+                );
+              })}
+            </nav>
+            <h1 style={styles.listingH1}>{seoPayload.h1}</h1>
+          </section>
+
           <Suspense
             fallback={
               <div style={styles.galleryFallback} aria-hidden="true">
@@ -1334,6 +1447,7 @@ const VehicleDetailsPage: React.FC = () => {
                     : []
               }
               title={title}
+              imageAlt={listingImageAlt}
               isMobile={isMobile}
               showTopBadge={isTopListing(listing)}
               showVipBadge={isVipListing(listing)}
@@ -1418,6 +1532,31 @@ const VehicleDetailsPage: React.FC = () => {
               mainCategory={String(listing.main_category || "")}
             />
           )}
+          <section id="ai-summary" style={styles.aiSummarySection} aria-label="AI Summary">
+            <h2 style={styles.aiSummaryTitle}>AI Summary</h2>
+            <dl style={styles.aiSummaryList}>
+              <div style={styles.aiSummaryRow}>
+                <dt style={styles.aiSummaryLabel}>What the site is</dt>
+                <dd style={styles.aiSummaryValue}>{seoPayload.aiSummary.whatTheSiteIs}</dd>
+              </div>
+              <div style={styles.aiSummaryRow}>
+                <dt style={styles.aiSummaryLabel}>What service it provides</dt>
+                <dd style={styles.aiSummaryValue}>{seoPayload.aiSummary.service}</dd>
+              </div>
+              <div style={styles.aiSummaryRow}>
+                <dt style={styles.aiSummaryLabel}>Country</dt>
+                <dd style={styles.aiSummaryValue}>{seoPayload.aiSummary.country}</dd>
+              </div>
+              <div style={styles.aiSummaryRow}>
+                <dt style={styles.aiSummaryLabel}>Audience</dt>
+                <dd style={styles.aiSummaryValue}>{seoPayload.aiSummary.audience}</dd>
+              </div>
+              <div style={styles.aiSummaryRow}>
+                <dt style={styles.aiSummaryLabel}>Marketplace type</dt>
+                <dd style={styles.aiSummaryValue}>{seoPayload.aiSummary.marketplaceType}</dd>
+              </div>
+            </dl>
+          </section>
           <div style={styles.similarSection}>
             <div style={styles.similarHeader}>
               <h2 style={styles.similarTitle}>Още обяви</h2>
@@ -1508,7 +1647,7 @@ const VehicleDetailsPage: React.FC = () => {
                             <ResponsiveImage
                               photo={coverPhoto}
                               fallbackPath={imageFallbackPath}
-                              alt={`${item.brand} ${item.model}`}
+                              alt={buildCardImageAlt(item.brand, item.model, item.year_from, item.city)}
                               kind="grid"
                               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
                               loading="lazy"

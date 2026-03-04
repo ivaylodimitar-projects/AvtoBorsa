@@ -4,6 +4,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.http import HttpResponseRedirect
 from backend.public_api.views import public_api_docs
+from backend.listings.prerender import prerender_listing
 
 
 def redirect_to_frontend_admin(request, path=""):
@@ -14,6 +15,7 @@ def redirect_to_frontend_admin(request, path=""):
     return HttpResponseRedirect(target)
 
 urlpatterns = [
+    path('prerender/listing/<int:listing_id>/', prerender_listing, name='prerender_listing'),
     path('admin/', redirect_to_frontend_admin),
     path('admin/<path:path>/', redirect_to_frontend_admin),
     path('django-admin/', admin.site.urls),
