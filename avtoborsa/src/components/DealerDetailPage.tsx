@@ -110,7 +110,6 @@ const isVipListing = (listing: CarListing) => {
 const NEW_LISTING_BADGE_MINUTES = 10;
 const NEW_LISTING_BADGE_WINDOW_MS = NEW_LISTING_BADGE_MINUTES * 60 * 1000;
 const PAGE_SIZE = 30;
-const DEFAULT_SHARE_IMAGE_PATH = "/karbglogo.png";
 
 const DealerDetailPage: React.FC = () => {
   const { dealerSlug: dealerSlugFromRoute } = useParams<{ dealerSlug: string }>();
@@ -212,28 +211,6 @@ const DealerDetailPage: React.FC = () => {
   useEffect(() => {
     if (!dealer) return;
 
-    const resolveAbsoluteUrl = (rawUrl?: string | null) => {
-      const value = (rawUrl || "").trim();
-      if (!value) return "";
-      if (/^https?:\/\//i.test(value)) return value;
-      if (value.startsWith("//")) return `${window.location.protocol}${value}`;
-
-      if (value.startsWith("/")) {
-        const base = API_BASE_URL || window.location.origin;
-        try {
-          return new URL(value, base).href;
-        } catch {
-          return `${window.location.origin}${value}`;
-        }
-      }
-
-      try {
-        return new URL(value, API_BASE_URL || window.location.origin).href;
-      } catch {
-        return value;
-      }
-    };
-
     const upsertMetaTag = (
       selector: string,
       attributeName: "property" | "name",
@@ -251,7 +228,13 @@ const DealerDetailPage: React.FC = () => {
 
     const title = `Kar.bg | ${dealer.dealer_name}`;
     const description = `Профил на дилър ${dealer.dealer_name} в ${dealer.city}. Общо ${dealer.listing_count} активни обяви в Kar.bg.`;
-    const shareImage = resolveAbsoluteUrl(dealer.profile_image_url) || `${window.location.origin}${DEFAULT_SHARE_IMAGE_PATH}`;
+    const dealerSlugForShare = buildDealerSlug(dealer.dealer_name);
+    const shareImageVersion = `${dealer.listing_count}-${dealer.profile_image_url || "no-photo"}`;
+    const shareImage = `${
+      (API_BASE_URL || window.location.origin).replace(/\/+$/, "")
+    }/prerender/dealer-card/${encodeURIComponent(dealerSlugForShare)}/?v=${encodeURIComponent(
+      shareImageVersion
+    )}`;
     const canonicalUrl = new URL(
       buildDealerProfilePath(dealer.dealer_name, dealer.id),
       window.location.origin
@@ -321,6 +304,7 @@ const DealerDetailPage: React.FC = () => {
 
   const handleToggleDealerFollow = () => {
     if (!dealer) return;
+    if (isOwner) return;
 
     if (!user?.id) {
       navigate("/auth");
@@ -1199,24 +1183,26 @@ const DealerDetailPage: React.FC = () => {
             </div>
           </div>
           <div style={styles.heroActions} className="dealer-hero-actions">
-            <button
-              type="button"
-              style={{
-                ...styles.followBtn,
-                ...(isFollowingDealer ? styles.followBtnActive : {}),
-              }}
-              className="dealer-follow-btn"
-              onClick={handleToggleDealerFollow}
-              title={isFollowingDealer ? "Спри следването" : "Следвай дилъра"}
-              aria-label={
-                isFollowingDealer
-                  ? `Спри следването на ${dealer.dealer_name}`
-                  : `Следвай ${dealer.dealer_name}`
-              }
-            >
-              <FiBell size={16} />
-              {isFollowingDealer ? "Следваш" : "Следвай"}
-            </button>
+            {!isOwner && (
+              <button
+                type="button"
+                style={{
+                  ...styles.followBtn,
+                  ...(isFollowingDealer ? styles.followBtnActive : {}),
+                }}
+                className="dealer-follow-btn"
+                onClick={handleToggleDealerFollow}
+                title={isFollowingDealer ? "Спри следването" : "Следвай дилъра"}
+                aria-label={
+                  isFollowingDealer
+                    ? `Спри следването на ${dealer.dealer_name}`
+                    : `Следвай ${dealer.dealer_name}`
+                }
+              >
+                <FiBell size={16} />
+                {isFollowingDealer ? "Следваш" : "Следвай"}
+              </button>
+            )}
             <button
               style={styles.backBtn}
               className="dealer-back-btn"

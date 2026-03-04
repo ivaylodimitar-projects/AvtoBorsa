@@ -24,6 +24,17 @@
       ],
       "destination": "https://api.kar.bg/prerender/listing/:id/"
     },
+    {
+      "source": "/dealers/:dealerSlug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|twitterbot|linkedinbot|whatsapp|slackbot|discordbot|googlebot|bingbot|duckduckbot|applebot|perplexitybot|gptbot|claudebot).*"
+        }
+      ],
+      "destination": "https://api.kar.bg/prerender/dealer/:dealerSlug/"
+    },
 
     {
       "source": "/(.*)",

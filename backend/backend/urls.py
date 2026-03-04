@@ -5,6 +5,7 @@ from django.conf.urls.static import static
 from django.http import HttpResponseRedirect
 from backend.public_api.views import public_api_docs
 from backend.listings.prerender import prerender_listing
+from backend.accounts.prerender import prerender_dealer, prerender_dealer_card
 
 
 def redirect_to_frontend_admin(request, path=""):
@@ -16,6 +17,8 @@ def redirect_to_frontend_admin(request, path=""):
 
 urlpatterns = [
     path('prerender/listing/<int:listing_id>/', prerender_listing, name='prerender_listing'),
+    path('prerender/dealer/<str:dealer_slug>/', prerender_dealer, name='prerender_dealer'),
+    path('prerender/dealer-card/<str:dealer_slug>/', prerender_dealer_card, name='prerender_dealer_card'),
     path('admin/', redirect_to_frontend_admin),
     path('admin/<path:path>/', redirect_to_frontend_admin),
     path('django-admin/', admin.site.urls),

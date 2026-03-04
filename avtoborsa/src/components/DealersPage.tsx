@@ -162,9 +162,19 @@ const DealersPage: React.FC = () => {
   };
 
   const isDealerFollowed = (dealerId: number) => followedDealerIds.has(dealerId);
+  const isOwnDealerPage = (dealer: Dealer) => {
+    if (!user || user.userType !== "business") return false;
+
+    const userEmail = (user.email || "").trim().toLowerCase();
+    const dealerEmail = (dealer.email || "").trim().toLowerCase();
+    if (userEmail && dealerEmail && userEmail === dealerEmail) return true;
+
+    return user.id === dealer.id;
+  };
 
   const handleToggleDealerFollow = (event: React.MouseEvent, dealer: Dealer) => {
     event.stopPropagation();
+    if (isOwnDealerPage(dealer)) return;
 
     if (!user?.id) {
       navigate("/auth");
@@ -340,6 +350,19 @@ const DealersPage: React.FC = () => {
       fontWeight: 700,
       color: "#111827",
       fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+    },
+    ownerBadge: {
+      display: "inline-flex",
+      alignItems: "center",
+      padding: "3px 8px",
+      borderRadius: 999,
+      border: "1px solid #99f6e4",
+      background: "#ecfdf5",
+      color: "#0f766e",
+      fontSize: 11,
+      fontWeight: 800,
+      whiteSpace: "nowrap",
+      letterSpacing: 0.2,
     },
     podiumMeta: {
       fontSize: 13,
@@ -719,7 +742,12 @@ const DealersPage: React.FC = () => {
                           )}
                         </div>
                         <div style={{ minWidth: 0 }}>
-                          <div style={styles.podiumName}>{dealer.dealer_name}</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                            <div style={styles.podiumName}>{dealer.dealer_name}</div>
+                            {isOwnDealerPage(dealer) && (
+                              <span style={styles.ownerBadge}>Моя страница</span>
+                            )}
+                          </div>
                           <div style={styles.podiumMeta}>
                             <span>{dealer.city}</span>
                             <span style={{ color: "#d1d5db" }}>|</span>
@@ -732,23 +760,25 @@ const DealersPage: React.FC = () => {
                       </div>
                       <div style={styles.podiumScore}>{dealer.listing_count} обяви</div>
                       <div style={styles.podiumActions} className="podium-actions">
-                        <button
-                          type="button"
-                          style={{
-                            ...styles.followButton,
-                            ...(isDealerFollowed(dealer.id) ? styles.followButtonActive : {}),
-                          }}
-                          onClick={(event) => handleToggleDealerFollow(event, dealer)}
-                          aria-label={
-                            isDealerFollowed(dealer.id)
-                              ? `Спри следването на ${dealer.dealer_name}`
-                              : `Следвай ${dealer.dealer_name}`
-                          }
-                          title={isDealerFollowed(dealer.id) ? "Спри следването" : "Следвай дилъра"}
-                        >
-                          <FiBell size={14} />
-                          {isDealerFollowed(dealer.id) ? "Следваш" : "Следвай"}
-                        </button>
+                        {!isOwnDealerPage(dealer) && (
+                          <button
+                            type="button"
+                            style={{
+                              ...styles.followButton,
+                              ...(isDealerFollowed(dealer.id) ? styles.followButtonActive : {}),
+                            }}
+                            onClick={(event) => handleToggleDealerFollow(event, dealer)}
+                            aria-label={
+                              isDealerFollowed(dealer.id)
+                                ? `Спри следването на ${dealer.dealer_name}`
+                                : `Следвай ${dealer.dealer_name}`
+                            }
+                            title={isDealerFollowed(dealer.id) ? "Спри следването" : "Следвай дилъра"}
+                          >
+                            <FiBell size={14} />
+                            {isDealerFollowed(dealer.id) ? "Следваш" : "Следвай"}
+                          </button>
+                        )}
                         <button
                           style={styles.podiumButton}
                           onClick={(e) => {
@@ -795,7 +825,12 @@ const DealersPage: React.FC = () => {
                             )}
                           </div>
                           <div style={{ minWidth: 0 }}>
-                            <div style={styles.rankName}>{dealer.dealer_name}</div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                              <div style={styles.rankName}>{dealer.dealer_name}</div>
+                              {isOwnDealerPage(dealer) && (
+                                <span style={styles.ownerBadge}>Моя страница</span>
+                              )}
+                            </div>
                             <div style={styles.mobileRankMeta}>
                               <span>{dealer.city}</span>
                               <span style={{ color: "#d1d5db" }}>|</span>
@@ -811,23 +846,25 @@ const DealersPage: React.FC = () => {
                       </div>
 
                       <div style={styles.mobileRankActions} className="mobile-rank-actions">
-                        <button
-                          type="button"
-                          style={{
-                            ...styles.followButton,
-                            ...(isDealerFollowed(dealer.id) ? styles.followButtonActive : {}),
-                          }}
-                          onClick={(event) => handleToggleDealerFollow(event, dealer)}
-                          aria-label={
-                            isDealerFollowed(dealer.id)
-                              ? `Спри следването на ${dealer.dealer_name}`
-                              : `Следвай ${dealer.dealer_name}`
-                          }
-                          title={isDealerFollowed(dealer.id) ? "Спри следването" : "Следвай дилъра"}
-                        >
-                          <FiBell size={14} />
-                          {isDealerFollowed(dealer.id) ? "Следваш" : "Следвай"}
-                        </button>
+                        {!isOwnDealerPage(dealer) && (
+                          <button
+                            type="button"
+                            style={{
+                              ...styles.followButton,
+                              ...(isDealerFollowed(dealer.id) ? styles.followButtonActive : {}),
+                            }}
+                            onClick={(event) => handleToggleDealerFollow(event, dealer)}
+                            aria-label={
+                              isDealerFollowed(dealer.id)
+                                ? `Спри следването на ${dealer.dealer_name}`
+                                : `Следвай ${dealer.dealer_name}`
+                            }
+                            title={isDealerFollowed(dealer.id) ? "Спри следването" : "Следвай дилъра"}
+                          >
+                            <FiBell size={14} />
+                            {isDealerFollowed(dealer.id) ? "Следваш" : "Следвай"}
+                          </button>
+                        )}
                         <button
                           style={styles.rankButton}
                           onClick={(e) => {
@@ -882,7 +919,12 @@ const DealersPage: React.FC = () => {
                         )}
                       </div>
                       <div style={styles.rankInfo}>
-                        <div style={styles.rankName}>{dealer.dealer_name}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <div style={styles.rankName}>{dealer.dealer_name}</div>
+                          {isOwnDealerPage(dealer) && (
+                            <span style={styles.ownerBadge}>Моя страница</span>
+                          )}
+                        </div>
                         <div style={styles.rankMeta}>
                           <span>{dealer.city}</span>
                           <span style={{ color: "#d1d5db" }}>|</span>
@@ -899,23 +941,25 @@ const DealersPage: React.FC = () => {
                         <div>в Kar.bg {getRelativeTime(dealer.created_at)}</div>
                       </div>
                       <div style={styles.rankActions} className="rank-actions">
-                        <button
-                          type="button"
-                          style={{
-                            ...styles.followButton,
-                            ...(isDealerFollowed(dealer.id) ? styles.followButtonActive : {}),
-                          }}
-                          onClick={(event) => handleToggleDealerFollow(event, dealer)}
-                          aria-label={
-                            isDealerFollowed(dealer.id)
-                              ? `Спри следването на ${dealer.dealer_name}`
-                              : `Следвай ${dealer.dealer_name}`
-                          }
-                          title={isDealerFollowed(dealer.id) ? "Спри следването" : "Следвай дилъра"}
-                        >
-                          <FiBell size={14} />
-                          {isDealerFollowed(dealer.id) ? "Следваш" : "Следвай"}
-                        </button>
+                        {!isOwnDealerPage(dealer) && (
+                          <button
+                            type="button"
+                            style={{
+                              ...styles.followButton,
+                              ...(isDealerFollowed(dealer.id) ? styles.followButtonActive : {}),
+                            }}
+                            onClick={(event) => handleToggleDealerFollow(event, dealer)}
+                            aria-label={
+                              isDealerFollowed(dealer.id)
+                                ? `Спри следването на ${dealer.dealer_name}`
+                                : `Следвай ${dealer.dealer_name}`
+                            }
+                            title={isDealerFollowed(dealer.id) ? "Спри следването" : "Следвай дилъра"}
+                          >
+                            <FiBell size={14} />
+                            {isDealerFollowed(dealer.id) ? "Следваш" : "Следвай"}
+                          </button>
+                        )}
                         <button
                           className="rank-action"
                           style={styles.rankButton}
@@ -964,7 +1008,12 @@ const DealersPage: React.FC = () => {
                             )}
                           </div>
                           <div style={{ minWidth: 0 }}>
-                            <div style={styles.rankName}>{dealer.dealer_name}</div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                              <div style={styles.rankName}>{dealer.dealer_name}</div>
+                              {isOwnDealerPage(dealer) && (
+                                <span style={styles.ownerBadge}>Моя страница</span>
+                              )}
+                            </div>
                             <div style={styles.mobileRankMeta}>
                               <span>{dealer.city}</span>
                               <span style={{ color: "#d1d5db" }}>|</span>
@@ -980,23 +1029,25 @@ const DealersPage: React.FC = () => {
                       </div>
 
                       <div style={styles.mobileRankActions} className="mobile-rank-actions">
-                        <button
-                          type="button"
-                          style={{
-                            ...styles.followButton,
-                            ...(isDealerFollowed(dealer.id) ? styles.followButtonActive : {}),
-                          }}
-                          onClick={(event) => handleToggleDealerFollow(event, dealer)}
-                          aria-label={
-                            isDealerFollowed(dealer.id)
-                              ? `Спри следването на ${dealer.dealer_name}`
-                              : `Следвай ${dealer.dealer_name}`
-                          }
-                          title={isDealerFollowed(dealer.id) ? "Спри следването" : "Следвай дилъра"}
-                        >
-                          <FiBell size={14} />
-                          {isDealerFollowed(dealer.id) ? "Следваш" : "Следвай"}
-                        </button>
+                        {!isOwnDealerPage(dealer) && (
+                          <button
+                            type="button"
+                            style={{
+                              ...styles.followButton,
+                              ...(isDealerFollowed(dealer.id) ? styles.followButtonActive : {}),
+                            }}
+                            onClick={(event) => handleToggleDealerFollow(event, dealer)}
+                            aria-label={
+                              isDealerFollowed(dealer.id)
+                                ? `Спри следването на ${dealer.dealer_name}`
+                                : `Следвай ${dealer.dealer_name}`
+                            }
+                            title={isDealerFollowed(dealer.id) ? "Спри следването" : "Следвай дилъра"}
+                          >
+                            <FiBell size={14} />
+                            {isDealerFollowed(dealer.id) ? "Следваш" : "Следвай"}
+                          </button>
+                        )}
                         <button
                           style={styles.rankButton}
                           onClick={(e) => {

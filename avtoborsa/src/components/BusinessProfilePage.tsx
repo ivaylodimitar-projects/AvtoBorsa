@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Briefcase } from "lucide-react";
 
 import { API_BASE_URL, RECAPTCHA_ENABLED, RECAPTCHA_SITE_KEY } from "../config/api";
 import RecaptchaField from "./RecaptchaField";
@@ -22,9 +23,8 @@ const CITIES = [
 
 const BusinessProfilePage: React.FC = () => {
   const navigate = useNavigate();
-  const dealerUsernameSuffix = ".kar.bg";
   const [formData, setFormData] = useState({
-    dealerName: "",
+    dealerName: "", 
     city: "",
     address: "",
     phone: "",
@@ -317,11 +317,55 @@ const BusinessProfilePage: React.FC = () => {
   return (
     <div style={styles.page}>
       <style>{`
-        .business-form input:focus,
+        .business-form input:not(.business-terms-checkbox):focus,
         .business-form select:focus,
         .business-form textarea:focus {
           border-color: #0f766e !important;
           box-shadow: 0 0 0 3px rgba(15,118,110,0.12);
+        }
+        .business-terms-checkbox {
+          appearance: none;
+          -webkit-appearance: none;
+          width: 18px;
+          height: 18px;
+          margin-top: 2px;
+          border: 2px solid #94a3b8;
+          border-radius: 6px;
+          background: #fff;
+          display: grid;
+          place-content: center;
+          cursor: pointer;
+          flex-shrink: 0;
+          transition: border-color 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+        }
+        .business-terms-checkbox:hover {
+          border-color: #0f766e;
+        }
+        .business-terms-checkbox::before {
+          content: "";
+          width: 9px;
+          height: 6px;
+          border: 2px solid #fff;
+          border-top: 0;
+          border-right: 0;
+          margin-top: -1px;
+          transform: rotate(-45deg) scale(0);
+          transform-origin: center;
+          transition: transform 0.14s ease-in-out;
+        }
+        .business-terms-checkbox:checked {
+          background: #0f766e;
+          border-color: #0f766e;
+        }
+        .business-terms-checkbox:checked::before {
+          transform: rotate(-45deg) scale(1);
+        }
+        .business-terms-checkbox:focus-visible {
+          outline: none;
+          box-shadow: 0 0 0 3px rgba(15,118,110,0.22) !important;
+        }
+        .business-terms-checkbox:active {
+          transform: scale(0.97);
         }
         .business-primary-btn,
         .business-ghost-btn,
@@ -397,7 +441,7 @@ const BusinessProfilePage: React.FC = () => {
           .business-form-card { padding: 16px !important; }
           .business-form h2 { font-size: 14px !important; }
           .business-form label { font-size: 12px !important; }
-          .business-form input,
+          .business-form input:not(.business-terms-checkbox),
           .business-form select,
           .business-form textarea {
             font-size: 13px !important;
@@ -446,7 +490,9 @@ const BusinessProfilePage: React.FC = () => {
       <div style={styles.container} className="business-container">
         <div style={styles.header} className="business-header">
           <div style={styles.headerLeft} className="business-header-left">
-            <div className="business-header-icon" style={{ width: 56, height: 56, borderRadius: 16, background: "rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 22 }}>Б</div>
+            <div className="business-header-icon" style={{ width: 56, height: 56, borderRadius: 16, background: "rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
+              <Briefcase size="1em" strokeWidth={2.4} aria-hidden="true" />
+            </div>
             <div className="business-header-copy">
               <h1 style={styles.headerTitle} className="business-header-title">Бизнес профил</h1>
               <p style={styles.headerSubtitle} className="business-header-subtitle">Попълни информацията на твоя бизнес. Ще получиш имейл за потвърждение на акаунта.</p>
@@ -577,11 +623,10 @@ const BusinessProfilePage: React.FC = () => {
                   style={{ ...styles.input, borderColor: errors.username ? "#fca5a5" : "#e2e8f0", flex: 1 }}
                   type="text"
                   name="username"
-                  placeholder="username"
+                  placeholder="Вашето потребителско име"
                   value={formData.username}
                   onChange={handleChange}
                 />
-                <span className="business-username-suffix" style={{ fontSize: 13, color: "#6b7280", paddingBottom: 10 }}>{dealerUsernameSuffix}</span>
               </div>
               {errors.username && <span style={styles.errorText}>{errors.username}</span>}
             </div>
@@ -685,6 +730,7 @@ const BusinessProfilePage: React.FC = () => {
           <div style={styles.termsRow}>
             <label style={styles.termsLabel}>
               <input
+                className="business-terms-checkbox"
                 type="checkbox"
                 checked={acceptedTerms}
                 onChange={(e) => {

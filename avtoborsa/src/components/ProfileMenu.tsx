@@ -7,6 +7,7 @@ import {
   Wallet,
   Plus,
   List,
+  Store,
   X,
   Camera,
   LogOut,
@@ -16,6 +17,7 @@ import { useToast } from "../context/ToastContext";
 import { addDepositNotification } from "../utils/notifications";
 import { API_BASE_URL } from "../config/api";
 import { buildPublicProfilePath } from "../utils/profilePaths";
+import { buildDealerProfilePath } from "../utils/slugify";
 const STRIPE_SESSION_STORAGE_KEY = "stripe_checkout_session_id";
 const PAYMENT_SYNC_MIN_MS = 650;
 const PROCESSED_PAYMENT_SESSION_KEY_PREFIX = "karbg:processed-payment:v1:";
@@ -582,6 +584,15 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
       color: "#6b7280",
       marginTop: 2,
     },
+    photoHint: {
+      marginTop: 4,
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 5,
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#0f766e",
+    },
     photoSince: {
       fontSize: 11,
       color: "#94a3b8",
@@ -600,6 +611,9 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
   const profileTriggerLabel =
     user.username?.trim() || user.first_name?.trim() || fullName || "Профил";
   const isBusiness = user.userType === "business";
+  const dealerName = (user.dealer_name || "").trim();
+  const dealerPagePath =
+    isBusiness && dealerName ? buildDealerProfilePath(dealerName, user.id) : null;
   const triggerAvatarSize = compactTrigger ? 22 : 20;
   const createdAtLabel = user.created_at
     ? new Date(user.created_at).toLocaleDateString("bg-BG", {
@@ -689,6 +703,9 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
             }
             .profile-menu-photo-type {
               font-size: 11px !important;
+            }
+            .profile-menu-photo-hint {
+              font-size: 10px !important;
             }
             .profile-menu-close-btn {
               width: 32px !important;
@@ -833,7 +850,8 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
               {/* Profile photo + name section */}
               <div style={styles.photoSection} className="profile-menu-photo-section">
                 <div
-                  style={styles.avatarWrap}
+                  style={{ ...styles.avatarWrap, cursor: isBusiness ? "pointer" : "default" }}
+                  title={isBusiness ? "Натисни за смяна на снимката" : undefined}
                   onClick={() => isBusiness && fileInputRef.current?.click()}
                   onMouseEnter={(e) => {
                     const overlay = e.currentTarget.querySelector(".avatar-overlay") as HTMLElement;
@@ -863,6 +881,12 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
                     {isBusiness ? "Бизнес профил" : "Частен профил"}
                     {uploadingPhoto && " — качване..."}
                   </div>
+                  {isBusiness && (
+                    <div style={styles.photoHint} className="profile-menu-photo-hint">
+                      <Camera size={11} />
+                      <span>Натисни снимката, за да я смениш</span>
+                    </div>
+                  )}
                   {createdAtLabel && (
                     <div style={styles.photoSince}>Потребител от {createdAtLabel}</div>
                   )}
@@ -949,6 +973,30 @@ const ProfileMenu: React.FC<ProfileMenuProps> = ({
                 </Link>
 
                 <div style={styles.divider} className="profile-menu-divider" />
+
+                {dealerPagePath && (
+                  <>
+                    <Link
+                      to={dealerPagePath}
+                      style={styles.menuItem}
+                      className="profile-menu-item-link"
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLElement).style.background = "#ecfdf5";
+                        (e.currentTarget as HTMLElement).style.color = "#0f766e";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLElement).style.background = "none";
+                        (e.currentTarget as HTMLElement).style.color = "#333";
+                      }}
+                      onClick={closeDropdown}
+                    >
+                      <Store size={18} />
+                      <span>Моята дилър страница</span>
+                    </Link>
+
+                    <div style={styles.divider} className="profile-menu-divider" />
+                  </>
+                )}
 
                 <Link
                   to="/settings"
