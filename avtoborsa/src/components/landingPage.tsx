@@ -244,6 +244,7 @@ type CategoryIconProps = {
   height?: number;
   fill?: 0 | 1;
   weight?: number;
+  isActive?: boolean;
 };
 type CategoryIconComponent = (props: CategoryIconProps) => React.JSX.Element;
 
@@ -342,6 +343,7 @@ const createImageCategoryIcon = (src: string): CategoryIconComponent => ({
   size = CATEGORY_SYMBOL_SIZE,
   width,
   height,
+  isActive = false,
 }) => {
   const iconWidth = width ?? size;
   const iconHeight = height ?? size;
@@ -353,6 +355,12 @@ const createImageCategoryIcon = (src: string): CategoryIconComponent => ({
       alt=""
       width={iconWidth}
       height={iconHeight}
+      style={{
+        filter: isActive
+          ? "brightness(0) saturate(100%) invert(37%) sepia(55%) saturate(540%) hue-rotate(125deg) brightness(92%) contrast(95%) drop-shadow(0 3px 9px rgba(15, 118, 110, 0.3))"
+          : "brightness(0) saturate(100%) drop-shadow(0 2px 5px rgba(15, 23, 42, 0.2))",
+        transform: isActive ? "scale(1.08) translateY(0)" : "none",
+      }}
       loading="lazy"
       decoding="async"
       aria-hidden="true"
@@ -864,17 +872,19 @@ export default function LandingPage() {
         height={baseHeight}
         fill={isActive ? 1 : 0}
         weight={isActive ? 650 : 500}
+        isActive={isActive}
       />
     );
   };
 
-  const handleMainCategoryTouchEnd = (
+const handleMainCategoryTouchEnd = (
     event: React.TouchEvent<HTMLButtonElement>,
     value: string
   ) => {
-    event.preventDefault();
     setCategory(value);
-    event.currentTarget.blur();
+    window.requestAnimationFrame(() => {
+      event.currentTarget.blur();
+    });
   };
 
   return (
@@ -992,6 +1002,8 @@ export default function LandingPage() {
           opacity: 1 !important;
           -webkit-tap-highlight-color: transparent;
           user-select: none;
+          background: transparent;
+          color: #111827;
           transition:
             border-color 0.32s cubic-bezier(0.22, 1, 0.36, 1),
             transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
@@ -1023,7 +1035,7 @@ export default function LandingPage() {
           object-fit: contain;
           transform-origin: center center;
           will-change: transform, filter;
-          filter: drop-shadow(0 2px 5px rgba(15, 23, 42, 0.2));
+          filter: brightness(0) saturate(100%) drop-shadow(0 2px 5px rgba(15, 23, 42, 0.2));
           transition:
             transform 0.38s cubic-bezier(0.22, 1, 0.36, 1),
             filter 0.34s cubic-bezier(0.22, 1, 0.36, 1),
@@ -1048,25 +1060,10 @@ export default function LandingPage() {
           }
         }
         .category-pill-btn.category-pill-btn--active .category-material-icon {
-          transform: scale(1.08) !important;
-          animation: none !important;
+          transform: scale(1.08);
         }
         .category-pill-btn.category-pill-btn--active .category-image-icon {
-          transform: scale(1.08) translateY(0) !important;
-          animation: none !important;
-          filter:
-            brightness(0) saturate(100%)
-            invert(37%) sepia(55%) saturate(540%) hue-rotate(125deg) brightness(92%) contrast(95%)
-            drop-shadow(0 3px 9px rgba(15, 118, 110, 0.3)) !important;
-        }
-        .category-pill-btn:not(.category-pill-btn--active) .category-image-icon {
-          animation: none !important;
-          transform: none !important;
-          filter: drop-shadow(0 2px 5px rgba(15, 23, 42, 0.2)) !important;
-        }
-        .category-pill-btn:not(.category-pill-btn--active) .category-material-icon {
-          animation: none !important;
-          transform: none !important;
+          transform: scale(1.08) translateY(0);
         }
         .category-pill-btn:active {
           transform: translateY(0);
@@ -1084,6 +1081,7 @@ export default function LandingPage() {
         .category-pill-btn.category-pill-btn--active {
           background: transparent !important;
           box-shadow: none;
+          color: #0f766e !important;
         }
         .main-category-grid {
           scrollbar-width: none;
@@ -1109,28 +1107,8 @@ export default function LandingPage() {
             padding-left: max(12px, env(safe-area-inset-left, 0px)) !important;
             padding-right: max(12px, env(safe-area-inset-right, 0px)) !important;
           }
-
-          /* Mobile/touch: avoid sticky hover states and hard-reset non-active icons */
-          .category-pill-btn:not(.category-pill-btn--active) .category-image-icon {
-            animation: none !important;
-            transform: none !important;
-            filter: drop-shadow(0 2px 5px rgba(15, 23, 42, 0.2)) !important;
-          }
-          .category-pill-btn:not(.category-pill-btn--active) .category-material-icon {
-            animation: none !important;
-            transform: none !important;
-          }
         }
         @media (hover: none) and (pointer: coarse) {
-          .category-pill-btn:not(.category-pill-btn--active) .category-image-icon {
-            animation: none !important;
-            transform: none !important;
-            filter: drop-shadow(0 2px 5px rgba(15, 23, 42, 0.2)) !important;
-          }
-          .category-pill-btn:not(.category-pill-btn--active) .category-material-icon {
-            animation: none !important;
-            transform: none !important;
-          }
           .category-pill-btn:not(.category-pill-btn--active):hover {
             background: transparent !important;
             transform: none !important;
@@ -1141,7 +1119,7 @@ export default function LandingPage() {
           }
           .category-pill-btn:not(.category-pill-btn--active):hover .category-image-icon {
             transform: none !important;
-            filter: drop-shadow(0 2px 5px rgba(15, 23, 42, 0.2)) !important;
+            filter: brightness(0) saturate(100%) drop-shadow(0 2px 5px rgba(15, 23, 42, 0.2)) !important;
           }
         }
       `}</style>
@@ -1181,10 +1159,11 @@ export default function LandingPage() {
                         type="button"
                         data-title={mainCategory.label}
                         data-category-value={mainCategory.value}
-                        className={`category-pill-btn cat${mainCategory.value}${isActive ? " category-pill-btn--active" : ""}`}
+                        className={`category-pill-btn${isActive ? " category-pill-btn--active" : ""}`}
                         style={{
                           ...styles.mainCategoryButton,
                           ...(isActive ? styles.mainCategoryButtonActive : {}),
+                          color: isActive ? "#0f766e" : "#111827",
                         }}
                         onClick={() => setCategory(mainCategory.value)}
                         onTouchEnd={(event) =>
@@ -1196,11 +1175,7 @@ export default function LandingPage() {
                         <span
                           style={{
                             ...styles.mainCategoryIconWrap,
-                            ...(isActive
-                              ? {
-                                  color: "#0f766e",
-                                }
-                              : {}),
+                            color: isActive ? "#0f766e" : "#111827",
                           }}
                         >
                           {renderMainCategoryIcon(mainCategory.value, { isActive })}
