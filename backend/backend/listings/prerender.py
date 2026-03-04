@@ -336,7 +336,6 @@ def prerender_listing(request, listing_id):
             is_archived=False,
             created_at__gte=cutoff,
         )
-        .select_related("user")
         .only(
             "id",
             "slug",
