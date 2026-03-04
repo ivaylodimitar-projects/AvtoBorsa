@@ -63,8 +63,8 @@ export default function ListingPromoBadge({
   const containerStyle: CSSProperties = isVip
     ? {
         ...BASE_CONTAINER_STYLE,
-        top: isExtraSmall ? -9 : isSmall ? -14 : -15,
-        left: isExtraSmall ? -29 : isSmall ? -34 : -36,
+        top: isExtraSmall ? -9 : isSmall ? -14 : -10,
+        left: isExtraSmall ? -29 : isSmall ? -34 : -25,
         width: isExtraSmall ? 58 : isSmall ? 76 : 80,
         height: isExtraSmall ? 58 : isSmall ? 76 : 80,
         zIndex,
