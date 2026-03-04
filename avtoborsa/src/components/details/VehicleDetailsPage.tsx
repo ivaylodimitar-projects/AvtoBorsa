@@ -407,8 +407,8 @@ const RezonGallery = React.lazy(() => import('./RezonGallery'));
 const VehicleDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const { slug } = useParams<{ slug: string }>();
+  const listingId = slug ? extractIdFromSlug(slug) : null;
   const { ensureFreshAccessToken } = useAuth();
-  const [id, setId] = useState<number | null>(null);
   const [listing, setListing] = useState<CarListing | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -426,12 +426,13 @@ const VehicleDetailsPage: React.FC = () => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, [slug]);
 
-  // Extract ID from slug
   useEffect(() => {
-    if (slug) {
-      const extractedId = extractIdFromSlug(slug);
-      setId(extractedId);
-    }
+    setListing(null);
+    setError(null);
+    setIsLoading(true);
+    setSimilarListings([]);
+    setSimilarError(null);
+    setIsSimilarLoading(false);
   }, [slug]);
 
   useEffect(() => {
@@ -510,7 +511,16 @@ const VehicleDetailsPage: React.FC = () => {
   }, [isDevPerfMode, logPerfIfReady]);
 
   useEffect(() => {
-    if (!id) return;
+    if (!slug) {
+      setError('Listing URL is missing.');
+      setIsLoading(false);
+      return;
+    }
+    if (!listingId) {
+      setError('Invalid listing URL.');
+      setIsLoading(false);
+      return;
+    }
     let isCancelled = false;
     const controller = new AbortController();
 
@@ -535,7 +545,7 @@ const VehicleDetailsPage: React.FC = () => {
           headers['Authorization'] = `Bearer ${token}`;
         }
 
-        const cachedEntry = listingDetailCache.get(id);
+        const cachedEntry = listingDetailCache.get(listingId);
         const hasFreshCache =
           cachedEntry && Date.now() - cachedEntry.cachedAt <= DETAIL_CACHE_TTL_MS;
         if (hasFreshCache && cachedEntry) {
@@ -543,8 +553,8 @@ const VehicleDetailsPage: React.FC = () => {
             ? cachedEntry.payload.images
             : [];
           if (cachedImages.length > DETAIL_INITIAL_PHOTO_LIMIT) {
-            listingPhotosCache.set(id, cachedImages);
-            loadedPhotosRef.current.add(id);
+            listingPhotosCache.set(listingId, cachedImages);
+            loadedPhotosRef.current.add(listingId);
           }
           setListing(cachedEntry.payload);
           setError(null);
@@ -561,7 +571,7 @@ const VehicleDetailsPage: React.FC = () => {
           headers['If-None-Match'] = cachedEntry.etag;
         }
 
-        const response = await fetch(buildListingDetailUrl(id, DETAIL_INITIAL_PHOTO_LIMIT), {
+        const response = await fetch(buildListingDetailUrl(listingId, DETAIL_INITIAL_PHOTO_LIMIT), {
           headers,
           credentials: 'include',
           signal: controller.signal,
@@ -590,7 +600,7 @@ const VehicleDetailsPage: React.FC = () => {
 
         if (!resolvedListing || isCancelled) return;
 
-        const cachedPhotos = listingPhotosCache.get(id);
+        const cachedPhotos = listingPhotosCache.get(listingId);
         const listingWithPhotos =
           Array.isArray(cachedPhotos) && cachedPhotos.length > 0
             ? {
@@ -603,13 +613,13 @@ const VehicleDetailsPage: React.FC = () => {
           ? listingWithPhotos.images
           : [];
         if (resolvedImages.length > DETAIL_INITIAL_PHOTO_LIMIT) {
-          listingPhotosCache.set(id, resolvedImages);
-          loadedPhotosRef.current.add(id);
+          listingPhotosCache.set(listingId, resolvedImages);
+          loadedPhotosRef.current.add(listingId);
         }
 
         setListing(listingWithPhotos);
         persistRecentlyViewed(listingWithPhotos);
-        updateDetailCache(id, listingWithPhotos, nextEtag || cachedEntry?.etag || null);
+        updateDetailCache(listingId, listingWithPhotos, nextEtag || cachedEntry?.etag || null);
         setError(null);
 
         if (isDevPerfMode && perf) {
@@ -634,7 +644,7 @@ const VehicleDetailsPage: React.FC = () => {
       isCancelled = true;
       controller.abort();
     };
-  }, [id, isDevPerfMode, logPerfIfReady, ensureFreshAccessToken]);
+  }, [slug, listingId, isDevPerfMode, logPerfIfReady, ensureFreshAccessToken]);
 
   useEffect(() => {
     if (!isDevPerfMode || !listing) return;
@@ -655,17 +665,17 @@ const VehicleDetailsPage: React.FC = () => {
   }, [isDevPerfMode, listing?.id, logPerfIfReady]);
 
   useEffect(() => {
-    if (!id) return;
-    if (loadedPhotosRef.current.has(id)) return;
+    if (!listingId) return;
+    if (loadedPhotosRef.current.has(listingId)) return;
 
     const applyPhotosToState = (photos: CarImage[]) => {
       if (!Array.isArray(photos)) return;
 
-      listingPhotosCache.set(id, photos);
-      loadedPhotosRef.current.add(id);
+      listingPhotosCache.set(listingId, photos);
+      loadedPhotosRef.current.add(listingId);
       if (photos.length === 0) return;
       setListing((prev) =>
-        prev && prev.id === id
+        prev && prev.id === listingId
           ? {
               ...prev,
               images: photos,
@@ -673,10 +683,10 @@ const VehicleDetailsPage: React.FC = () => {
           : prev
       );
 
-      const cachedDetail = listingDetailCache.get(id);
+      const cachedDetail = listingDetailCache.get(listingId);
       if (cachedDetail) {
         updateDetailCache(
-          id,
+          listingId,
           {
             ...cachedDetail.payload,
             images: photos,
@@ -686,13 +696,13 @@ const VehicleDetailsPage: React.FC = () => {
       }
     };
 
-    const cachedPhotos = listingPhotosCache.get(id);
+    const cachedPhotos = listingPhotosCache.get(listingId);
     if (Array.isArray(cachedPhotos)) {
       applyPhotosToState(cachedPhotos);
       return;
     }
 
-    const cachedDetail = listingDetailCache.get(id);
+    const cachedDetail = listingDetailCache.get(listingId);
     const cachedDetailPhotos = Array.isArray(cachedDetail?.payload?.images)
       ? cachedDetail.payload.images
       : [];
@@ -703,8 +713,8 @@ const VehicleDetailsPage: React.FC = () => {
 
     let isCancelled = false;
     const cancelIdle = scheduleIdleTask(() => {
-      const inFlight = listingPhotosInFlight.get(id);
-      const request = inFlight || fetchListingPhotosOnce(id);
+      const inFlight = listingPhotosInFlight.get(listingId);
+      const request = inFlight || fetchListingPhotosOnce(listingId);
       request.then((photos) => {
         if (isCancelled || !Array.isArray(photos)) {
           return;
@@ -717,7 +727,7 @@ const VehicleDetailsPage: React.FC = () => {
       isCancelled = true;
       cancelIdle();
     };
-  }, [id]);
+  }, [listingId]);
 
   useEffect(() => {
     if (!listing) return;
@@ -879,10 +889,10 @@ const VehicleDetailsPage: React.FC = () => {
 
   const handleFavoriteChange = useCallback(
     (nextIsFavorite: boolean) => {
-      if (!id) return;
+      if (!listingId) return;
 
       setListing((prev) =>
-        prev && prev.id === id
+        prev && prev.id === listingId
           ? {
               ...prev,
               is_favorited: nextIsFavorite,
@@ -890,11 +900,11 @@ const VehicleDetailsPage: React.FC = () => {
           : prev
       );
 
-      const cachedDetail = listingDetailCache.get(id);
+      const cachedDetail = listingDetailCache.get(listingId);
       if (!cachedDetail) return;
 
       updateDetailCache(
-        id,
+        listingId,
         {
           ...cachedDetail.payload,
           is_favorited: nextIsFavorite,
@@ -902,14 +912,17 @@ const VehicleDetailsPage: React.FC = () => {
         cachedDetail.etag
       );
     },
-    [id]
+    [listingId]
   );
 
   useEffect(() => {
-    if (!slug || !listing?.slug) return;
+    if (!slug || !listing?.slug || !listingId) return;
+    if (listing.id !== listingId) return;
     if (slug === listing.slug) return;
-    navigate(`/details/${listing.slug}`, { replace: true });
-  }, [listing?.slug, navigate, slug]);
+    const targetPath = `/details/${listing.slug}`;
+    if (window.location.pathname === targetPath) return;
+    navigate(targetPath, { replace: true });
+  }, [listing?.id, listing?.slug, listingId, navigate, slug]);
 
   const styles: Record<string, React.CSSProperties> = {
     container: {
@@ -1532,27 +1545,32 @@ const VehicleDetailsPage: React.FC = () => {
               mainCategory={String(listing.main_category || "")}
             />
           )}
-          <section id="ai-summary" style={styles.aiSummarySection} aria-label="AI Summary">
-            <h2 style={styles.aiSummaryTitle}>AI Summary</h2>
+          <section id="ai-summary" style={styles.aiSummarySection} aria-label="Резюме за AI системи">
+            <h2 style={styles.aiSummaryTitle}>Резюме за AI системи</h2>
+
             <dl style={styles.aiSummaryList}>
               <div style={styles.aiSummaryRow}>
-                <dt style={styles.aiSummaryLabel}>What the site is</dt>
+                <dt style={styles.aiSummaryLabel}>Какво е сайтът</dt>
                 <dd style={styles.aiSummaryValue}>{seoPayload.aiSummary.whatTheSiteIs}</dd>
               </div>
+
               <div style={styles.aiSummaryRow}>
-                <dt style={styles.aiSummaryLabel}>What service it provides</dt>
+                <dt style={styles.aiSummaryLabel}>Каква услуга предлага</dt>
                 <dd style={styles.aiSummaryValue}>{seoPayload.aiSummary.service}</dd>
               </div>
+
               <div style={styles.aiSummaryRow}>
-                <dt style={styles.aiSummaryLabel}>Country</dt>
+                <dt style={styles.aiSummaryLabel}>Държава</dt>
                 <dd style={styles.aiSummaryValue}>{seoPayload.aiSummary.country}</dd>
               </div>
+
               <div style={styles.aiSummaryRow}>
-                <dt style={styles.aiSummaryLabel}>Audience</dt>
+                <dt style={styles.aiSummaryLabel}>Аудитория</dt>
                 <dd style={styles.aiSummaryValue}>{seoPayload.aiSummary.audience}</dd>
               </div>
+
               <div style={styles.aiSummaryRow}>
-                <dt style={styles.aiSummaryLabel}>Marketplace type</dt>
+                <dt style={styles.aiSummaryLabel}>Тип платформа</dt>
                 <dd style={styles.aiSummaryValue}>{seoPayload.aiSummary.marketplaceType}</dd>
               </div>
             </dl>
