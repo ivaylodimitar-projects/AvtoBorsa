@@ -1,13 +1,66 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/src/assets/favicon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Kar.bg - Автомобилни обяви</title>
-  </head>
-  <body>
-    <div id="root" style="width: 100%; height: 100vh;"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8" />
+
+  <title>Авто обяви в България | Kar.bg – Модерната платформа за покупко-продажба на автомобили</title>
+  <meta name="description" content="Kar.bg е модерната платформа за авто обяви в България – нови и употребявани автомобили, бусове, камиони, мотоциклети, части и услуги. Намери или публикувай обява." />
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
+  <meta property="og:image:type" content="image/png" />
+
+  <link rel="canonical" href="https://www.kar.bg/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Open Graph -->
+  <meta property="og:site_name" content="Kar.bg" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Авто обяви в България – Kar.bg" />
+  <meta property="og:description" content="Модерната платформа за покупко-продажба на автомобили в България." />
+  <meta property="og:url" content="https://www.kar.bg/" />
+  <meta property="og:image" content="https://www.kar.bg/karbgbannerlogo.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Авто обяви в България – Kar.bg" />
+  <meta name="twitter:description" content="Модерната платформа за покупко-продажба на автомобили в България." />
+  <meta name="twitter:image" content="https://www.kar.bg/karbgbannerlogo.jpg" />
+
+  <!-- Icons (трябва да са в public/) -->
+  <link rel="icon" href="/favicon.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+
+  <!-- hreflang -->
+  <link rel="alternate" href="https://www.kar.bg/" hreflang="bg-BG" />
+  <link rel="alternate" href="https://www.kar.bg/" hreflang="x-default" />
+
+  <!-- JSON-LD -->
+  <script type="application/ld+json">
+  {
+    "@context":"https://schema.org",
+    "@graph":[
+      {
+        "@type":"Organization",
+        "@id":"https://www.kar.bg/#org",
+        "name":"Kar.bg",
+        "url":"https://www.kar.bg/",
+        "logo":"https://www.kar.bg/karbglogo.png",
+        "areaServed":"BG"
+      },
+      {
+        "@type":"WebSite",
+        "@id":"https://www.kar.bg/#website",
+        "url":"https://www.kar.bg/",
+        "name":"Kar.bg",
+        "publisher":{"@id":"https://www.kar.bg/#org"},
+        "potentialAction":{
+          "@type":"SearchAction",
+          "target":"https://www.kar.bg/search?brand={search_term_string}",
+          "query-input":"required name=search_term_string"
+        }
+      }
+    ]
+  }
+  </script>
+</head>
