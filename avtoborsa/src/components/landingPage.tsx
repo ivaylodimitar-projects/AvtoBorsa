@@ -868,6 +868,15 @@ export default function LandingPage() {
     );
   };
 
+  const handleMainCategoryTouchEnd = (
+    event: React.TouchEvent<HTMLButtonElement>,
+    value: string
+  ) => {
+    event.preventDefault();
+    setCategory(value);
+    event.currentTarget.blur();
+  };
+
   return (
     <div style={styles.page}>
       <link
@@ -1024,16 +1033,16 @@ export default function LandingPage() {
           display: none;
         }
         @media (hover: hover) and (pointer: fine) {
-          .category-pill-btn:hover {
+          .category-pill-btn:not(.category-pill-btn--active):hover {
             box-shadow: none;
             background: rgba(15, 23, 42, 0.04);
             transform: translateY(-1px);
             opacity: 1 !important;
           }
-          .category-pill-btn:hover .category-material-icon {
+          .category-pill-btn:not(.category-pill-btn--active):hover .category-material-icon {
             transform: scale(1.03);
           }
-          .category-pill-btn:hover .category-image-icon {
+          .category-pill-btn:not(.category-pill-btn--active):hover .category-image-icon {
             transform: scale(1.02);
             filter: drop-shadow(0 3px 8px rgba(15, 23, 42, 0.24));
           }
@@ -1122,15 +1131,15 @@ export default function LandingPage() {
             animation: none !important;
             transform: none !important;
           }
-          .category-pill-btn:hover {
+          .category-pill-btn:not(.category-pill-btn--active):hover {
             background: transparent !important;
             transform: none !important;
             box-shadow: none !important;
           }
-          .category-pill-btn:hover .category-material-icon {
+          .category-pill-btn:not(.category-pill-btn--active):hover .category-material-icon {
             transform: none !important;
           }
-          .category-pill-btn:hover .category-image-icon {
+          .category-pill-btn:not(.category-pill-btn--active):hover .category-image-icon {
             transform: none !important;
             filter: drop-shadow(0 2px 5px rgba(15, 23, 42, 0.2)) !important;
           }
@@ -1178,6 +1187,9 @@ export default function LandingPage() {
                           ...(isActive ? styles.mainCategoryButtonActive : {}),
                         }}
                         onClick={() => setCategory(mainCategory.value)}
+                        onTouchEnd={(event) =>
+                          handleMainCategoryTouchEnd(event, mainCategory.value)
+                        }
                         aria-pressed={isActive}
                         aria-label={mainCategory.label}
                       >
@@ -2761,6 +2773,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: "64px",
     flex: "0 0 auto",
     boxShadow: "none",
+    touchAction: "manipulation",
   },
   mainCategoryButtonActive: {
     background: "transparent",
