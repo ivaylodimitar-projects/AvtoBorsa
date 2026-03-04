@@ -300,6 +300,7 @@ def _render_dealer_card_image(request, dealer, dealer_slug, listing_count):
     badge_font = _load_font(23, bold=True)
 
     left_x = _CARD_PADDING + 36
+    logo_anchor_x = _CARD_PADDING + 44
     logo_bottom_y = _CARD_PADDING + 24
     logo = None
     for logo_url in (f"{frontend_base_url}/karbglogo.png", "https://www.kar.bg/karbglogo.png"):
@@ -316,7 +317,7 @@ def _render_dealer_card_image(request, dealer, dealer_slug, listing_count):
             max(1, int(logo.height * scale)),
         )
         logo = logo.resize(logo_size, _LANCZOS)
-        logo_x = left_x
+        logo_x = logo_anchor_x
         logo_y = _CARD_PADDING + 18
         logo_box = [logo_x - 12, logo_y - 8, logo_x + logo_size[0] + 12, logo_y + logo_size[1] + 8]
         draw.rounded_rectangle(
@@ -331,7 +332,7 @@ def _render_dealer_card_image(request, dealer, dealer_slug, listing_count):
     else:
         logo_fallback_font = _load_font(44, bold=True)
         logo_fallback_y = _CARD_PADDING + 24
-        draw.text((left_x, logo_fallback_y), "kar.bg", font=logo_fallback_font, fill=(15, 118, 110, 255))
+        draw.text((logo_anchor_x, logo_fallback_y), "kar.bg", font=logo_fallback_font, fill=(15, 118, 110, 255))
         logo_bottom_y = logo_fallback_y + logo_fallback_font.size
 
     title_lines = _wrap_text(draw, dealer.dealer_name, title_font, max_width=610, max_lines=2)
@@ -426,31 +427,46 @@ def _render_dealer_card_image(request, dealer, dealer_slug, listing_count):
         width=2,
     )
 
+    fallback_box = (
+        photo_box[0] + 10,
+        photo_box[1] + 10,
+        photo_box[2] - 10,
+        photo_box[3] - 10,
+    )
     dealer_photo_url = _resolve_dealer_profile_image_url(request, dealer, frontend_base_url)
     dealer_photo = _fetch_image_from_url(dealer_photo_url)
     if dealer_photo is not None:
-        photo_w = photo_box[2] - photo_box[0] - 20
-        photo_h = photo_box[3] - photo_box[1] - 20
+        photo_w = fallback_box[2] - fallback_box[0]
+        photo_h = fallback_box[3] - fallback_box[1]
         fitted = ImageOps.fit(dealer_photo, (photo_w, photo_h), method=_LANCZOS, centering=(0.5, 0.5))
         mask = Image.new("L", (photo_w, photo_h), 0)
         ImageDraw.Draw(mask).rounded_rectangle([0, 0, photo_w, photo_h], radius=22, fill=255)
-        canvas.paste(fitted, (photo_box[0] + 10, photo_box[1] + 10), mask)
+        canvas.paste(fitted, (fallback_box[0], fallback_box[1]), mask)
     else:
-        fallback_box = (
-            photo_box[0] + 10,
-            photo_box[1] + 10,
-            photo_box[2] - 10,
-            photo_box[3] - 10,
-        )
         draw.rounded_rectangle(fallback_box, radius=22, fill=(226, 232, 240, 255))
-        initial_font = _load_font(112, bold=True)
+        avatar_radius = 92
+        avatar_cx = (fallback_box[0] + fallback_box[2]) // 2
+        avatar_cy = (fallback_box[1] + fallback_box[3]) // 2 - 8
+        draw.ellipse(
+            [
+                avatar_cx - avatar_radius,
+                avatar_cy - avatar_radius,
+                avatar_cx + avatar_radius,
+                avatar_cy + avatar_radius,
+            ],
+            fill=(15, 118, 110, 255),
+            outline=(15, 148, 136, 255),
+            width=4,
+        )
+
+        initial_font = _load_font(118, bold=True)
         initial = _trim_to_value(dealer.dealer_name, fallback="D")[0].upper()
         initial_bbox = draw.textbbox((0, 0), initial, font=initial_font)
         initial_w = initial_bbox[2] - initial_bbox[0]
         initial_h = initial_bbox[3] - initial_bbox[1]
-        initial_x = fallback_box[0] + ((fallback_box[2] - fallback_box[0]) - initial_w) / 2
-        initial_y = fallback_box[1] + ((fallback_box[3] - fallback_box[1]) - initial_h) / 2 - 8
-        draw.text((initial_x, initial_y), initial, font=initial_font, fill=(15, 118, 110, 255))
+        initial_x = avatar_cx - (initial_w / 2)
+        initial_y = avatar_cy - (initial_h / 2) - 8
+        draw.text((initial_x, initial_y), initial, font=initial_font, fill=(255, 255, 255, 255))
 
     return canvas.convert("RGB")
 
