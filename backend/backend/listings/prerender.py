@@ -12,7 +12,7 @@ from django.utils.http import http_date, parse_http_date_safe, quote_etag
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 
-from .models import CarImage, CarListing, get_expiry_cutoff
+from .models import CarImage, BaseListing, get_expiry_cutoff
 
 PRERENDER_PUBLIC_CACHE_SECONDS = 300
 PRERENDER_PUBLIC_STALE_SECONDS = 900
@@ -230,7 +230,7 @@ def _normalize_listing_title(listing):
 def _build_breadcrumb_items(listing, frontend_base_url, canonical_path):
     brand = _trim_to_value(listing.brand, fallback="Марка")
     model = _trim_to_value(listing.model, fallback="Модел")
-    cars_path = "/search?mainCategory=1"
+    cars_path = "/search?mainCategory=cars"
     brand_path = f"{cars_path}&brand={quote(brand)}"
     model_path = f"{brand_path}&model={quote(model)}"
     listing_path = canonical_path if canonical_path.startswith("/") else f"/{canonical_path}"
@@ -330,44 +330,17 @@ def prerender_listing(request, listing_id):
 
     cutoff = get_expiry_cutoff()
     listing_queryset = (
-        CarListing.objects.filter(
+        BaseListing.objects.filter(
             is_active=True,
             is_draft=False,
             is_archived=False,
             created_at__gte=cutoff,
         )
-        .only(
-            "id",
-            "slug",
-            "brand",
-            "model",
-            "year_from",
-            "price",
-            "mileage",
-            "fuel",
-            "gearbox",
-            "city",
-            "description",
-            "updated_at",
-            "created_at",
-            "is_active",
-            "view_count",
-        )
+        .select_related("cars_details")
     )
     listing = get_object_or_404(listing_queryset, pk=listing_id)
     images = list(
         CarImage.objects.filter(listing_id=listing.id)
-        .only(
-            "id",
-            "image",
-            "thumbnail",
-            "renditions",
-            "original_width",
-            "original_height",
-            "order",
-            "is_cover",
-            "created_at",
-        )
         .order_by("-is_cover", "order", "id")
     )
 

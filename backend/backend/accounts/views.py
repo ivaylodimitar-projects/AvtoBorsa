@@ -927,7 +927,7 @@ def _build_copart_draft_payload(payload, user):
         description_lines.append(f"Estimated repair cost: {repair_cost}")
 
     return {
-        'main_category': '1',
+        'main_category': 'cars',
         'category': _normalize_copart_category(
             payload.get('category')
             or payload.get('body_style')
@@ -1641,14 +1641,13 @@ def import_copart_listing(request):
                 status=status_code,
             )
 
-        from backend.listings.models import CarListing
+        from backend.listings.serializers import CarListingSerializer
 
         draft_payload = _build_copart_draft_payload(request.data, api_key.user)
         try:
-            listing = CarListing.objects.create(
-                user=api_key.user,
-                **draft_payload,
-            )
+            serializer = CarListingSerializer(data=draft_payload, context={'request': request})
+            serializer.is_valid(raise_exception=True)
+            listing = serializer.save(user=api_key.user)
         except Exception as exc:
             status_code = status.HTTP_400_BAD_REQUEST
             error_message = str(exc)

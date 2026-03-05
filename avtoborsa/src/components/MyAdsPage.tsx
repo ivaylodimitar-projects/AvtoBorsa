@@ -42,7 +42,7 @@ import {
   formatGearboxLabel,
 } from "../utils/listingLabels";
 import { resolvePriceBadgeState } from "../utils/priceChangeBadge";
-import { getMainCategoryLabel } from "../constants/mobileBgData";
+import { getMainCategoryLabel } from "../constants/karbgdata";
 import {
   readMyAdsCache,
   writeMyAdsCache,
@@ -63,7 +63,9 @@ import vipBadgeImage from "../assets/vip_badge.jpg";
 interface CarListing {
   id: number;
   slug: string;
-  main_category: string;
+  main_category?: string;
+  mainCategory?: string;
+  maincategory?: string;
   category: string;
   brand: string;
   model: string;
@@ -208,7 +210,51 @@ const LISTING_DELETE_ANIMATION_MS = 240;
 const AUTH_REQUIRED_ERROR_CODE = "__AUTH_REQUIRED__";
 const QR_BRAND_TAG = "Kar.bg";
 const QR_HEADER_LOGO_PATH = "/karbglogo.png";
-const CATEGORY_AS_BRAND_MAIN_CATEGORIES = new Set(["6", "7", "8", "a", "b"]);
+const MAIN_CATEGORY_ALIAS_MAP: Record<string, string> = {
+  cars: "cars",
+  "1": "cars",
+  "2": "cars",
+  wheels: "wheels",
+  w: "wheels",
+  parts: "parts",
+  u: "parts",
+  buses: "buses",
+  "3": "buses",
+  trucks: "trucks",
+  "4": "trucks",
+  motorcycles: "motorcycles",
+  "5": "motorcycles",
+  agriculture: "agriculture",
+  agri: "agriculture",
+  agricultural: "agriculture",
+  "6": "agriculture",
+  industrial: "industrial",
+  "7": "industrial",
+  forklifts: "forklifts",
+  "8": "forklifts",
+  rvs: "rvs",
+  caravans: "rvs",
+  "9": "rvs",
+  yachts: "yachts",
+  boats: "yachts",
+  a: "yachts",
+  trailer: "trailer",
+  trailers: "trailer",
+  b: "trailer",
+  accessories: "accessories",
+  v: "accessories",
+  buy: "buy",
+  y: "buy",
+  services: "services",
+  z: "services",
+};
+const CATEGORY_AS_BRAND_MAIN_CATEGORIES = new Set([
+  "agriculture",
+  "industrial",
+  "forklifts",
+  "yachts",
+  "trailer",
+]);
 const GENERIC_BRAND_TERMS = new Set([
   "трактор",
   "трактори",
@@ -618,16 +664,37 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
   const tabsSliderRef = React.useRef<HTMLDivElement | null>(null);
   const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
 
+  const normalizeMainCategoryValue = (value: unknown) => {
+    const rawValue = String(value ?? "").trim();
+    if (!rawValue) return "";
+    const lowered = rawValue.toLocaleLowerCase("bg-BG");
+    return MAIN_CATEGORY_ALIAS_MAP[lowered] || lowered;
+  };
+
+  const normalizeListingRecord = (item: unknown): CarListing | null => {
+    if (!item || typeof item !== "object") return null;
+    const listing = item as Record<string, unknown>;
+    const baseListing = listing as unknown as CarListing;
+    const numericId = Number(listing.id);
+    if (!Number.isInteger(numericId) || numericId <= 0) return null;
+
+    return {
+      ...baseListing,
+      id: numericId,
+      main_category: normalizeMainCategoryValue(
+        listing.main_category ?? listing.mainCategory ?? listing.maincategory
+      ),
+    };
+  };
+
   const sanitizeListingsArray = (items: unknown[], excludedListingIds: ReadonlySet<number>) => {
     const byId = new Map<number, CarListing>();
 
     items.forEach((item) => {
-      if (!item || typeof item !== "object") return;
-      const listing = item as { id?: unknown };
-      const numericId = Number(listing.id);
-      if (!Number.isInteger(numericId) || numericId <= 0) return;
-      if (excludedListingIds.has(numericId)) return;
-      byId.set(numericId, item as CarListing);
+      const listing = normalizeListingRecord(item);
+      if (!listing) return;
+      if (excludedListingIds.has(listing.id)) return;
+      byId.set(listing.id, listing);
     });
 
     return Array.from(byId.values());
@@ -680,7 +747,12 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
         }
 
         const payload = (await response.json()) as PublicProfilePayload;
-        setActiveListings(Array.isArray(payload.listings) ? payload.listings : []);
+        setActiveListings(
+          sanitizeListingsArray(
+            Array.isArray(payload.listings) ? payload.listings : [],
+            deletedListingIdsRef.current
+          )
+        );
         setArchivedListings([]);
         setDraftListings([]);
         setExpiredListings([]);
@@ -1399,7 +1471,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     mainCategory: string
   ) => {
     // Base density for normal cards.
-    const isHeavyCard = mainCategory === "3" || mainCategory === "4";
+    const isHeavyCard = mainCategory === "buses" || mainCategory === "trucks";
     let limit = isHeavyCard ? 6 : 4;
     const descriptionLength = descriptionSnippet.trim().length;
 
@@ -1619,7 +1691,10 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
         throw new Error(errorMessage);
       }
 
-      const updatedListing = (await response.json()) as CarListing;
+      const updatedListing = normalizeListingRecord(await response.json());
+      if (!updatedListing) {
+        throw new Error("Невалиден отговор от сървъра.");
+      }
 
       setExpiredListings((prev) => prev.filter((l) => l.id !== listingId));
       setActiveListings((prev) => [
@@ -1713,7 +1788,10 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
         throw new Error(errorMessage);
       }
 
-      const updatedListing = (await response.json()) as CarListing;
+      const updatedListing = normalizeListingRecord(await response.json());
+      if (!updatedListing) {
+        throw new Error("Невалиден отговор от сървъра.");
+      }
       setActiveListings((prev) =>
         prev.map((l) => (l.id === listingId ? updatedListing : l))
       );
@@ -1789,7 +1867,10 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
         throw new Error(errorMessage);
       }
 
-      const updatedListing: CarListing = await response.json();
+      const updatedListing = normalizeListingRecord(await response.json());
+      if (!updatedListing) {
+        throw new Error("Невалиден отговор от сървъра.");
+      }
       const applyUpdate = (items: CarListing[]) =>
         items.map((item) => (item.id === updatedListing.id ? updatedListing : item));
 
@@ -2091,7 +2172,9 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
   };
 
   const getEffectiveListingBrand = (listing: CarListing) => {
-    const mainCategory = toText(listing.main_category);
+    const mainCategory = normalizeMainCategoryValue(
+      listing.main_category ?? listing.mainCategory ?? listing.maincategory
+    );
     const rawBrand = toText(listing.brand);
     const rawModel = toText(listing.model);
 
@@ -2158,18 +2241,20 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
       }
     };
 
-    const mainCategory = toText(listing.main_category);
-    const isCarCategory = !mainCategory || mainCategory === "1";
+    const mainCategory = normalizeMainCategoryValue(
+      listing.main_category ?? listing.mainCategory ?? listing.maincategory
+    );
+    const isCarCategory = !mainCategory || mainCategory === "cars";
     const conditionLabel = formatConditionLabel(listing.condition);
 
     switch (mainCategory) {
-      case "u":
+      case "parts":
         addSpec("Част", listing.part_element, Settings);
         addSpec("За", formatTopmenuCategory(listing.part_for), Car);
         addSpec("Години", formatYearRange(listing.part_year_from, listing.part_year_to), Calendar);
         addSpec("Състояние", conditionLabel, ShieldCheck);
         break;
-      case "w":
+      case "wheels":
         addSpec("Оферта", formatWheelOfferType(listing.offer_type), PackageOpen);
         addSpec("За", formatTopmenuCategory(listing.wheel_for), Car);
         addSpec("Марка гуми", listing.tire_brand, PackageOpen);
@@ -2180,20 +2265,20 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
         addSpec("Болтове", listing.bolts, Settings);
         addSpec("PCD", listing.pcd, Ruler);
         break;
-      case "v":
+      case "accessories":
         addSpec("За", formatTopmenuCategory(listing.classified_for), Car);
         addSpec("Състояние", conditionLabel, ShieldCheck);
         break;
-      case "y":
+      case "buy":
         addSpec("Купува", listing.buy_service_category, PackageOpen);
         addSpec("За", formatTopmenuCategory(listing.classified_for), Car);
         break;
-      case "z":
+      case "services":
         addSpec("Услуга", listing.buy_service_category, PackageOpen);
         addSpec("За", formatTopmenuCategory(listing.classified_for), Car);
         break;
-      case "3":
-      case "4":
+      case "buses":
+      case "trucks":
         addSpec("Марка", getEffectiveListingBrand(listing), Tag);
         addSpec("Модел", listing.model, Car);
         addSpec("Град", listing.city, MapPin);
@@ -2211,33 +2296,33 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
         );
         addNumeric("Мощност", listing.power, "к.с.", Zap);
         break;
-      case "5":
+      case "motorcycles":
         addNumeric("Кубатура", listing.displacement_cc ?? listing.displacement, "cc", Ruler);
         addSpec("Двигател", listing.engine_type, Fuel);
         addSpec("Трансмисия", listing.transmission, Settings);
         addNumeric("Мощност", listing.power, "к.с.", Zap);
         break;
-      case "6":
-      case "7":
+      case "agriculture":
+      case "industrial":
         addSpec("Двигател", listing.engine_type, Fuel);
         addNumeric("Мощност", listing.power, "к.с.", Zap);
         addSpec("Състояние", conditionLabel, ShieldCheck);
         break;
-      case "8":
+      case "forklifts":
         addSpec("Двигател", listing.engine_type, Fuel);
         addNumeric("Товар", listing.lift_capacity_kg, "кг", Gauge);
         addNumeric("Часове", listing.hours, "ч", Clock);
         addNumeric("Мощност", listing.power, "к.с.", Zap);
         addSpec("Състояние", conditionLabel, ShieldCheck);
         break;
-      case "9":
+      case "rvs":
         addNumeric("Легла", listing.beds, "", PackageOpen);
         addNumeric("Дължина", listing.length_m, "м", Ruler, false);
         addBoolean("Тоалетна", listing.has_toilet, ShieldCheck);
         addBoolean("Отопление", listing.has_heating, ShieldCheck);
         addBoolean("Климатик", listing.has_air_conditioning, ShieldCheck);
         break;
-      case "a":
+      case "yachts":
         addSpec("Двигател", listing.engine_type, Fuel);
         addNumeric("Брой двигатели", listing.engine_count, "", Settings);
         addSpec("Материал", listing.material, Palette);
@@ -2246,7 +2331,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
         addNumeric("Газене", listing.draft_m, "м", Ruler, false);
         addNumeric("Часове", listing.hours, "ч", Clock);
         break;
-      case "b":
+      case "trailer":
         addNumeric("Товар", listing.load_kg, "кг", Gauge);
         addNumeric("Оси", listing.axles, "", Settings);
         break;
@@ -2295,7 +2380,9 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
   };
 
   const getListingCategoryBadge = (listing: CarListing) => {
-    const mainCode = toText(listing.main_category);
+    const mainCode = normalizeMainCategoryValue(
+      listing.main_category ?? listing.mainCategory ?? listing.maincategory
+    );
     const mainLabel = getMainCategoryLabel(mainCode) || mainCode;
     return mainLabel || "";
   };
@@ -3817,7 +3904,11 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
   const categoryOptions = Array.from(
     new Set(
       currentListings
-        .map((listing) => (listing.main_category || "").trim())
+        .map((listing) =>
+          normalizeMainCategoryValue(
+            listing.main_category ?? listing.mainCategory ?? listing.maincategory
+          )
+        )
         .filter(Boolean)
     )
   )
@@ -3835,7 +3926,12 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
   const categoryScopedListings =
     selectedCategory === "all"
       ? currentListings
-      : currentListings.filter((listing) => (listing.main_category || "").trim() === selectedCategory);
+      : currentListings.filter(
+          (listing) =>
+            normalizeMainCategoryValue(
+              listing.main_category ?? listing.mainCategory ?? listing.maincategory
+            ) === selectedCategory
+        );
 
   const brandOptions = Array.from(
     new Set(
@@ -5917,3 +6013,4 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
 };
 
 export default MyAdsPage;
+

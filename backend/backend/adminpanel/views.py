@@ -14,7 +14,7 @@ from rest_framework.response import Response
 
 from backend.accounts.models import BusinessUser, ImportApiUsageEvent, UserProfile
 from backend.listings.models import (
-    CarListing,
+    BaseListing,
     Favorite,
     ListingPurchase,
     ListingAnonymousView,
@@ -146,15 +146,37 @@ def _resolve_user_type(user):
     return "private"
 
 
+def _get_cars_details(listing):
+    try:
+        return listing.cars_details
+    except Exception:
+        return None
+
+
+def _resolve_listing_brand(listing):
+    details = _get_cars_details(listing)
+    return getattr(details, "brand", "") if details else ""
+
+
+def _resolve_listing_model(listing):
+    details = _get_cars_details(listing)
+    return getattr(details, "model", "") if details else ""
+
+
+def _resolve_listing_year_from(listing):
+    details = _get_cars_details(listing)
+    return getattr(details, "year_from", None) if details else None
+
+
 def _serialize_listing(listing):
     return {
         "id": listing.id,
         "slug": listing.slug,
         "title": listing.title,
-        "brand": listing.brand,
-        "model": listing.model,
+        "brand": _resolve_listing_brand(listing),
+        "model": _resolve_listing_model(listing),
         "main_category": listing.main_category,
-        "year_from": listing.year_from,
+        "year_from": _resolve_listing_year_from(listing),
         "price": float(listing.price),
         "city": listing.city,
         "listing_type": listing.listing_type,
@@ -240,21 +262,21 @@ def admin_overview(request):
     users_business = User.objects.filter(business_profile__isnull=False).count()
     users_admin = User.objects.filter(is_staff=True).count()
 
-    listings_total = CarListing.objects.count()
-    listings_active = CarListing.objects.filter(
+    listings_total = BaseListing.objects.count()
+    listings_active = BaseListing.objects.filter(
         is_active=True,
         is_draft=False,
         is_archived=False,
         created_at__gte=expiry_cutoff,
     ).count()
-    listings_archived = CarListing.objects.filter(is_archived=True).count()
-    listings_drafts = CarListing.objects.filter(is_draft=True).count()
-    listings_expired = CarListing.objects.filter(
+    listings_archived = BaseListing.objects.filter(is_archived=True).count()
+    listings_drafts = BaseListing.objects.filter(is_draft=True).count()
+    listings_expired = BaseListing.objects.filter(
         is_draft=False,
         is_archived=False,
         created_at__lt=expiry_cutoff,
     ).count()
-    listings_requires_moderation = CarListing.objects.filter(
+    listings_requires_moderation = BaseListing.objects.filter(
         requires_moderation=True
     ).count()
 
@@ -268,7 +290,7 @@ def admin_overview(request):
         total=Coalesce(Sum("amount"), Value(Decimal("0.00")))
     )["total"]
 
-    views_total = CarListing.objects.aggregate(total=Coalesce(Sum("view_count"), Value(0)))["total"]
+    views_total = BaseListing.objects.aggregate(total=Coalesce(Sum("view_count"), Value(0)))["total"]
     contact_inquiries_total = ContactInquiry.objects.count()
     contact_inquiries_new = ContactInquiry.objects.filter(status=ContactInquiry.STATUS_NEW).count()
 
@@ -312,7 +334,7 @@ def admin_overview(request):
             purchases_by_day[day]["amount"] = row.get("amount") or Decimal("0.00")
 
     top_listings = (
-        CarListing.objects.select_related("user", "user__business_profile")
+        BaseListing.objects.select_related("user", "user__business_profile")
         .order_by("-view_count", "-created_at")[:10]
     )
 
@@ -326,15 +348,15 @@ def admin_overview(request):
         .order_by("-total_views", "-listing_count", "-date_joined")[:10]
     )
 
-    category_labels = dict(CarListing.MAIN_CATEGORY_CHOICES)
-    listing_type_labels = dict(CarListing.LISTING_TYPE_CHOICES)
+    category_labels = dict(BaseListing.MAIN_CATEGORY_CHOICES)
+    listing_type_labels = dict(BaseListing.LISTING_TYPE_CHOICES)
     category_breakdown = [
         {
             "main_category": row["main_category"],
             "label": category_labels.get(row["main_category"], row["main_category"]),
             "count": row["count"],
         }
-        for row in CarListing.objects.values("main_category")
+        for row in BaseListing.objects.values("main_category")
         .annotate(count=Count("id"))
         .order_by("-count")
     ]
@@ -344,7 +366,7 @@ def admin_overview(request):
             "label": listing_type_labels.get(row["listing_type"], row["listing_type"]),
             "count": row["count"],
         }
-        for row in CarListing.objects.values("listing_type")
+        for row in BaseListing.objects.values("listing_type")
         .annotate(count=Count("id"))
         .order_by("-count")
     ]
@@ -411,14 +433,14 @@ def admin_overview(request):
 @api_view(["GET"])
 @permission_classes([AdminPanelAccessPermission])
 def admin_listings(request):
-    queryset = CarListing.objects.select_related("user", "user__business_profile")
+    queryset = BaseListing.objects.select_related("user", "user__business_profile")
 
     search_query = (request.query_params.get("q") or "").strip()
     if search_query:
         queryset = queryset.filter(
             Q(title__icontains=search_query)
-            | Q(brand__icontains=search_query)
-            | Q(model__icontains=search_query)
+            | Q(cars_details__brand__icontains=search_query)
+            | Q(cars_details__model__icontains=search_query)
             | Q(slug__icontains=search_query)
             | Q(user__email__icontains=search_query)
         )
@@ -492,7 +514,7 @@ def admin_listings(request):
 @permission_classes([AdminPanelAccessPermission])
 def admin_listing_update(request, listing_id):
     listing = get_object_or_404(
-        CarListing.objects.select_related("user", "user__business_profile"),
+        BaseListing.objects.select_related("user", "user__business_profile"),
         pk=listing_id,
     )
     data = request.data
@@ -593,12 +615,20 @@ def admin_listing_update(request, listing_id):
 @api_view(["DELETE"])
 @permission_classes([AdminPanelAccessPermission])
 def admin_listing_delete(request, listing_id):
-    listing = get_object_or_404(CarListing, pk=listing_id)
-    reason_key, reason_text, reason_error = _resolve_listing_delete_reason(request.data or {})
+    listing = get_object_or_404(BaseListing, pk=listing_id)
+    delete_payload = request.data or {}
+    reason_key, reason_text, reason_error = _resolve_listing_delete_reason(delete_payload)
     if reason_error:
         return Response({"error": reason_error}, status=status.HTTP_400_BAD_REQUEST)
 
-    listing_title = (listing.title or f"{listing.brand} {listing.model}").strip()[:200]
+    send_email = _parse_bool(delete_payload.get("send_email"))
+    if send_email is None:
+        send_email = True
+
+    listing_title = (
+        listing.title
+        or f"{_resolve_listing_brand(listing)} {_resolve_listing_model(listing)}"
+    ).strip()[:200]
     recipient_email = str(listing.user.email or "").strip()
 
     from_email = str(
@@ -606,7 +636,7 @@ def admin_listing_delete(request, listing_id):
         or getattr(settings, "SUPPORT_FROM_EMAIL", "")
         or ""
     ).strip()
-    if from_email and recipient_email:
+    if send_email and from_email and recipient_email:
         subject = f"Обявата ви е премахната (#{listing.id})"
         body = (
             "Здравейте,\n\n"
@@ -653,6 +683,7 @@ def admin_listing_delete(request, listing_id):
         {
             "message": "Обявата е изтрита.",
             "reason": reason_key,
+            "email_requested": send_email,
             "email_sent": email_sent,
         },
         status=status.HTTP_200_OK,
@@ -1102,9 +1133,9 @@ def admin_site_purchases(request):
                     "listing_title": item.listing_title_snapshot
                     or (item.listing.title if item.listing else ""),
                     "listing_brand": item.listing_brand_snapshot
-                    or (item.listing.brand if item.listing else ""),
+                    or (_resolve_listing_brand(item.listing) if item.listing else ""),
                     "listing_model": item.listing_model_snapshot
-                    or (item.listing.model if item.listing else ""),
+                    or (_resolve_listing_model(item.listing) if item.listing else ""),
                     "listing_type": item.listing_type,
                     "plan": item.plan,
                     "source": item.source,
@@ -1453,8 +1484,8 @@ def admin_reports(request):
             Q(message__icontains=search_query)
             | Q(user__email__icontains=search_query)
             | Q(listing__title__icontains=search_query)
-            | Q(listing__brand__icontains=search_query)
-            | Q(listing__model__icontains=search_query)
+            | Q(listing__cars_details__brand__icontains=search_query)
+            | Q(listing__cars_details__model__icontains=search_query)
         )
 
     listing_id = request.query_params.get("listing_id")
@@ -1475,8 +1506,8 @@ def admin_reports(request):
                     "listing_id": report.listing_id,
                     "listing_slug": report.listing.slug,
                     "listing_title": report.listing.title,
-                    "listing_brand": report.listing.brand,
-                    "listing_model": report.listing.model,
+                    "listing_brand": _resolve_listing_brand(report.listing),
+                    "listing_model": _resolve_listing_model(report.listing),
                     "user_id": report.user_id,
                     "user_email": report.user.email,
                     "incorrect_price": report.incorrect_price,

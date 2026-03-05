@@ -177,7 +177,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
           setIsFavorite(false);
         }
       } catch (err) {
-        console.error('Error checking favorite status:', err);
+        console.error('Грешка при проверка на любима обява:', err);
       }
     };
     checkFavorite();
@@ -221,7 +221,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
         showToast('Грешка при запазване на обявата.', { type: 'error' });
       }
     } catch (err) {
-      console.error('Error toggling favorite:', err);
+      console.error('Грешка при промяна на любима обява:', err);
       showToast('Грешка при запазване на обявата.', { type: 'error' });
     } finally {
       setIsLoading(false);
@@ -305,7 +305,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
       resetReportForm();
       setShowReportForm(false);
     } catch (error) {
-      console.error('Error creating report:', error);
+      console.error('Грешка при изпращане на сигнал:', error);
       showToast('Грешка при изпращане на доклада.', { type: 'error' });
     } finally {
       setIsReporting(false);
@@ -328,7 +328,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Error copying link:', err);
+      console.error('Грешка при копиране на линка:', err);
     }
   };
 
@@ -486,7 +486,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
     },
     {
       id: 'email',
-      label: 'Email',
+      label: 'Имейл',
       url: `mailto:?subject=${encodedText}&body=${encodedText}%0A${encodedUrl}`,
       icon: Mail,
     },
@@ -703,7 +703,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
           }}
           onClick={handleToggleFavorite}
           disabled={isLoading}
-          aria-label={isFavorite ? 'Saved' : 'Save'}
+          aria-label={isFavorite ? 'Премахни от любими' : 'Запази в любими'}
         >
           <Heart size={16} fill={isFavorite ? 'currentColor' : 'none'} />
         </button>
@@ -1402,7 +1402,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                 <span>
                   Съгласявам се с{' '}
                   <a
-                    href="https://www.mobile.bg/obshti-uslovia"
+                    href="/legal#terms"
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ color: '#b91c1c', fontWeight: 600 }}
@@ -1411,7 +1411,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                   </a>{' '}
                   и{' '}
                   <a
-                    href="https://www.mobile.bg/zashtita-na-lichni-danni"
+                    href="/legal#privacy"
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ color: '#b91c1c', fontWeight: 600 }}

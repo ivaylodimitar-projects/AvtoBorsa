@@ -1,3 +1,4 @@
+# models.py
 from datetime import timedelta
 from concurrent.futures import ThreadPoolExecutor
 import io
@@ -8,6 +9,8 @@ from threading import Lock
 from urllib.parse import unquote, urlparse
 
 from PIL import Image as PILImage, ImageOps
+from PIL import UnidentifiedImageError
+
 from django.conf import settings
 from django.db import close_old_connections, models, transaction as db_transaction
 from django.contrib.auth.models import User
@@ -18,12 +21,24 @@ from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.text import slugify
 
+logger = logging.getLogger(__name__)
+
+# ----------------------------
+# Listing promotion windows
+# ----------------------------
 LISTING_EXPIRY_DAYS = 30
+
 TOP_PLAN_1D = "1d"
 TOP_PLAN_7D = "7d"
 TOP_LISTING_DURATION_DAYS_1D = 1
 TOP_LISTING_DURATION_DAYS_7D = 7
+
 VIP_LISTING_DURATION_DAYS = 7
+
+# ----------------------------
+# Image rendition settings
+# (keep the old constant names for compatibility)
+# ----------------------------
 CAR_IMAGE_DETAIL_WIDTHS = (1200, 1600)
 CAR_IMAGE_GRID_RENDITIONS = (
     (600, 356),
@@ -32,7 +47,9 @@ CAR_IMAGE_WEBP_QUALITY = 82
 CAR_IMAGE_WEBP_METHOD = 4
 CAR_IMAGE_LOW_RES_MIN_WIDTH = 800
 
-logger = logging.getLogger(__name__)
+# Safety: skip extremely huge images (avoid memory spikes)
+# You can tune this from settings if needed.
+CAR_IMAGE_MAX_PIXELS = int(getattr(settings, "CAR_IMAGE_MAX_PIXELS", 40_000_000))  # 40 MP default
 
 
 def _resolve_rendition_worker_count():
@@ -65,6 +82,9 @@ def _get_car_image_rendition_executor():
     return _CAR_IMAGE_RENDITION_EXECUTOR
 
 
+# ----------------------------
+# Time helpers
+# ----------------------------
 def get_expiry_cutoff(now=None):
     """Return the datetime before which listings are considered expired."""
     current = now or timezone.now()
@@ -93,96 +113,53 @@ def get_vip_short_expiry(now=None):
     current = now or timezone.now()
     return current + timedelta(days=VIP_LISTING_DURATION_DAYS)
 
-class CarListing(models.Model):
-    """Model for car listings/advertisements"""
 
-    FUEL_CHOICES = [
-        ('benzin', 'Бензин'),
-        ('dizel', 'Дизел'),
-        ('gaz_benzin', 'Газ/Бензин'),
-        ('hibrid', 'Хибрид'),
-        ('elektro', 'Електро'),
-    ]
-
-    GEARBOX_CHOICES = [
-        ('ruchna', 'Ръчна'),
-        ('avtomatik', 'Автоматик'),
-    ]
-
-    CONDITION_CHOICES = [
-        ('0', 'Нов'),
-        ('1', 'Употребяван'),
-        ('2', 'Повреден/ударен'),
-        ('3', 'За части'),
-    ]
-
-    CAR_TYPE_CHOICES = [
-        ('van', 'Ван'),
-        ('jeep', 'Джип'),
-        ('cabriolet', 'Кабрио'),
-        ('wagon', 'Комби'),
-        ('coupe', 'Купе'),
-        ('minivan', 'Миниван'),
-        ('pickup', 'Пикап'),
-        ('sedan', 'Седан'),
-        ('stretch_limo', 'Стреч лимузина'),
-        ('hatchback', 'Хечбек'),
-    ]
-
-    EURO_STANDARD_CHOICES = [
-        ('1', 'Евро 1'),
-        ('2', 'Евро 2'),
-        ('3', 'Евро 3'),
-        ('4', 'Евро 4'),
-        ('5', 'Евро 5'),
-        ('6', 'Евро 6'),
-    ]
+# ======================================================================
+# BASE LISTING (COMMON FIELDS ONLY)
+# ======================================================================
+class BaseListing(models.Model):
+    """
+    Base Listing model (COMMON columns only).
+    Category-specific columns MUST live in separate OneToOne models.
+    """
 
     LISTING_TYPE_CHOICES = [
-        ('normal', 'Нормална'),
-        ('top', 'Топ'),
-        ('vip', 'VIP'),
+        ("normal", "Нормална"),
+        ("top", "Топ"),
+        ("vip", "VIP"),
     ]
     TOP_PLAN_CHOICES = [
-        (TOP_PLAN_1D, '1 day'),
-        (TOP_PLAN_7D, '7 days'),
+        (TOP_PLAN_1D, "1 day"),
+        (TOP_PLAN_7D, "7 days"),
     ]
     VIP_PLAN_CHOICES = [
-        ('7d', '7 days'),
-        ('lifetime', 'Lifetime'),
+        ("7d", "7 days"),
+        ("lifetime", "Lifetime"),
     ]
 
     MAIN_CATEGORY_CHOICES = [
-        ('1', 'Автомобили и Джипове'),
-        ('w', 'Гуми и джанти'),
-        ('u', 'Части'),
-        ('3', 'Бусове'),
-        ('4', 'Камиони'),
-        ('5', 'Мотоциклети'),
-        ('6', 'Селскостопански'),
-        ('7', 'Индустриални'),
-        ('8', 'Кари'),
-        ('9', 'Каравани'),
-        ('a', 'Яхти и Лодки'),
-        ('b', 'Ремаркета'),
-        ('v', 'Аксесоари'),
-        ('y', 'Купува'),
-        ('z', 'Услуги'),
+        ("cars", "Автомобили и Джипове"),
+        ("wheels", "Гуми и джанти"),
+        ("parts", "Части"),
+        ("buses", "Бусове"),
+        ("trucks", "Камиони"),
+        ("motorcycles", "Мотоциклети"),
+        ("agriculture", "Селскостопански"),
+        ("industrial", "Индустриални"),
+        ("forklifts", "Кари"),
+        ("rvs", "Каравани"),
+        ("yachts", "Яхти и Лодки"),
+        ("trailer", "Ремаркета"),
+        ("accessories", "Аксесоари"),
+        ("buy", "Купува"),
+        ("services", "Услуги"),
     ]
 
     # User and basic info
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='car_listings')
-    main_category = models.CharField(max_length=1, choices=MAIN_CATEGORY_CHOICES, default='1')
-    category = models.CharField(max_length=20, choices=CAR_TYPE_CHOICES, null=True, blank=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="car_listings")
+    main_category = models.CharField(max_length=20, choices=MAIN_CATEGORY_CHOICES, default="cars")
     title = models.CharField(max_length=200, null=True, blank=True)
-
-    # Car details
-    brand = models.CharField(max_length=100)
-    model = models.CharField(max_length=100)
     slug = models.SlugField(max_length=255, unique=True, db_index=True, null=True, blank=True)
-    year_from = models.IntegerField(validators=[MinValueValidator(1900), MaxValueValidator(2100)])
-    month = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(12)])
-    vin = models.CharField(max_length=17, null=True, blank=True)
 
     # Price and location
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -190,39 +167,30 @@ class CarListing(models.Model):
     location_region = models.CharField(max_length=100, null=True, blank=True)
     city = models.CharField(max_length=100)
 
-    # Technical details
-    fuel = models.CharField(max_length=20, choices=FUEL_CHOICES, blank=True, default='')
-    gearbox = models.CharField(max_length=20, choices=GEARBOX_CHOICES, blank=True, default='')
-    mileage = models.IntegerField(validators=[MinValueValidator(0)])
-    color = models.CharField(max_length=50, null=True, blank=True)
-    condition = models.CharField(max_length=1, choices=CONDITION_CHOICES, default='0')
-    power = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
-    displacement = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
-    euro_standard = models.CharField(max_length=1, choices=EURO_STANDARD_CHOICES, null=True, blank=True)
-
     # Description and contact
     description = models.TextField()
     phone = models.CharField(max_length=20)
     email = models.EmailField()
-
-    # Features (stored as JSON)
-    features = models.JSONField(default=list, blank=True)
 
     # Status
     is_draft = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     is_archived = models.BooleanField(default=False)
     is_kaparirano = models.BooleanField(default=False)
+
     risk_score = models.PositiveSmallIntegerField(default=0)
     risk_flags = models.JSONField(default=list, blank=True)
     requires_moderation = models.BooleanField(default=False)
-    listing_type = models.CharField(max_length=10, choices=LISTING_TYPE_CHOICES, default='normal')
+
+    listing_type = models.CharField(max_length=10, choices=LISTING_TYPE_CHOICES, default="normal")
     top_plan = models.CharField(max_length=12, choices=TOP_PLAN_CHOICES, null=True, blank=True)
     top_paid_at = models.DateTimeField(null=True, blank=True)
     top_expires_at = models.DateTimeField(null=True, blank=True)
+
     vip_plan = models.CharField(max_length=12, choices=VIP_PLAN_CHOICES, null=True, blank=True)
     vip_paid_at = models.DateTimeField(null=True, blank=True)
     vip_expires_at = models.DateTimeField(null=True, blank=True)
+
     view_count = models.PositiveIntegerField(default=0)
 
     # Timestamps
@@ -230,36 +198,170 @@ class CarListing(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['-created_at']
-        verbose_name = 'Car Listing'
-        verbose_name_plural = 'Car Listings'
+        db_table = "listings_carlisting"
+        ordering = ["-created_at"]
+        verbose_name = "Listing"
+        verbose_name_plural = "Listings"
         indexes = [
-            models.Index(fields=['is_active', 'is_draft', 'is_archived', 'created_at'], name='carlist_state_created_idx'),
-            models.Index(fields=['created_at'], name='carlist_created_idx'),
-            models.Index(fields=['price'], name='carlist_price_idx'),
-            models.Index(fields=['year_from'], name='carlist_year_idx'),
-            models.Index(fields=['mileage'], name='carlist_mileage_idx'),
-            models.Index(fields=['power'], name='carlist_power_idx'),
-            models.Index(fields=['fuel'], name='carlist_fuel_idx'),
-            models.Index(fields=['gearbox'], name='carlist_gearbox_idx'),
-            models.Index(fields=['condition'], name='carlist_condition_idx'),
-            models.Index(fields=['category'], name='carlist_category_idx'),
-            models.Index(fields=['location_region'], name='carlist_region_idx'),
-            models.Index(fields=['listing_type', 'top_expires_at'], name='carlist_top_exp_idx'),
-            models.Index(fields=['listing_type', 'vip_expires_at'], name='carlist_vip_exp_idx'),
-            models.Index(fields=['requires_moderation', 'created_at'], name='carlist_mod_created_idx'),
+            # Most common: show active listings in a category by newest
+            models.Index(
+                fields=["is_active", "is_draft", "is_archived", "main_category", "created_at"],
+                name="listing_state_cat_created_idx",
+            ),
+            models.Index(fields=["created_at"], name="listing_created_idx"),
+            models.Index(fields=["main_category", "created_at"], name="listing_cat_created_idx"),
+            models.Index(fields=["price"], name="listing_price_idx"),
+            models.Index(fields=["main_category", "price"], name="listing_cat_price_idx"),
+            models.Index(fields=["requires_moderation", "created_at"], name="listing_mod_created_idx"),
+            models.Index(fields=["listing_type", "top_expires_at"], name="listing_top_exp_idx"),
+            models.Index(fields=["listing_type", "vip_expires_at"], name="listing_vip_exp_idx"),
         ]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Track original price without extra DB query on save()
+        self._original_price = self.price
+
     def __str__(self):
-        return f"{self.brand} {self.model} - {self.title}"
+        return self.display_title
+
+    def _cars_detail(self):
+        try:
+            return self.cars_details
+        except Exception:
+            return None
+
+    def _cars_value(self, field_name, default=None):
+        cars = self._cars_detail()
+        if not cars:
+            return default
+        return getattr(cars, field_name, default)
+
+    @property
+    def display_title(self):
+        """
+        Used for admin + UI when title is empty.
+        For cars, prefer 'brand model' if available.
+        """
+        if self.title:
+            return self.title
+
+        cars = getattr(self, "cars_details", None)
+        if cars and cars.brand and cars.model:
+            return f"{cars.brand} {cars.model}"
+
+        return f"Обява #{self.pk or 'новa'}"
+
+    # Backward-compatible proxies for code paths that still read common
+    # vehicle fields from BaseListing. Data lives in cars_details.
+    @property
+    def brand(self):
+        return self._cars_value("brand", "")
+
+    @property
+    def model(self):
+        return self._cars_value("model", "")
+
+    @property
+    def year_from(self):
+        return self._cars_value("year_from", None)
+
+    @property
+    def month(self):
+        return self._cars_value("month", None)
+
+    @property
+    def vin(self):
+        return self._cars_value("vin", "")
+
+    @property
+    def fuel(self):
+        return self._cars_value("fuel", "")
+
+    @property
+    def gearbox(self):
+        return self._cars_value("gearbox", "")
+
+    @property
+    def mileage(self):
+        return self._cars_value("mileage", None)
+
+    @property
+    def color(self):
+        return self._cars_value("color", "")
+
+    @property
+    def condition(self):
+        return self._cars_value("condition", "")
+
+    @property
+    def power(self):
+        return self._cars_value("power", None)
+
+    @property
+    def displacement(self):
+        return self._cars_value("displacement", None)
+
+    @property
+    def euro_standard(self):
+        return self._cars_value("euro_standard", "")
+
+    @property
+    def category(self):
+        return self._cars_value("category", "")
+
+    @property
+    def features(self):
+        value = self._cars_value("features", None)
+        return value if isinstance(value, list) else []
+
+    def get_fuel_display(self):
+        value = self.fuel
+        if not value:
+            return ""
+        return dict(CarsListing.FUEL_CHOICES).get(value, value)
+
+    def get_gearbox_display(self):
+        value = self.gearbox
+        if not value:
+            return ""
+        return dict(CarsListing.GEARBOX_CHOICES).get(value, value)
+
+    def get_condition_display(self):
+        value = self.condition
+        if not value:
+            return ""
+        return dict(CarsListing.CONDITION_CHOICES).get(value, value)
+
+    def get_category_display(self):
+        value = self.category
+        if not value:
+            return ""
+        return dict(CarsListing.CAR_TYPE_CHOICES).get(value, value)
 
     def generate_slug(self):
-        """Generate slug in format: obiava-{id}-{brand}-{model}"""
-        if self.id and self.brand and self.model:
-            brand_slug = slugify(self.brand)
-            model_slug = slugify(self.model)
-            return f"obiava-{self.id}-{brand_slug}-{model_slug}"
-        return None
+        """
+        Slug format:
+        - cars: obiava-{id}-{brand}-{model}
+        - others: obiava-{id}-{title}
+        Always unique because it includes ID.
+        """
+        if not self.id:
+            return None
+
+        cars = getattr(self, "cars_details", None)
+        if cars and cars.brand and cars.model:
+            brand_slug = slugify(cars.brand)
+            model_slug = slugify(cars.model)
+            if brand_slug and model_slug:
+                return f"obiava-{self.id}-{brand_slug}-{model_slug}"
+
+        if self.title:
+            title_slug = slugify(self.title)[:80]
+            if title_slug:
+                return f"obiava-{self.id}-{title_slug}"
+
+        return f"obiava-{self.id}"
 
     def _clear_top_status(self):
         self.top_plan = None
@@ -274,9 +376,10 @@ class CarListing(models.Model):
     def apply_listing_type_status(self, now=None):
         """Ensure promoted listings have expiries and demote expired ones."""
         current = now or timezone.now()
-        if self.listing_type == 'top':
+
+        if self.listing_type == "top":
             if self.top_expires_at and self.top_expires_at <= current:
-                self.listing_type = 'normal'
+                self.listing_type = "normal"
                 self._clear_top_status()
                 self._clear_vip_status()
                 return
@@ -290,19 +393,20 @@ class CarListing(models.Model):
             self._clear_vip_status()
             return
 
-        if self.listing_type == 'vip':
+        if self.listing_type == "vip":
             if self.vip_expires_at and self.vip_expires_at <= current:
-                self.listing_type = 'normal'
+                self.listing_type = "normal"
                 self._clear_top_status()
                 self._clear_vip_status()
                 return
 
-            if self.vip_plan not in {'7d', 'lifetime'}:
-                self.vip_plan = '7d'
+            if self.vip_plan not in {"7d", "lifetime"}:
+                self.vip_plan = "7d"
             if self.vip_paid_at is None:
                 self.vip_paid_at = current
             if self.vip_expires_at is None:
-                if self.vip_plan == 'lifetime':
+                if self.vip_plan == "lifetime":
+                    # Keep original behavior: lifetime valid until listing expiry window
                     self.vip_expires_at = get_listing_expiry(self.created_at, now=current)
                 else:
                     self.vip_expires_at = get_vip_short_expiry(self.vip_paid_at)
@@ -320,12 +424,13 @@ class CarListing(models.Model):
     def demote_expired_top_listings(cls, now=None):
         """Bulk demote expired promoted listings to normal."""
         current = now or timezone.now()
+
         demoted_top = cls.objects.filter(
-            listing_type='top',
+            listing_type="top",
             top_expires_at__isnull=False,
             top_expires_at__lte=current,
         ).update(
-            listing_type='normal',
+            listing_type="normal",
             top_plan=None,
             top_paid_at=None,
             top_expires_at=None,
@@ -333,12 +438,13 @@ class CarListing(models.Model):
             vip_paid_at=None,
             vip_expires_at=None,
         )
+
         demoted_vip = cls.objects.filter(
-            listing_type='vip',
+            listing_type="vip",
             vip_expires_at__isnull=False,
             vip_expires_at__lte=current,
         ).update(
-            listing_type='normal',
+            listing_type="normal",
             top_plan=None,
             top_paid_at=None,
             top_expires_at=None,
@@ -349,48 +455,58 @@ class CarListing(models.Model):
         return demoted_top + demoted_vip
 
     def save(self, *args, **kwargs):
-        """Override save to auto-generate slug"""
-        old_price = None
-        if self.pk:
-            old_price = CarListing.objects.filter(pk=self.pk).values_list('price', flat=True).first()
+        creating = self._state.adding
         self.apply_listing_type_status()
-        # First save to get an ID if it's a new object
-        if not self.pk:
-            # Remove force_insert to allow normal insert
-            kwargs.pop('force_insert', None)
-            super().save(*args, **kwargs)
 
-        # Generate slug if not already set
-        if not self.slug:
-            generated_slug = self.generate_slug()
-            if generated_slug:
-                self.slug = generated_slug
+        # Determine price change without extra DB query
+        price_changed = (not creating) and (self.price is not None) and (self._original_price is not None) and (self.price != self._original_price)
+        old_price = self._original_price
 
-        # Save again with the slug (now it's an update since we have pk)
-        kwargs.pop('force_insert', None)
         super().save(*args, **kwargs)
 
-        if old_price is not None and self.price is not None and old_price != self.price:
+        # Slug: set once, using UPDATE to avoid a second model save()
+        if not self.slug:
+            generated = self.generate_slug()
+            if generated:
+                BaseListing.objects.filter(pk=self.pk).update(slug=generated)
+                self.slug = generated
+
+        # Price history
+        if price_changed:
             CarListingPriceHistory.objects.create(
                 listing=self,
                 old_price=old_price,
                 new_price=self.price,
-                delta=self.price - old_price
+                delta=self.price - old_price,
             )
+
+        self._original_price = self.price
+
+
+class CarListing(BaseListing):
+    """
+    Compatibility proxy for legacy lazy references ('listings.CarListing').
+    Uses the same table/data as BaseListing.
+    """
+
+    class Meta:
+        proxy = True
+        verbose_name = "Listing"
+        verbose_name_plural = "Listings"
 
 
 class CarListingPriceHistory(models.Model):
     """Track price changes for listings."""
-    listing = models.ForeignKey(CarListing, on_delete=models.CASCADE, related_name='price_history')
+    listing = models.ForeignKey(BaseListing, on_delete=models.CASCADE, related_name="price_history")
     old_price = models.DecimalField(max_digits=10, decimal_places=2)
     new_price = models.DecimalField(max_digits=10, decimal_places=2)
     delta = models.DecimalField(max_digits=10, decimal_places=2)
     changed_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-changed_at']
+        ordering = ["-changed_at"]
         indexes = [
-            models.Index(fields=['listing', 'changed_at'], name='carlist_price_hist_idx'),
+            models.Index(fields=["listing", "changed_at"], name="list_price_hist_idx"),
         ]
 
     def __str__(self):
@@ -420,7 +536,7 @@ class ListingPurchase(models.Model):
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="listing_purchases")
     listing = models.ForeignKey(
-        CarListing,
+        BaseListing,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
@@ -433,9 +549,11 @@ class ListingPurchase(models.Model):
     plan = models.CharField(max_length=12)
     source = models.CharField(max_length=16, choices=SOURCE_CHOICES, default=SOURCE_UNKNOWN)
     discount_ratio = models.DecimalField(max_digits=6, decimal_places=4, null=True, blank=True)
+
     listing_title_snapshot = models.CharField(max_length=200, blank=True)
     listing_brand_snapshot = models.CharField(max_length=100, blank=True)
     listing_model_snapshot = models.CharField(max_length=100, blank=True)
+
     metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -456,16 +574,117 @@ class ListingPurchase(models.Model):
         )
 
 
+# ======================================================================
+# CATEGORY DETAILS (ONE TABLE PER CATEGORY)
+# ======================================================================
+
 class CarsListing(models.Model):
-    """Dedicated details model for main_category='1' (Автомобили и Джипове)."""
-    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='cars_details')
+    """Details for main_category='cars' (Автомобили и Джипове)."""
+
+    FUEL_CHOICES = [
+        ("benzin", "Бензин"),
+        ("dizel", "Дизел"),
+        ("gaz_benzin", "Газ/Бензин"),
+        ("hibrid", "Хибрид"),
+        ("elektro", "Електро"),
+    ]
+
+    GEARBOX_CHOICES = [
+        ("ruchna", "Ръчна"),
+        ("avtomatik", "Автоматик"),
+    ]
+
+    CONDITION_CHOICES = [
+        ("0", "Нов"),
+        ("1", "Употребяван"),
+        ("2", "Повреден/ударен"),
+        ("3", "За части"),
+    ]
+
+    CAR_TYPE_CHOICES = [
+        ("van", "Ван"),
+        ("jeep", "Джип"),
+        ("cabriolet", "Кабрио"),
+        ("wagon", "Комби"),
+        ("coupe", "Купе"),
+        ("minivan", "Миниван"),
+        ("pickup", "Пикап"),
+        ("sedan", "Седан"),
+        ("stretch_limo", "Стреч лимузина"),
+        ("hatchback", "Хечбек"),
+    ]
+
+    EURO_STANDARD_CHOICES = [
+        ("1", "Евро 1"),
+        ("2", "Евро 2"),
+        ("3", "Евро 3"),
+        ("4", "Евро 4"),
+        ("5", "Евро 5"),
+        ("6", "Евро 6"),
+    ]
+
+    listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="cars_details")
+
+    # Car details (moved out of CarListing)
+    category = models.CharField(max_length=20, choices=CAR_TYPE_CHOICES, null=True, blank=True)
+
+    brand = models.CharField(max_length=100, default="")
+    model = models.CharField(max_length=100, default="")
+    year_from = models.IntegerField(
+        validators=[MinValueValidator(1900), MaxValueValidator(2100)],
+        default=1900,
+    )
+    month = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(12)])
+    vin = models.CharField(max_length=17, null=True, blank=True)
+
+    fuel = models.CharField(max_length=20, choices=FUEL_CHOICES, default="benzin")
+    gearbox = models.CharField(max_length=20, choices=GEARBOX_CHOICES, default="ruchna")
+    mileage = models.IntegerField(validators=[MinValueValidator(0)], default=0)
+    color = models.CharField(max_length=50, null=True, blank=True)
+    condition = models.CharField(max_length=1, choices=CONDITION_CHOICES, default="0")
+    power = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
+    displacement = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
+    euro_standard = models.CharField(max_length=1, choices=EURO_STANDARD_CHOICES, null=True, blank=True)
+
+    # Features (moved out of CarListing; car-specific)
+    features = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["brand", "model"], name="cars_brand_model_idx"),
+            models.Index(fields=["year_from"], name="cars_year_idx"),
+            models.Index(fields=["mileage"], name="cars_mileage_idx"),
+            models.Index(fields=["power"], name="cars_power_idx"),
+            models.Index(fields=["fuel"], name="cars_fuel_idx"),
+            models.Index(fields=["gearbox"], name="cars_gearbox_idx"),
+            models.Index(fields=["condition"], name="cars_condition_idx"),
+            models.Index(fields=["category"], name="cars_category_idx"),
+        ]
 
     def __str__(self):
-        return f"Cars details for listing {self.listing_id}"
+        return f"{self.brand} {self.model} (listing={self.listing_id})"
+
+    def save(self, *args, **kwargs):
+        """
+        If listing has only a basic slug, upgrade it to brand/model slug.
+        This keeps the old behavior without forcing listing to be saved twice.
+        """
+        super().save(*args, **kwargs)
+
+        listing = self.listing
+        if not listing:
+            return
+
+        # If slug missing or is the minimal form, regenerate with brand/model
+        if not listing.slug or listing.slug == f"obiava-{listing.id}":
+            new_slug = listing.generate_slug()
+            if new_slug and new_slug != listing.slug:
+                BaseListing.objects.filter(pk=listing.pk).update(slug=new_slug)
+                listing.slug = new_slug
 
 
 class WheelsListing(models.Model):
-    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='wheels_details')
+    listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="wheels_details")
     wheel_for = models.CharField(max_length=8, blank=True)
     offer_type = models.CharField(max_length=8, blank=True)
     tire_brand = models.CharField(max_length=120, blank=True)
@@ -492,7 +711,7 @@ class WheelsListing(models.Model):
 
 
 class PartsListing(models.Model):
-    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='parts_details')
+    listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="parts_details")
     part_for = models.CharField(max_length=8, blank=True)
     part_category = models.CharField(max_length=120, blank=True)
     part_element = models.CharField(max_length=120, blank=True)
@@ -512,7 +731,7 @@ class PartsListing(models.Model):
 
 
 class BusesListing(models.Model):
-    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='buses_details')
+    listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="buses_details")
     axles = models.PositiveSmallIntegerField(null=True, blank=True)
     seats = models.PositiveIntegerField(null=True, blank=True)
     load_kg = models.PositiveIntegerField(null=True, blank=True)
@@ -525,7 +744,7 @@ class BusesListing(models.Model):
 
 
 class TrucksListing(models.Model):
-    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='trucks_details')
+    listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="trucks_details")
     axles = models.PositiveSmallIntegerField(null=True, blank=True)
     seats = models.PositiveIntegerField(null=True, blank=True)
     load_kg = models.PositiveIntegerField(null=True, blank=True)
@@ -538,7 +757,7 @@ class TrucksListing(models.Model):
 
 
 class MotoListing(models.Model):
-    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='moto_details')
+    listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="moto_details")
     displacement_cc = models.PositiveIntegerField(null=True, blank=True)
     transmission = models.CharField(max_length=60, blank=True)
     engine_type = models.CharField(max_length=60, blank=True)
@@ -548,7 +767,7 @@ class MotoListing(models.Model):
 
 
 class AgriListing(models.Model):
-    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='agri_details')
+    listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="agri_details")
     equipment_type = models.CharField(max_length=120, blank=True)
 
     def __str__(self):
@@ -556,7 +775,7 @@ class AgriListing(models.Model):
 
 
 class IndustrialListing(models.Model):
-    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='industrial_details')
+    listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="industrial_details")
     equipment_type = models.CharField(max_length=120, blank=True)
 
     def __str__(self):
@@ -564,7 +783,7 @@ class IndustrialListing(models.Model):
 
 
 class ForkliftListing(models.Model):
-    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='forklift_details')
+    listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="forklift_details")
     engine_type = models.CharField(max_length=60, blank=True)
     lift_capacity_kg = models.PositiveIntegerField(null=True, blank=True)
     hours = models.PositiveIntegerField(null=True, blank=True)
@@ -574,7 +793,7 @@ class ForkliftListing(models.Model):
 
 
 class CaravanListing(models.Model):
-    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='caravan_details')
+    listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="caravan_details")
     beds = models.PositiveSmallIntegerField(null=True, blank=True)
     length_m = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     has_toilet = models.BooleanField(default=False)
@@ -586,7 +805,7 @@ class CaravanListing(models.Model):
 
 
 class BoatsListing(models.Model):
-    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='boats_details')
+    listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="boats_details")
     boat_category = models.CharField(max_length=120, blank=True)
     engine_type = models.CharField(max_length=60, blank=True)
     engine_count = models.PositiveSmallIntegerField(null=True, blank=True)
@@ -599,10 +818,10 @@ class BoatsListing(models.Model):
 
     def __str__(self):
         return f"Boats details for listing {self.listing_id}"
-    
+
 
 class TrailersListing(models.Model):
-    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='trailers_details')
+    listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="trailers_details")
     trailer_category = models.CharField(max_length=120, blank=True)
     load_kg = models.PositiveIntegerField(null=True, blank=True)
     axles = models.PositiveSmallIntegerField(null=True, blank=True)
@@ -613,7 +832,7 @@ class TrailersListing(models.Model):
 
 
 class AccessoriesListing(models.Model):
-    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='accessories_details')
+    listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="accessories_details")
     classified_for = models.CharField(max_length=8, blank=True)
     accessory_category = models.CharField(max_length=160, blank=True)
 
@@ -622,7 +841,7 @@ class AccessoriesListing(models.Model):
 
 
 class BuyListing(models.Model):
-    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='buy_details')
+    listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="buy_details")
     classified_for = models.CharField(max_length=8, blank=True)
     buy_category = models.CharField(max_length=160, blank=True)
 
@@ -631,7 +850,7 @@ class BuyListing(models.Model):
 
 
 class ServicesListing(models.Model):
-    listing = models.OneToOneField(CarListing, on_delete=models.CASCADE, related_name='services_details')
+    listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="services_details")
     classified_for = models.CharField(max_length=8, blank=True)
     service_category = models.CharField(max_length=160, blank=True)
 
@@ -639,26 +858,36 @@ class ServicesListing(models.Model):
         return f"Service details for listing {self.listing_id}"
 
 
+# ======================================================================
+# IMAGES
+# ======================================================================
 class CarImage(models.Model):
-    """Model for storing images for car listings"""
-    listing = models.ForeignKey(CarListing, on_delete=models.CASCADE, related_name='images')
-    image = models.ImageField(upload_to='car_listings/%Y/%m/%d/')
-    thumbnail = models.ImageField(upload_to='car_listings/thumbs/%Y/%m/%d/', null=True, blank=True)
+    """Model for storing images for listings (all categories)."""
+
+    listing = models.ForeignKey(BaseListing, on_delete=models.CASCADE, related_name="images")
+    image = models.ImageField(upload_to="car_listings/%Y/%m/%d/")
+    thumbnail = models.ImageField(upload_to="car_listings/thumbs/%Y/%m/%d/", null=True, blank=True)
+
     original_width = models.PositiveIntegerField(null=True, blank=True)
     original_height = models.PositiveIntegerField(null=True, blank=True)
     low_res = models.BooleanField(default=False)
     renditions = models.JSONField(default=dict, blank=True)
+
     order = models.IntegerField(default=0)
     is_cover = models.BooleanField(default=False, help_text="Mark this image as the cover/main image for the listing")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['order']
-        verbose_name = 'Car Image'
-        verbose_name_plural = 'Car Images'
+        ordering = ["order"]
+        verbose_name = "Listing Image"
+        verbose_name_plural = "Listing Images"
+        indexes = [
+            models.Index(fields=["listing", "order"], name="carimg_listing_order_idx"),
+            models.Index(fields=["listing", "is_cover"], name="carimg_listing_cover_idx"),
+        ]
 
     def __str__(self):
-        return f"Image for {self.listing.title}"
+        return f"Image for {self.listing.display_title}"
 
     @staticmethod
     def _collect_rendition_paths(renditions_data):
@@ -671,7 +900,7 @@ class CarImage(models.Model):
             for item in items:
                 if not isinstance(item, dict):
                     continue
-                path = str(item.get('path') or item.get('url') or '').strip()
+                path = str(item.get("path") or item.get("url") or "").strip()
                 if path:
                     paths.add(path)
         return paths
@@ -679,32 +908,32 @@ class CarImage(models.Model):
     def _has_valid_renditions(self, payload):
         if not payload:
             return False
-        width = payload.get('original_width')
-        height = payload.get('original_height')
+        width = payload.get("original_width")
+        height = payload.get("original_height")
         if not isinstance(width, int) or width <= 0:
             return False
         if not isinstance(height, int) or height <= 0:
             return False
-        return bool(self._collect_rendition_paths(payload.get('renditions')))
+        return bool(self._collect_rendition_paths(payload.get("renditions")))
 
     def _get_rendition_directory(self):
-        image_name = str(self.image.name or '')
+        image_name = str(self.image.name or "")
         image_dir = posixpath.dirname(image_name)
         if image_dir:
-            return posixpath.join(image_dir, 'renditions')
-        return 'car_listings/renditions'
+            return posixpath.join(image_dir, "renditions")
+        return "car_listings/renditions"
 
     def _build_rendition_path(self, base_name, kind, width):
         return posixpath.join(
             self._get_rendition_directory(),
-            f'{base_name}_{kind}_{width}.webp',
+            f"{base_name}_{kind}_{width}.webp",
         )
 
     def _store_rendition(self, rendered_image, rendition_path):
         buffer = io.BytesIO()
         rendered_image.save(
             buffer,
-            format='WEBP',
+            format="WEBP",
             quality=CAR_IMAGE_WEBP_QUALITY,
             method=CAR_IMAGE_WEBP_METHOD,
             optimize=True,
@@ -719,16 +948,26 @@ class CarImage(models.Model):
             return None
 
         try:
-            self.image.open('rb')
+            self.image.open("rb")
             with PILImage.open(self.image) as source_file:
-                source = ImageOps.exif_transpose(source_file).convert('RGB')
+                source = ImageOps.exif_transpose(source_file).convert("RGB")
                 original_width, original_height = source.size
+
                 if original_width <= 0 or original_height <= 0:
                     return None
 
-                image_name = os.path.basename(self.image.name or f'listing-{self.pk}')
+                # safety guard for huge images
+                if (original_width * original_height) > CAR_IMAGE_MAX_PIXELS:
+                    logger.warning(
+                        "Skipping renditions for image %s due to huge dimensions: %sx%s",
+                        self.pk, original_width, original_height
+                    )
+                    return None
+
+                image_name = os.path.basename(self.image.name or f"listing-{self.pk}")
                 base_name, _ = os.path.splitext(image_name)
-                resampling = getattr(PILImage, 'Resampling', PILImage)
+
+                resampling = getattr(PILImage, "Resampling", PILImage)
 
                 renditions = []
                 thumbnail_path = None
@@ -745,17 +984,17 @@ class CarImage(models.Model):
                         resampling.LANCZOS,
                     )
                     try:
-                        rendition_path = self._build_rendition_path(base_name, 'detail', detail_width)
+                        rendition_path = self._build_rendition_path(base_name, "detail", detail_width)
                         stored_path = self._store_rendition(resized, rendition_path)
                     finally:
                         resized.close()
                     renditions.append(
                         {
-                            'width': detail_width,
-                            'height': detail_height,
-                            'kind': 'detail',
-                            'format': 'webp',
-                            'path': stored_path,
+                            "width": detail_width,
+                            "height": detail_height,
+                            "kind": "detail",
+                            "format": "webp",
+                            "path": stored_path,
                         }
                     )
 
@@ -769,30 +1008,34 @@ class CarImage(models.Model):
                         centering=(0.5, 0.5),
                     )
                     try:
-                        rendition_path = self._build_rendition_path(base_name, 'grid', grid_width)
+                        rendition_path = self._build_rendition_path(base_name, "grid", grid_width)
                         stored_path = self._store_rendition(fitted, rendition_path)
                     finally:
                         fitted.close()
                     renditions.append(
                         {
-                            'width': grid_width,
-                            'height': grid_height,
-                            'kind': 'grid',
-                            'format': 'webp',
-                            'path': stored_path,
+                            "width": grid_width,
+                            "height": grid_height,
+                            "kind": "grid",
+                            "format": "webp",
+                            "path": stored_path,
                         }
                     )
                     if thumbnail_path is None:
                         thumbnail_path = stored_path
 
-                renditions.sort(key=lambda item: (0 if item.get('kind') == 'grid' else 1, item.get('width') or 0))
+                renditions.sort(key=lambda item: (0 if item.get("kind") == "grid" else 1, item.get("width") or 0))
                 return {
-                    'original_width': original_width,
-                    'original_height': original_height,
-                    'thumbnail_path': thumbnail_path,
-                    'renditions': renditions,
+                    "original_width": original_width,
+                    "original_height": original_height,
+                    "thumbnail_path": thumbnail_path,
+                    "renditions": renditions,
                 }
+
+        except (UnidentifiedImageError, OSError):
+            return None
         except Exception:
+            # keep it silent to avoid breaking save()
             return None
         finally:
             try:
@@ -803,17 +1046,23 @@ class CarImage(models.Model):
     def _cleanup_previous_assets(self, previous):
         if not previous or not self.image:
             return
+
         storage = self.image.storage
-        previous_image = str(previous.get('image') or '').strip()
-        previous_thumbnail = str(previous.get('thumbnail') or '').strip()
-        current_image = str(self.image.name or '').strip()
+
+        previous_image = str(previous.get("image") or "").strip()
+        previous_thumbnail = str(previous.get("thumbnail") or "").strip()
+        current_image = str(self.image.name or "").strip()
+        current_thumbnail = str(self.thumbnail.name or "").strip() if self.thumbnail else ""
 
         if previous_image and previous_image != current_image:
             _delete_storage_path_safely(storage, previous_image)
-        if previous_thumbnail and previous_thumbnail != current_image:
+
+        # Delete only if previous thumbnail differs from current thumbnail and current image
+        if previous_thumbnail and previous_thumbnail not in {current_thumbnail, current_image}:
             _delete_storage_path_safely(storage, previous_thumbnail)
-        for rendition_path in self._collect_rendition_paths(previous.get('renditions')):
-            if rendition_path != current_image:
+
+        for rendition_path in self._collect_rendition_paths(previous.get("renditions")):
+            if rendition_path not in {current_image, current_thumbnail}:
                 _delete_storage_path_safely(storage, rendition_path)
 
     @classmethod
@@ -850,21 +1099,21 @@ class CarImage(models.Model):
         close_old_connections()
         try:
             image_obj = cls.objects.filter(pk=image_id).only(
-                'id',
-                'image',
-                'thumbnail',
-                'original_width',
-                'original_height',
-                'low_res',
-                'renditions',
+                "id",
+                "image",
+                "thumbnail",
+                "original_width",
+                "original_height",
+                "low_res",
+                "renditions",
             ).first()
             if image_obj is None or not image_obj.image:
                 return
 
             current_payload = {
-                'original_width': image_obj.original_width,
-                'original_height': image_obj.original_height,
-                'renditions': image_obj.renditions,
+                "original_width": image_obj.original_width,
+                "original_height": image_obj.original_height,
+                "renditions": image_obj.renditions,
             }
             if image_obj._has_valid_renditions(current_payload):
                 return
@@ -873,13 +1122,13 @@ class CarImage(models.Model):
             if not generated:
                 return
 
-            original_width = generated.get('original_width')
+            original_width = generated.get("original_width")
             cls.objects.filter(pk=image_obj.pk).update(
-                thumbnail=generated.get('thumbnail_path') or None,
+                thumbnail=generated.get("thumbnail_path") or None,
                 original_width=original_width,
-                original_height=generated.get('original_height'),
+                original_height=generated.get("original_height"),
                 low_res=bool(original_width and original_width < CAR_IMAGE_LOW_RES_MIN_WIDTH),
-                renditions={'webp': generated.get('renditions') or []},
+                renditions={"webp": generated.get("renditions") or []},
             )
         finally:
             with _CAR_IMAGE_PENDING_RENDITIONS_LOCK:
@@ -887,16 +1136,16 @@ class CarImage(models.Model):
             close_old_connections()
 
     def save(self, *args, **kwargs):
-        update_fields = kwargs.get('update_fields')
+        update_fields = kwargs.get("update_fields")
         if update_fields is not None:
             normalized_update_fields = {str(field_name) for field_name in update_fields}
             image_related_fields = {
-                'image',
-                'thumbnail',
-                'original_width',
-                'original_height',
-                'low_res',
-                'renditions',
+                "image",
+                "thumbnail",
+                "original_width",
+                "original_height",
+                "low_res",
+                "renditions",
             }
             if normalized_update_fields and normalized_update_fields.isdisjoint(image_related_fields):
                 super().save(*args, **kwargs)
@@ -905,22 +1154,23 @@ class CarImage(models.Model):
         previous = None
         if self.pk:
             previous = CarImage.objects.filter(pk=self.pk).values(
-                'image',
-                'thumbnail',
-                'renditions',
-                'original_width',
-                'original_height',
+                "image",
+                "thumbnail",
+                "renditions",
+                "original_width",
+                "original_height",
             ).first()
+
         super().save(*args, **kwargs)
 
         if not self.image:
             return
 
-        current_image_name = str(self.image.name or '').strip()
+        current_image_name = str(self.image.name or "").strip()
         if not current_image_name:
             return
 
-        previous_image_name = str((previous or {}).get('image') or '').strip()
+        previous_image_name = str((previous or {}).get("image") or "").strip()
         image_changed = bool(previous and previous_image_name and previous_image_name != current_image_name)
 
         should_generate = previous is None or image_changed or not self._has_valid_renditions(previous)
@@ -930,8 +1180,8 @@ class CarImage(models.Model):
         if image_changed:
             self._cleanup_previous_assets(previous)
 
-        should_defer_renditions = bool(getattr(self, '_defer_renditions', False)) or (
-            previous is None and bool(getattr(settings, 'CAR_IMAGE_ASYNC_RENDITIONS', True))
+        should_defer_renditions = bool(getattr(self, "_defer_renditions", False)) or (
+            previous is None and bool(getattr(settings, "CAR_IMAGE_ASYNC_RENDITIONS", True))
         )
         if should_defer_renditions:
             self._schedule_rendition_generation(self.pk)
@@ -941,22 +1191,22 @@ class CarImage(models.Model):
         if not generated:
             return
 
-        thumbnail_path = generated.get('thumbnail_path')
+        thumbnail_path = generated.get("thumbnail_path")
         self.thumbnail = thumbnail_path or None
-        self.original_width = generated.get('original_width')
-        self.original_height = generated.get('original_height')
+        self.original_width = generated.get("original_width")
+        self.original_height = generated.get("original_height")
         self.low_res = bool(self.original_width and self.original_width < CAR_IMAGE_LOW_RES_MIN_WIDTH)
         self.renditions = {
-            'webp': generated.get('renditions') or [],
+            "webp": generated.get("renditions") or [],
         }
 
         super().save(
             update_fields=[
-                'thumbnail',
-                'original_width',
-                'original_height',
-                'low_res',
-                'renditions',
+                "thumbnail",
+                "original_width",
+                "original_height",
+                "low_res",
+                "renditions",
             ]
         )
 
@@ -965,9 +1215,9 @@ class CarImage(models.Model):
         if not self.image:
             return False
         current_payload = {
-            'original_width': self.original_width,
-            'original_height': self.original_height,
-            'renditions': self.renditions,
+            "original_width": self.original_width,
+            "original_height": self.original_height,
+            "renditions": self.renditions,
         }
         if self._has_valid_renditions(current_payload):
             return False
@@ -997,14 +1247,14 @@ def _delete_storage_path_safely(storage, name):
 
 
 def _collect_storage_delete_candidates(storage, raw_name):
-    normalized = str(raw_name or '').strip()
+    normalized = str(raw_name or "").strip()
     if not normalized:
         return []
 
     candidates = set()
 
     def _add_candidate(value):
-        candidate = str(value or '').strip()
+        candidate = str(value or "").strip()
         if not candidate:
             return
         candidate = unquote(candidate).strip().lstrip("/")
@@ -1015,12 +1265,14 @@ def _collect_storage_delete_candidates(storage, raw_name):
             candidates.add(candidate[len("media/"):])
 
     _add_candidate(normalized)
+
     if normalized.startswith("//"):
         parsed = urlparse(f"https:{normalized}")
         _add_candidate(parsed.path)
     elif "://" in normalized:
         parsed = urlparse(normalized)
         _add_candidate(parsed.path)
+
         path_without_slash = unquote(parsed.path or "").lstrip("/")
         bucket_name = str(getattr(storage, "bucket_name", "") or "").strip()
         if bucket_name and path_without_slash.startswith(f"{bucket_name}/"):
@@ -1039,7 +1291,7 @@ def _collect_storage_delete_candidates(storage, raw_name):
 
 
 def _delete_file_field_safely(file_field):
-    name = getattr(file_field, 'name', '') or ''
+    name = getattr(file_field, "name", "") or ""
     if not name:
         return
     try:
@@ -1052,7 +1304,7 @@ def _delete_file_field_safely(file_field):
 def cleanup_car_image_files(sender, instance, **kwargs):
     """Ensure image files are removed from storage when CarImage rows are deleted."""
     _delete_file_field_safely(instance.thumbnail)
-    for rendition_path in CarImage._collect_rendition_paths(getattr(instance, 'renditions', {}) or {}):
+    for rendition_path in CarImage._collect_rendition_paths(getattr(instance, "renditions", {}) or {}):
         try:
             _delete_storage_path_safely(instance.image.storage, rendition_path)
         except Exception:
@@ -1060,17 +1312,20 @@ def cleanup_car_image_files(sender, instance, **kwargs):
     _delete_file_field_safely(instance.image)
 
 
+# ======================================================================
+# VIEWS + FAVORITES
+# ======================================================================
 class ListingView(models.Model):
     """Track unique listing views per authenticated user."""
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='listing_views')
-    listing = models.ForeignKey(CarListing, on_delete=models.CASCADE, related_name='viewer_entries')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="listing_views")
+    listing = models.ForeignKey(BaseListing, on_delete=models.CASCADE, related_name="viewer_entries")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('user', 'listing')
-        ordering = ['-created_at']
-        verbose_name = 'Listing View'
-        verbose_name_plural = 'Listing Views'
+        unique_together = ("user", "listing")
+        ordering = ["-created_at"]
+        verbose_name = "Listing View"
+        verbose_name_plural = "Listing Views"
 
     def __str__(self):
         return f"{self.user.email} viewed {self.listing_id}"
@@ -1078,15 +1333,15 @@ class ListingView(models.Model):
 
 class ListingAnonymousView(models.Model):
     """Track unique listing views per anonymous browser session."""
-    listing = models.ForeignKey(CarListing, on_delete=models.CASCADE, related_name='anonymous_viewer_entries')
+    listing = models.ForeignKey(BaseListing, on_delete=models.CASCADE, related_name="anonymous_viewer_entries")
     session_key = models.CharField(max_length=64, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('listing', 'session_key')
-        ordering = ['-created_at']
-        verbose_name = 'Listing Anonymous View'
-        verbose_name_plural = 'Listing Anonymous Views'
+        unique_together = ("listing", "session_key")
+        ordering = ["-created_at"]
+        verbose_name = "Listing Anonymous View"
+        verbose_name_plural = "Listing Anonymous Views"
 
     def __str__(self):
         return f"anonymous({self.session_key}) viewed {self.listing_id}"
@@ -1094,17 +1349,15 @@ class ListingAnonymousView(models.Model):
 
 class Favorite(models.Model):
     """Model for storing user's favorite listings"""
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='favorites')
-    listing = models.ForeignKey(CarListing, on_delete=models.CASCADE, related_name='favorited_by')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="favorites")
+    listing = models.ForeignKey(BaseListing, on_delete=models.CASCADE, related_name="favorited_by")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('user', 'listing')
-        ordering = ['-created_at']
-        verbose_name = 'Favorite'
-        verbose_name_plural = 'Favorites'
+        unique_together = ("user", "listing")
+        ordering = ["-created_at"]
+        verbose_name = "Favorite"
+        verbose_name_plural = "Favorites"
 
     def __str__(self):
-        return f"{self.user.email} favorited {self.listing.brand} {self.listing.model}"
-
-
+        return f"{self.user.email} favorited {self.listing.display_title}"

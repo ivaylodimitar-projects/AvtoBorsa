@@ -22,7 +22,7 @@ from django.utils import timezone
 from django.utils.http import http_date, parse_http_date_safe, quote_etag
 from backend.accounts.models import UserProfile, PrivateUser, BusinessUser
 from .models import (
-    CarListing,
+    BaseListing,
     CarImage,
     ListingView,
     ListingAnonymousView,
@@ -84,6 +84,61 @@ DETAIL_RELATED_SELECT_FIELDS = (
     'services_details',
 )
 
+MAIN_CATEGORY_CANONICAL_MAP = {
+    "cars": "cars",
+    "car": "cars",
+    "wheels": "wheels",
+    "parts": "parts",
+    "buses": "buses",
+    "trucks": "trucks",
+    "motorcycles": "motorcycles",
+    "agriculture": "agriculture",
+    "agri": "agriculture",
+    "industrial": "industrial",
+    "forklifts": "forklifts",
+    "rvs": "rvs",
+    "caravans": "rvs",
+    "yachts": "yachts",
+    "boats": "yachts",
+    "trailer": "trailer",
+    "trailers": "trailer",
+    "accessories": "accessories",
+    "buy": "buy",
+    "services": "services",
+}
+
+MAIN_CATEGORY_DB_VALUES_BY_CANONICAL = {}
+for raw_value, canonical_value in MAIN_CATEGORY_CANONICAL_MAP.items():
+    MAIN_CATEGORY_DB_VALUES_BY_CANONICAL.setdefault(canonical_value, set()).add(raw_value)
+
+MAIN_CATEGORY_LABEL_TO_CANONICAL = {}
+for choice_value, choice_label in BaseListing.MAIN_CATEGORY_CHOICES:
+    canonical_value = MAIN_CATEGORY_CANONICAL_MAP.get(str(choice_value).strip().lower())
+    if canonical_value:
+        MAIN_CATEGORY_LABEL_TO_CANONICAL[str(choice_label).strip().lower()] = canonical_value
+
+
+def _normalize_main_category(value):
+    if value in (None, ""):
+        return None
+    normalized = str(value).strip().lower()
+    if not normalized:
+        return None
+    canonical = MAIN_CATEGORY_CANONICAL_MAP.get(normalized)
+    if canonical:
+        return canonical
+    return MAIN_CATEGORY_LABEL_TO_CANONICAL.get(normalized)
+
+
+def _resolve_main_category_db_values(value):
+    canonical = _normalize_main_category(value)
+    if not canonical:
+        return []
+    values = MAIN_CATEGORY_DB_VALUES_BY_CANONICAL.get(canonical)
+    if not values:
+        return [canonical]
+    return sorted(values)
+
 
 def _slugify_public_segment(value: str) -> str:
     normalized = unicodedata.normalize("NFKC", str(value or "")).strip().lower()
@@ -91,6 +146,25 @@ def _slugify_public_segment(value: str) -> str:
     compact = re.sub(r"\s+", "-", cleaned)
     compact = re.sub(r"-{2,}", "-", compact).strip("-")
     return compact or "profile"
+
+
+def _get_listing_cars_details(listing):
+    if listing is None:
+        return None
+    try:
+        return listing.cars_details
+    except Exception:
+        return None
+
+
+def _get_listing_brand_model(listing):
+    details = _get_listing_cars_details(listing)
+    if details is None:
+        return "", ""
+    return (
+        str(getattr(details, "brand", "") or "").strip(),
+        str(getattr(details, "model", "") or "").strip(),
+    )
 
 
 class ListingsPagination(PageNumberPagination):
@@ -118,7 +192,7 @@ def _demote_expired_top_listings():
     """Ensure expired promoted listings are demoted to normal."""
     if not cache.add(TOP_DEMOTION_LOCK_KEY, 1, TOP_DEMOTION_MIN_INTERVAL_SECONDS):
         return 0
-    return CarListing.demote_expired_top_listings()
+    return BaseListing.demote_expired_top_listings()
 
 
 def _invalidate_latest_listings_cache():
@@ -193,10 +267,11 @@ def _sanitize_purchase_metadata(raw_metadata):
 
 def _resolve_listing_snapshot(listing=None, listing_snapshot=None):
     if listing is not None:
+        brand_value, model_value = _get_listing_brand_model(listing)
         return (
             str(listing.title or "").strip()[:200],
-            str(listing.brand or "").strip()[:100],
-            str(listing.model or "").strip()[:100],
+            brand_value[:100],
+            model_value[:100],
         )
     if isinstance(listing_snapshot, dict):
         return (
@@ -245,9 +320,10 @@ def _attach_purchase_record_to_listing(purchase_record, listing):
     if not purchase_record or not listing:
         return
     purchase_record.listing = listing
+    brand_value, model_value = _get_listing_brand_model(listing)
     purchase_record.listing_title_snapshot = str(listing.title or "").strip()[:200]
-    purchase_record.listing_brand_snapshot = str(listing.brand or "").strip()[:100]
-    purchase_record.listing_model_snapshot = str(listing.model or "").strip()[:100]
+    purchase_record.listing_brand_snapshot = brand_value[:100]
+    purchase_record.listing_model_snapshot = model_value[:100]
     purchase_record.save(
         update_fields=[
             "listing",
@@ -428,6 +504,10 @@ def _build_listing_snapshot_from_validated_data(validated_data, current_listing=
     title_value = validated_data.get("title")
     brand_value = validated_data.get("brand")
     model_value = validated_data.get("model")
+    current_brand = ""
+    current_model = ""
+    if current_listing is not None:
+        current_brand, current_model = _get_listing_brand_model(current_listing)
     return {
         "title": str(
             title_value
@@ -437,12 +517,12 @@ def _build_listing_snapshot_from_validated_data(validated_data, current_listing=
         "brand": str(
             brand_value
             if brand_value is not None
-            else getattr(current_listing, "brand", "") or ""
+            else current_brand
         ).strip()[:100],
         "model": str(
             model_value
             if model_value is not None
-            else getattr(current_listing, "model", "") or ""
+            else current_model
         ).strip()[:100],
     }
 
@@ -616,10 +696,10 @@ class CarListingViewSet(viewsets.ModelViewSet):
             and self.request.user.is_authenticated
         )
         if can_access_own_private_listings:
-            queryset = CarListing.objects.filter(public_visibility_filter | Q(user=self.request.user))
+            queryset = BaseListing.objects.filter(public_visibility_filter | Q(user=self.request.user))
         else:
-            queryset = CarListing.objects.filter(public_visibility_filter)
-        queryset = queryset.annotate(
+            queryset = BaseListing.objects.filter(public_visibility_filter)
+        queryset = queryset.select_related('cars_details').annotate(
             top_rank=Case(
                 When(listing_type='top', then=Value(0)),
                 default=Value(1),
@@ -640,21 +720,18 @@ class CarListingViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(user_id=user_id)
 
         # Search filters
-        main_category = (
+        raw_main_category = (
             self.request.query_params.get('main_category')
             or self.request.query_params.get('mainCategory')
+            or self.request.query_params.get('maincategory')
         )
-        if main_category:
-            allowed_main_categories = {key for key, _ in CarListing.MAIN_CATEGORY_CHOICES}
-            label_to_main_category = {
-                label: key for key, label in CarListing.MAIN_CATEGORY_CHOICES
-            }
-            main_category_key = (
-                main_category
-                if main_category in allowed_main_categories
-                else label_to_main_category.get(main_category, main_category)
-            )
-            queryset = queryset.filter(main_category=main_category_key)
+        main_category = _normalize_main_category(raw_main_category)
+        if raw_main_category not in (None, ""):
+            category_db_values = _resolve_main_category_db_values(raw_main_category)
+            if category_db_values:
+                queryset = queryset.filter(main_category__in=category_db_values)
+            else:
+                queryset = queryset.none()
 
         def get_param(*keys):
             for key in keys:
@@ -678,6 +755,20 @@ class CarListingViewSet(viewsets.ModelViewSet):
         brand = get_param('brand', 'marka')
         model = get_param('model')
         equipment_type = get_param('equipmentType')
+        is_cars_category = main_category in {'cars', None, ''}
+        title_brand_filter_categories = {
+            'buses',
+            'trucks',
+            'motorcycles',
+            'industrial',
+            'forklifts',
+            'rvs',
+        }
+        title_model_filter_categories = {
+            'agriculture',
+            'yachts',
+            'trailer',
+        }
 
         # Price filters
         price_from = to_float(get_param('priceFrom'))
@@ -694,40 +785,43 @@ class CarListingViewSet(viewsets.ModelViewSet):
 
         # Year filters
         year_from = to_int(get_param('yearFrom', 'year'))
-        if year_from is not None:
-            queryset = queryset.filter(year_from__gte=year_from)
+        if year_from is not None and is_cars_category:
+            queryset = queryset.filter(cars_details__year_from__gte=year_from)
 
         year_to = to_int(get_param('yearTo'))
-        if year_to is not None:
-            queryset = queryset.filter(year_from__lte=year_to)
+        if year_to is not None and is_cars_category:
+            queryset = queryset.filter(cars_details__year_from__lte=year_to)
 
-        if main_category in {'6', '7'}:
-            related_name = 'agri_details__equipment_type' if main_category == '6' else 'industrial_details__equipment_type'
-            # Preferred mode:
-            # - equipmentType => detail equipment_type
-            # - marka/brand => listing brand
-            # - model => listing model
-            # Legacy mode (kept for old saved searches):
-            # - marka => equipment_type
-            # - model => listing brand
+        if main_category in {'agriculture', 'industrial'}:
+            if main_category == 'agriculture' and not equipment_type:
+                # Keep older saved searches working where the category lives in `marka`.
+                equipment_type = brand
+            related_name = (
+                'agri_details__equipment_type'
+                if main_category == 'agriculture'
+                else 'industrial_details__equipment_type'
+            )
             if equipment_type:
                 queryset = queryset.filter(**{f'{related_name}__icontains': equipment_type})
-                if brand:
-                    queryset = queryset.filter(brand__icontains=brand)
-                if model:
-                    queryset = queryset.filter(model__icontains=model)
-            else:
-                if brand:
-                    queryset = queryset.filter(**{f'{related_name}__icontains': brand})
-                if model:
-                    queryset = queryset.filter(brand__icontains=model)
-        elif main_category == 'v' and brand:
+            if main_category == 'industrial' and brand:
+                queryset = queryset.filter(title__icontains=brand)
+            if model:
+                queryset = queryset.filter(title__icontains=model)
+        elif main_category == 'accessories' and brand:
             queryset = queryset.filter(accessories_details__accessory_category__icontains=brand)
         else:
-            if brand:
-                queryset = queryset.filter(brand__icontains=brand)
-            if model:
-                queryset = queryset.filter(model__icontains=model)
+            if is_cars_category:
+                if brand:
+                    queryset = queryset.filter(cars_details__brand__icontains=brand)
+                if model:
+                    queryset = queryset.filter(cars_details__model__icontains=model)
+            elif main_category in title_brand_filter_categories:
+                if brand:
+                    queryset = queryset.filter(title__icontains=brand)
+                if model:
+                    queryset = queryset.filter(title__icontains=model)
+            elif main_category in title_model_filter_categories and model:
+                queryset = queryset.filter(title__icontains=model)
 
         # Location filters
         region = get_param('region', 'locat')
@@ -748,15 +842,15 @@ class CarListingViewSet(viewsets.ModelViewSet):
         # Fuel / engine type filters
         fuel = get_param('fuel')
         if fuel:
-            if main_category == '3':
+            if main_category == 'buses':
                 queryset = queryset.filter(buses_details__engine_type__icontains=fuel)
-            elif main_category == '4':
+            elif main_category == 'trucks':
                 queryset = queryset.filter(trucks_details__engine_type__icontains=fuel)
-            elif main_category == '5':
+            elif main_category == 'motorcycles':
                 queryset = queryset.filter(moto_details__engine_type__icontains=fuel)
-            elif main_category == '8':
+            elif main_category == 'forklifts':
                 queryset = queryset.filter(forklift_details__engine_type__icontains=fuel)
-            elif main_category == 'a':
+            elif main_category == 'yachts':
                 queryset = queryset.filter(boats_details__engine_type__icontains=fuel)
             else:
                 fuel_mapping = {
@@ -772,19 +866,19 @@ class CarListingViewSet(viewsets.ModelViewSet):
                     'elektro': 'elektro',
                 }
                 fuel_key = fuel_mapping.get(fuel, fuel)
-                queryset = queryset.filter(fuel=fuel_key)
+                queryset = queryset.filter(cars_details__fuel=fuel_key)
 
         transmission = get_param('transmission')
         if transmission:
-            if main_category == '3':
+            if main_category == 'buses':
                 queryset = queryset.filter(buses_details__transmission__icontains=transmission)
-            elif main_category == '4':
+            elif main_category == 'trucks':
                 queryset = queryset.filter(trucks_details__transmission__icontains=transmission)
-            elif main_category == '5':
+            elif main_category == 'motorcycles':
                 queryset = queryset.filter(moto_details__transmission__icontains=transmission)
 
         gearbox = get_param('gearbox')
-        if gearbox:
+        if gearbox and is_cars_category:
             gearbox_mapping = {
                 'Ръчна': 'ruchna',
                 'Автоматик': 'avtomatik',
@@ -792,31 +886,31 @@ class CarListingViewSet(viewsets.ModelViewSet):
                 'avtomatik': 'avtomatik',
             }
             gearbox_key = gearbox_mapping.get(gearbox, gearbox)
-            queryset = queryset.filter(gearbox=gearbox_key)
+            queryset = queryset.filter(cars_details__gearbox=gearbox_key)
 
         # Mileage filters
         mileage_from = to_int(get_param('mileageFrom'))
-        if mileage_from is not None:
-            queryset = queryset.filter(mileage__gte=mileage_from)
+        if mileage_from is not None and is_cars_category:
+            queryset = queryset.filter(cars_details__mileage__gte=mileage_from)
         mileage_to = to_int(get_param('mileageTo'))
-        if mileage_to is not None:
-            queryset = queryset.filter(mileage__lte=mileage_to)
+        if mileage_to is not None and is_cars_category:
+            queryset = queryset.filter(cars_details__mileage__lte=mileage_to)
 
         # Engine/Power filters
         engine_from = to_int(get_param('engineFrom'))
-        if engine_from is not None:
-            queryset = queryset.filter(power__gte=engine_from)
+        if engine_from is not None and is_cars_category:
+            queryset = queryset.filter(cars_details__power__gte=engine_from)
         engine_to = to_int(get_param('engineTo'))
-        if engine_to is not None:
-            queryset = queryset.filter(power__lte=engine_to)
+        if engine_to is not None and is_cars_category:
+            queryset = queryset.filter(cars_details__power__lte=engine_to)
 
         color = get_param('color')
-        if color:
-            queryset = queryset.filter(color__icontains=color)
+        if color and is_cars_category:
+            queryset = queryset.filter(cars_details__color__icontains=color)
 
         condition = get_param('condition')
         nup = get_param('nup')
-        if condition:
+        if condition and (main_category in {'cars', None, ''}):
             condition_mapping = {
                 'Нов': '0',
                 'Употребяван': '1',
@@ -828,8 +922,8 @@ class CarListingViewSet(viewsets.ModelViewSet):
                 '3': '3',
             }
             condition_key = condition_mapping.get(condition, condition)
-            queryset = queryset.filter(condition=condition_key)
-        elif nup:
+            queryset = queryset.filter(cars_details__condition=condition_key)
+        elif nup and (main_category in {'cars', None, ''}):
             # mobile.bg-compatible state mask:
             # 1=new, 0=used, 3=damaged, 2=for parts
             nup_to_condition = {
@@ -840,10 +934,10 @@ class CarListingViewSet(viewsets.ModelViewSet):
             }
             allowed_states = [nup_to_condition[flag] for flag in str(nup) if flag in nup_to_condition]
             if allowed_states:
-                queryset = queryset.filter(condition__in=list(dict.fromkeys(allowed_states)))
+                queryset = queryset.filter(cars_details__condition__in=list(dict.fromkeys(allowed_states)))
 
         # Main-category-specific filters
-        if main_category == 'w':
+        if main_category == 'wheels':
             topmenu = get_param('topmenu')
             if topmenu:
                 queryset = queryset.filter(wheels_details__wheel_for=topmenu)
@@ -905,7 +999,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
             if wheel_type:
                 queryset = queryset.filter(wheels_details__wheel_type__icontains=wheel_type)
 
-        if main_category == 'u':
+        if main_category == 'parts':
             part_for = get_param('topmenu')
             if part_for:
                 queryset = queryset.filter(parts_details__part_for=part_for)
@@ -922,8 +1016,8 @@ class CarListingViewSet(viewsets.ModelViewSet):
             if part_year_to is not None:
                 queryset = queryset.filter(parts_details__part_year_to__lte=part_year_to)
 
-        if main_category in {'3', '4'}:
-            relation = 'buses_details' if main_category == '3' else 'trucks_details'
+        if main_category in {'buses', 'trucks'}:
+            relation = 'buses_details' if main_category == 'buses' else 'trucks_details'
             axles_from = to_int(get_param('axlesFrom'))
             if axles_from is not None:
                 queryset = queryset.filter(**{f'{relation}__axles__gte': axles_from})
@@ -946,16 +1040,12 @@ class CarListingViewSet(viewsets.ModelViewSet):
             if euro_standard:
                 queryset = queryset.filter(**{f'{relation}__euro_standard__icontains': euro_standard})
 
-        if main_category == '5':
+        if main_category == 'motorcycles':
             moto_category = get_param('motoCategory')
-            if moto_category:
-                queryset = queryset.filter(features__contains=[f'Категория: {moto_category}'])
             moto_cooling_type = get_param('motoCoolingType')
-            if moto_cooling_type:
-                queryset = queryset.filter(features__contains=[f'Охлаждане: {moto_cooling_type}'])
             moto_engine_kind = get_param('motoEngineKind')
             if moto_engine_kind:
-                queryset = queryset.filter(features__contains=[f'Вид двигател: {moto_engine_kind}'])
+                queryset = queryset.filter(moto_details__engine_type__icontains=moto_engine_kind)
             displacement_from = to_int(get_param('displacementFrom'))
             if displacement_from is not None:
                 queryset = queryset.filter(moto_details__displacement_cc__gte=displacement_from)
@@ -963,11 +1053,12 @@ class CarListingViewSet(viewsets.ModelViewSet):
             if displacement_to is not None:
                 queryset = queryset.filter(moto_details__displacement_cc__lte=displacement_to)
             moto_features = get_param('motoFeatures')
-            if moto_features:
-                for feature in [item.strip() for item in moto_features.split(',') if item.strip()]:
-                    queryset = queryset.filter(features__contains=[feature])
+            if moto_category or moto_cooling_type or moto_features:
+                # No dedicated fields in MotoListing for these legacy UI filters.
+                # Keep endpoint stable by ignoring them instead of forcing empty results.
+                pass
 
-        if main_category == '8':
+        if main_category == 'forklifts':
             lift_from = to_int(get_param('liftCapacityFrom'))
             if lift_from is not None:
                 queryset = queryset.filter(forklift_details__lift_capacity_kg__gte=lift_from)
@@ -981,7 +1072,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
             if hours_to is not None:
                 queryset = queryset.filter(forklift_details__hours__lte=hours_to)
 
-        if main_category == '9':
+        if main_category == 'rvs':
             beds_from = to_int(get_param('bedsFrom'))
             if beds_from is not None:
                 queryset = queryset.filter(caravan_details__beds__gte=beds_from)
@@ -1001,8 +1092,8 @@ class CarListingViewSet(viewsets.ModelViewSet):
             if get_param('hasAirConditioning') in {'1', 'true', 'True'}:
                 queryset = queryset.filter(caravan_details__has_air_conditioning=True)
 
-        if main_category == 'a':
-            boat_category = get_param('boatCategory')
+        if main_category == 'yachts':
+            boat_category = get_param('boatCategory', 'marka')
             if boat_category:
                 queryset = queryset.filter(boats_details__boat_category__icontains=boat_category)
             engine_count_from = to_int(get_param('engineCountFrom'))
@@ -1032,8 +1123,8 @@ class CarListingViewSet(viewsets.ModelViewSet):
                 for feature in [item.strip() for item in boat_features.split(',') if item.strip()]:
                     queryset = queryset.filter(boats_details__features__contains=[feature])
 
-        if main_category == 'b':
-            trailer_category = get_param('trailerCategory')
+        if main_category == 'trailer':
+            trailer_category = get_param('trailerCategory', 'marka')
             if trailer_category:
                 queryset = queryset.filter(trailers_details__trailer_category__icontains=trailer_category)
             load_from = to_int(get_param('loadFrom'))
@@ -1053,7 +1144,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
                 for feature in [item.strip() for item in trailer_features.split(',') if item.strip()]:
                     queryset = queryset.filter(trailers_details__features__contains=[feature])
 
-        if main_category == 'v':
+        if main_category == 'accessories':
             topmenu = get_param('topmenu')
             if topmenu:
                 queryset = queryset.filter(accessories_details__classified_for=topmenu)
@@ -1061,19 +1152,27 @@ class CarListingViewSet(viewsets.ModelViewSet):
             if accessory_category:
                 queryset = queryset.filter(accessories_details__accessory_category__icontains=accessory_category)
 
-        if main_category in {'y', 'z'}:
+        if main_category in {'buy', 'services'}:
             topmenu = get_param('topmenu')
             if topmenu:
-                relation_field = 'buy_details__classified_for' if main_category == 'y' else 'services_details__classified_for'
+                relation_field = (
+                    'buy_details__classified_for'
+                    if main_category == 'buy'
+                    else 'services_details__classified_for'
+                )
                 queryset = queryset.filter(**{relation_field: topmenu})
             category = get_param('category')
             if category:
-                relation_field = 'buy_details__buy_category' if main_category == 'y' else 'services_details__service_category'
+                relation_field = (
+                    'buy_details__buy_category'
+                    if main_category == 'buy'
+                    else 'services_details__service_category'
+                )
                 queryset = queryset.filter(**{f'{relation_field}__icontains': category})
 
         # Car category filter (legacy mappings)
         category = get_param('category')
-        if category and (main_category == '1' or main_category is None):
+        if category and (main_category == 'cars' or main_category is None):
             category_mapping = {
                 'Ван': 'van',
                 'Джип': 'jeep',
@@ -1097,16 +1196,16 @@ class CarListingViewSet(viewsets.ModelViewSet):
                 'hatchback': 'hatchback',
             }
             category_key = category_mapping.get(category, category)
-            queryset = queryset.filter(category=category_key)
+            queryset = queryset.filter(cars_details__category=category_key)
 
         # Car-specific numeric filters
-        if main_category in {'1', None, ''}:
+        if main_category in {'cars', None, ''}:
             displacement_from = to_int(get_param('displacementFrom'))
             if displacement_from is not None:
-                queryset = queryset.filter(displacement__gte=displacement_from)
+                queryset = queryset.filter(cars_details__displacement__gte=displacement_from)
             displacement_to = to_int(get_param('displacementTo'))
             if displacement_to is not None:
-                queryset = queryset.filter(displacement__lte=displacement_to)
+                queryset = queryset.filter(cars_details__displacement__lte=displacement_to)
 
             euro_standard = get_param('euroStandard')
             if euro_standard:
@@ -1115,12 +1214,12 @@ class CarListingViewSet(viewsets.ModelViewSet):
                 if lowered.startswith('евро'):
                     parts = normalized_euro.split()
                     normalized_euro = parts[-1] if parts else normalized_euro
-                queryset = queryset.filter(euro_standard__icontains=normalized_euro)
+                queryset = queryset.filter(cars_details__euro_standard__icontains=normalized_euro)
 
         listing_features = get_param('features')
-        if listing_features and main_category not in {'a', 'b'}:
+        if listing_features and (main_category in {'cars', None, ''}):
             for feature in [item.strip() for item in listing_features.split(',') if item.strip()]:
-                queryset = queryset.filter(features__contains=[feature])
+                queryset = queryset.filter(cars_details__features__contains=[feature])
 
         # Media / seller filters
         if get_param('hasPhoto') in {'1', 'true', 'True'}:
@@ -1139,17 +1238,17 @@ class CarListingViewSet(viewsets.ModelViewSet):
         elif sort_by in {'price-desc'}:
             queryset = queryset.order_by('top_rank', '-price')
         elif sort_by in {'year-desc', '4'}:
-            queryset = queryset.order_by('top_rank', '-year_from')
+            queryset = queryset.order_by('top_rank', '-cars_details__year_from')
         elif sort_by in {'year-asc'}:
-            queryset = queryset.order_by('top_rank', 'year_from')
+            queryset = queryset.order_by('top_rank', 'cars_details__year_from')
         elif sort_by in {'mileage-desc', '5'}:
-            queryset = queryset.order_by('top_rank', '-mileage')
+            queryset = queryset.order_by('top_rank', '-cars_details__mileage')
         elif sort_by in {'newest', '6', 'Най-новите обяви'}:
             queryset = queryset.order_by('top_rank', '-created_at')
         elif sort_by in {'newest-2days', '7', 'Най-новите обяви от посл. 2 дни'}:
             queryset = queryset.filter(created_at__gte=timezone.now() - timedelta(days=2)).order_by('top_rank', '-created_at')
         else:
-            queryset = queryset.order_by('top_rank', 'brand', 'model', 'price')
+            queryset = queryset.order_by('top_rank', 'cars_details__brand', 'cars_details__model', 'price')
         if self.action == "list":
             lite = (self.request.query_params.get("lite") or "").lower()
             compact = (self.request.query_params.get("compact") or "").lower()
@@ -1181,9 +1280,6 @@ class CarListingViewSet(viewsets.ModelViewSet):
                         Subquery(first_thumbnail_subquery),
                         Subquery(first_image_subquery),
                     )
-                ).only(
-                    'id', 'slug', 'brand', 'model', 'year_from', 'price', 'mileage',
-                    'fuel', 'power', 'city', 'created_at', 'listing_type', 'is_kaparirano'
                 )
             elif compact in {"1", "true", "yes"}:
                 queryset = queryset.annotate(
@@ -1196,13 +1292,6 @@ class CarListingViewSet(viewsets.ModelViewSet):
                     'user',
                     'user__business_profile',
                     'user__private_profile'
-                ).only(
-                    'id', 'slug', 'main_category', 'title', 'brand', 'model', 'year_from', 'price', 'mileage',
-                    'fuel', 'gearbox', 'power', 'location_country', 'city',
-                    'category', 'condition', 'created_at', 'updated_at', 'listing_type', 'is_kaparirano',
-                    'user_id', 'user__email',
-                    'user__business_profile__dealer_name',
-                    'user__private_profile__id'
                 ).prefetch_related(image_prefetch)
             else:
                 queryset = queryset.annotate(
@@ -1211,14 +1300,6 @@ class CarListingViewSet(viewsets.ModelViewSet):
                     'user',
                     'user__business_profile',
                     'user__private_profile'
-                ).only(
-                    'id', 'slug', 'main_category', 'title', 'brand', 'model', 'year_from', 'price', 'mileage',
-                    'fuel', 'gearbox', 'power', 'location_country', 'city',
-                    'category', 'condition', 'created_at', 'updated_at', 'listing_type', 'is_kaparirano',
-                    'is_active', 'is_draft', 'is_archived',
-                    'user_id', 'user__email',
-                    'user__business_profile__dealer_name',
-                    'user__private_profile__id'
                 ).prefetch_related(image_prefetch)
         elif self.action == "retrieve":
             queryset = queryset.select_related(
@@ -1319,7 +1400,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
                 should_increment = created
 
         if should_increment:
-            CarListing.objects.filter(pk=instance.pk).update(view_count=F('view_count') + 1)
+            BaseListing.objects.filter(pk=instance.pk).update(view_count=F('view_count') + 1)
             instance.refresh_from_db(fields=['view_count'])
             detail_etag = _compute_listing_detail_etag(
                 instance,
@@ -1553,7 +1634,7 @@ def get_user_listings(request):
     """Get current user's active listings"""
     _demote_expired_top_listings()
     cutoff = get_expiry_cutoff()
-    listings = CarListing.objects.filter(
+    listings = BaseListing.objects.filter(
         user=request.user,
         is_active=True,
         is_draft=False,
@@ -1574,7 +1655,7 @@ def get_user_drafts(request):
     """Get current user's draft listings"""
     _demote_expired_top_listings()
     drafts = (
-        CarListing.objects.filter(user=request.user, is_draft=True)
+        BaseListing.objects.filter(user=request.user, is_draft=True)
         .annotate(favorites_count=Count('favorited_by', distinct=True))
         .prefetch_related('images')
     )
@@ -1592,7 +1673,7 @@ def get_user_archived(request):
     """Get current user's archived listings"""
     _demote_expired_top_listings()
     archived = (
-        CarListing.objects.filter(user=request.user, is_archived=True)
+        BaseListing.objects.filter(user=request.user, is_archived=True)
         .annotate(favorites_count=Count('favorited_by', distinct=True))
         .prefetch_related('images')
     )
@@ -1610,7 +1691,7 @@ def get_user_expired(request):
     """Get current user's expired listings"""
     _demote_expired_top_listings()
     cutoff = get_expiry_cutoff()
-    expired = CarListing.objects.filter(
+    expired = BaseListing.objects.filter(
         user=request.user,
         is_draft=False,
         is_archived=False,
@@ -1671,7 +1752,7 @@ def get_public_profile_listings(request, profile_slug: str):
 
     cutoff = get_expiry_cutoff()
     listings = (
-        CarListing.objects.filter(
+        BaseListing.objects.filter(
             user=profile_user,
             is_active=True,
             is_draft=False,
@@ -1708,7 +1789,7 @@ def get_public_profile_listings(request, profile_slug: str):
 @permission_classes([IsAuthenticated])
 def archive_listing(request, listing_id):
     """Archive a listing"""
-    listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
+    listing = get_object_or_404(BaseListing, id=listing_id, user=request.user)
     listing.is_archived = True
     listing.is_active = False
     listing.save()
@@ -1721,7 +1802,7 @@ def archive_listing(request, listing_id):
 @permission_classes([IsAuthenticated])
 def unarchive_listing(request, listing_id):
     """Unarchive a listing"""
-    listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
+    listing = get_object_or_404(BaseListing, id=listing_id, user=request.user)
     listing.is_archived = False
     listing.is_active = True
     listing.created_at = timezone.now()
@@ -1735,7 +1816,7 @@ def unarchive_listing(request, listing_id):
 @permission_classes([IsAuthenticated])
 def delete_listing(request, listing_id):
     """Delete a listing"""
-    listing = CarListing.objects.filter(id=listing_id, user=request.user).first()
+    listing = BaseListing.objects.filter(id=listing_id, user=request.user).first()
     if listing is None:
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -1750,7 +1831,7 @@ def delete_listing(request, listing_id):
 def republish_listing(request, listing_id):
     """Republish a listing for another 30 minutes."""
     _demote_expired_top_listings()
-    listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
+    listing = get_object_or_404(BaseListing, id=listing_id, user=request.user)
     listing_type = request.data.get('listing_type')
     top_plan = (
         _normalize_top_plan(request.data.get("top_plan") or request.data.get("topPlan"))
@@ -1812,7 +1893,7 @@ def republish_listing(request, listing_id):
 def update_listing_type(request, listing_id):
     """Update listing type (top/vip/normal) for a listing."""
     _demote_expired_top_listings()
-    listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
+    listing = get_object_or_404(BaseListing, id=listing_id, user=request.user)
     listing_type = request.data.get('listing_type')
     top_plan = (
         _normalize_top_plan(request.data.get("top_plan") or request.data.get("topPlan"))
@@ -1913,7 +1994,7 @@ def update_kaparirano_status(request, listing_id):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
+    listing = get_object_or_404(BaseListing, id=listing_id, user=request.user)
 
     raw_value = request.data.get("is_kaparirano")
     if raw_value is None:
@@ -1928,7 +2009,7 @@ def update_kaparirano_status(request, listing_id):
     if next_value is None:
         next_value = not bool(listing.is_kaparirano)
 
-    CarListing.objects.filter(pk=listing.pk).update(
+    BaseListing.objects.filter(pk=listing.pk).update(
         is_kaparirano=next_value,
         updated_at=timezone.now(),
     )
@@ -1943,7 +2024,7 @@ def update_kaparirano_status(request, listing_id):
 @permission_classes([IsAuthenticated])
 def upload_listing_images(request, listing_id):
     """Upload images for a listing"""
-    listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
+    listing = get_object_or_404(BaseListing, id=listing_id, user=request.user)
 
     images = request.FILES.getlist('images')
     existing_count = listing.images.count()
@@ -1968,7 +2049,7 @@ def upload_listing_images(request, listing_id):
 @permission_classes([IsAuthenticated])
 def update_listing_images(request, listing_id):
     """Update image order and cover status for a listing"""
-    listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
+    listing = get_object_or_404(BaseListing, id=listing_id, user=request.user)
 
     images_data = request.data.get('images', [])
     if not isinstance(images_data, list):
@@ -2046,7 +2127,7 @@ def update_listing_images(request, listing_id):
 @permission_classes([IsAuthenticated])
 def add_favorite(request, listing_id):
     """Add a listing to user's favorites"""
-    listing = get_object_or_404(CarListing, id=listing_id)
+    listing = get_object_or_404(BaseListing, id=listing_id)
 
     favorite, created = Favorite.objects.get_or_create(
         user=request.user,
@@ -2144,9 +2225,9 @@ def listing_photos(request, listing_id):
         created_at__gte=cutoff,
     )
     if request.user.is_authenticated:
-        listing_queryset = CarListing.objects.filter(visibility_filter | Q(user=request.user))
+        listing_queryset = BaseListing.objects.filter(visibility_filter | Q(user=request.user))
     else:
-        listing_queryset = CarListing.objects.filter(visibility_filter)
+        listing_queryset = BaseListing.objects.filter(visibility_filter)
 
     listing = get_object_or_404(
         listing_queryset.only('id', 'created_at', 'updated_at', 'view_count'),
@@ -2264,13 +2345,13 @@ def latest_listings(request):
     )
 
     queryset = (
-        CarListing.objects.filter(
+        BaseListing.objects.filter(
             is_active=True,
             is_draft=False,
             is_archived=False,
             created_at__gte=cutoff
         )
-        .select_related('parts_details')
+        .select_related('parts_details', 'cars_details')
         .prefetch_related(image_prefetch)
         .annotate(
             first_image=Coalesce(
@@ -2279,11 +2360,6 @@ def latest_listings(request):
             ),
             last_price_change_delta=Subquery(latest_price_change.values('delta')[:1]),
             last_price_change_at=Subquery(latest_price_change.values('changed_at')[:1]),
-        )
-        .only(
-            'id', 'slug', 'main_category', 'brand', 'model', 'year_from', 'price', 'mileage',
-            'fuel', 'power', 'city', 'created_at', 'listing_type', 'is_kaparirano',
-            'parts_details__part_for', 'parts_details__part_element'
         )
         .order_by('-created_at')[:16]
     )

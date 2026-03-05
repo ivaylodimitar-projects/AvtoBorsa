@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from backend.listings.models import CarListing
+from backend.listings.models import BaseListing
 from .models import ContactInquiry, ListingReport
 from .serializers import ContactInquiryCreateSerializer, ListingReportCreateSerializer
 
@@ -17,7 +17,7 @@ DUPLICATE_REPORT_MESSAGE = "Можете да съобщите за нередн
 @permission_classes([IsAuthenticated])
 def create_listing_report(request, listing_id):
     listing = get_object_or_404(
-        CarListing,
+        BaseListing,
         id=listing_id,
         is_active=True,
         is_draft=False,

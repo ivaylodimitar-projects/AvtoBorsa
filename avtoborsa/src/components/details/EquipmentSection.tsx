@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
 import { CAR_FEATURE_GROUPS, normalizeCarFeatureLabel } from '../../constants/carFeatures';
 import { HEAVY_FEATURE_GROUPS } from '../../constants/heavyFeatures';
+import { normalizeMainCategory } from '../../constants/karbgdata';
 import { MOTO_FEATURE_GROUPS, isMotoMetaFeature } from '../../constants/motoData';
 
 interface EquipmentSectionProps {
@@ -10,14 +11,19 @@ interface EquipmentSectionProps {
 }
 
 const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features, mainCategory }) => {
+  const normalizedMainCategory = React.useMemo(
+    () => normalizeMainCategory(mainCategory),
+    [mainCategory]
+  );
+
   const featureGroups = React.useMemo(
     () =>
-      mainCategory === '3' || mainCategory === '4'
+      normalizedMainCategory === 'buses' || normalizedMainCategory === 'trucks'
         ? HEAVY_FEATURE_GROUPS
-        : mainCategory === '5'
+        : normalizedMainCategory === 'motorcycles'
           ? MOTO_FEATURE_GROUPS
           : CAR_FEATURE_GROUPS,
-    [mainCategory]
+    [normalizedMainCategory]
   );
 
   const initialExpandedCategories = React.useMemo(() => {
@@ -126,7 +132,7 @@ const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features, mainCateg
         }
         return [];
       })();
-  const visibleFeatures = mainCategory === '5'
+  const visibleFeatures = normalizedMainCategory === 'motorcycles'
     ? normalizedFeatures.filter((feature) => !isMotoMetaFeature(feature))
     : normalizedFeatures;
   const usedFeatures = new Set<string>();
@@ -275,3 +281,4 @@ const EquipmentSection: React.FC<EquipmentSectionProps> = ({ features, mainCateg
 };
 
 export default EquipmentSection;
+

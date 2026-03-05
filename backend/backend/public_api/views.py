@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from backend.accounts.models import UserProfile
-from backend.listings.models import CarListing, ListingPurchase
+from backend.listings.models import BaseListing, ListingPurchase
 from backend.listings.serializers import CarListingSerializer
 from backend.listings.views import (
     TOP_LISTING_PRICE_1D_EUR,
@@ -34,7 +34,7 @@ from backend.listings.views import (
 from .authentication import PublicApiKeyAuthentication
 
 
-SUPPORTED_PUBLIC_MAIN_CATEGORIES = {"1", "5", "3", "4"}
+SUPPORTED_PUBLIC_MAIN_CATEGORIES = {"cars", "motorcycles", "buses", "trucks"}
 IMAGE_UPLOAD_FIELD_ALIASES = ("images_upload", "images", "images[]", "photos", "photos[]")
 
 PUBLIC_API_COMMON_FIELDS = [
@@ -75,7 +75,7 @@ PUBLIC_API_CATEGORY_CONFIG = {
     "cars": {
         "label": "Автомобили и джипове",
         "endpoint": "/api/public/ads/cars/",
-        "main_category": "1",
+        "main_category": "cars",
         "specific_fields": [
             {"name": "category", "type": "string", "required": False, "description": "jeep, sedan, wagon, ..."},
             {"name": "condition", "type": "string", "required": False, "description": "0,1,2,3"},
@@ -98,7 +98,7 @@ PUBLIC_API_CATEGORY_CONFIG = {
     "motorcycles": {
         "label": "Мотоциклети",
         "endpoint": "/api/public/ads/motorcycles/",
-        "main_category": "5",
+        "main_category": "motorcycles",
         "specific_fields": [
             {"name": "displacement_cc", "type": "integer", "required": False, "description": "Кубатура"},
             {"name": "transmission", "type": "string", "required": False, "description": "Ръчни/автоматични"},
@@ -116,7 +116,7 @@ PUBLIC_API_CATEGORY_CONFIG = {
     "buses": {
         "label": "Бусове",
         "endpoint": "/api/public/ads/buses/",
-        "main_category": "3",
+        "main_category": "buses",
         "specific_fields": [
             {"name": "axles", "type": "integer", "required": False, "description": "ОсИ"},
             {"name": "seats", "type": "integer", "required": False, "description": "Брой места"},
@@ -140,7 +140,7 @@ PUBLIC_API_CATEGORY_CONFIG = {
     "trucks": {
         "label": "Камиони",
         "endpoint": "/api/public/ads/trucks/",
-        "main_category": "4",
+        "main_category": "trucks",
         "specific_fields": [
             {"name": "axles", "type": "integer", "required": False, "description": "ОсИ"},
             {"name": "seats", "type": "integer", "required": False, "description": "Брой места"},
@@ -354,19 +354,19 @@ class PublicCategoryListingCreateView(APIView):
 
 
 class PublicCarsCreateView(PublicCategoryListingCreateView):
-    main_category = "1"
+    main_category = "cars"
 
 
 class PublicMotorcyclesCreateView(PublicCategoryListingCreateView):
-    main_category = "5"
+    main_category = "motorcycles"
 
 
 class PublicBusesCreateView(PublicCategoryListingCreateView):
-    main_category = "3"
+    main_category = "buses"
 
 
 class PublicTrucksCreateView(PublicCategoryListingCreateView):
-    main_category = "4"
+    main_category = "trucks"
 
 
 class PublicDraftPublishView(APIView):
@@ -377,7 +377,7 @@ class PublicDraftPublishView(APIView):
     parser_classes = (MultiPartParser, FormParser, JSONParser)
 
     def post(self, request, listing_id):
-        listing = get_object_or_404(CarListing, id=listing_id, user=request.user)
+        listing = get_object_or_404(BaseListing, id=listing_id, user=request.user)
         if listing.main_category not in SUPPORTED_PUBLIC_MAIN_CATEGORIES:
             raise ValidationError(
                 {"detail": "Only cars, motorcycles, buses, and trucks can be published here."}

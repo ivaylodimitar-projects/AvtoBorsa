@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
-import { getMainCategoryLabel } from "../constants/mobileBgData";
+﻿import { useState, useEffect, useMemo } from "react";
+import { getMainCategoryLabel } from "../constants/karbgdata";
 import { useAuth } from "../context/AuthContext";
 
 export interface RecentSearch {
@@ -96,7 +96,7 @@ const generateSearchLabel = (criteria: Record<string, any>): string => {
 
   // Brand and Model
   if (criteria.equipmentType) {
-    parts.push(`Вид: ${criteria.equipmentType}`);
+    parts.push(`Ð’Ð¸Ð´: ${criteria.equipmentType}`);
   }
 
   const brand = criteria.brand || criteria.marka;
@@ -116,35 +116,35 @@ const generateSearchLabel = (criteria: Record<string, any>): string => {
   // Year Range
   if (criteria.yearFrom) {
     if (criteria.yearTo) {
-      parts.push(`${criteria.yearFrom}–${criteria.yearTo} г.`);
+      parts.push(`${criteria.yearFrom}â€“${criteria.yearTo} Ð³.`);
     } else {
-      parts.push(`от ${criteria.yearFrom} г.`);
+      parts.push(`Ð¾Ñ‚ ${criteria.yearFrom} Ð³.`);
     }
   } else if (criteria.yearTo) {
-    parts.push(`до ${criteria.yearTo} г.`);
+    parts.push(`Ð´Ð¾ ${criteria.yearTo} Ð³.`);
   }
 
   // Price Range
   if (criteria.maxPrice) {
-    parts.push(`до €${criteria.maxPrice}`);
+    parts.push(`Ð´Ð¾ â‚¬${criteria.maxPrice}`);
   } else if (criteria.priceFrom || criteria.priceTo) {
     const from = criteria.priceFrom || "0";
-    const to = criteria.priceTo || "∞";
-    parts.push(`€${from}–${to}`);
+    const to = criteria.priceTo || "âˆž";
+    parts.push(`â‚¬${from}â€“${to}`);
   }
 
   // Mileage Range
   if (criteria.mileageFrom || criteria.mileageTo) {
     const from = criteria.mileageFrom || "0";
-    const to = criteria.mileageTo || "∞";
-    parts.push(`${from}–${to} км`);
+    const to = criteria.mileageTo || "âˆž";
+    parts.push(`${from}â€“${to} ÐºÐ¼`);
   }
 
   // Engine/Power Range
   if (criteria.engineFrom || criteria.engineTo) {
     const from = criteria.engineFrom || "0";
-    const to = criteria.engineTo || "∞";
-    parts.push(`${from}–${to} к.с.`);
+    const to = criteria.engineTo || "âˆž";
+    parts.push(`${from}â€“${to} Ðº.Ñ.`);
   }
 
   // Region
@@ -173,8 +173,9 @@ const generateSearchLabel = (criteria: Record<string, any>): string => {
   }
 
   if (parts.length === 0) {
-    return "Всички обяви";
+    return "Ð’ÑÐ¸Ñ‡ÐºÐ¸ Ð¾Ð±ÑÐ²Ð¸";
   }
 
-  return parts.join(" • ");
+  return parts.join(" â€¢ ");
 };
+

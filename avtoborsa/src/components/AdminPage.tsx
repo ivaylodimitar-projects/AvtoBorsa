@@ -1054,7 +1054,7 @@ const AdminPage: React.FC = () => {
     setDeleteCustomReason("");
   }, [deleteModalListing, busyId]);
 
-  const confirmDeleteListing = useCallback(async () => {
+  const confirmDeleteListing = useCallback(async (sendEmail = true) => {
     if (!deleteModalListing) return;
     if (deleteReason === "other" && deleteCustomReason.trim().length < 5) {
       setError("Custom reason must be at least 5 characters.");
@@ -1071,11 +1071,12 @@ const AdminPage: React.FC = () => {
             body: JSON.stringify({
               reason: deleteReason,
               custom_reason: deleteReason === "other" ? deleteCustomReason.trim() : "",
+              send_email: sendEmail,
             }),
           }
         );
         await Promise.all([loadListings(), loadOverview()]);
-        if (response?.email_sent === false) {
+        if (sendEmail && response?.email_sent === false) {
           setError("Listing was deleted, but notification email was not sent.");
         }
         setDeleteModalListing(null);
@@ -2811,7 +2812,7 @@ const AdminPage: React.FC = () => {
                 )}
 
                 <div style={{ fontSize: 12, color: color.muted }}>
-                  This action will delete the listing and notify the seller by in-app notification and email.
+                  This action will always delete the listing and send an in-app notification. Email notification is optional.
                 </div>
               </div>
 
@@ -2826,11 +2827,19 @@ const AdminPage: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => void confirmDeleteListing()}
+                  onClick={() => void confirmDeleteListing(false)}
+                  disabled={busyId === deleteModalListing.id}
+                  style={buttonStyle("neutral")}
+                >
+                  {busyId === deleteModalListing.id ? "Deleting..." : "Delete without email"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void confirmDeleteListing(true)}
                   disabled={busyId === deleteModalListing.id}
                   style={buttonStyle("danger")}
                 >
-                  {busyId === deleteModalListing.id ? "Deleting..." : "Delete and notify"}
+                  {busyId === deleteModalListing.id ? "Deleting..." : "Delete and send email"}
                 </button>
               </div>
             </div>

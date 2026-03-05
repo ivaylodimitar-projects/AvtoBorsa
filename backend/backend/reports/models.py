@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.db import models
 
-from backend.listings.models import CarListing
+from backend.listings.models import BaseListing
 
 
 class ListingReport(models.Model):
@@ -11,7 +11,7 @@ class ListingReport(models.Model):
         related_name='listing_reports',
     )
     listing = models.ForeignKey(
-        CarListing,
+        BaseListing,
         on_delete=models.CASCADE,
         related_name='reports',
     )

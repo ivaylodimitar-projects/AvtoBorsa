@@ -3,7 +3,7 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from backend.listings.models import CarListing
+from backend.listings.models import BaseListing, CarsListing
 from backend.reports.models import ListingReport
 from backend.reports.views import DUPLICATE_REPORT_MESSAGE
 
@@ -14,19 +14,24 @@ class CreateListingReportTests(TestCase):
         self.owner = User.objects.create_user(username='owner', email='owner@example.com', password='pass12345')
         self.reporter = User.objects.create_user(username='reporter', email='reporter@example.com', password='pass12345')
         self.other_user = User.objects.create_user(username='other', email='other@example.com', password='pass12345')
-        self.listing = CarListing.objects.create(
+        self.listing = BaseListing.objects.create(
             user=self.owner,
-            brand='BMW',
-            model='X5',
-            year_from=2021,
+            main_category='cars',
             price='32000.00',
             city='Sofia',
-            fuel='dizel',
-            gearbox='avtomatik',
-            mileage=120000,
             description='Test listing',
             phone='0888123456',
             email='owner@example.com',
+        )
+        CarsListing.objects.create(
+            listing=self.listing,
+            brand='BMW',
+            model='X5',
+            year_from=2021,
+            fuel='dizel',
+            gearbox='avtomatik',
+            mileage=120000,
+            condition='1',
         )
 
     def test_authenticated_user_can_create_report(self):

@@ -42,7 +42,7 @@ const prefetchImage = (url: string): Promise<void> => {
       }
       resolve();
     };
-    img.onerror = () => reject(new Error(`Failed to prefetch image: ${url}`));
+    img.onerror = () => reject(new Error(`Неуспешно предварително зареждане на снимката: ${url}`));
     img.src = url;
   });
 };
@@ -746,7 +746,7 @@ const FullscreenModal = memo<{
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
-                  aria-label="Zoom out"
+                  aria-label="Намали"
                 >
                   <ZoomOut size={18} />
                 </button>
@@ -760,7 +760,7 @@ const FullscreenModal = memo<{
                   step={0.01}
                   value={zoomLevel}
                   onChange={handleZoomSlider}
-                  aria-label="Zoom level"
+                  aria-label="Ниво на приближение"
                   style={{
                     width: 160,
                     accentColor: '#34d399',
@@ -782,7 +782,7 @@ const FullscreenModal = memo<{
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
-                  aria-label="Zoom in"
+                  aria-label="Увеличи"
                 >
                   <ZoomIn size={18} />
                 </button>
@@ -799,7 +799,7 @@ const FullscreenModal = memo<{
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
-                  aria-label="Reset zoom"
+                  aria-label="Нулирай приближението"
                 >
                   <RotateCcw size={18} />
                 </button>
@@ -818,7 +818,7 @@ const FullscreenModal = memo<{
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
-              aria-label="Close"
+              aria-label="Затвори"
             >
               <X size={24} />
             </button>
@@ -1522,7 +1522,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
           fontSize: 16,
         }}
       >
-        📷 Нема слики
+        📷 Няма снимки
       </div>
     );
   }
@@ -1761,7 +1761,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
             onClick={isMobile ? () => setIsFullscreenOpen(true) : undefined}
             role={isMobile ? 'button' : undefined}
             tabIndex={isMobile ? 0 : -1}
-            aria-label={isMobile ? 'Open image fullscreen' : undefined}
+            aria-label={isMobile ? 'Отвори снимката на цял екран' : undefined}
             onKeyDown={
               isMobile
                 ? (event) => {
@@ -1826,7 +1826,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
           {promoLabel && (
             <img
               src={promoLabel}
-              alt="Promo"
+              alt="Промоция"
               style={{
                 ...styles.promoLabel,
                 top: (isMobile ? 8 : 12) + (showTopBadge || showVipBadge ? (isMobile ? 56 : 54) : 0),
@@ -1855,7 +1855,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
                   e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
                   e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
                 }}
-                aria-label="Previous image"
+                aria-label="Предишна снимка"
               >
                 <ChevronLeft size={isMobile ? 22 : 28} strokeWidth={3} />
               </button>
@@ -1875,7 +1875,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
                   e.currentTarget.style.transform = 'translateY(-50%) scale(1)';
                   e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
                 }}
-                aria-label="Next image"
+                aria-label="Следваща снимка"
               >
                 <ChevronRight size={isMobile ? 22 : 28} strokeWidth={3} />
               </button>
@@ -1892,7 +1892,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
               onMouseLeave={(e) =>
                 (e.currentTarget.style.background = 'rgba(15, 23, 42, 0.65)')
               }
-              aria-label="View fullscreen"
+              aria-label="Отвори на цял екран"
             >
               <Monitor size={18} />
               <span>Голям екран</span>
@@ -1921,7 +1921,7 @@ const RezonGallery: React.FC<RezonGalleryProps> = ({
                     event.stopPropagation();
                     handleSlideTo(index, 'dots');
                   }}
-                  aria-label={`Image ${index + 1}`}
+                  aria-label={`Снимка ${index + 1}`}
                   style={{
                     ...styles.mobileDot,
                     background:

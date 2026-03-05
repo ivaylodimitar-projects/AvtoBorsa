@@ -1,8 +1,9 @@
 ﻿from rest_framework import serializers
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 import json
 from .models import (
-    CarListing,
+    BaseListing,
     CarImage,
     Favorite,
     CarsListing,
@@ -343,55 +344,57 @@ LISTING_TYPE_ALIASES = {
 }
 
 MAIN_CATEGORY_ALIASES = {
-    "1": "1",
-    "cars": "1",
-    "car": "1",
-    "автомобили и джипове": "1",
-    "w": "w",
-    "wheels": "w",
-    "tires and rims": "w",
-    "гуми и джанти": "w",
-    "u": "u",
-    "parts": "u",
-    "части": "u",
-    "3": "3",
-    "buses": "3",
-    "бусове": "3",
-    "4": "4",
-    "trucks": "4",
-    "камиони": "4",
-    "5": "5",
-    "motorcycles": "5",
-    "мотоциклети": "5",
-    "6": "6",
-    "agri": "6",
-    "agricultural": "6",
-    "селскостопански": "6",
-    "7": "7",
-    "industrial": "7",
-    "индустриални": "7",
-    "8": "8",
-    "forklifts": "8",
-    "кари": "8",
-    "9": "9",
-    "caravans": "9",
-    "каравани": "9",
-    "a": "a",
-    "boats": "a",
-    "яхти и лодки": "a",
-    "b": "b",
-    "trailers": "b",
-    "ремаркета": "b",
-    "v": "v",
-    "accessories": "v",
-    "аксесоари": "v",
-    "y": "y",
-    "buy": "y",
-    "купува": "y",
-    "z": "z",
-    "services": "z",
-    "услуги": "z",
+    "cars": "cars",
+    "car": "cars",
+    "автомобили и джипове": "cars",
+    "wheels": "wheels",
+    "tires and rims": "wheels",
+    "гуми и джанти": "wheels",
+    "parts": "parts",
+    "части": "parts",
+    "buses": "buses",
+    "бусове": "buses",
+    "trucks": "trucks",
+    "камиони": "trucks",
+    "motorcycles": "motorcycles",
+    "мотоциклети": "motorcycles",
+    "agriculture": "agriculture",
+    "agri": "agriculture",
+    "agricultural": "agriculture",
+    "селскостопански": "agriculture",
+    "industrial": "industrial",
+    "индустриални": "industrial",
+    "forklifts": "forklifts",
+    "кари": "forklifts",
+    "rvs": "rvs",
+    "caravans": "rvs",
+    "каравани": "rvs",
+    "yachts": "yachts",
+    "boats": "yachts",
+    "яхти и лодки": "yachts",
+    "trailer": "trailer",
+    "trailers": "trailer",
+    "ремаркета": "trailer",
+    "accessories": "accessories",
+    "аксесоари": "accessories",
+    "buy": "buy",
+    "купува": "buy",
+    "services": "services",
+    "услуги": "services",
 }
+
+
+def _canonical_main_category(value, default=None):
+    if value in (None, ""):
+        return default
+    key = str(value).strip().lower()
+    if not key:
+        return default
+    return str(MAIN_CATEGORY_ALIASES.get(key, value))
+
+
+def _category_matches(value, canonical_code):
+    return _canonical_main_category(value) == str(canonical_code)
 
 VIP_PLAN_ALIASES = {
     "7d": "7d",
@@ -415,7 +418,7 @@ TOP_PLAN_ALIASES = {
 }
 
 MIN_IMAGES_REQUIRED_FOR_PUBLISH = 3
-MAIN_CATEGORIES_WITH_OPTIONAL_IMAGES = {"y", "z"}
+MAIN_CATEGORIES_WITH_OPTIONAL_IMAGES = {"buy", "services"}
 LIST_IMAGE_RENDITION_WIDTHS = {600}
 DETAIL_IMAGE_RENDITION_WIDTHS = {600, 1200, 1600}
 DETAIL_IMAGE_MAX_WIDTH = 1600
@@ -588,6 +591,7 @@ class CarImageDetailSerializer(CarImageSerializer):
 
 class CarListingLiteSerializer(serializers.ModelSerializer):
     """Lightweight serializer for list views like the landing page."""
+    display_title = serializers.SerializerMethodField()
     fuel_display = serializers.SerializerMethodField()
     listing_type_display = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
@@ -597,15 +601,18 @@ class CarListingLiteSerializer(serializers.ModelSerializer):
     part_element = serializers.SerializerMethodField()
 
     class Meta:
-        model = CarListing
+        model = BaseListing
         fields = [
-            'id', 'slug', 'main_category', 'brand', 'model', 'year_from', 'price', 'mileage',
+            'id', 'slug', 'main_category', 'title', 'display_title', 'brand', 'model', 'year_from', 'price', 'mileage',
             'fuel', 'fuel_display', 'power', 'city', 'created_at',
             'listing_type', 'listing_type_display', 'image_url', 'photo', 'price_change',
             'is_kaparirano',
             'part_for', 'part_element',
         ]
         read_only_fields = fields
+
+    def get_display_title(self, obj):
+        return _build_listing_display_title(obj)
 
     def get_fuel_display(self, obj):
         return obj.fuel
@@ -680,7 +687,7 @@ class CarListingLiteSerializer(serializers.ModelSerializer):
         }
 
     def get_part_for(self, obj):
-        if getattr(obj, 'main_category', None) != 'u':
+        if not _category_matches(getattr(obj, 'main_category', None), 'parts'):
             return ""
         try:
             details = obj.parts_details
@@ -689,7 +696,7 @@ class CarListingLiteSerializer(serializers.ModelSerializer):
         return getattr(details, 'part_for', "") if details else ""
 
     def get_part_element(self, obj):
-        if getattr(obj, 'main_category', None) != 'u':
+        if not _category_matches(getattr(obj, 'main_category', None), 'parts'):
             return ""
         try:
             details = obj.parts_details
@@ -700,6 +707,7 @@ class CarListingLiteSerializer(serializers.ModelSerializer):
 
 class CarListingListSerializer(serializers.ModelSerializer):
     """Optimized serializer for search/list pages."""
+    display_title = serializers.SerializerMethodField()
     main_category_display = serializers.SerializerMethodField()
     fuel_display = serializers.SerializerMethodField()
     gearbox_display = serializers.SerializerMethodField()
@@ -716,9 +724,9 @@ class CarListingListSerializer(serializers.ModelSerializer):
     price_change = serializers.SerializerMethodField()
 
     class Meta:
-        model = CarListing
+        model = BaseListing
         fields = [
-            'id', 'slug', 'main_category', 'main_category_display', 'title', 'brand', 'model', 'year_from', 'price', 'mileage', 'power', 'location_country', 'city',
+            'id', 'slug', 'main_category', 'main_category_display', 'title', 'display_title', 'brand', 'model', 'year_from', 'price', 'mileage', 'power', 'location_country', 'city',
             'fuel', 'fuel_display', 'gearbox', 'gearbox_display',
             'category', 'category_display', 'condition', 'condition_display',
             'description_preview', 'created_at', 'updated_at',
@@ -786,6 +794,9 @@ class CarListingListSerializer(serializers.ModelSerializer):
 
     def get_listing_type_display(self, obj):
         return obj.listing_type
+
+    def get_display_title(self, obj):
+        return _build_listing_display_title(obj)
 
     def get_description_preview(self, obj):
         preview = getattr(obj, 'description_preview', None)
@@ -859,13 +870,17 @@ class CarListingListSerializer(serializers.ModelSerializer):
             'changed_at': changed_at
         }
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        return _inject_listing_detail_fields(data, instance)
+
 class CarListingSearchCompactSerializer(CarListingListSerializer):
     """Compact serializer for SearchPage pagination."""
 
     class Meta:
-        model = CarListing
+        model = BaseListing
         fields = [
-            'id', 'slug', 'main_category', 'main_category_display', 'title', 'brand', 'model', 'year_from', 'price', 'mileage', 'power', 'location_country', 'city',
+            'id', 'slug', 'main_category', 'main_category_display', 'title', 'display_title', 'brand', 'model', 'year_from', 'price', 'mileage', 'power', 'location_country', 'city',
             'fuel_display', 'gearbox_display', 'category_display', 'condition_display',
             'description_preview', 'created_at', 'updated_at',
             'listing_type', 'listing_type_display',
@@ -875,49 +890,229 @@ class CarListingSearchCompactSerializer(CarListingListSerializer):
 
 
 DETAIL_MODEL_MAP = {
-    '1': (CarsListing, 'cars_details'),
-    'w': (WheelsListing, 'wheels_details'),
-    'u': (PartsListing, 'parts_details'),
-    '3': (BusesListing, 'buses_details'),
-    '4': (TrucksListing, 'trucks_details'),
-    '5': (MotoListing, 'moto_details'),
-    '6': (AgriListing, 'agri_details'),
-    '7': (IndustrialListing, 'industrial_details'),
-    '8': (ForkliftListing, 'forklift_details'),
-    '9': (CaravanListing, 'caravan_details'),
-    'a': (BoatsListing, 'boats_details'),
-    'b': (TrailersListing, 'trailers_details'),
-    'v': (AccessoriesListing, 'accessories_details'),
-    'y': (BuyListing, 'buy_details'),
-    'z': (ServicesListing, 'services_details'),
+    'cars': (CarsListing, 'cars_details'),
+    'wheels': (WheelsListing, 'wheels_details'),
+    'parts': (PartsListing, 'parts_details'),
+    'buses': (BusesListing, 'buses_details'),
+    'trucks': (TrucksListing, 'trucks_details'),
+    'motorcycles': (MotoListing, 'moto_details'),
+    'agriculture': (AgriListing, 'agri_details'),
+    'industrial': (IndustrialListing, 'industrial_details'),
+    'forklifts': (ForkliftListing, 'forklift_details'),
+    'rvs': (CaravanListing, 'caravan_details'),
+    'yachts': (BoatsListing, 'boats_details'),
+    'trailer': (TrailersListing, 'trailers_details'),
+    'accessories': (AccessoriesListing, 'accessories_details'),
+    'buy': (BuyListing, 'buy_details'),
+    'services': (ServicesListing, 'services_details'),
 }
 
 DETAIL_FIELDS_BY_MAIN_CATEGORY = {
-    '1': [],
-    'w': [
+    'cars': [
+        'category',
+        'brand',
+        'model',
+        'year_from',
+        'month',
+        'vin',
+        'fuel',
+        'gearbox',
+        'mileage',
+        'color',
+        'condition',
+        'power',
+        'displacement',
+        'euro_standard',
+        'features',
+    ],
+    'wheels': [
         'wheel_for', 'offer_type',
         'tire_brand', 'tire_width', 'tire_height', 'tire_diameter',
         'tire_season', 'tire_speed_index', 'tire_load_index', 'tire_tread',
         'wheel_brand', 'material', 'bolts', 'pcd',
         'center_bore', 'offset', 'width', 'diameter', 'count', 'wheel_type',
     ],
-    'u': ['part_for', 'part_category', 'part_element', 'part_year_from', 'part_year_to'],
-    '3': ['axles', 'seats', 'load_kg', 'transmission', 'engine_type', 'euro_standard'],
-    '4': ['axles', 'seats', 'load_kg', 'transmission', 'engine_type', 'euro_standard'],
-    '5': ['displacement_cc', 'transmission', 'engine_type'],
-    '6': ['equipment_type'],
-    '7': ['equipment_type'],
-    '8': ['engine_type', 'lift_capacity_kg', 'hours'],
-    '9': ['beds', 'length_m', 'has_toilet', 'has_heating', 'has_air_conditioning'],
-    'a': [
+    'parts': ['part_for', 'part_category', 'part_element', 'part_year_from', 'part_year_to'],
+    'buses': ['axles', 'seats', 'load_kg', 'transmission', 'engine_type', 'euro_standard'],
+    'trucks': ['axles', 'seats', 'load_kg', 'transmission', 'engine_type', 'euro_standard'],
+    'motorcycles': ['displacement_cc', 'transmission', 'engine_type'],
+    'agriculture': ['equipment_type'],
+    'industrial': ['equipment_type'],
+    'forklifts': ['engine_type', 'lift_capacity_kg', 'hours'],
+    'rvs': ['beds', 'length_m', 'has_toilet', 'has_heating', 'has_air_conditioning'],
+    'yachts': [
         'boat_category', 'engine_type', 'engine_count', 'material',
         'length_m', 'width_m', 'draft_m', 'hours',
     ],
-    'b': ['trailer_category', 'load_kg', 'axles'],
-    'v': ['classified_for', 'accessory_category'],
-    'y': ['classified_for', 'buy_category'],
-    'z': ['classified_for', 'service_category'],
+    'trailer': ['trailer_category', 'load_kg', 'axles'],
+    'accessories': ['classified_for', 'accessory_category'],
+    'buy': ['classified_for', 'buy_category'],
+    'services': ['classified_for', 'service_category'],
 }
+
+MAIN_CATEGORY_LABELS = {value: label for value, label in BaseListing.MAIN_CATEGORY_CHOICES}
+WHEEL_OFFER_TYPE_LABELS = {
+    "1": "Гуми",
+    "2": "Джанти",
+    "3": "Гуми с джанти",
+}
+TOPMENU_CATEGORY_LABELS = {
+    "1": "автомобили и джипове",
+    "3": "бусове",
+    "4": "камиони",
+    "5": "мотоциклети",
+    "6": "селскостопански",
+    "7": "индустриални",
+    "8": "кари",
+    "9": "каравани",
+    "10": "яхти и лодки",
+    "11": "ремаркета",
+}
+
+
+def _safe_related(instance, relation_name):
+    if not relation_name:
+        return None
+    try:
+        return getattr(instance, relation_name)
+    except (AttributeError, ObjectDoesNotExist):
+        return None
+
+
+def _text_or_empty(value):
+    return str(value or "").strip()
+
+
+def _join_display_parts(*values):
+    parts = [_text_or_empty(value) for value in values]
+    return " ".join(part for part in parts if part).strip()
+
+
+def _build_wheels_display_title(details):
+    if details is None:
+        return ""
+
+    offer_label = WHEEL_OFFER_TYPE_LABELS.get(_text_or_empty(getattr(details, "offer_type", "")))
+    tire_size = ""
+    tire_width = _text_or_empty(getattr(details, "tire_width", ""))
+    tire_height = _text_or_empty(getattr(details, "tire_height", ""))
+    tire_diameter = _text_or_empty(getattr(details, "tire_diameter", ""))
+    wheel_diameter = _text_or_empty(getattr(details, "diameter", ""))
+    if tire_width and tire_height and tire_diameter:
+        tire_size = f"{tire_width}/{tire_height} R{tire_diameter}"
+    elif tire_diameter:
+        tire_size = f"R{tire_diameter}"
+    elif wheel_diameter:
+        tire_size = f"R{wheel_diameter}"
+
+    brand = _text_or_empty(getattr(details, "wheel_brand", "")) or _text_or_empty(
+        getattr(details, "tire_brand", "")
+    )
+    return _join_display_parts(
+        offer_label or MAIN_CATEGORY_LABELS.get("wheels", "Гуми и джанти"),
+        brand,
+        tire_size,
+    )
+
+
+def _build_parts_display_title(details):
+    if details is None:
+        return ""
+
+    part_element = _text_or_empty(getattr(details, "part_element", ""))
+    part_category = _text_or_empty(getattr(details, "part_category", ""))
+    part_for = TOPMENU_CATEGORY_LABELS.get(_text_or_empty(getattr(details, "part_for", "")), "")
+
+    if part_element and part_for:
+        return f"{part_element} за {part_for}"
+    if part_element:
+        return part_element
+    if part_category and part_for:
+        return f"{part_category} за {part_for}"
+    return part_category
+
+
+def _build_listing_display_title(instance):
+    explicit_title = _text_or_empty(getattr(instance, "title", ""))
+    if explicit_title:
+        return explicit_title
+
+    normalized_main_category = (
+        _canonical_main_category(getattr(instance, "main_category", None), default="cars") or "cars"
+    )
+    model_and_relation = DETAIL_MODEL_MAP.get(normalized_main_category)
+    relation_name = model_and_relation[1] if model_and_relation else None
+    details = _safe_related(instance, relation_name)
+
+    if normalized_main_category == "cars":
+        return _join_display_parts(getattr(instance, "brand", ""), getattr(instance, "model", ""))
+    if normalized_main_category == "wheels":
+        wheels_title = _build_wheels_display_title(details)
+        if wheels_title:
+            return wheels_title
+    if normalized_main_category == "parts":
+        parts_title = _build_parts_display_title(details)
+        if parts_title:
+            return parts_title
+    if normalized_main_category == "accessories" and details is not None:
+        accessory_category = _text_or_empty(getattr(details, "accessory_category", ""))
+        if accessory_category:
+            return accessory_category
+    if normalized_main_category == "buy" and details is not None:
+        buy_category = _text_or_empty(getattr(details, "buy_category", ""))
+        if buy_category:
+            return buy_category
+    if normalized_main_category == "services" and details is not None:
+        service_category = _text_or_empty(getattr(details, "service_category", ""))
+        if service_category:
+            return service_category
+    if normalized_main_category in {"agriculture", "industrial"} and details is not None:
+        equipment_type = _text_or_empty(getattr(details, "equipment_type", ""))
+        if equipment_type:
+            return equipment_type
+    if normalized_main_category == "yachts" and details is not None:
+        boat_category = _text_or_empty(getattr(details, "boat_category", ""))
+        if boat_category:
+            return boat_category
+    if normalized_main_category == "trailer" and details is not None:
+        trailer_category = _text_or_empty(getattr(details, "trailer_category", ""))
+        if trailer_category:
+            return trailer_category
+
+    return MAIN_CATEGORY_LABELS.get(normalized_main_category, f"Обява #{instance.pk or 'нова'}")
+
+
+def _inject_listing_detail_fields(data, instance):
+    normalized_main_category = _canonical_main_category(getattr(instance, "main_category", None))
+    data["display_title"] = _build_listing_display_title(instance)
+
+    model_and_relation = DETAIL_MODEL_MAP.get(normalized_main_category)
+    if not model_and_relation:
+        return data
+
+    _, relation_name = model_and_relation
+    detail_instance = _safe_related(instance, relation_name)
+    if detail_instance is None:
+        return data
+
+    for field_name in DETAIL_FIELDS_BY_MAIN_CATEGORY.get(normalized_main_category, []):
+        value = getattr(detail_instance, field_name, None)
+        if isinstance(value, Decimal):
+            value = str(value)
+        data[field_name] = value
+
+    if normalized_main_category in {"buses", "trucks"}:
+        data["heavy_euro_standard"] = getattr(detail_instance, "euro_standard", "")
+    if normalized_main_category == "yachts":
+        data["boat_features"] = getattr(detail_instance, "features", []) or []
+    if normalized_main_category == "trailer":
+        data["trailer_features"] = getattr(detail_instance, "features", []) or []
+    if normalized_main_category == "buy":
+        data["buy_service_category"] = getattr(detail_instance, "buy_category", "")
+    if normalized_main_category == "services":
+        data["buy_service_category"] = getattr(detail_instance, "service_category", "")
+
+    return data
 
 
 class CarListingSerializer(serializers.ModelSerializer):
@@ -939,6 +1134,21 @@ class CarListingSerializer(serializers.ModelSerializer):
     seller_created_at = serializers.SerializerMethodField()
     price_history = serializers.SerializerMethodField()
     description = serializers.CharField(required=False, allow_blank=True, default="")
+    category = serializers.CharField(required=False, allow_blank=True)
+    brand = serializers.CharField(required=False, allow_blank=True)
+    model = serializers.CharField(required=False, allow_blank=True)
+    year_from = serializers.IntegerField(required=False, allow_null=True)
+    month = serializers.IntegerField(required=False, allow_null=True)
+    vin = serializers.CharField(required=False, allow_blank=True)
+    fuel = serializers.CharField(required=False, allow_blank=True)
+    gearbox = serializers.CharField(required=False, allow_blank=True)
+    mileage = serializers.IntegerField(required=False, allow_null=True)
+    color = serializers.CharField(required=False, allow_blank=True)
+    condition = serializers.CharField(required=False, allow_blank=True)
+    power = serializers.IntegerField(required=False, allow_null=True)
+    displacement = serializers.IntegerField(required=False, allow_null=True)
+    euro_standard = serializers.CharField(required=False, allow_blank=True)
+    features = serializers.ListField(child=serializers.CharField(), required=False)
 
     images_upload = serializers.ListField(
         child=serializers.ImageField(),
@@ -1005,7 +1215,7 @@ class CarListingSerializer(serializers.ModelSerializer):
     buy_service_category = serializers.CharField(required=False, allow_blank=True)
 
     class Meta:
-        model = CarListing
+        model = BaseListing
         fields = [
             'id', 'slug', 'user', 'user_email', 'main_category', 'category', 'category_display', 'title', 'brand', 'model',
             'year_from', 'month', 'vin', 'price', 'location_country', 'location_region', 'city',
@@ -1183,9 +1393,10 @@ class CarListingSerializer(serializers.ModelSerializer):
         return payload
 
     def validate(self, attrs):
-        main_category = str(
-            attrs.get("main_category", self.instance.main_category if self.instance else "1")
-        )
+        main_category = _canonical_main_category(
+            attrs.get("main_category", self.instance.main_category if self.instance else "cars"),
+            default="cars",
+        ) or "cars"
 
         is_create = self.instance is None
         if is_create:
@@ -1286,6 +1497,7 @@ class CarListingSerializer(serializers.ModelSerializer):
 
         camel_to_snake = {
             "mainCategory": "main_category",
+            "maincategory": "main_category",
             "yearFrom": "year_from",
             "locationCountry": "location_country",
             "locationRegion": "location_region",
@@ -1443,7 +1655,7 @@ class CarListingSerializer(serializers.ModelSerializer):
 
     def _extract_detail_payload(self, validated_data, main_category):
         detail_payload = {}
-        normalized_main_category = str(main_category or '1')
+        normalized_main_category = _canonical_main_category(main_category, default='cars') or 'cars'
 
         # Defensive cleanup: never let detail fields leak into CarListing(**validated_data).
         all_detail_fields = set()
@@ -1466,23 +1678,23 @@ class CarListingSerializer(serializers.ModelSerializer):
         trailer_features = extracted_values.get('trailer_features')
         buy_service_category = extracted_values.get('buy_service_category')
 
-        if normalized_main_category in {'3', '4'} and heavy_euro_standard not in (None, ''):
+        if normalized_main_category in {'buses', 'trucks'} and heavy_euro_standard not in (None, ''):
             detail_payload['euro_standard'] = heavy_euro_standard
 
-        if normalized_main_category == 'a' and boat_features is not None:
+        if normalized_main_category == 'yachts' and boat_features is not None:
             detail_payload['features'] = boat_features
-        if normalized_main_category == 'b' and trailer_features is not None:
+        if normalized_main_category == 'trailer' and trailer_features is not None:
             detail_payload['features'] = trailer_features
 
-        if normalized_main_category == 'y' and buy_service_category not in (None, ''):
+        if normalized_main_category == 'buy' and buy_service_category not in (None, ''):
             detail_payload['buy_category'] = buy_service_category
-        if normalized_main_category == 'z' and buy_service_category not in (None, ''):
+        if normalized_main_category == 'services' and buy_service_category not in (None, ''):
             detail_payload['service_category'] = buy_service_category
 
         return detail_payload
 
     def _upsert_details(self, listing, detail_payload):
-        main_category = listing.main_category
+        main_category = _canonical_main_category(listing.main_category)
         model_and_relation = DETAIL_MODEL_MAP.get(main_category)
         if not model_and_relation:
             return
@@ -1498,12 +1710,20 @@ class CarListingSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        model_and_relation = DETAIL_MODEL_MAP.get(instance.main_category)
+        normalized_main_category = _canonical_main_category(instance.main_category)
+        model_and_relation = DETAIL_MODEL_MAP.get(normalized_main_category)
         if not model_and_relation:
             return data
 
-        detail_fields = DETAIL_FIELDS_BY_MAIN_CATEGORY.get(instance.main_category, [])
-        has_derived_fields = instance.main_category in {'3', '4', 'a', 'b', 'y', 'z'}
+        detail_fields = DETAIL_FIELDS_BY_MAIN_CATEGORY.get(normalized_main_category, [])
+        has_derived_fields = normalized_main_category in {
+            'buses',
+            'trucks',
+            'yachts',
+            'trailer',
+            'buy',
+            'services',
+        }
         if not detail_fields and not has_derived_fields:
             return data
 
@@ -1518,25 +1738,26 @@ class CarListingSerializer(serializers.ModelSerializer):
                 value = str(value)
             data[field_name] = value
 
-        if instance.main_category in {'3', '4'}:
+        if normalized_main_category in {'buses', 'trucks'}:
             data['heavy_euro_standard'] = getattr(detail_instance, 'euro_standard', '')
-        if instance.main_category == 'a':
+        if normalized_main_category == 'yachts':
             data['boat_features'] = getattr(detail_instance, 'features', []) or []
-        if instance.main_category == 'b':
+        if normalized_main_category == 'trailer':
             data['trailer_features'] = getattr(detail_instance, 'features', []) or []
-        if instance.main_category == 'y':
+        if normalized_main_category == 'buy':
             data['buy_service_category'] = getattr(detail_instance, 'buy_category', '')
-        if instance.main_category == 'z':
+        if normalized_main_category == 'services':
             data['buy_service_category'] = getattr(detail_instance, 'service_category', '')
 
         return data
 
     def create(self, validated_data):
         images_data = validated_data.pop('images_upload', [])
-        main_category = validated_data.get('main_category', '1')
+        main_category = _canonical_main_category(validated_data.get('main_category', 'cars'), default='cars') or 'cars'
+        validated_data['main_category'] = main_category
         detail_payload = self._extract_detail_payload(validated_data, main_category)
 
-        listing = CarListing.objects.create(**validated_data)
+        listing = BaseListing.objects.create(**validated_data)
         self._upsert_details(listing, detail_payload)
 
         for index, image in enumerate(images_data):
@@ -1552,7 +1773,11 @@ class CarListingSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         images_data = validated_data.pop('images_upload', [])
-        main_category = validated_data.get('main_category', instance.main_category)
+        main_category = _canonical_main_category(
+            validated_data.get('main_category', instance.main_category),
+            default=_canonical_main_category(instance.main_category, default='cars') or 'cars',
+        ) or 'cars'
+        validated_data['main_category'] = main_category
         detail_payload = self._extract_detail_payload(validated_data, main_category)
 
         for attr, value in validated_data.items():

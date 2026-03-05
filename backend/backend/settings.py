@@ -21,6 +21,16 @@ def _env_flag(name: str, default: bool = False) -> bool:
     return value.strip().lower() in ("1", "true", "yes", "on")
 
 
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return int(value.strip())
+    except (TypeError, ValueError):
+        return default
+
+
 def _split_csv_env(name: str) -> list[str]:
     raw = os.getenv(name, "")
     return [item.strip() for item in raw.split(",") if item.strip()]
@@ -77,6 +87,15 @@ def _ensure_media_url(value: str | None, default: str = "/media/") -> str:
         return f"{raw_value.rstrip('/')}/"
     normalized = f"/{raw_value.lstrip('/')}"
     return f"{normalized.rstrip('/')}/"
+
+
+def _default_database_conn_max_age(host: str | None) -> int:
+    normalized_host = str(host or "").strip().lower()
+    if normalized_host in {"", "localhost", "127.0.0.1", "::1"}:
+        return 600
+    # Remote Postgres instances are safer with non-persistent connections
+    # unless an explicit override is provided.
+    return 0
 
 
 # Load environment variables from backend/.env if present (local dev convenience).
@@ -200,7 +219,11 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD", ""),
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
-        "CONN_MAX_AGE": int(os.getenv("DATABASE_CONN_MAX_AGE", "600")),
+        "CONN_MAX_AGE": _env_int(
+            "DATABASE_CONN_MAX_AGE",
+            _default_database_conn_max_age(os.getenv("DB_HOST", "localhost")),
+        ),
+        "CONN_HEALTH_CHECKS": _env_flag("DATABASE_CONN_HEALTH_CHECKS", default=True),
     }
 }
 

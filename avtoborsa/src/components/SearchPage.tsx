@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { formatConditionLabel, formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
-import { getMainCategoryFromTopmenu, getMainCategoryLabel } from "../constants/mobileBgData";
+import { getMainCategoryFromTopmenu, getMainCategoryLabel } from "../constants/karbgdata";
 import { useSavedSearches } from "../hooks/useSavedSearches";
 import { resolvePriceBadgeState } from "../utils/priceChangeBadge";
 import ListingPromoBadge from "./ListingPromoBadge";
@@ -129,6 +129,54 @@ type CarListing = {
   buy_service_category?: string;
 };
 
+const MAIN_CATEGORY_ALIAS_MAP: Record<string, string> = {
+  cars: "cars",
+  "1": "cars",
+  "2": "cars",
+  wheels: "wheels",
+  w: "wheels",
+  parts: "parts",
+  u: "parts",
+  buses: "buses",
+  "3": "buses",
+  trucks: "trucks",
+  "4": "trucks",
+  motorcycles: "motorcycles",
+  "5": "motorcycles",
+  agriculture: "agriculture",
+  agri: "agriculture",
+  agricultural: "agriculture",
+  "6": "agriculture",
+  industrial: "industrial",
+  "7": "industrial",
+  forklifts: "forklifts",
+  "8": "forklifts",
+  rvs: "rvs",
+  caravans: "rvs",
+  "9": "rvs",
+  yachts: "yachts",
+  boats: "yachts",
+  a: "yachts",
+  trailer: "trailer",
+  trailers: "trailer",
+  b: "trailer",
+  accessories: "accessories",
+  v: "accessories",
+  buy: "buy",
+  y: "buy",
+  services: "services",
+  z: "services",
+};
+
+const normalizeMainCategory = (value: unknown): string => {
+  const rawValue = String(value ?? "").trim();
+  if (!rawValue) return "";
+  const lowered = rawValue.toLocaleLowerCase("bg-BG");
+  const topmenuMappedCategory = getMainCategoryFromTopmenu(lowered);
+  if (topmenuMappedCategory) return topmenuMappedCategory;
+  return MAIN_CATEGORY_ALIAS_MAP[lowered] || lowered;
+};
+
 const isTopListing = (listing: CarListing) => {
   if (listing.is_top || listing.is_top_listing || listing.is_top_ad) return true;
   const numericType = Number(listing.listing_type);
@@ -138,7 +186,7 @@ const isTopListing = (listing: CarListing) => {
     return true;
   }
   const display = (listing.listing_type_display || "").toString().toLowerCase();
-  return display.includes("топ");
+  return display.includes("топ") || display.includes("top");
 };
 
 const isVipListing = (listing: CarListing) => {
@@ -405,7 +453,7 @@ const SearchPage: React.FC = () => {
         }
       }
       const response = await fetch(url, { signal: options.signal, headers });
-      if (!response.ok) throw new Error("Failed to fetch listings");
+      if (!response.ok) throw new Error("Неуспешно зареждане на обявите");
       const data = await response.json();
 
       if (activeQueryRef.current !== queryKey) {
@@ -448,7 +496,7 @@ const SearchPage: React.FC = () => {
         if (controller.signal.aborted || isCancelled) return;
         console.error("Error fetching listings:", err);
         if (!hasCached) {
-          setError("Failed to load listings");
+          setError("Неуспешно зареждане на обявите");
         }
       } finally {
         if (!isCancelled) {
@@ -613,7 +661,8 @@ const SearchPage: React.FC = () => {
   const formatTopmenuCategory = (value: unknown) => {
     const code = toText(value);
     if (!code) return "";
-    return getMainCategoryLabel(code) || code;
+    const resolvedMainCategory = normalizeMainCategory(code);
+    return getMainCategoryLabel(resolvedMainCategory) || getMainCategoryLabel(code) || code;
   };
 
   const formatWheelOfferType = (value: unknown) => {
@@ -663,17 +712,17 @@ const SearchPage: React.FC = () => {
       addParam(label, unit ? `${rendered} ${unit}` : rendered, icon);
     };
 
-    const mainCategory = toText(listing.main_category);
+    const mainCategory = normalizeMainCategory(listing.main_category);
 
     switch (mainCategory) {
-      case "u":
+      case "parts":
         addParam("Вид част", listing.part_category, PackageOpen);
         addParam("Част", listing.part_element, Settings);
         addParam("За", formatTopmenuCategory(listing.part_for), MapPin);
         addParam("Години", formatYearRange(listing.part_year_from, listing.part_year_to), Calendar);
         addParam("Състояние", conditionLabel, ShieldCheck);
         break;
-      case "w":
+      case "wheels":
         addParam("Оферта", formatWheelOfferType(listing.offer_type), PackageOpen);
         addParam("За", formatTopmenuCategory(listing.wheel_for), MapPin);
         addParam("Размер", formatTireSize(listing), Ruler);
@@ -681,21 +730,21 @@ const SearchPage: React.FC = () => {
         addParam("Джанти", listing.wheel_brand, Settings);
         addParam("PCD", listing.pcd, Ruler);
         break;
-      case "v":
+      case "accessories":
         addParam("Вид", listing.accessory_category, PackageOpen);
         addParam("За", formatTopmenuCategory(listing.classified_for), MapPin);
         addParam("Състояние", conditionLabel, ShieldCheck);
         break;
-      case "y":
+      case "buy":
         addParam("Купува", listing.buy_service_category, PackageOpen);
         addParam("За", formatTopmenuCategory(listing.classified_for), MapPin);
         break;
-      case "z":
+      case "services":
         addParam("Услуга", listing.buy_service_category, PackageOpen);
         addParam("За", formatTopmenuCategory(listing.classified_for), MapPin);
         break;
-      case "3":
-      case "4":
+      case "buses":
+      case "trucks":
         addNumeric("Оси", listing.axles, "", Settings);
         addNumeric("Седалки", listing.seats, "", PackageOpen);
         addNumeric("Товар", listing.load_kg, "кг", Gauge);
@@ -703,34 +752,34 @@ const SearchPage: React.FC = () => {
         addParam("Трансмисия", listing.transmission, Settings);
         addNumeric("Мощност", listing.power, "к.с.", Zap);
         break;
-      case "5":
+      case "motorcycles":
         addNumeric("Кубатура", listing.displacement_cc ?? listing.displacement, "cc", Ruler);
         addParam("Двигател", listing.engine_type, Fuel);
         addParam("Трансмисия", listing.transmission, Settings);
         addNumeric("Мощност", listing.power, "к.с.", Zap);
         break;
-      case "6":
-      case "7":
+      case "agriculture":
+      case "industrial":
         addParam("Вид техника", listing.equipment_type, PackageOpen);
         addParam("Двигател", listing.engine_type, Fuel);
         addNumeric("Мощност", listing.power, "к.с.", Zap);
         addParam("Състояние", conditionLabel, ShieldCheck);
         break;
-      case "8":
+      case "forklifts":
         addParam("Двигател", listing.engine_type, Fuel);
         addNumeric("Товар", listing.lift_capacity_kg, "кг", Gauge);
         addNumeric("Часове", listing.hours, "ч", Clock);
         addNumeric("Мощност", listing.power, "к.с.", Zap);
         addParam("Състояние", conditionLabel, ShieldCheck);
         break;
-      case "9":
+      case "rvs":
         addNumeric("Легла", listing.beds, "", PackageOpen);
         addNumeric("Дължина", listing.length_m, "м", Ruler, false);
         addParam("Тоалетна", listing.has_toilet ? "Да" : "", ShieldCheck);
         addParam("Отопление", listing.has_heating ? "Да" : "", ShieldCheck);
         addParam("Климатик", listing.has_air_conditioning ? "Да" : "", ShieldCheck);
         break;
-      case "a":
+      case "yachts":
         addParam("Вид лодка", listing.boat_category, PackageOpen);
         addParam("Двигател", listing.engine_type, Fuel);
         addNumeric("Брой двиг.", listing.engine_count, "", Settings);
@@ -738,7 +787,7 @@ const SearchPage: React.FC = () => {
         addNumeric("Ширина", listing.width_m, "м", Ruler, false);
         addNumeric("Часове", listing.hours, "ч", Clock);
         break;
-      case "b":
+      case "trailer":
         addParam("Вид ремарке", listing.trailer_category, PackageOpen);
         addNumeric("Товар", listing.load_kg, "кг", Gauge);
         addNumeric("Оси", listing.axles, "", Settings);
@@ -753,12 +802,12 @@ const SearchPage: React.FC = () => {
         break;
     }
 
-    const isCategoryBasedBrandModel = ["6", "7", "8", "9", "a", "b"].includes(mainCategory);
+    const isCategoryBasedBrandModel = ["agriculture", "industrial", "forklifts", "rvs", "yachts", "trailer"].includes(mainCategory);
     const fallbackCandidates: Array<{ label: string; value: string; icon: React.ComponentType<any> }> = [
       {
         label: "Легла",
         value:
-          mainCategory === "9" && toPositiveNumber(listing.beds) !== null
+          mainCategory === "rvs" && toPositiveNumber(listing.beds) !== null
             ? `${Math.round(Number(listing.beds))}`
             : "",
         icon: PackageOpen,
@@ -766,7 +815,7 @@ const SearchPage: React.FC = () => {
       {
         label: "Дължина",
         value:
-          mainCategory === "9" && toPositiveNumber(listing.length_m) !== null
+          mainCategory === "rvs" && toPositiveNumber(listing.length_m) !== null
             ? `${Number(listing.length_m)} м`
             : "",
         icon: Ruler,
@@ -805,9 +854,9 @@ const SearchPage: React.FC = () => {
 
     for (const fallback of fallbackCandidates) {
       if (params.length >= 5) break;
-      if (mainCategory === "u" && fallback.label === "Пробег") continue;
-      if (mainCategory === "u" && fallback.label === "Марка") continue;
-      if (mainCategory === "9" && fallback.label === "Локация") continue;
+      if (mainCategory === "parts" && fallback.label === "Пробег") continue;
+      if (mainCategory === "parts" && fallback.label === "Марка") continue;
+      if (mainCategory === "rvs" && fallback.label === "Локация") continue;
       if (!toText(fallback.value)) continue;
       const exists = params.some((param) => param.label === fallback.label);
       if (!exists) {
@@ -862,7 +911,7 @@ const SearchPage: React.FC = () => {
       "2": "За части",
     };
 
-    const mainCategory = getParam("main_category", "mainCategory");
+    const mainCategory = normalizeMainCategory(getParam("main_category", "mainCategory"));
     const category = getParam("category");
     const year = getParam("year");
     const yearFrom = getParam("yearFrom");
@@ -874,14 +923,14 @@ const SearchPage: React.FC = () => {
     const region = getParam("region", "locat");
     const city = getParam("city", "locatc");
     const topmenu = getParam("topmenu");
-    const topmenuMainCategory = getMainCategoryFromTopmenu(topmenu);
+    const topmenuMainCategory = normalizeMainCategory(getMainCategoryFromTopmenu(topmenu));
     const topmenuLabel = getMainCategoryLabel(topmenuMainCategory);
     const sort = getParam("sortBy", "sort");
     const sellerType = getParam("sellerType");
     const condition = getParam("condition");
     const nup = getParam("nup");
 
-    if (topmenuLabel && ["w", "u", "v", "y", "z"].includes(mainCategory)) {
+    if (topmenuLabel && ["wheels", "parts", "accessories", "buy", "services"].includes(mainCategory)) {
       addCriterion("За", topmenuLabel);
     }
 
@@ -919,7 +968,7 @@ const SearchPage: React.FC = () => {
     if (["1", "true", "True"].includes(getParam("hasVideo"))) addCriterion("Видео/VR360", "Само с видео");
     if (sellerType && sellerTypeLabels[sellerType]) addCriterion("Тип обяви", sellerTypeLabels[sellerType]);
 
-    if (mainCategory === "w") {
+    if (mainCategory === "wheels") {
       const brand = getParam("brand", "marka");
       const model = getParam("model");
       addCriterion("Марка авто", brand);
@@ -947,7 +996,7 @@ const SearchPage: React.FC = () => {
       return criteria;
     }
 
-    if (mainCategory === "u") {
+    if (mainCategory === "parts") {
       addCriterion("Вид част", getParam("partrub"));
       addCriterion("Част", getParam("partelem"));
       addRangeCriterion("Година на част (от)", getParam("partYearFrom", "part_year_from"), "");
@@ -955,17 +1004,17 @@ const SearchPage: React.FC = () => {
       return criteria;
     }
 
-    if (mainCategory === "v") {
+    if (mainCategory === "accessories") {
       addCriterion("Вид аксесоар", getParam("marka", "accessoryCategory"));
       return criteria;
     }
 
-    if (mainCategory === "y" || mainCategory === "z") {
+    if (mainCategory === "buy" || mainCategory === "services") {
       addCriterion("Тип", category);
       return criteria;
     }
 
-    if (mainCategory === "6") {
+    if (mainCategory === "agriculture") {
       const equipmentType = getParam("equipmentType", "marka");
       const equipmentBrandOrModel = getParam("model");
       addCriterion("Категория", equipmentType);
@@ -977,7 +1026,7 @@ const SearchPage: React.FC = () => {
       return criteria;
     }
 
-    if (mainCategory === "7") {
+    if (mainCategory === "industrial") {
       addCriterion("Вид техника", getParam("equipmentType"));
       addCriterion("Марка", getParam("brand", "marka"));
       addCriterion("Модел", getParam("model"));
@@ -986,7 +1035,7 @@ const SearchPage: React.FC = () => {
       return criteria;
     }
 
-    if (mainCategory === "a") {
+    if (mainCategory === "yachts") {
       addCriterion("Вид лодка", getParam("boatCategory", "marka"));
       addCriterion("Марка", getParam("model"));
       addCriterion("Вид двигател", getParam("fuel"));
@@ -1000,7 +1049,7 @@ const SearchPage: React.FC = () => {
       return criteria;
     }
 
-    if (mainCategory === "b") {
+    if (mainCategory === "trailer") {
       addCriterion("Вид ремарке", getParam("trailerCategory", "marka"));
       addCriterion("Марка", getParam("model"));
       addRangeCriterion("Товароносимост", getParam("loadFrom"), getParam("loadTo"), " кг");
@@ -1009,22 +1058,22 @@ const SearchPage: React.FC = () => {
       return criteria;
     }
 
-    if (mainCategory === "8" || mainCategory === "9") {
+    if (mainCategory === "forklifts" || mainCategory === "rvs") {
       addCriterion("Категория", getParam("brand", "marka"));
     } else {
       addCriterion("Марка", getParam("brand", "marka"));
     }
-    addCriterion(mainCategory === "8" || mainCategory === "9" ? "Марка" : "Модел", getParam("model"));
-    addCriterion("Тип", mainCategory === "5" ? getParam("motoCategory") : category);
+    addCriterion(mainCategory === "forklifts" || mainCategory === "rvs" ? "Марка" : "Модел", getParam("model"));
+    addCriterion("Тип", mainCategory === "motorcycles" ? getParam("motoCategory") : category);
     const fuelOrEngineType = getParam("fuel");
-    if (mainCategory === "1") {
+    if (mainCategory === "cars") {
       addCriterion("Гориво", formatFuelLabel(fuelOrEngineType));
       addCriterion("Скоростна кутия", formatGearboxLabel(getParam("gearbox")));
       addRangeCriterion("Кубатура", getParam("displacementFrom"), getParam("displacementTo"), " куб.см.");
     } else {
       addCriterion("Вид двигател", fuelOrEngineType);
     }
-    if (mainCategory === "5") {
+    if (mainCategory === "motorcycles") {
       addCriterion("Вид охлаждане", getParam("motoCoolingType"));
       addCriterion("Вид двигател (конфигурация)", getParam("motoEngineKind"));
     }
@@ -1103,12 +1152,12 @@ const SearchPage: React.FC = () => {
       return "";
     };
 
-    const mainCategory = getParam("main_category", "mainCategory");
-    const mainCategoryLabel = getMainCategoryLabel(mainCategory || "1") || "Обяви";
+    const mainCategory = normalizeMainCategory(getParam("main_category", "mainCategory"));
+    const mainCategoryLabel = getMainCategoryLabel(mainCategory || "cars") || "Обяви";
     const topmenu = getParam("topmenu");
-    const topmenuLabel = getMainCategoryLabel(getMainCategoryFromTopmenu(topmenu));
+    const topmenuLabel = getMainCategoryLabel(normalizeMainCategory(getMainCategoryFromTopmenu(topmenu)));
 
-    if (mainCategory === "6" || mainCategory === "7") {
+    if (mainCategory === "agriculture" || mainCategory === "industrial") {
       const marka = getParam("marka");
       const model = getParam("model");
       const explicitEquipmentType = getParam("equipmentType");
@@ -1125,19 +1174,19 @@ const SearchPage: React.FC = () => {
       return parts.join(" • ");
     }
 
-    if (mainCategory === "v") {
+    if (mainCategory === "accessories") {
       const accessoryCategory = getParam("marka");
       return accessoryCategory ? `${mainCategoryLabel} • ${accessoryCategory}` : mainCategoryLabel;
     }
 
-    if (mainCategory === "y" || mainCategory === "z") {
+    if (mainCategory === "buy" || mainCategory === "services") {
       const category = getParam("category");
       if (category && topmenuLabel) return `${mainCategoryLabel} • ${category} • за ${topmenuLabel}`;
       if (category) return `${mainCategoryLabel} • ${category}`;
       return mainCategoryLabel;
     }
 
-    if (mainCategory === "a") {
+    if (mainCategory === "yachts") {
       const boatCategory = getParam("boatCategory");
       const brand = getParam("brand", "marka");
       const model = getParam("model");
@@ -1148,7 +1197,7 @@ const SearchPage: React.FC = () => {
       return mainCategoryLabel;
     }
 
-    if (mainCategory === "b") {
+    if (mainCategory === "trailer") {
       const trailerCategory = getParam("trailerCategory");
       const brand = getParam("brand", "marka");
       const model = getParam("model");
@@ -1159,7 +1208,7 @@ const SearchPage: React.FC = () => {
       return mainCategoryLabel;
     }
 
-    if (mainCategory === "9") {
+    if (mainCategory === "rvs") {
       const caravanCategory = getParam("brand", "marka");
       const caravanBrand = getParam("model");
       if (caravanCategory && caravanBrand) return `${mainCategoryLabel} • ${caravanCategory} • ${caravanBrand}`;
@@ -1168,7 +1217,7 @@ const SearchPage: React.FC = () => {
       return mainCategoryLabel;
     }
 
-    if (mainCategory === "5") {
+    if (mainCategory === "motorcycles") {
       const motoCategory = getParam("motoCategory");
       const brand = getParam("brand", "marka");
       const model = getParam("model");
@@ -1185,7 +1234,7 @@ const SearchPage: React.FC = () => {
     const model = getParam("model");
     if (brand && model) return `${mainCategoryLabel} • ${brand} / ${model}`;
     if (brand) return `${mainCategoryLabel} • ${brand}`;
-    if (topmenuLabel && ["w", "u", "v", "y", "z"].includes(mainCategory)) {
+    if (topmenuLabel && ["wheels", "parts", "accessories", "buy", "services"].includes(mainCategory)) {
       return `${mainCategoryLabel} • за ${topmenuLabel}`;
     }
     return mainCategoryLabel;
@@ -2587,4 +2636,3 @@ const SearchPage: React.FC = () => {
 };
 
 export default SearchPage;
-

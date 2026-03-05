@@ -5,53 +5,48 @@
 export type SelectOption = { value: string; label: string };
 
 const MAIN_CATEGORY_LABELS: Record<string, string> = {
-  "1": "Автомобили и Джипове",
-  "2": "Автомобили и Джипове",
-  "3": "Бусове",
-  "4": "Камиони",
-  "5": "Мотоциклети",
-  "6": "Селскостопански",
-  "7": "Индустриални",
-  "8": "Кари",
-  "9": "Каравани",
-  "a": "Яхти и Лодки",
-  "b": "Ремаркета",
-  "c": "Велосипеди",
-  "u": "Части",
-  "v": "Аксесоари",
-  "w": "Гуми и джанти",
-  "y": "Купува",
-  "z": "Услуги"
+  cars: "Автомобили и Джипове",
+  wheels: "Гуми и джанти",
+  parts: "Части",
+  buses: "Бусове",
+  trucks: "Камиони",
+  motorcycles: "Мотоциклети",
+  agriculture: "Селскостопански",
+  industrial: "Индустриални",
+  forklifts: "Кари",
+  rvs: "Каравани",
+  yachts: "Яхти и Лодки",
+  trailer: "Ремаркета",
+  accessories: "Аксесоари",
+  buy: "Купува",
+  services: "Услуги"
 };
 
 const MAIN_CATEGORY_TO_TOPMENU: Record<string, string> = {
-  "1": "1",
-  "2": "2",
-  "3": "3",
-  "4": "4",
-  "5": "5",
-  "6": "6",
-  "7": "7",
-  "8": "8",
-  "9": "9",
-  "a": "10",
-  "b": "11",
-  "c": "12"
+  cars: "1",
+  buses: "3",
+  trucks: "4",
+  motorcycles: "5",
+  agriculture: "6",
+  industrial: "7",
+  forklifts: "8",
+  rvs: "9",
+  yachts: "10",
+  trailer: "11"
 };
 
 const TOPMENU_TO_MAIN_CATEGORY: Record<string, string> = {
-  "1": "1",
-  "2": "2",
-  "3": "3",
-  "4": "4",
-  "5": "5",
-  "6": "6",
-  "7": "7",
-  "8": "8",
-  "9": "9",
-  "10": "a",
-  "11": "b",
-  "12": "c"
+  "1": "cars",
+  "2": "cars",
+  "3": "buses",
+  "4": "trucks",
+  "5": "motorcycles",
+  "6": "agriculture",
+  "7": "industrial",
+  "8": "forklifts",
+  "9": "rvs",
+  "10": "yachts",
+  "11": "trailer"
 };
 
 const BRAND_MODELS_BY_TOPMENU: Record<string, Record<string, string[]>> = {
@@ -10113,7 +10108,7 @@ const BRAND_MODELS_BY_TOPMENU: Record<string, Record<string, string[]>> = {
       "Hip-Hop",
       "LX",
       "MC",
-      "Pack’R",
+      "Pack'R",
       "Quadro",
       "Racing",
       "Revival",
@@ -10124,8 +10119,8 @@ const BRAND_MODELS_BY_TOPMENU: Record<string, Record<string, string[]>> = {
       "Sprint",
       "Street Soul",
       "Streetmate",
-      "Whizzr’d",
-      "Youngst’r"
+      "Whizzr'd",
+      "Youngst'r"
     ],
     "Triumph": [
       "Adventurer",
@@ -17270,12 +17265,35 @@ export const WHEEL_PCD_OPTIONS_BY_BOLTS: Record<string, string[]> = {
   ]
 };
 
-export const APP_MAIN_CATEGORY_ORDER = ["1","w","u","3","4","5","6","7","8","9","a","b","v","y","z"] as const;
+export const APP_MAIN_CATEGORY_ORDER = [
+  "cars",
+  "wheels",
+  "parts",
+  "buses",
+  "trucks",
+  "motorcycles",
+  "agriculture",
+  "industrial",
+  "forklifts",
+  "rvs",
+  "yachts",
+  "trailer",
+  "accessories",
+  "buy",
+  "services",
+] as const;
 export type AppMainCategory = (typeof APP_MAIN_CATEGORY_ORDER)[number];
 
-export const CLASSIFIED_FOR_TOPMENU_VALUES = ["1","3","4","5","6","7","8","9","10","11","12"] as const;
+export const CLASSIFIED_FOR_TOPMENU_VALUES = ["1", "3", "4", "5", "6", "7", "8", "9", "10", "11"] as const;
 
-export const EQUIPMENT_STYLE_MAIN_CATEGORIES = new Set<string>(["6", "7", "8", "9", "a", "b"]);
+export const EQUIPMENT_STYLE_MAIN_CATEGORIES = new Set<string>([
+  "agriculture",
+  "industrial",
+  "forklifts",
+  "rvs",
+  "yachts",
+  "trailer",
+]);
 
 export const APP_MAIN_CATEGORY_OPTIONS: SelectOption[] = APP_MAIN_CATEGORY_ORDER.map((value) => ({
   value,
@@ -17287,14 +17305,80 @@ export const CLASSIFIED_FOR_OPTIONS: SelectOption[] = CLASSIFIED_FOR_TOPMENU_VAL
   label: MAIN_CATEGORY_LABELS[TOPMENU_TO_MAIN_CATEGORY[topmenu]] || topmenu,
 }));
 
+const MAIN_CATEGORY_ALIAS_MAP: Record<string, AppMainCategory> = {
+  cars: "cars",
+  car: "cars",
+  "1": "cars",
+  "2": "cars",
+  wheels: "wheels",
+  wheel: "wheels",
+  w: "wheels",
+  parts: "parts",
+  part: "parts",
+  u: "parts",
+  buses: "buses",
+  bus: "buses",
+  "3": "buses",
+  trucks: "trucks",
+  truck: "trucks",
+  "4": "trucks",
+  motorcycles: "motorcycles",
+  motorcycle: "motorcycles",
+  moto: "motorcycles",
+  "5": "motorcycles",
+  agriculture: "agriculture",
+  agricultural: "agriculture",
+  agri: "agriculture",
+  "6": "agriculture",
+  industrial: "industrial",
+  "7": "industrial",
+  forklifts: "forklifts",
+  forklift: "forklifts",
+  "8": "forklifts",
+  rvs: "rvs",
+  rv: "rvs",
+  caravan: "rvs",
+  caravans: "rvs",
+  "9": "rvs",
+  yachts: "yachts",
+  yacht: "yachts",
+  boat: "yachts",
+  boats: "yachts",
+  a: "yachts",
+  "10": "yachts",
+  trailer: "trailer",
+  trailers: "trailer",
+  b: "trailer",
+  "11": "trailer",
+  accessories: "accessories",
+  accessory: "accessories",
+  v: "accessories",
+  buy: "buy",
+  y: "buy",
+  services: "services",
+  service: "services",
+  z: "services",
+};
+
+export const normalizeMainCategory = (mainCategory?: string | null): AppMainCategory | "" => {
+  if (!mainCategory) return "";
+  const normalizedMainCategory = String(mainCategory).trim().toLocaleLowerCase("bg-BG");
+  if (!normalizedMainCategory) return "";
+  const mappedFromTopmenu = getMainCategoryFromTopmenu(normalizedMainCategory);
+  if (mappedFromTopmenu) return mappedFromTopmenu as AppMainCategory;
+  return MAIN_CATEGORY_ALIAS_MAP[normalizedMainCategory] || "";
+};
+
 export const getMainCategoryLabel = (mainCategory?: string | null): string => {
   if (!mainCategory) return "";
-  return MAIN_CATEGORY_LABELS[mainCategory] || mainCategory;
+  const normalizedMainCategory = normalizeMainCategory(mainCategory);
+  return MAIN_CATEGORY_LABELS[normalizedMainCategory || mainCategory] || mainCategory;
 };
 
 export const getTopmenuFromMainCategory = (mainCategory?: string | null): string => {
   if (!mainCategory) return "";
-  return MAIN_CATEGORY_TO_TOPMENU[mainCategory] || "";
+  const normalizedMainCategory = normalizeMainCategory(mainCategory);
+  return MAIN_CATEGORY_TO_TOPMENU[normalizedMainCategory || mainCategory] || "";
 };
 
 export const getMainCategoryFromTopmenu = (topmenu?: string | null): string => {
@@ -17358,7 +17442,7 @@ export const getWheelPcdOptions = (bolts?: string | null): string[] => {
 export const getCriteriaMainCategoryCode = (criteria: Record<string, unknown> | null | undefined): string => {
   if (!criteria || typeof criteria !== "object") return "";
   const raw = criteria.mainCategory ?? criteria.main_category ?? criteria.pubtype ?? "";
-  return typeof raw === "string" ? raw : String(raw || "");
+  return normalizeMainCategory(typeof raw === "string" ? raw : String(raw || ""));
 };
 
 export const getCriteriaMainCategoryLabel = (criteria: Record<string, unknown> | null | undefined): string => {

@@ -12,6 +12,7 @@ import KapariranoBadge from '../KapariranoBadge';
 import ResponsiveImage, { type ApiPhoto, type PhotoRendition } from '../ResponsiveImage';
 import ListingSeo from '../seo/ListingSeo';
 import { API_BASE_URL } from '../../config/api';
+import { normalizeMainCategory } from '../../constants/karbgdata';
 import { buildListingSeoPayload } from '../../seo/listingSeo';
 
 interface CarImage extends ApiPhoto {
@@ -207,14 +208,31 @@ const isVipListing = (listing: ListingWithPromoStatus) => {
   return false;
 };
 
-const TITLE_WITH_YEAR_MAIN_CATEGORIES = new Set(['1', '3', '4', '5', '6', '7', '8', '9', 'a', 'b']);
+const TITLE_WITH_YEAR_MAIN_CATEGORIES = new Set([
+  'cars',
+  'buses',
+  'trucks',
+  'motorcycles',
+  'agriculture',
+  'industrial',
+  'forklifts',
+  'rvs',
+  'yachts',
+  'trailer',
+]);
+
+const normalizeDetailMainCategory = (value?: string | null) => {
+  return normalizeMainCategory(value) || (value ?? '').toString().trim().toLowerCase();
+};
 
 const resolveListingDisplayTitle = (
   listing: Pick<CarListing, 'title' | 'brand' | 'model' | 'main_category' | 'year_from'>
 ) => {
   const baseTitle = (listing.title || `${listing.brand} ${listing.model}`).trim() || 'Обява';
   const hasLeadingYear = /^\d{4}\b/.test(baseTitle);
-  const includeYearInTitle = TITLE_WITH_YEAR_MAIN_CATEGORIES.has(String(listing.main_category || ''));
+  const includeYearInTitle = TITLE_WITH_YEAR_MAIN_CATEGORIES.has(
+    normalizeDetailMainCategory(listing.main_category)
+  );
 
   if (includeYearInTitle && listing.year_from && !hasLeadingYear) {
     return `${listing.year_from} ${baseTitle}`;
@@ -304,7 +322,7 @@ const fetchListingPhotosOnce = (listingId: number): Promise<CarImage[] | null> =
       return photos;
     })
     .catch((error) => {
-      console.warn('Failed to load full listing photos:', error);
+      console.warn('Неуспешно зареждане на всички снимки за обявата:', error);
       return null;
     })
     .finally(() => {
@@ -512,12 +530,12 @@ const VehicleDetailsPage: React.FC = () => {
 
   useEffect(() => {
     if (!slug) {
-      setError('Listing URL is missing.');
+      setError('Липсва адресът на обявата.');
       setIsLoading(false);
       return;
     }
     if (!listingId) {
-      setError('Invalid listing URL.');
+      setError('Невалиден адрес на обявата.');
       setIsLoading(false);
       return;
     }
@@ -588,9 +606,9 @@ const VehicleDetailsPage: React.FC = () => {
         } else {
           if (!response.ok) {
             if (response.status === 404 || response.status === 410) {
-              throw new Error('Listing is no longer available.');
+              throw new Error('Обявата вече не е налична.');
             }
-            throw new Error('Failed to load listing details.');
+            throw new Error('Неуспешно зареждане на детайлите за обявата.');
           }
           resolvedListing = await response.json();
           if (isDevPerfMode && perf) {
@@ -628,8 +646,9 @@ const VehicleDetailsPage: React.FC = () => {
         }
       } catch (err) {
         if (controller.signal.aborted || isCancelled) return;
-        const errorMsg = err instanceof Error ? err.message : 'An error occurred';
-        console.error('Error fetching listing:', errorMsg);
+        const errorMsg =
+          err instanceof Error ? err.message : 'Възникна грешка при зареждането на обявата.';
+        console.error('Грешка при зареждане на обявата:', errorMsg);
         setError(errorMsg);
       } finally {
         if (!isCancelled) {
@@ -1384,12 +1403,13 @@ const VehicleDetailsPage: React.FC = () => {
   const cityLabel = listing.city || listing.location_region || 'Град';
   const updatedLabel = listing.updated_at ? getRelativeTime(listing.updated_at) : null;
   const priceHistory = listing.price_history || [];
+  const normalizedMainCategory = normalizeDetailMainCategory(listing.main_category);
   const hasFeaturePayload = Array.isArray(listing.features)
     ? listing.features.length > 0
     : typeof listing.features === 'string'
       ? listing.features.trim() !== '' && listing.features.trim() !== '[]'
       : false;
-  const showEquipmentSection = String(listing.main_category || '') === '1' || hasFeaturePayload;
+  const showEquipmentSection = normalizedMainCategory === 'cars' || hasFeaturePayload;
   const routeSegments = [cityLabel, sellerName, title].filter(Boolean);
   const isNewListing = (() => {
     if (!listing.created_at) return false;
@@ -1426,7 +1446,7 @@ const VehicleDetailsPage: React.FC = () => {
       <div style={styles.content}>
         <div style={styles.mainContent}>
           <section style={styles.seoIntro}>
-            <nav style={styles.breadcrumbNav} aria-label="Breadcrumb">
+            <nav style={styles.breadcrumbNav} aria-label="Навигационна пътека">
               {seoPayload.breadcrumbs.map((item, index) => {
                 const isLast = index === seoPayload.breadcrumbs.length - 1;
                 return (
@@ -1474,7 +1494,7 @@ const VehicleDetailsPage: React.FC = () => {
           </Suspense>
 
           <TechnicalDataSection
-            mainCategory={listing.main_category}
+            mainCategory={normalizedMainCategory || listing.main_category}
             year={listing.year_from}
             month={listing.month}
             fuel={listing.fuel}
@@ -1545,7 +1565,7 @@ const VehicleDetailsPage: React.FC = () => {
           {showEquipmentSection && (
             <EquipmentSection
               features={listing.features}
-              mainCategory={String(listing.main_category || "")}
+              mainCategory={normalizedMainCategory || String(listing.main_category || '')}
             />
           )}
           <section id="ai-summary" style={styles.aiSummarySection} aria-label="Резюме за AI системи">
@@ -1767,4 +1787,3 @@ const VehicleDetailsPage: React.FC = () => {
 };
 
 export default VehicleDetailsPage;
-

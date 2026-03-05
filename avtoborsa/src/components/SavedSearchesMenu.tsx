@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from "react";
+﻿import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bookmark, Trash2, X } from "lucide-react";
 import { useSavedSearches } from "../hooks/useSavedSearches";
-import { getCriteriaMainCategoryLabel } from "../constants/mobileBgData";
+import { getCriteriaMainCategoryCode, getCriteriaMainCategoryLabel } from "../constants/karbgdata";
 
 type SavedSearchesMenuProps = {
   onDropdownOpenChange?: (isOpen: boolean) => void;
@@ -85,7 +85,14 @@ const SavedSearchesMenu: React.FC<SavedSearchesMenuProps> = ({
 
   const serializeCriteria = (criteria: Record<string, unknown>) => {
     const params = new URLSearchParams();
+    const normalizedMainCategory = getCriteriaMainCategoryCode(criteria);
+
+    if (normalizedMainCategory) {
+      params.set("mainCategory", normalizedMainCategory);
+    }
+
     Object.entries(criteria).forEach(([key, value]) => {
+      if (key === "mainCategory" || key === "main_category" || key === "pubtype") return;
       if (value === null || value === undefined || value === "") return;
       if (Array.isArray(value)) {
         value.forEach((item) => params.append(key, String(item)));
@@ -98,7 +105,7 @@ const SavedSearchesMenu: React.FC<SavedSearchesMenuProps> = ({
 
   const handleSearchClick = (criteria: Record<string, unknown>) => {
     const queryString = serializeCriteria(criteria);
-    navigate(`/search?${queryString}`);
+    navigate(queryString ? `/search?${queryString}` : "/search");
     closeDropdown();
   };
 
@@ -425,47 +432,50 @@ const SavedSearchesMenu: React.FC<SavedSearchesMenuProps> = ({
                 {emptySavedSearchesLabel}
               </div>
             ) : (
-              savedSearches.map((search) => (
-                <div
-                  key={search.id}
-                  style={styles.searchItem}
-                  className={`saved-searches-item ${removingSearchIds.has(search.id) ? "is-removing" : ""}`}
-                  onClick={() => {
-                    if (removingSearchIds.has(search.id)) return;
-                    handleSearchClick(search.criteria);
-                  }}
-                >
-                  <div style={styles.searchItemContent}>
-                    <div style={styles.searchName} className="saved-searches-name">
-                      {search.name}
-                    </div>
-                    {(search.mainCategoryLabel ||
-                      getCriteriaMainCategoryLabel(search.criteria)) && (
-                      <div style={styles.searchCategory} className="saved-searches-category">
-                        {(search.mainCategoryLabel ||
-                          getCriteriaMainCategoryLabel(search.criteria)) as string}
-                      </div>
-                    )}
-                    <div style={styles.searchDate} className="saved-searches-date">
-                      {new Date(search.timestamp).toLocaleDateString("bg-BG", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    style={styles.deleteBtn}
-                    className="saved-searches-delete"
-                    onClick={(event) => handleDeleteSearch(event, search.id)}
-                    aria-label={deleteSearchLabel}
-                    disabled={removingSearchIds.has(search.id)}
+              savedSearches.map((search) => {
+                const mainCategoryLabel =
+                  getCriteriaMainCategoryLabel(search.criteria) || search.mainCategoryLabel || "";
+
+                return (
+                  <div
+                    key={search.id}
+                    style={styles.searchItem}
+                    className={`saved-searches-item ${removingSearchIds.has(search.id) ? "is-removing" : ""}`}
+                    onClick={() => {
+                      if (removingSearchIds.has(search.id)) return;
+                      handleSearchClick(search.criteria);
+                    }}
                   >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ))
+                    <div style={styles.searchItemContent}>
+                      <div style={styles.searchName} className="saved-searches-name">
+                        {search.name}
+                      </div>
+                      {mainCategoryLabel && (
+                        <div style={styles.searchCategory} className="saved-searches-category">
+                          {mainCategoryLabel}
+                        </div>
+                      )}
+                      <div style={styles.searchDate} className="saved-searches-date">
+                        {new Date(search.timestamp).toLocaleDateString("bg-BG", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      style={styles.deleteBtn}
+                      className="saved-searches-delete"
+                      onClick={(event) => handleDeleteSearch(event, search.id)}
+                      aria-label={deleteSearchLabel}
+                      disabled={removingSearchIds.has(search.id)}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                );
+              })
             )}
           </div>
         </div>

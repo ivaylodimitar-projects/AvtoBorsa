@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { CAR_FEATURES } from "../constants/carFeatures";
 import { AdvancedSearch } from "./AdvancedSearch";
@@ -39,7 +39,7 @@ import {
   writeLatestListingsCache,
 } from "../utils/latestListingsCache";
 import { CAR_BRANDS, CAR_MODELS } from "../constants/carBrandModels";
-import { APP_MAIN_CATEGORY_OPTIONS, getMainCategoryLabel } from "../constants/mobileBgData";
+import { APP_MAIN_CATEGORY_OPTIONS, getMainCategoryLabel } from "../constants/karbgdata";
 import { formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 import { resolvePriceBadgeState } from "../utils/priceChangeBadge";
 import { API_BASE_URL } from "../config/api";
@@ -51,6 +51,8 @@ type CarListing = {
   id: number;
   slug: string;
   main_category?: string;
+  title?: string;
+  display_title?: string;
   brand: string;
   model: string;
   year_from: number;
@@ -266,21 +268,21 @@ type MaterialSymbolName =
   | "handyman";
 
 const CATEGORY_SYMBOLS: Record<string, MaterialSymbolName> = {
-  "1": "directions_car",
-  w: "tire_repair",
-  u: "manufacturing",
-  "3": "directions_bus",
-  "4": "local_shipping",
-  "5": "two_wheeler",
-  "6": "agriculture",
-  "7": "front_loader",
-  "8": "forklift",
-  "9": "rv_hookup",
-  a: "sailing",
-  b: "commute",
-  v: "settings",
-  y: "shopping_cart",
-  z: "handyman",
+  cars: "directions_car",
+  wheels: "tire_repair",
+  parts: "manufacturing",
+  buses: "directions_bus",
+  trucks: "local_shipping",
+  motorcycles: "two_wheeler",
+  agriculture: "agriculture",
+  industrial: "front_loader",
+  forklifts: "forklift",
+  rvs: "rv_hookup",
+  yachts: "sailing",
+  trailer: "commute",
+  accessories: "settings",
+  buy: "shopping_cart",
+  services: "handyman",
 };
 
 function MaterialCategoryIcon({
@@ -322,21 +324,21 @@ const createCategoryIcon = (name: MaterialSymbolName): CategoryIconComponent => 
 );
 
 const CATEGORY_IMAGE_SOURCES: Record<string, string> = {
-  "1": sportCarIcon,
-  w: tiresIcon,
-  u: carPartsIcon,
-  "3": vanIcon,
-  "4": truckIcon,
-  "5": motorbikeIcon,
-  "6": tractorIcon,
-  "7": excavatorIcon,
-  "8": forkliftIcon,
-  "9": camperVanIcon,
-  a: yachtIcon,
-  b: carTrailerIcon,
-  v: automotiveIcon,
-  y: dealIcon,
-  z: customerSupportIcon,
+  cars: sportCarIcon,
+  wheels: tiresIcon,
+  parts: carPartsIcon,
+  buses: vanIcon,
+  trucks: truckIcon,
+  motorcycles: motorbikeIcon,
+  agriculture: tractorIcon,
+  industrial: excavatorIcon,
+  forklifts: forkliftIcon,
+  rvs: camperVanIcon,
+  yachts: yachtIcon,
+  trailer: carTrailerIcon,
+  accessories: automotiveIcon,
+  buy: dealIcon,
+  services: customerSupportIcon,
 };
 
 const createImageCategoryIcon = (src: string): CategoryIconComponent => ({
@@ -521,7 +523,7 @@ export default function LandingPage() {
   }, []);
 
   // filters
-  const [category, setCategory] = useState<string>("1");
+  const [category, setCategory] = useState<string>("cars");
   const [brand, setBrand] = useState<string>("");
   const [model, setModel] = useState<string>("");
   const [city, setCity] = useState<string>("");
@@ -582,7 +584,7 @@ export default function LandingPage() {
   };
 
   const resetFilters = () => {
-    setCategory("1");
+    setCategory("cars");
     setBrand("");
     setModel("");
     setCity("");
@@ -786,8 +788,8 @@ export default function LandingPage() {
 
   const getLatestListingMeta = (listing: CarListing) => {
     const mainCategory = (listing.main_category || "").toString().trim();
-    const isPartsCategory = mainCategory === "u";
-    const isCarCategory = !mainCategory || mainCategory === "1";
+    const isPartsCategory = mainCategory === "parts";
+    const isCarCategory = !mainCategory || mainCategory === "cars";
     if (isPartsCategory) {
       const partItems: string[] = [];
       const partElement = (listing.part_element || "").toString().trim();
@@ -835,6 +837,38 @@ export default function LandingPage() {
     return values.slice(0, 4);
   };
 
+  const getLatestListingTitle = (listing: CarListing) => {
+    const brandModelTitle = [listing.brand, listing.model]
+      .map((value) => (value || "").toString().trim())
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    if (brandModelTitle) {
+      return brandModelTitle;
+    }
+
+    const displayTitle = (listing.display_title || listing.title || "").toString().trim();
+    const hasGenericDisplayTitle = /^Обява\s*#/i.test(displayTitle);
+    if (displayTitle && !hasGenericDisplayTitle) {
+      return displayTitle;
+    }
+
+    const partElement = (listing.part_element || "").toString().trim();
+    const partForRaw = (listing.part_for || "").toString().trim();
+    const partForLabel = getMainCategoryLabel(partForRaw) || partForRaw;
+    if (partElement && partForLabel) {
+      return `${partElement} за ${partForLabel}`;
+    }
+    if (partElement) {
+      return partElement;
+    }
+    if (partForLabel) {
+      return `Част за ${partForLabel}`;
+    }
+
+    return getMainCategoryLabel((listing.main_category || "").toString()) || "Обява";
+  };
+
   const selectedCategoryLabel =
     CATEGORIES.find((mainCategory) => mainCategory.value === category)?.label || "";
 
@@ -843,9 +877,9 @@ export default function LandingPage() {
     options: { isActive: boolean; compact?: boolean }
   ) => {
     const { isActive, compact = false } = options;
-    const isCarCategory = categoryValue === "1";
-    const isServicesCategory = categoryValue === "z";
-    const Icon = CATEGORY_ICONS[categoryValue] || CATEGORY_ICONS["1"];
+    const isCarCategory = categoryValue === "cars";
+    const isServicesCategory = categoryValue === "services";
+    const Icon = CATEGORY_ICONS[categoryValue] || CATEGORY_ICONS["cars"];
 
     const baseWidth = compact
       ? isCarCategory
@@ -1211,7 +1245,7 @@ const handleMainCategoryTouchEnd = (
                       value={model}
                       onChange={(e) => setModel(e.target.value)}
                       options={["", ...(brand && MODELS[brand] ? MODELS[brand] : [])]}
-                      placeholder={brand ? "Избери модел" : "Избери марка първо"}
+                      placeholder={brand ? "Изберете модел" : "Изберете марка първо"}
                     />
                   </Field>
 
@@ -1496,7 +1530,7 @@ const handleMainCategoryTouchEnd = (
                 </div>
 
                 <div style={styles.note}>
-                  * Демо: резултатите филтрират примерни “топ обяви”. В реален проект тук се връзва API.
+                  * Демо: резултатите филтрират примерни "топ обяви". В реален проект тук се връзва API.
                 </div>
             </form>}
           </div>
@@ -2089,6 +2123,7 @@ const handleMainCategoryTouchEnd = (
                   const isTop = isTopListing(listing);
                   const isVip = isVipListing(listing);
                   const isNew = isListingNew(listing.created_at);
+                  const listingTitle = getLatestListingTitle(listing);
                   const listingMeta = getLatestListingMeta(listing);
                   const locationLabel = getListingLocationLabel(listing);
                   const coverPhoto =
@@ -2141,7 +2176,7 @@ const handleMainCategoryTouchEnd = (
                             <ResponsiveImage
                               photo={coverPhoto}
                               fallbackPath={listing.image_url}
-                              alt={`${listing.brand} ${listing.model}`}
+                              alt={listingTitle}
                               kind="grid"
                               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
                               loading="lazy"
@@ -2240,7 +2275,7 @@ const handleMainCategoryTouchEnd = (
                       {/* Body */}
                       <div style={{ padding: "14px 15px 13px", display: "flex", flexDirection: "column", gap: 9, flex: 1 }}>
                         <div style={{ fontWeight: 700, fontSize: 16, color: "#111827", lineHeight: 1.3 }}>
-                          {listing.brand} {listing.model}
+                          {listingTitle}
                         </div>
                         {listingMeta.length > 0 && (
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, fontSize: 12, color: "#64748b" }}>
@@ -2467,7 +2502,7 @@ const handleMainCategoryTouchEnd = (
               <div style={styles.infoCard} className="info-card">
                 <div style={styles.infoTitle}>Защо Kar.bg е различен</div>
                 <p style={styles.infoText}>
-                  Не сме просто още един „листинг“ сайт. Платформата е подредена така, че да стигаш до правилната кола
+                  Не сме просто още един "листинг" сайт. Платформата е подредена така, че да стигаш до правилната кола
                   за минути, а не за часове.
                 </p>
                 <p style={{ ...styles.infoText, marginBottom: 0 }}>
@@ -2476,7 +2511,7 @@ const handleMainCategoryTouchEnd = (
               </div>
 
               <div style={styles.infoCard} className="info-card">
-                <div style={styles.infoTitle}>С какво печелиш пред „старите“ портали</div>
+                <div style={styles.infoTitle}>С какво печелиш пред "старите" портали</div>
                 <ul style={styles.infoList}>
                   <li style={styles.infoListItem}>
                     <span style={styles.infoHighlight}>По-малко дублирани резултати</span> и по-ясно сравнение.
@@ -3315,5 +3350,3 @@ const globalCss = `
     }
   }
 `;
-
-

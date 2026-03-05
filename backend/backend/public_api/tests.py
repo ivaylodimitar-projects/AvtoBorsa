@@ -9,7 +9,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from backend.accounts.models import UserImportApiKey, UserProfile
-from backend.listings.models import CarImage, CarListing
+from backend.listings.models import CarImage, BaseListing
 
 
 @override_settings(ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"])
@@ -80,9 +80,9 @@ class PublicApiListingTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_motorcycles_endpoint_forces_main_category_5(self):
+    def test_motorcycles_endpoint_forces_main_category(self):
         payload = self._draft_payload()
-        payload["main_category"] = "1"
+        payload["main_category"] = "cars"
         response = self.client.post(
             "/api/public/ads/motorcycles/",
             payload,
@@ -91,8 +91,8 @@ class PublicApiListingTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        listing = CarListing.objects.get(id=response.data["listing"]["id"])
-        self.assertEqual(listing.main_category, "5")
+        listing = BaseListing.objects.get(id=response.data["listing"]["id"])
+        self.assertEqual(listing.main_category, "motorcycles")
         self.assertEqual(listing.user_id, self.user.id)
 
     def test_publish_draft_as_top_charges_user_balance(self):
@@ -104,7 +104,7 @@ class PublicApiListingTests(APITestCase):
         )
         self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
 
-        listing = CarListing.objects.get(id=create_response.data["listing"]["id"])
+        listing = BaseListing.objects.get(id=create_response.data["listing"]["id"])
         self._attach_minimum_images(listing, count=3)
 
         publish_response = self.client.post(
@@ -137,7 +137,7 @@ class PublicApiListingTests(APITestCase):
         )
         self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
 
-        listing = CarListing.objects.get(id=create_response.data["listing"]["id"])
+        listing = BaseListing.objects.get(id=create_response.data["listing"]["id"])
         self._attach_minimum_images(listing, count=3)
 
         publish_response = self.client.post(
@@ -173,7 +173,7 @@ class PublicApiListingTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        listing = CarListing.objects.get(id=response.data["listing"]["id"])
+        listing = BaseListing.objects.get(id=response.data["listing"]["id"])
         profile = UserProfile.objects.get(user=self.user)
         self.assertFalse(listing.is_draft)
         self.assertEqual(listing.listing_type, "top")

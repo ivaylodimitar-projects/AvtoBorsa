@@ -219,7 +219,7 @@ const buildBreadcrumbs = (
   const brand = trimToValue(listing.brand) || "Марка";
   const model = trimToValue(listing.model) || "Модел";
 
-  const carsPath = "/search?mainCategory=1";
+  const carsPath = "/search?mainCategory=cars";
   const brandPath = `${carsPath}&brand=${encodeURIComponent(brand)}`;
   const modelPath = `${brandPath}&model=${encodeURIComponent(model)}`;
   const listingPath = withLeadingSlash(canonicalPath);
@@ -346,3 +346,6 @@ export const buildListingSeoPayload = (
     },
   };
 };
+
+
+

@@ -43,6 +43,7 @@ import {
 import { buildDealerProfilePath } from "../utils/slugify";
 import karBgLogo from "../assets/karbglogo.png";
 import { API_BASE_URL } from "../config/api";
+import { APP_MAIN_CATEGORY_OPTIONS } from "../constants/karbgdata";
 
 const DEALER_LISTINGS_SYNC_COOLDOWN_MS = 15_000;
 const DEALER_LISTINGS_FALLBACK_POLL_MS = 90_000;
@@ -50,6 +51,190 @@ const DEALER_NOTIFICATIONS_STACK_WINDOW_MS = 60 * 60 * 1000;
 const DEALER_NOTIFICATIONS_WS_RECONNECT_MS = 5_000;
 const ACCESS_TOKEN_KEY = "authToken";
 const WS_BASE_URL = (import.meta.env.VITE_WS_BASE_URL || "").replace(/\/+$/, "");
+
+const stripLeadingCategorySymbols = (value: string) =>
+  value.replace(/^[^\p{L}\p{N}]+/gu, "").trim();
+
+const normalizeCategoryLookupKey = (value: string) =>
+  stripLeadingCategorySymbols(value)
+    .toLocaleLowerCase("bg-BG")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+const MAIN_CATEGORY_LABELS_BY_CODE = APP_MAIN_CATEGORY_OPTIONS.reduce<
+  Record<string, string>
+>((acc, option) => {
+  acc[option.value] = option.label;
+  return acc;
+}, {});
+
+const TOPMENU_CATEGORY_TO_MAIN_CATEGORY_CODE: Record<string, string> = {
+  "1": "cars",
+  "2": "cars",
+  "3": "buses",
+  "4": "trucks",
+  "5": "motorcycles",
+  "6": "agriculture",
+  "7": "industrial",
+  "8": "forklifts",
+  "9": "rvs",
+  "10": "yachts",
+  "11": "trailer",
+};
+
+const MAIN_CATEGORY_ALIAS_TO_CODE = (() => {
+  const aliasToCode: Record<string, string> = {};
+  const addAlias = (alias: string, categoryCode: string) => {
+    const normalizedAlias = normalizeCategoryLookupKey(alias);
+    if (!normalizedAlias) return;
+    aliasToCode[normalizedAlias] = categoryCode;
+  };
+
+  Object.keys(MAIN_CATEGORY_LABELS_BY_CODE).forEach((categoryCode) => {
+    addAlias(categoryCode, categoryCode);
+  });
+
+  Object.entries(TOPMENU_CATEGORY_TO_MAIN_CATEGORY_CODE).forEach(
+    ([topmenuCode, categoryCode]) => {
+      addAlias(topmenuCode, categoryCode);
+    }
+  );
+
+  // Additional aliases that often arrive from API/admin notifications.
+  addAlias("car", "cars");
+  addAlias("cars", "cars");
+  addAlias("auto", "cars");
+  addAlias("автомобил", "cars");
+  addAlias("автомобили", "cars");
+  addAlias("джип", "cars");
+  addAlias("джипове", "cars");
+  addAlias("wheel", "wheels");
+  addAlias("wheels", "wheels");
+  addAlias("гуми", "wheels");
+  addAlias("джанти", "wheels");
+  addAlias("part", "parts");
+  addAlias("parts", "parts");
+  addAlias("част", "parts");
+  addAlias("части", "parts");
+  addAlias("bus", "buses");
+  addAlias("buses", "buses");
+  addAlias("бус", "buses");
+  addAlias("бусове", "buses");
+  addAlias("truck", "trucks");
+  addAlias("trucks", "trucks");
+  addAlias("камион", "trucks");
+  addAlias("камиони", "trucks");
+  addAlias("moto", "motorcycles");
+  addAlias("motorcycle", "motorcycles");
+  addAlias("motorcycles", "motorcycles");
+  addAlias("мото", "motorcycles");
+  addAlias("мотоциклет", "motorcycles");
+  addAlias("мотоциклети", "motorcycles");
+  addAlias("agri", "agriculture");
+  addAlias("agriculture", "agriculture");
+  addAlias("селскостопански", "agriculture");
+  addAlias("industrial", "industrial");
+  addAlias("индустриални", "industrial");
+  addAlias("forklift", "forklifts");
+  addAlias("forklifts", "forklifts");
+  addAlias("кари", "forklifts");
+  addAlias("rv", "rvs");
+  addAlias("rvs", "rvs");
+  addAlias("caravan", "rvs");
+  addAlias("caravans", "rvs");
+  addAlias("каравана", "rvs");
+  addAlias("каравани", "rvs");
+  addAlias("boat", "yachts");
+  addAlias("boats", "yachts");
+  addAlias("yacht", "yachts");
+  addAlias("yachts", "yachts");
+  addAlias("лодка", "yachts");
+  addAlias("лодки", "yachts");
+  addAlias("яхта", "yachts");
+  addAlias("яхти", "yachts");
+  addAlias("trailer", "trailer");
+  addAlias("trailers", "trailer");
+  addAlias("ремарке", "trailer");
+  addAlias("ремаркета", "trailer");
+  addAlias("accessory", "accessories");
+  addAlias("accessories", "accessories");
+  addAlias("аксесоар", "accessories");
+  addAlias("аксесоари", "accessories");
+  addAlias("buy", "buy");
+  addAlias("купува", "buy");
+  addAlias("services", "services");
+  addAlias("service", "services");
+  addAlias("услуга", "services");
+  addAlias("услуги", "services");
+
+  return aliasToCode;
+})();
+
+const SYSTEM_CATEGORY_LABEL_BY_KEY = (() => {
+  const labelsByKey: Record<string, string> = {};
+  const addAlias = (alias: string, label: string) => {
+    const normalizedAlias = normalizeCategoryLookupKey(alias);
+    if (!normalizedAlias) return;
+    labelsByKey[normalizedAlias] = label;
+  };
+
+  addAlias("system", "Система");
+  addAlias("system notification", "Система");
+  addAlias("система", "Система");
+  addAlias("система известия", "Система");
+  addAlias("notification", "Известия");
+  addAlias("notifications", "Известия");
+  addAlias("известие", "Известия");
+  addAlias("известия", "Известия");
+  addAlias("moderation", "Модерация");
+  addAlias("moderator", "Модерация");
+  addAlias("модерация", "Модерация");
+  addAlias("deposit", "Депозит");
+  addAlias("deposits", "Депозит");
+  addAlias("депозит", "Депозит");
+  addAlias("payment", "Плащане");
+  addAlias("payments", "Плащания");
+  addAlias("плащане", "Плащане");
+  addAlias("плащания", "Плащания");
+  addAlias("promo", "Промоции");
+  addAlias("promotions", "Промоции");
+  addAlias("промоция", "Промоции");
+  addAlias("промоции", "Промоции");
+  addAlias("profile", "Профил");
+  addAlias("профил", "Профил");
+
+  return labelsByKey;
+})();
+
+const toSystemNotificationCategoryLabel = (category?: string | null) => {
+  if (typeof category !== "string") return "";
+
+  const cleanedCategory = stripLeadingCategorySymbols(category);
+  if (!cleanedCategory) return "";
+
+  const normalizedCategory = normalizeCategoryLookupKey(cleanedCategory);
+  if (!normalizedCategory) return cleanedCategory;
+
+  const fixedSystemLabel = SYSTEM_CATEGORY_LABEL_BY_KEY[normalizedCategory];
+  if (fixedSystemLabel) return fixedSystemLabel;
+
+  const categoryCode = MAIN_CATEGORY_ALIAS_TO_CODE[normalizedCategory];
+  if (categoryCode) {
+    return MAIN_CATEGORY_LABELS_BY_CODE[categoryCode] || cleanedCategory;
+  }
+
+  if (normalizedCategory.includes("модерац") || normalizedCategory.includes("moderat")) {
+    return "Модерация";
+  }
+  if (normalizedCategory.includes("извести") || normalizedCategory.includes("notification")) {
+    return "Известия";
+  }
+  if (normalizedCategory.includes("систем") || normalizedCategory.includes("system")) {
+    return "Система";
+  }
+
+  return cleanedCategory;
+};
 
 type NotificationRenderItem =
   | {
@@ -600,7 +785,7 @@ const Navbar: React.FC = () => {
           if (payload?.type === "user_notification" && payload.notification?.type === "system") {
             const created = addSystemNotification(user.id, {
               id: payload.notification.id,
-              title: payload.notification.title || "System notification",
+              title: payload.notification.title || "Системно известие",
               message: payload.notification.message || "",
               category: payload.notification.category,
               link: payload.notification.link,
@@ -1264,6 +1449,10 @@ const Navbar: React.FC = () => {
                                     : notification.type === "system"
                                       ? notification.title
                                       : `Дилър ${notification.dealerName}`;
+                                const systemNotificationCategoryLabel =
+                                  notification.type === "system"
+                                    ? toSystemNotificationCategoryLabel(notification.category)
+                                    : "";
                                 const notificationAmountLabel =
                                   notification.type === "deposit"
                                     ? `+${formatNotificationAmount(
@@ -1272,8 +1461,8 @@ const Navbar: React.FC = () => {
                                       )}`
                                     : notification.type === "dealer_listing"
                                       ? `+${formatListingsAdded(notification.listingsAdded)}`
-                                      : notification.category
-                                        ? notification.category
+                                      : systemNotificationCategoryLabel
+                                        ? systemNotificationCategoryLabel
                                         : "Система";
                                 const notificationMainText =
                                   notification.type === "deposit"

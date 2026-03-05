@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronDown, ChevronLeft, Circle, Search, Bookmark, Lock } from "lucide-react";
 import { BrandSelector } from "./BrandSelector";
@@ -15,7 +15,7 @@ import {
   getModelOptionsByMainCategory,
   getWheelOfferTypeOptions,
   getWheelPcdOptions,
-} from "../constants/mobileBgData";
+} from "../constants/karbgdata";
 import {
   MOTO_CATEGORY_OPTIONS,
   MOTO_COOLING_TYPE_OPTIONS,
@@ -293,10 +293,10 @@ const BOAT_TYPE_OPTIONS = [
 ];
 const TRAILER_TYPE_OPTIONS = ["За автомобил", "За камион", "За трактор", "Полуремарке"];
 const EQUIPMENT_TYPE_OPTIONS_BY_MAIN_CATEGORY: Record<string, string[]> = {
-  "6": AGRI_TYPE_OPTIONS,
-  "7": INDUSTRIAL_TYPE_OPTIONS,
-  a: BOAT_TYPE_OPTIONS,
-  b: TRAILER_TYPE_OPTIONS,
+  agriculture: AGRI_TYPE_OPTIONS,
+  industrial: INDUSTRIAL_TYPE_OPTIONS,
+  yachts: BOAT_TYPE_OPTIONS,
+  trailer: TRAILER_TYPE_OPTIONS,
 };
 const ACCESSORY_CATEGORY_OPTIONS = [
   "CD, DVD",
@@ -616,7 +616,7 @@ const DEFAULT_AGRI_FIELD_VISIBILITY: AgriFieldVisibility = {
 };
 
 const AGRI_FIELD_VISIBILITY_BY_CATEGORY: Record<string, AgriFieldVisibility> = {
-  трактор: {
+  "трактор": {
     showEngineType: true,
     showPower: true,
     showTransmission: true,
@@ -624,7 +624,7 @@ const AGRI_FIELD_VISIBILITY_BY_CATEGORY: Record<string, AgriFieldVisibility> = {
     showHours: true,
     showEuroStandard: true,
   },
-  комбайн: {
+  "комбайн": {
     showEngineType: true,
     showPower: true,
     showTransmission: true,
@@ -757,10 +757,10 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     agriDriveType: "",
     condition: "",
     sortBy: "Марка/Модел/Цена",
-    isNew: mainCategory === "1",
-    isUsed: true,
-    isPartial: mainCategory === "1",
-    isParts: mainCategory === "1",
+    isNew: mainCategory === "cars",
+    isUsed: mainCategory === "cars",
+    isPartial: mainCategory === "cars",
+    isParts: mainCategory === "cars",
     priceFrom: "",
     priceTo: "",
     mileageFrom: "",
@@ -925,22 +925,23 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     }
   };
 
-  const isWheelsCategory = mainCategory === "w";
-  const isPartsCategory = mainCategory === "u";
-  const isBusesCategory = mainCategory === "3";
-  const isTrucksCategory = mainCategory === "4";
-  const isMotoCategory = mainCategory === "5";
-  const isAgroCategory = mainCategory === "6";
-  const isIndustrialCategory = mainCategory === "7";
-  const isForkliftCategory = mainCategory === "8";
-  const isCaravanCategory = mainCategory === "9";
-  const isBoatsCategory = mainCategory === "a";
-  const isTrailersCategory = mainCategory === "b";
-  const isAccessoriesCategory = mainCategory === "v";
-  const isBuyCategory = mainCategory === "y";
-  const isServicesCategory = mainCategory === "z";
-  const isCarsCategory = mainCategory === "1";
+  const isWheelsCategory = mainCategory === "wheels";
+  const isPartsCategory = mainCategory === "parts";
+  const isBusesCategory = mainCategory === "buses";
+  const isTrucksCategory = mainCategory === "trucks";
+  const isMotoCategory = mainCategory === "motorcycles";
+  const isAgroCategory = mainCategory === "agriculture";
+  const isIndustrialCategory = mainCategory === "industrial";
+  const isForkliftCategory = mainCategory === "forklifts";
+  const isCaravanCategory = mainCategory === "rvs";
+  const isBoatsCategory = mainCategory === "yachts";
+  const isTrailersCategory = mainCategory === "trailer";
+  const isAccessoriesCategory = mainCategory === "accessories";
+  const isBuyCategory = mainCategory === "buy";
+  const isServicesCategory = mainCategory === "services";
+  const isCarsCategory = mainCategory === "cars";
   const isBuyOrServicesCategory = isBuyCategory || isServicesCategory;
+  const supportsConditionFiltering = isCarsCategory;
   const isHeavyCategory = isBusesCategory || isTrucksCategory || isMotoCategory;
   const isCategoryBasedBrandModel = isAgroCategory || isBoatsCategory || isTrailersCategory;
   const isEquipmentCategory =
@@ -953,7 +954,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   const usesVehicleForSelect = isWheelsCategory || isPartsCategory || isAccessoriesCategory;
   const usesCompactMainCategoryForm =
     usesVehicleForSelect || isHeavyCategory || isEquipmentCategory || isBuyOrServicesCategory;
-  const hasConditionCheckboxes = !isBuyOrServicesCategory;
+  const hasConditionCheckboxes = supportsConditionFiltering;
   const hasAdditionalCriteria = !isBuyOrServicesCategory;
   const formattedResultCount =
     liveResultCount !== null ? liveResultCount.toLocaleString("bg-BG") : null;
@@ -1017,15 +1018,15 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
 
   const brandMainCategory = useMemo(() => {
     if (isWheelsCategory) {
-      return getMainCategoryFromTopmenu(searchCriteria.wheelFor || "1") || "1";
+      return getMainCategoryFromTopmenu(searchCriteria.wheelFor || "1") || "cars";
     }
     if (isPartsCategory) {
-      return getMainCategoryFromTopmenu(searchCriteria.partFor || "1") || "1";
+      return getMainCategoryFromTopmenu(searchCriteria.partFor || "1") || "cars";
     }
     if (isAccessoriesCategory || isBuyOrServicesCategory) {
-      return getMainCategoryFromTopmenu(searchCriteria.classifiedFor || "1") || "1";
+      return getMainCategoryFromTopmenu(searchCriteria.classifiedFor || "1") || "cars";
     }
-    return mainCategory || "1";
+    return mainCategory || "cars";
   }, [
     isAccessoriesCategory,
     isBuyOrServicesCategory,
@@ -1092,16 +1093,43 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   const buildSearchQuery = React.useCallback(() => {
     const query: Record<string, string> = {};
     if (mainCategory) query.mainCategory = mainCategory;
+    const appendListFilter = (key: string, values: string[]) => {
+      const normalized = Array.from(
+        new Set(
+          values
+            .map((value) => value.trim())
+            .filter(Boolean)
+        )
+      );
+      if (normalized.length > 0) {
+        query[key] = normalized.join(",");
+      }
+    };
 
     const appendExtendedListingFilters = () => {
       if (searchCriteria.currency) query.currency = searchCriteria.currency;
-      if (searchCriteria.condition) query.condition = searchCriteria.condition;
       if (searchCriteria.taxCreditOnly) query.taxCredit = "1";
       if (searchCriteria.hasPhoto) query.hasPhoto = "1";
       if (searchCriteria.hasVideo) query.hasVideo = "1";
       if (searchCriteria.sellerType && searchCriteria.sellerType !== "0") {
         query.sellerType = searchCriteria.sellerType;
       }
+    };
+
+    const appendVehicleConditionFilters = () => {
+      if (!supportsConditionFiltering) return;
+      if (searchCriteria.condition) {
+        query.condition = searchCriteria.condition;
+        return;
+      }
+
+      const nup = [
+        searchCriteria.isNew ? "1" : "",
+        searchCriteria.isUsed ? "0" : "",
+        searchCriteria.isPartial ? "3" : "",
+        searchCriteria.isParts ? "2" : "",
+      ].join("");
+      if (nup) query.nup = nup;
     };
 
     if (isWheelsCategory) {
@@ -1143,15 +1171,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       if (searchCriteria.priceFrom) query.priceFrom = searchCriteria.priceFrom;
       if (searchCriteria.priceTo) query.priceTo = searchCriteria.priceTo;
       appendExtendedListingFilters();
-
-      const nup = [
-        searchCriteria.isNew ? "1" : "",
-        searchCriteria.isUsed ? "0" : "",
-        searchCriteria.isPartial ? "3" : "",
-        searchCriteria.isParts ? "2" : "",
-      ].join("");
-      if (nup) query.nup = nup;
-
+      appendVehicleConditionFilters();
       return query;
     }
 
@@ -1172,14 +1192,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       if (searchCriteria.priceFrom) query.priceFrom = searchCriteria.priceFrom;
       if (searchCriteria.priceTo) query.priceTo = searchCriteria.priceTo;
       appendExtendedListingFilters();
-
-      const nup = [
-        searchCriteria.isNew ? "1" : "",
-        searchCriteria.isUsed ? "0" : "",
-        searchCriteria.isPartial ? "3" : "",
-      ].join("");
-      if (nup) query.nup = nup;
-
+      appendVehicleConditionFilters();
       return query;
     }
 
@@ -1217,17 +1230,10 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         if (searchCriteria.motoEngineKind) query.motoEngineKind = searchCriteria.motoEngineKind;
         if (searchCriteria.motoDisplacementFrom) query.displacementFrom = searchCriteria.motoDisplacementFrom;
         if (searchCriteria.motoDisplacementTo) query.displacementTo = searchCriteria.motoDisplacementTo;
+        appendListFilter("motoFeatures", searchCriteria.motoFeatures);
       }
       appendExtendedListingFilters();
-
-      const nup = [
-        searchCriteria.isNew ? "1" : "",
-        searchCriteria.isUsed ? "0" : "",
-        searchCriteria.isPartial ? "3" : "",
-        searchCriteria.isParts ? "2" : "",
-      ].join("");
-      if (nup) query.nup = nup;
-
+      appendVehicleConditionFilters();
       return query;
     }
 
@@ -1298,12 +1304,14 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         if (searchCriteria.boatDraftTo) query.draftTo = searchCriteria.boatDraftTo;
         if (searchCriteria.boatHoursFrom) query.hoursFrom = searchCriteria.boatHoursFrom;
         if (searchCriteria.boatHoursTo) query.hoursTo = searchCriteria.boatHoursTo;
+        appendListFilter("boatFeatures", [...searchCriteria.boatFeatures, ...searchCriteria.features]);
       }
       if (isTrailersCategory) {
         if (searchCriteria.trailerLoadFrom) query.loadFrom = searchCriteria.trailerLoadFrom;
         if (searchCriteria.trailerLoadTo) query.loadTo = searchCriteria.trailerLoadTo;
         if (searchCriteria.trailerAxlesFrom) query.axlesFrom = searchCriteria.trailerAxlesFrom;
         if (searchCriteria.trailerAxlesTo) query.axlesTo = searchCriteria.trailerAxlesTo;
+        appendListFilter("trailerFeatures", [...searchCriteria.trailerFeatures, ...searchCriteria.features]);
       }
       if (isForkliftCategory) {
         if (searchCriteria.engineType) query.fuel = searchCriteria.engineType;
@@ -1322,15 +1330,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         if (searchCriteria.caravanHasAc) query.hasAirConditioning = "1";
       }
       appendExtendedListingFilters();
-
-      const nup = [
-        searchCriteria.isNew ? "1" : "",
-        searchCriteria.isUsed ? "0" : "",
-        searchCriteria.isPartial ? "3" : "",
-        searchCriteria.isParts ? "2" : "",
-      ].join("");
-      if (nup) query.nup = nup;
-
+      appendVehicleConditionFilters();
       return query;
     }
 
@@ -1344,14 +1344,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       if (searchCriteria.priceFrom) query.priceFrom = searchCriteria.priceFrom;
       if (searchCriteria.priceTo) query.priceTo = searchCriteria.priceTo;
       appendExtendedListingFilters();
-
-      const nup = [
-        searchCriteria.isNew ? "1" : "",
-        searchCriteria.isUsed ? "0" : "",
-        searchCriteria.isPartial ? "3" : "",
-      ].join("");
-      if (nup) query.nup = nup;
-
+      appendVehicleConditionFilters();
       return query;
     }
 
@@ -1387,15 +1380,8 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     if (searchCriteria.city) query.city = searchCriteria.city;
     if (searchCriteria.category) query.category = searchCriteria.category;
     if (searchCriteria.sortBy) query.sortBy = searchCriteria.sortBy;
-    if (!searchCriteria.condition) {
-      const nup = [
-        searchCriteria.isNew ? "1" : "",
-        searchCriteria.isUsed ? "0" : "",
-        searchCriteria.isPartial ? "3" : "",
-        searchCriteria.isParts ? "2" : "",
-      ].join("");
-      if (nup) query.nup = nup;
-    }
+    appendListFilter("features", searchCriteria.features);
+    appendVehicleConditionFilters();
 
     return query;
   }, [
@@ -1418,6 +1404,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     isWheelsCategory,
     mainCategory,
     searchCriteria,
+    supportsConditionFiltering,
   ]);
 
   React.useEffect(() => {
@@ -1530,21 +1517,37 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   }, [mainCategory]);
 
   React.useEffect(() => {
-    if (mainCategory !== "1") return;
+    if (supportsConditionFiltering) {
+      setSearchCriteria((prev) => {
+        if (prev.isNew && prev.isUsed && prev.isPartial && prev.isParts && !prev.condition) {
+          return prev;
+        }
+        return {
+          ...prev,
+          condition: "",
+          isNew: true,
+          isUsed: true,
+          isPartial: true,
+          isParts: true,
+        };
+      });
+      return;
+    }
+
     setSearchCriteria((prev) => {
-      if (prev.isNew && prev.isUsed && prev.isPartial && prev.isParts && !prev.condition) {
+      if (!prev.condition && !prev.isNew && !prev.isUsed && !prev.isPartial && !prev.isParts) {
         return prev;
       }
       return {
         ...prev,
         condition: "",
-        isNew: true,
-        isUsed: true,
-        isPartial: true,
-        isParts: true,
+        isNew: false,
+        isUsed: false,
+        isPartial: false,
+        isParts: false,
       };
     });
-  }, [mainCategory]);
+  }, [supportsConditionFiltering]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1588,10 +1591,10 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       agriDriveType: "",
       condition: "",
       sortBy: "Марка/Модел/Цена",
-      isNew: mainCategory === "1",
-      isUsed: true,
-      isPartial: mainCategory === "1",
-      isParts: mainCategory === "1",
+      isNew: supportsConditionFiltering,
+      isUsed: supportsConditionFiltering,
+      isPartial: supportsConditionFiltering,
+      isParts: supportsConditionFiltering,
       priceFrom: "",
       priceTo: "",
       mileageFrom: "",
@@ -3696,9 +3699,9 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         {hasAdditionalCriteria && showAdvanced && (
           <div className="adv-detailed-section">
             <div className="adv-detailed-grid">
-              {usesCompactMainCategoryForm && hasConditionCheckboxes ? (
+              {usesCompactMainCategoryForm ? (
                 <>
-                  <div className="adv-field">
+                  <div className="adv-field" style={supportsConditionFiltering ? undefined : { display: "none" }}>
                     <label className="adv-label">ЦЕНА ОТ</label>
                     <input type="number" placeholder="Мин." value={searchCriteria.priceFrom} onChange={(e) => handleInputChange("priceFrom", e.target.value)} className="adv-input" />
                   </div>
@@ -3722,13 +3725,13 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                   </div>
                   <div className="adv-field">
                     <label className="adv-label">СЪСТОЯНИЕ</label>
-                    <select value={searchCriteria.condition} onChange={(e) => handleInputChange("condition", e.target.value)} className="adv-select">
+                    {supportsConditionFiltering && <select value={searchCriteria.condition} onChange={(e) => handleInputChange("condition", e.target.value)} className="adv-select">
                       <option value="">Всички</option>
                       <option value="Нов">Нов</option>
                       <option value="Употребяван">Употребяван</option>
                       <option value="Повреден/ударен">Повреден/ударен</option>
                       {!usesVehicleForSelect && <option value="За части">За части</option>}
-                    </select>
+                    </select>}
                   </div>
                   {(isPartsCategory || isHeavyCategory || isEquipmentCategory || isAccessoriesCategory || isCaravanCategory) && (
                     <div className="adv-field">
