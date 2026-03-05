@@ -284,6 +284,11 @@ const PublicProfilePage: React.FC = () => {
                 onClick={() => navigate(`/details/${listing.slug}`)}
                 style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: 12, display: "grid", gridTemplateColumns: "160px 1fr", gap: 12, cursor: "pointer" }}
               >
+                {(() => {
+                  const mainCategory = String(listing.main_category || "").trim();
+                  const isCarCategory = !mainCategory || mainCategory === "1";
+                  return (
+                    <>
                 <div style={{ width: "100%", aspectRatio: "4 / 3", borderRadius: 12, overflow: "hidden", background: "#e2e8f0" }}>
                   <ResponsiveImage
                     photo={listing.photo || null}
@@ -306,10 +311,13 @@ const PublicProfilePage: React.FC = () => {
                   </div>
                   <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", color: "#475569", fontSize: 14 }}>
                     {listing.city ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><MapPin size={14} />{listing.city}</span> : null}
-                    {listing.fuel_display ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><Fuel size={14} />{listing.fuel_display}</span> : null}
+                    {isCarCategory && listing.fuel_display ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><Fuel size={14} />{listing.fuel_display}</span> : null}
                     {listing.mileage ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><Gauge size={14} />{Number(listing.mileage).toLocaleString("bg-BG")} км</span> : null}
                   </div>
                 </div>
+                    </>
+                  );
+                })()}
               </article>
             ))}
           </div>

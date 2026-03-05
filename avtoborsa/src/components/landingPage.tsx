@@ -785,7 +785,9 @@ export default function LandingPage() {
   };
 
   const getLatestListingMeta = (listing: CarListing) => {
-    const isPartsCategory = (listing.main_category || "").toString() === "u";
+    const mainCategory = (listing.main_category || "").toString().trim();
+    const isPartsCategory = mainCategory === "u";
+    const isCarCategory = !mainCategory || mainCategory === "1";
     if (isPartsCategory) {
       const partItems: string[] = [];
       const partElement = (listing.part_element || "").toString().trim();
@@ -798,6 +800,9 @@ export default function LandingPage() {
         partItems.push(`За ${partForLabel}`);
       }
       return partItems.slice(0, 2);
+    }
+    if (!isCarCategory) {
+      return [];
     }
 
     const values: string[] = [];

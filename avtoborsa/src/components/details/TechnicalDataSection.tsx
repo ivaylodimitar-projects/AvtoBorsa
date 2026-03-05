@@ -417,6 +417,7 @@ const TechnicalDataSection: React.FC<TechnicalDataSectionProps> = ({
 
   const color = formatColor(rawColor);
   const normalizedMainCategory = toText(mainCategory);
+  const isCarCategory = !normalizedMainCategory || normalizedMainCategory === '1';
 
   switch (normalizedMainCategory) {
     case 'u':
@@ -477,8 +478,8 @@ const TechnicalDataSection: React.FC<TechnicalDataSectionProps> = ({
       addItem('date', 'Дата на производство', formatDate(year, month), Calendar);
       addItem('type', 'Категория', category, PackageOpen);
       addNumericItem('displacement-cc', 'Кубатура', displacementCc || displacement, 'см³', Ruler);
-      addItem('engine-type', 'Вид двигател', engineType || formatFuel(fuel), Fuel);
-      addItem('transmission', 'Трансмисия', transmission || formatGearbox(gearbox), Cog);
+      addItem('engine-type', 'Вид двигател', engineType, Fuel);
+      addItem('transmission', 'Трансмисия', transmission, Cog);
       addNumericItem('power', 'Мощност', power, 'к.с.', Gauge);
       addNumericItem('mileage', 'Пробег', mileage, 'км', Route);
       addItem('condition', 'Състояние', formatCondition(condition), ShieldCheck);
@@ -487,15 +488,15 @@ const TechnicalDataSection: React.FC<TechnicalDataSectionProps> = ({
     case '7':
       addItem('date', 'Дата на производство', formatDate(year, month), Calendar);
       addItem('equipment-type', 'Категория', equipmentType, PackageOpen);
-      addItem('engine-type', 'Вид двигател', engineType || formatFuel(fuel), Fuel);
-      addItem('transmission', 'Трансмисия', transmission || formatGearbox(gearbox), Cog);
+      addItem('engine-type', 'Вид двигател', engineType, Fuel);
+      addItem('transmission', 'Трансмисия', transmission, Cog);
       addNumericItem('power', 'Мощност', power, 'к.с.', Gauge);
       addNumericItem('mileage', 'Пробег', mileage, 'км', Route);
       addItem('condition', 'Състояние', formatCondition(condition), ShieldCheck);
       break;
     case '8':
       addItem('date', 'Дата на производство', formatDate(year, month), Calendar);
-      addItem('engine-type', 'Вид двигател', engineType || formatFuel(fuel), Fuel);
+      addItem('engine-type', 'Вид двигател', engineType, Fuel);
       addNumericItem('forklift-load', 'Товароподемност', liftCapacityKg, 'кг', Gauge);
       addNumericItem('hours', 'Часове работа', hours, 'ч', Clock);
       addNumericItem('power', 'Мощност', power, 'к.с.', Gauge);
@@ -513,7 +514,7 @@ const TechnicalDataSection: React.FC<TechnicalDataSectionProps> = ({
     case 'a':
       addItem('date', 'Дата на производство', formatDate(year, month), Calendar);
       addItem('boat-category', 'Категория', boatCategory, PackageOpen);
-      addItem('engine-type', 'Вид двигател', engineType || formatFuel(fuel), Fuel);
+      addItem('engine-type', 'Вид двигател', engineType, Fuel);
       addNumericItem('engine-count', 'Брой двигатели', engineCount, '', Cog);
       addItem('material', 'Материал', material, Palette);
       addNumericItem('length', 'Дължина', lengthM, 'м', Ruler, false);
@@ -548,8 +549,8 @@ const TechnicalDataSection: React.FC<TechnicalDataSectionProps> = ({
   if (items.length < 3) addItem('fallback-date', 'Дата на производство', formatDate(year, month), Calendar);
   if (items.length < 3) addNumericItem('fallback-power', 'Мощност', power, 'к.с.', Gauge);
   if (items.length < 3) addNumericItem('fallback-mileage', 'Пробег', mileage, 'км', Route);
-  if (items.length < 3) addItem('fallback-fuel', 'Гориво', formatFuel(fuel), Fuel);
-  if (items.length < 3) addItem('fallback-gearbox', 'Скоростна кутия', formatGearbox(gearbox), Cog);
+  if (isCarCategory && items.length < 3) addItem('fallback-fuel', 'Гориво', formatFuel(fuel), Fuel);
+  if (isCarCategory && items.length < 3) addItem('fallback-gearbox', 'Скоростна кутия', formatGearbox(gearbox), Cog);
   if (items.length < 3) addItem('fallback-city', 'Град', city, Route);
   if (items.length < 3) addItem('fallback-condition', 'Състояние', formatCondition(condition), ShieldCheck);
   if (items.length < 2) addItem('fallback-extra', 'Допълнителни данни', 'Няма налични', PackageOpen);

@@ -1148,19 +1148,19 @@ const getBuyServiceCategoryOptions = (mainCategory: MainCategoryKey) =>
 
 const mapEngineTypeToFuelValue = (engineType: string): string => {
   const normalized = engineType.trim().toLocaleLowerCase("bg-BG");
-  if (!normalized) return "benzin";
+  if (!normalized) return "";
   if (normalized.includes("дизел")) return "dizel";
   if (normalized.includes("електр")) return "elektro";
   if (normalized.includes("хибрид")) return "hibrid";
   if (normalized.includes("газ") || normalized.includes("метан")) return "gaz_benzin";
-  return "benzin";
+  return "";
 };
 
 const mapTransmissionToGearboxValue = (transmission: string): string => {
   const normalized = transmission.trim().toLocaleLowerCase("bg-BG");
-  if (!normalized) return "ruchna";
+  if (!normalized) return "";
   if (normalized.includes("автомат")) return "avtomatik";
-  return "ruchna";
+  return "";
 };
 
 const normalizeLookupText = (value: string): string =>
@@ -3477,16 +3477,16 @@ const PublishPage: React.FC = () => {
       const normalizedYear = normalizedYearSource || String(currentYear);
       const normalizedFuel =
         formData.mainCategory === "1"
-          ? formData.fuel || "benzin"
+          ? formData.fuel
           : isHeavyMainCategory(formData.mainCategory)
             ? mapEngineTypeToFuelValue(formData.engineType)
-            : "benzin";
+            : "";
       const normalizedGearbox =
         formData.mainCategory === "1"
-          ? formData.gearbox || "ruchna"
+          ? formData.gearbox
           : isHeavyMainCategory(formData.mainCategory)
             ? mapTransmissionToGearboxValue(formData.transmission)
-            : "ruchna";
+            : "";
       const normalizedMileage =
         formData.mainCategory === "1" || isHeavyMainCategory(formData.mainCategory)
           ? formData.mileage || "0"

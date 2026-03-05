@@ -191,8 +191,8 @@ class CarListing(models.Model):
     city = models.CharField(max_length=100)
 
     # Technical details
-    fuel = models.CharField(max_length=20, choices=FUEL_CHOICES)
-    gearbox = models.CharField(max_length=20, choices=GEARBOX_CHOICES)
+    fuel = models.CharField(max_length=20, choices=FUEL_CHOICES, blank=True, default='')
+    gearbox = models.CharField(max_length=20, choices=GEARBOX_CHOICES, blank=True, default='')
     mileage = models.IntegerField(validators=[MinValueValidator(0)])
     color = models.CharField(max_length=50, null=True, blank=True)
     condition = models.CharField(max_length=1, choices=CONDITION_CHOICES, default='0')

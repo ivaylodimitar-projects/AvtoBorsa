@@ -2159,6 +2159,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     };
 
     const mainCategory = toText(listing.main_category);
+    const isCarCategory = !mainCategory || mainCategory === "1";
     const conditionLabel = formatConditionLabel(listing.condition);
 
     switch (mainCategory) {
@@ -2202,8 +2203,6 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
         addNumeric("Товар", listing.load_kg, "кг", Gauge);
         addSpec("Трансмисия", listing.transmission, Settings);
         addSpec("Двигател", listing.engine_type, Fuel);
-        addSpec("Гориво", formatFuelLabel(listing.fuel), Fuel);
-        addSpec("Кутия", formatGearboxLabel(listing.gearbox), Settings);
         addNumeric("Кубатура", listing.displacement_cc ?? listing.displacement, "cc", Ruler);
         addSpec(
           "Еко",
@@ -2275,8 +2274,8 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     addNumeric("Пробег", listing.mileage, "км", Gauge);
     addNumeric("Кубатура", listing.displacement_cc ?? listing.displacement, "cc", Ruler);
     addNumeric("Мощност", listing.power, "к.с.", Zap);
-    addSpec("Гориво", formatFuelLabel(listing.fuel), Fuel);
-    addSpec("Кутия", formatGearboxLabel(listing.gearbox), Settings);
+    if (isCarCategory) addSpec("Гориво", formatFuelLabel(listing.fuel), Fuel);
+    if (isCarCategory) addSpec("Кутия", formatGearboxLabel(listing.gearbox), Settings);
     addSpec(
       "Еко",
       formatEuroStandardLabel(toText(listing.heavy_euro_standard) || toText(listing.euro_standard)),
