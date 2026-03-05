@@ -597,12 +597,11 @@ const BusinessProfilePage: React.FC = () => {
                   style={{ ...styles.input, borderColor: errors.email ? "#fca5a5" : "#e2e8f0" }}
                   type="email"
                   name="email"
-                  placeholder="company@email.com"
+                  placeholder="company@kar.bg"
                   value={formData.email}
                   onChange={handleChange}
                 />
                 {errors.email && <span style={styles.errorText}>{errors.email}</span>}
-                <p style={styles.footNote}>{EMAIL_CONFIRMATION_MESSAGE}</p>
               </div>
             </div>
 
@@ -614,20 +613,23 @@ const BusinessProfilePage: React.FC = () => {
 
           {/* Потребителско име и парола */}
           <div style={{ ...styles.section }}>
-            <h2 style={styles.sectionTitle}>Потребителско име и парола</h2>
+            <h2 style={styles.sectionTitle}>Имейл и парола</h2>
+            <h3 style={styles.footNote}>Имейлът ще бъде използван като потребителско име за вход в системата</h3>
 
             <div style={styles.formRow}>
-              <label style={styles.label}>Потребителско име *</label>
+              <label style={styles.label}>Имейл *</label>
               <div className="business-username-row" style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
                 <input
                   style={{ ...styles.input, borderColor: errors.username ? "#fca5a5" : "#e2e8f0", flex: 1 }}
                   type="text"
                   name="username"
-                  placeholder="Вашето потребителско име"
+                  placeholder="dealer@kar.bg"
                   value={formData.username}
                   onChange={handleChange}
                 />
               </div>
+              <p style={styles.footNote}>{EMAIL_CONFIRMATION_MESSAGE}</p>
+
               {errors.username && <span style={styles.errorText}>{errors.username}</span>}
             </div>
 
@@ -685,8 +687,8 @@ const BusinessProfilePage: React.FC = () => {
               </div>
 
               <div style={styles.formRow}>
-                <label style={styles.label}>БУЛСТАТ *</label>
-                <input style={{ ...styles.input, borderColor: errors.bulstat ? "#fca5a5" : "#e2e8f0" }} type="text" name="bulstat" placeholder="БУЛСТАТ номер" value={formData.bulstat} onChange={handleChange} />
+                <label style={styles.label}>БУЛСТАТ или ЕИК *</label>
+                <input style={{ ...styles.input, borderColor: errors.bulstat ? "#fca5a5" : "#e2e8f0" }} type="text" name="bulstat" placeholder="БУЛСТАТ или ЕИК номер" value={formData.bulstat} onChange={handleChange} />
                 {errors.bulstat && <span style={styles.errorText}>{errors.bulstat}</span>}
               </div>
             </div>

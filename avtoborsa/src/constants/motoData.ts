@@ -7,6 +7,7 @@ export interface MotoFeatureGroup {
 
 export const MOTO_CATEGORY_OPTIONS = [
   "ATV/UTV",
+  "Адвенчър",
   "Ендуро",
   "Кросов",
   "Круизър",

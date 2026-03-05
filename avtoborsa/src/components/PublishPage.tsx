@@ -19,6 +19,7 @@ import { requestDealerListingsSync } from "../utils/dealerSubscriptions";
 import { addBalanceUsageRecord } from "../utils/balanceUsageHistory";
 import { buildPublicProfilePath } from "../utils/profilePaths";
 import { BULGARIAN_CITIES_BY_REGION } from "../constants/bulgarianCities";
+import { OUTSIDE_BULGARIA_COUNTRY_OPTIONS } from "../constants/locationCountries";
 import ListingFormStepper from "./ListingFormStepper";
 import AdvancedImageUpload, { type ExistingImageItem } from "./AdvancedImageUpload";
 import FormFieldWithTooltip from "./FormFieldWithTooltip";
@@ -2433,6 +2434,9 @@ const PublishPage: React.FC = () => {
       if (key === "wheelBolts") {
         next.wheelPcd = "";
       }
+      if (key === "locationCountry") {
+        next.city = "";
+      }
 
       return next;
     });
@@ -2448,6 +2452,11 @@ const PublishPage: React.FC = () => {
   ): Record<PublishStepKey, StepRequirement[]> => {
     const pricingRequirements: StepRequirement[] = [
       { key: "locationCountry", label: "Регион" },
+      {
+        key: "city",
+        label: "Държава",
+        when: (data) => data.locationCountry === "Извън страната",
+      },
       {
         key: "city",
         label: "Град",
@@ -3076,6 +3085,16 @@ const PublishPage: React.FC = () => {
   const completionStats = calculateCompletionStats();
   const completionPercentage = completionStats.percentage;
   const currentFormSnapshot = normalizeFormSnapshot(formData);
+  const isOutsideBulgariaLocation = formData.locationCountry === "Извън страната";
+  const isLocationDetailVisible = Boolean(formData.locationCountry);
+  const locationDetailLabel = isOutsideBulgariaLocation ? "Държава" : "Град";
+  const locationDetailTooltip = isOutsideBulgariaLocation
+    ? "Държава, в която се намира обявата"
+    : "Град, където се намира обявата";
+  const locationDetailPlaceholder = isOutsideBulgariaLocation ? "Избери държава" : "Избери град";
+  const locationDetailOptions = isOutsideBulgariaLocation
+    ? OUTSIDE_BULGARIA_COUNTRY_OPTIONS
+    : BULGARIAN_CITIES_BY_REGION[formData.locationCountry] || [];
   const currentExistingImagesSnapshot = serializeExistingImagesSnapshot(existingListingImages);
   const hasExistingImagesChanges =
     isEditMode &&
@@ -3097,8 +3116,10 @@ const PublishPage: React.FC = () => {
       : "не се използва",
     region: formData.locationCountry ? formData.locationCountry : "не е избран",
     city:
-      formData.locationCountry === "Извън страната"
-        ? "извън страната"
+      isOutsideBulgariaLocation
+        ? formData.city
+          ? formData.city
+          : "не е избрана"
         : formData.city
           ? formData.city
           : "не е избран",
@@ -6337,7 +6358,7 @@ const PublishPage: React.FC = () => {
                         <strong>Регион:</strong> {priceSummary.region}
                       </span>
                       <span>
-                        <strong>Град:</strong> {priceSummary.city}
+                        <strong>{isOutsideBulgariaLocation ? "Държава" : "Град"}:</strong> {priceSummary.city}
                       </span>
                     </div>
                   </FormFieldWithTooltip>
@@ -6354,13 +6375,13 @@ const PublishPage: React.FC = () => {
                   </select>
                 </FormFieldWithTooltip>
 
-                {formData.locationCountry && formData.locationCountry !== "Извън страната" && (
-                  <FormFieldWithTooltip label="Град" required tooltip="Град, където се намира обявата">
+                {isLocationDetailVisible && (
+                  <FormFieldWithTooltip label={locationDetailLabel} required tooltip={locationDetailTooltip}>
                     <select style={styles.input} name="city" value={formData.city} onChange={handleChange} required>
-                      <option value="">Избери град</option>
-                      {BULGARIAN_CITIES_BY_REGION[formData.locationCountry]?.map((city) => (
-                        <option key={city.value} value={city.value}>
-                          {city.label}
+                      <option value="">{locationDetailPlaceholder}</option>
+                      {locationDetailOptions.map((locationOption) => (
+                        <option key={locationOption.value} value={locationOption.value}>
+                          {locationOption.label}
                         </option>
                       ))}
                     </select>

@@ -108,6 +108,8 @@ class BusinessUserSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"accepted_terms": "Трябва да приемете Общите условия."})
         if len(data['username']) < 3:
             raise serializers.ValidationError({"username": "Потребителското име трябва да е поне 3 символа"})
+        if len(data['bulstat']) != 9:
+            raise serializers.ValidationError({"bulstat": "БУЛСТАТ/ЕИК трябва да е 9 символа"})
         return data
 
     def validate_email(self, value):

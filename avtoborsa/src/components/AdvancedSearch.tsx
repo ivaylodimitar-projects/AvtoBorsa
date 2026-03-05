@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ChevronDown, ChevronLeft, Circle, Search, Bookmark, Lock } from "lucide-react";
 import { BrandSelector } from "./BrandSelector";
 import { BULGARIAN_CITIES_BY_REGION } from "../constants/bulgarianCities";
+import { OUTSIDE_BULGARIA_COUNTRY_OPTIONS } from "../constants/locationCountries";
 import { useRecentSearches } from "../hooks/useRecentSearches";
 import type { RecentSearch } from "../hooks/useRecentSearches";
 import { useSavedSearches } from "../hooks/useSavedSearches";
@@ -1004,6 +1005,15 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     () => (searchCriteria.region ? BULGARIAN_CITIES_BY_REGION[searchCriteria.region] || [] : []),
     [searchCriteria.region]
   );
+  const isOutsideBulgaria = searchCriteria.region === "Извън страната";
+  const locationDetailOptions = isOutsideBulgaria ? OUTSIDE_BULGARIA_COUNTRY_OPTIONS : cities;
+  const isLocationDetailDisabled = !isOutsideBulgaria && cities.length === 0;
+  const locationDetailLabel = isOutsideBulgaria ? "ДЪРЖАВА" : "ГРАД / ОБЛАСТ";
+  const locationDetailPlaceholder = isOutsideBulgaria
+    ? "Всички"
+    : cities.length > 0
+      ? "Всички"
+      : "Избери област първо";
 
   const brandMainCategory = useMemo(() => {
     if (isWheelsCategory) {
@@ -1695,6 +1705,25 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       </div>
     );
   };
+
+  const renderLocationDetailField = () => (
+    <div className="adv-field">
+      <label className="adv-label">{locationDetailLabel}</label>
+      <select
+        value={searchCriteria.city}
+        onChange={(e) => handleInputChange("city", e.target.value)}
+        className={`adv-select ${isLocationDetailDisabled ? "adv-select--disabled" : ""}`}
+        disabled={isLocationDetailDisabled}
+      >
+        <option value="">{locationDetailPlaceholder}</option>
+        {locationDetailOptions.map((locationOption) => (
+          <option key={locationOption.value} value={locationOption.value}>
+            {locationOption.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
 
   const advancedSearchCSS = `
     .adv-search-root {
@@ -2818,24 +2847,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               </select>
             </div>
 
-            <div className="adv-field">
-              <label className="adv-label">ГРАД / ОБЛАСT</label>
-              <select
-                value={searchCriteria.city}
-                onChange={(e) => handleInputChange("city", e.target.value)}
-                className={`adv-select ${cities.length === 0 ? "adv-select--disabled" : ""}`}
-                disabled={cities.length === 0}
-              >
-                <option value="">
-                  {cities.length > 0 ? "Всички" : "Избери област първо"}
-                </option>
-                {cities.map((cityOption) => (
-                  <option key={cityOption.value} value={cityOption.value}>
-                    {cityOption.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {renderLocationDetailField()}
 
             <div className="adv-field">
               <label className="adv-label">МАКСИМАЛНА ЦЕНА</label>
@@ -2922,24 +2934,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               </select>
             </div>
 
-            <div className="adv-field">
-              <label className="adv-label">ГРАД / ОБЛАСТ</label>
-              <select
-                value={searchCriteria.city}
-                onChange={(e) => handleInputChange("city", e.target.value)}
-                className={`adv-select ${cities.length === 0 ? "adv-select--disabled" : ""}`}
-                disabled={cities.length === 0}
-              >
-                <option value="">
-                  {cities.length > 0 ? "Всички" : "Избери област първо"}
-                </option>
-                {cities.map((cityOption) => (
-                  <option key={cityOption.value} value={cityOption.value}>
-                    {cityOption.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {renderLocationDetailField()}
 
             <div className="adv-field">
               <label className="adv-label">МАКСИМАЛНА ЦЕНА</label>
@@ -3062,24 +3057,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               </select>
             </div>
 
-            <div className="adv-field">
-              <label className="adv-label">ГРАД / ОБЛАСТ</label>
-              <select
-                value={searchCriteria.city}
-                onChange={(e) => handleInputChange("city", e.target.value)}
-                className={`adv-select ${cities.length === 0 ? "adv-select--disabled" : ""}`}
-                disabled={cities.length === 0}
-              >
-                <option value="">
-                  {cities.length > 0 ? "Всички" : "Избери област първо"}
-                </option>
-                {cities.map((cityOption) => (
-                  <option key={cityOption.value} value={cityOption.value}>
-                    {cityOption.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {renderLocationDetailField()}
 
             <div className="adv-field">
               <label className="adv-label">МАКСИМАЛНА ЦЕНА</label>
@@ -3283,24 +3261,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               </select>
             </div>
 
-            <div className="adv-field">
-              <label className="adv-label">ГРАД / ОБЛАСТ</label>
-              <select
-                value={searchCriteria.city}
-                onChange={(e) => handleInputChange("city", e.target.value)}
-                className={`adv-select ${cities.length === 0 ? "adv-select--disabled" : ""}`}
-                disabled={cities.length === 0}
-              >
-                <option value="">
-                  {cities.length > 0 ? "Всички" : "Избери област първо"}
-                </option>
-                {cities.map((cityOption) => (
-                  <option key={cityOption.value} value={cityOption.value}>
-                    {cityOption.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {renderLocationDetailField()}
 
             <div className="adv-field">
               <label className="adv-label">МАКСИМАЛНА ЦЕНА</label>
@@ -3400,24 +3361,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               </select>
             </div>
 
-            <div className="adv-field">
-              <label className="adv-label">ГРАД / ОБЛАСТ</label>
-              <select
-                value={searchCriteria.city}
-                onChange={(e) => handleInputChange("city", e.target.value)}
-                className={`adv-select ${cities.length === 0 ? "adv-select--disabled" : ""}`}
-                disabled={cities.length === 0}
-              >
-                <option value="">
-                  {cities.length > 0 ? "Всички" : "Избери област първо"}
-                </option>
-                {cities.map((cityOption) => (
-                  <option key={cityOption.value} value={cityOption.value}>
-                    {cityOption.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {renderLocationDetailField()}
 
             <div className="adv-field">
               <label className="adv-label">МАКСИМАЛНА ЦЕНА</label>
@@ -3485,24 +3429,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               </select>
             </div>
 
-            <div className="adv-field">
-              <label className="adv-label">ГРАД / ОБЛАСТ</label>
-              <select
-                value={searchCriteria.city}
-                onChange={(e) => handleInputChange("city", e.target.value)}
-                className={`adv-select ${cities.length === 0 ? "adv-select--disabled" : ""}`}
-                disabled={cities.length === 0}
-              >
-                <option value="">
-                  {cities.length > 0 ? "Всички" : "Избери област първо"}
-                </option>
-                {cities.map((cityOption) => (
-                  <option key={cityOption.value} value={cityOption.value}>
-                    {cityOption.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {renderLocationDetailField()}
 
             <div className="adv-field">
               <label className="adv-label">КАТЕГОРИЯ</label>
@@ -3600,30 +3527,14 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                 className="adv-select"
               >
                 <option value="">Цяла България</option>
+                <option value="Извън страната">Извън страната</option>
                 {regions.map((region) => (
                   <option key={region} value={region}>{region}</option>
                 ))}
               </select>
             </div>
 
-            <div className="adv-field">
-              <label className="adv-label">ГРАД / ОБЛАСТ</label>
-              <select
-                value={searchCriteria.city}
-                onChange={(e) => handleInputChange("city", e.target.value)}
-                className={`adv-select ${cities.length === 0 ? "adv-select--disabled" : ""}`}
-                disabled={cities.length === 0}
-              >
-                <option value="">
-                  {cities.length > 0 ? "Всички" : "Избери област първо"}
-                </option>
-                {cities.map((cityOption) => (
-                  <option key={cityOption.value} value={cityOption.value}>
-                    {cityOption.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {renderLocationDetailField()}
 
             {/* Secondary filters */}
             <div className="adv-field">
