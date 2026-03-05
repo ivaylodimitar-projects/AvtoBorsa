@@ -145,22 +145,22 @@ const PublicProfilePage: React.FC = () => {
     setBrandFilter("all");
     setModelFilter("all");
   }, [categoryFilter, listingFilter]);
-  const profileTitle = payload?.profile?.title || "ÐŸÑ€Ð¾Ñ„Ð¸Ð»";
+  const profileTitle = payload?.profile?.title || "Профил";
 
   if (loading) {
-    return <div style={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>Ð—Ð°Ñ€ÐµÐ¶Ð´Ð°Ð½Ðµ...</div>;
+    return <div style={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>Зареждане...</div>;
   }
 
   if (notFound || !payload) {
     return (
       <div style={{ minHeight: "60vh", display: "grid", placeItems: "center", padding: 20 }}>
         <div style={{ textAlign: "center" }}>
-          <h2 style={{ margin: "0 0 8px" }}>ÐŸÑ€Ð¾Ñ„Ð¸Ð»ÑŠÑ‚ Ð½Ðµ Ðµ Ð½Ð°Ð¼ÐµÑ€ÐµÐ½</h2>
+          <h2 style={{ margin: "0 0 8px" }}>Профилът не е намерен</h2>
           <button
             onClick={() => navigate("/")}
             style={{ border: "1px solid #0f766e", background: "#0f766e", color: "#fff", borderRadius: 12, padding: "10px 14px", cursor: "pointer" }}
           >
-            ÐšÑŠÐ¼ Ð½Ð°Ñ‡Ð°Ð»Ð¾Ñ‚Ð¾
+            Към началото
           </button>
         </div>
       </div>
@@ -179,10 +179,10 @@ const PublicProfilePage: React.FC = () => {
             </div>
           )}
           <div style={{ minWidth: 0 }}>
-            <h1 style={{ margin: 0, fontSize: 24 }}>{`ÐžÐ±ÑÐ²Ð¸ Ð½Ð° ${profileTitle}`}</h1>
+            <h1 style={{ margin: 0, fontSize: 24 }}>{`Обяви на ${profileTitle}`}</h1>
             <div style={{ marginTop: 6, color: "#64748b", fontSize: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
               {payload.profile?.city ? <span>{payload.profile.city}</span> : null}
-              <span>{payload.listing_count || listings.length} Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¸ Ð¾Ð±ÑÐ²Ð¸</span>
+              <span>{payload.listing_count || listings.length} активни обяви</span>
             </div>
           </div>
         </div>
@@ -201,7 +201,7 @@ const PublicProfilePage: React.FC = () => {
                 fontWeight: 700,
               }}
             >
-              ÐžÐ±ÑÐ²Ð¸
+              Обяви
             </button>
             <button
               onClick={() => setListingFilter("top")}
@@ -215,7 +215,7 @@ const PublicProfilePage: React.FC = () => {
                 fontWeight: 700,
               }}
             >
-              TOP Ð¾Ð±ÑÐ²Ð¸
+              Топ обяви
             </button>
             <button
               onClick={() => setListingFilter("vip")}
@@ -229,7 +229,7 @@ const PublicProfilePage: React.FC = () => {
                 fontWeight: 700,
               }}
             >
-              VIP Ð¾Ð±ÑÐ²Ð¸
+              ВИП обяви
             </button>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 8 }}>
@@ -238,7 +238,7 @@ const PublicProfilePage: React.FC = () => {
               onChange={(event) => setCategoryFilter(event.target.value)}
               style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "9px 10px", fontSize: 14 }}
             >
-              <option value="all">ÐšÐ°Ñ‚ÐµÐ³Ð¾Ñ€Ð¸Ð¸</option>
+              <option value="all">Категории</option>
               {categoryOptions.map((option) => (
                 <option key={option} value={option}>
                   {getMainCategoryLabel(option)}
@@ -250,7 +250,7 @@ const PublicProfilePage: React.FC = () => {
               onChange={(event) => setBrandFilter(event.target.value)}
               style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "9px 10px", fontSize: 14 }}
             >
-              <option value="all">ÐœÐ°Ñ€ÐºÐ¸</option>
+              <option value="all">Марки</option>
               {brandOptions.map((option) => (
                 <option key={option} value={option}>
                   {option}
@@ -262,7 +262,7 @@ const PublicProfilePage: React.FC = () => {
               onChange={(event) => setModelFilter(event.target.value)}
               style={{ border: "1px solid #cbd5e1", borderRadius: 10, padding: "9px 10px", fontSize: 14 }}
             >
-              <option value="all">ÐœÐ¾Ð´ÐµÐ»Ð¸</option>
+              <option value="all">Модели</option>
               {modelOptions.map((option) => (
                 <option key={option} value={option}>
                   {option}
@@ -274,7 +274,7 @@ const PublicProfilePage: React.FC = () => {
 
         {visibleListings.length === 0 ? (
           <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: 18, color: "#475569" }}>
-            ÐÑÐ¼Ð° Ð°ÐºÑ‚Ð¸Ð²Ð½Ð¸ Ð¾Ð±ÑÐ²Ð¸.
+            Няма активни обяви.
           </div>
         ) : (
           <div style={{ display: "grid", gap: 12 }}>
@@ -312,7 +312,7 @@ const PublicProfilePage: React.FC = () => {
                   <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", color: "#475569", fontSize: 14 }}>
                     {listing.city ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><MapPin size={14} />{listing.city}</span> : null}
                     {isCarCategory && listing.fuel_display ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><Fuel size={14} />{listing.fuel_display}</span> : null}
-                    {listing.mileage ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><Gauge size={14} />{Number(listing.mileage).toLocaleString("bg-BG")} ÐºÐ¼</span> : null}
+                    {listing.mileage ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><Gauge size={14} />{Number(listing.mileage).toLocaleString("bg-BG")} км</span> : null}
                   </div>
                 </div>
                     </>
