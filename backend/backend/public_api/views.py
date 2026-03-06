@@ -12,7 +12,7 @@ from rest_framework.views import APIView
 
 from backend.accounts.models import UserProfile
 from backend.listings.models import BaseListing, ListingPurchase
-from backend.listings.serializers import CarListingSerializer
+from backend.listings.serializers import BaseListingSerializer
 from backend.listings.views import (
     TOP_LISTING_PRICE_1D_EUR,
     TOP_LISTING_PRICE_7D_EUR,
@@ -292,7 +292,7 @@ class PublicCategoryListingCreateView(APIView):
             forced_fields={"main_category": self.main_category},
             request_files=request.FILES,
         )
-        serializer = CarListingSerializer(data=payload, context={"request": request})
+        serializer = BaseListingSerializer(data=payload, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
         is_draft = bool(serializer.validated_data.get("is_draft", False))
@@ -342,7 +342,7 @@ class PublicCategoryListingCreateView(APIView):
                 )
 
         _invalidate_latest_listings_cache()
-        response_serializer = CarListingSerializer(listing, context={"request": request})
+        response_serializer = BaseListingSerializer(listing, context={"request": request})
         return Response(
             {
                 "listing": response_serializer.data,
@@ -394,7 +394,7 @@ class PublicDraftPublishView(APIView):
             },
             request_files=request.FILES,
         )
-        serializer = CarListingSerializer(
+        serializer = BaseListingSerializer(
             listing,
             data=payload,
             partial=True,
@@ -448,7 +448,7 @@ class PublicDraftPublishView(APIView):
             )
 
         _invalidate_latest_listings_cache()
-        response_serializer = CarListingSerializer(updated, context={"request": request})
+        response_serializer = BaseListingSerializer(updated, context={"request": request})
         return Response(
             {
                 "listing": response_serializer.data,

@@ -47,7 +47,7 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 const PUBLIC_API_DOCS_URL = `${API_BASE_URL}/docs/api/`;
 
-type CarListing = {
+type ListingRecord = {
   id: number;
   slug: string;
   main_category?: string;
@@ -87,7 +87,7 @@ type CarListing = {
   } | null;
 };
 
-const isTopListing = (listing: CarListing) => {
+const isTopListing = (listing: ListingRecord) => {
   if (listing.is_top || listing.is_top_listing || listing.is_top_ad) return true;
   const numericType = Number(listing.listing_type);
   if (!Number.isNaN(numericType) && numericType === 1) return true;
@@ -97,7 +97,7 @@ const isTopListing = (listing: CarListing) => {
   return display.includes("топ");
 };
 
-const isVipListing = (listing: CarListing) => {
+const isVipListing = (listing: ListingRecord) => {
   if (isTopListing(listing)) return false;
   const numericType = Number(listing.listing_type);
   if (!Number.isNaN(numericType) && numericType === 2) return true;
@@ -412,12 +412,12 @@ export default function LandingPage() {
   const { user } = useAuth();
   const { showToast } = useToast();
   const { searches } = useRecentSearches();
-  const initialLatestListingsRef = useRef<CarListing[] | null>(
-    readLatestListingsCache<CarListing>()
+  const initialLatestListingsRef = useRef<ListingRecord[] | null>(
+    readLatestListingsCache<ListingRecord>()
   );
 
   // Latest listings
-  const [latestListings, setLatestListings] = useState<CarListing[]>(
+  const [latestListings, setLatestListings] = useState<ListingRecord[]>(
     () => initialLatestListingsRef.current ?? []
   );
   const [listingsLoading, setListingsLoading] = useState(
@@ -447,14 +447,14 @@ export default function LandingPage() {
       setListingsLoading(false);
     }
 
-    const parseListingPayload = (payload: unknown): CarListing[] => {
-      if (Array.isArray(payload)) return payload as CarListing[];
+    const parseListingPayload = (payload: unknown): ListingRecord[] => {
+      if (Array.isArray(payload)) return payload as ListingRecord[];
       if (
         payload &&
         typeof payload === "object" &&
         Array.isArray((payload as { results?: unknown[] }).results)
       ) {
-        return (payload as { results: CarListing[] }).results;
+        return (payload as { results: ListingRecord[] }).results;
       }
       return [];
     };
@@ -475,13 +475,13 @@ export default function LandingPage() {
           ),
         ]);
 
-        let latestFromDedicated: CarListing[] = [];
+        let latestFromDedicated: ListingRecord[] = [];
         if (latestResponse.ok) {
           const latestData = await latestResponse.json();
           latestFromDedicated = parseListingPayload(latestData);
         }
 
-        let latestFromFallback: CarListing[] = [];
+        let latestFromFallback: ListingRecord[] = [];
         if (fallbackResponse.ok) {
           const fallbackData = await fallbackResponse.json();
           latestFromFallback = parseListingPayload(fallbackData);
@@ -776,7 +776,7 @@ export default function LandingPage() {
     return "току-що";
   };
 
-  const getListingLocationLabel = (listing: CarListing) => {
+  const getListingLocationLabel = (listing: ListingRecord) => {
     const city = (listing.city || "").toString().trim();
     if (city) return city;
     const region = (listing.location_region || "").toString().trim();
@@ -786,7 +786,7 @@ export default function LandingPage() {
     return "Непосочен";
   };
 
-  const getLatestListingMeta = (listing: CarListing) => {
+  const getLatestListingMeta = (listing: ListingRecord) => {
     const mainCategory = (listing.main_category || "").toString().trim();
     const isPartsCategory = mainCategory === "parts";
     const isCarCategory = !mainCategory || mainCategory === "cars";
@@ -837,7 +837,7 @@ export default function LandingPage() {
     return values.slice(0, 4);
   };
 
-  const getLatestListingTitle = (listing: CarListing) => {
+  const getLatestListingTitle = (listing: ListingRecord) => {
     const brandModelTitle = [listing.brand, listing.model]
       .map((value) => (value || "").toString().trim())
       .filter(Boolean)

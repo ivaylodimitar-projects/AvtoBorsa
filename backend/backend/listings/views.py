@@ -27,7 +27,7 @@ from .models import (
     ListingView,
     ListingAnonymousView,
     Favorite,
-    CarListingPriceHistory,
+    BaseListingPriceHistory,
     ListingPurchase,
     get_expiry_cutoff,
     get_top_expiry,
@@ -37,10 +37,10 @@ from .models import (
     TOP_PLAN_7D,
 )
 from .serializers import (
-    CarListingSerializer,
-    CarListingLiteSerializer,
-    CarListingListSerializer,
-    CarListingSearchCompactSerializer,
+    BaseListingSerializer,
+    BaseListingLiteSerializer,
+    BaseListingListSerializer,
+    BaseListingSearchCompactSerializer,
     CarImageSerializer,
     CarImageDetailSerializer,
     FavoriteSerializer,
@@ -625,9 +625,9 @@ def _if_none_match_matches(request, current_etag):
     return False
 
 
-class CarListingViewSet(viewsets.ModelViewSet):
+class BaseListingViewSet(viewsets.ModelViewSet):
     """ViewSet for car listings"""
-    serializer_class = CarListingSerializer
+    serializer_class = BaseListingSerializer
     parser_classes = (MultiPartParser, FormParser)
     pagination_class = ListingsPagination
 
@@ -674,11 +674,11 @@ class CarListingViewSet(viewsets.ModelViewSet):
         if self.action == "list":
             lite = (self.request.query_params.get("lite") or "").lower()
             if lite in {"1", "true", "yes"}:
-                return CarListingLiteSerializer
+                return BaseListingLiteSerializer
             compact = (self.request.query_params.get("compact") or "").lower()
             if compact in {"1", "true", "yes"}:
-                return CarListingSearchCompactSerializer
-            return CarListingListSerializer
+                return BaseListingSearchCompactSerializer
+            return BaseListingListSerializer
         return super().get_serializer_class()
 
     def get_queryset(self):
@@ -706,7 +706,7 @@ class CarListingViewSet(viewsets.ModelViewSet):
                 output_field=IntegerField(),
             )
         )
-        latest_price_change = CarListingPriceHistory.objects.filter(
+        latest_price_change = BaseListingPriceHistory.objects.filter(
             listing=OuterRef('pk')
         ).order_by('-changed_at')
         queryset = queryset.annotate(
@@ -1641,7 +1641,7 @@ def get_user_listings(request):
         is_archived=False,
         created_at__gte=cutoff
     ).annotate(favorites_count=Count('favorited_by', distinct=True)).prefetch_related('images')
-    serializer = CarListingSerializer(
+    serializer = BaseListingSerializer(
         listings,
         many=True,
         context={'request': request, 'include_favorites_count': True},
@@ -1659,7 +1659,7 @@ def get_user_drafts(request):
         .annotate(favorites_count=Count('favorited_by', distinct=True))
         .prefetch_related('images')
     )
-    serializer = CarListingSerializer(
+    serializer = BaseListingSerializer(
         drafts,
         many=True,
         context={'request': request, 'include_favorites_count': True},
@@ -1677,7 +1677,7 @@ def get_user_archived(request):
         .annotate(favorites_count=Count('favorited_by', distinct=True))
         .prefetch_related('images')
     )
-    serializer = CarListingSerializer(
+    serializer = BaseListingSerializer(
         archived,
         many=True,
         context={'request': request, 'include_favorites_count': True},
@@ -1697,7 +1697,7 @@ def get_user_expired(request):
         is_archived=False,
         created_at__lt=cutoff
     ).annotate(favorites_count=Count('favorited_by', distinct=True)).prefetch_related('images')
-    serializer = CarListingSerializer(
+    serializer = BaseListingSerializer(
         expired,
         many=True,
         context={'request': request, 'include_favorites_count': True},
@@ -1763,7 +1763,7 @@ def get_public_profile_listings(request, profile_slug: str):
         .order_by("-created_at")
     )
 
-    serializer = CarListingSerializer(listings, many=True, context={"request": request})
+    serializer = BaseListingSerializer(listings, many=True, context={"request": request})
     response = Response(
         {
             "profile": {
@@ -1794,7 +1794,7 @@ def archive_listing(request, listing_id):
     listing.is_active = False
     listing.save()
     _invalidate_latest_listings_cache()
-    serializer = CarListingSerializer(listing)
+    serializer = BaseListingSerializer(listing)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -1808,7 +1808,7 @@ def unarchive_listing(request, listing_id):
     listing.created_at = timezone.now()
     listing.save()
     _invalidate_latest_listings_cache()
-    serializer = CarListingSerializer(listing)
+    serializer = BaseListingSerializer(listing)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -1884,7 +1884,7 @@ def republish_listing(request, listing_id):
     _invalidate_latest_listings_cache()
     broadcast_dealer_listings_updated()
 
-    serializer = CarListingSerializer(listing, context={'request': request})
+    serializer = BaseListingSerializer(listing, context={'request': request})
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -1980,7 +1980,7 @@ def update_listing_type(request, listing_id):
         listing.save()
     _invalidate_latest_listings_cache()
 
-    serializer = CarListingSerializer(listing, context={'request': request})
+    serializer = BaseListingSerializer(listing, context={'request': request})
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -2016,7 +2016,7 @@ def update_kaparirano_status(request, listing_id):
     listing.refresh_from_db()
     _invalidate_latest_listings_cache()
 
-    serializer = CarListingSerializer(listing, context={'request': request})
+    serializer = BaseListingSerializer(listing, context={'request': request})
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
@@ -2325,7 +2325,7 @@ def latest_listings(request):
     first_image_subquery = CarImage.objects.filter(
         listing_id=OuterRef('pk')
     ).order_by('-is_cover', 'order', 'id').values('image')[:1]
-    latest_price_change = CarListingPriceHistory.objects.filter(
+    latest_price_change = BaseListingPriceHistory.objects.filter(
         listing=OuterRef('pk')
     ).order_by('-changed_at')
     image_prefetch = Prefetch(
@@ -2364,7 +2364,7 @@ def latest_listings(request):
         .order_by('-created_at')[:16]
     )
 
-    payload = CarListingLiteSerializer(queryset, many=True, context={'request': request}).data
+    payload = BaseListingLiteSerializer(queryset, many=True, context={'request': request}).data
     cache.set(LATEST_LISTINGS_CACHE_KEY, payload, LATEST_LISTINGS_CACHE_SECONDS)
 
     response = Response(payload, status=status.HTTP_200_OK)

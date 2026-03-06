@@ -1641,11 +1641,11 @@ def import_copart_listing(request):
                 status=status_code,
             )
 
-        from backend.listings.serializers import CarListingSerializer
+        from backend.listings.serializers import BaseListingSerializer
 
         draft_payload = _build_copart_draft_payload(request.data, api_key.user)
         try:
-            serializer = CarListingSerializer(data=draft_payload, context={'request': request})
+            serializer = BaseListingSerializer(data=draft_payload, context={'request': request})
             serializer.is_valid(raise_exception=True)
             listing = serializer.save(user=api_key.user)
         except Exception as exc:
@@ -1771,7 +1771,7 @@ def dealer_detail(request, pk):
 
     # Include dealer's active listings
     from backend.listings.models import CarImage
-    from backend.listings.serializers import CarListingSerializer
+    from backend.listings.serializers import BaseListingSerializer
     cutoff = get_expiry_cutoff()
     image_prefetch = Prefetch(
         'images',
@@ -1794,7 +1794,7 @@ def dealer_detail(request, pk):
         is_archived=False,
         created_at__gte=cutoff
     ).prefetch_related(image_prefetch).order_by('-created_at')
-    listings_data = CarListingSerializer(listings, many=True, context={'request': request}).data
+    listings_data = BaseListingSerializer(listings, many=True, context={'request': request}).data
     data['listings'] = listings_data
 
     return Response(data, status=status.HTTP_200_OK)

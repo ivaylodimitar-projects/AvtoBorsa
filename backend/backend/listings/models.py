@@ -154,6 +154,24 @@ class BaseListing(models.Model):
         ("buy", "Купува"),
         ("services", "Услуги"),
     ]
+    MAIN_CATEGORY_LABELS = dict(MAIN_CATEGORY_CHOICES)
+    TOPMENU_TO_MAIN_CATEGORY = {
+        "1": "cars",
+        "3": "buses",
+        "4": "trucks",
+        "5": "motorcycles",
+        "6": "agriculture",
+        "7": "industrial",
+        "8": "forklifts",
+        "9": "rvs",
+        "10": "yachts",
+        "11": "trailer",
+    }
+    WHEEL_OFFER_TYPE_LABELS = {
+        "1": "Гуми",
+        "2": "Джанти",
+        "3": "Гуми с джанти",
+    }
 
     # User and basic info
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="car_listings")
@@ -339,27 +357,112 @@ class BaseListing(models.Model):
             return ""
         return dict(CarsListing.CAR_TYPE_CHOICES).get(value, value)
 
+    def _get_slug_detail_instance(self):
+        relation_name = {
+            "cars": "cars_details",
+            "wheels": "wheels_details",
+            "parts": "parts_details",
+            "buses": "buses_details",
+            "trucks": "trucks_details",
+            "motorcycles": "moto_details",
+            "agriculture": "agri_details",
+            "industrial": "industrial_details",
+            "forklifts": "forklift_details",
+            "rvs": "caravan_details",
+            "yachts": "boats_details",
+            "trailer": "trailers_details",
+            "accessories": "accessories_details",
+            "buy": "buy_details",
+            "services": "services_details",
+        }.get(self.main_category)
+        if not relation_name:
+            return None
+        try:
+            return getattr(self, relation_name)
+        except Exception:
+            return None
+
+    def _slugify_segment(self, value):
+        text = str(value or "").strip()
+        if not text:
+            return ""
+        return slugify(text, allow_unicode=True)[:80]
+
+    def _build_category_slug(self, *values):
+        slug_parts = []
+        for value in values:
+            slug_part = self._slugify_segment(value)
+            if slug_part:
+                slug_parts.append(slug_part)
+        if not slug_parts:
+            return f"obiava-{self.id}"
+        return f"obiava-{self.id}-{'-'.join(slug_parts)}"
+
+    def _get_topmenu_slug_label(self, value):
+        code = str(value or "").strip()
+        if not code:
+            return ""
+        main_category = self.TOPMENU_TO_MAIN_CATEGORY.get(code)
+        if not main_category:
+            return code
+        return self.MAIN_CATEGORY_LABELS.get(main_category, code)
+
+    def _get_wheel_offer_slug_label(self, value):
+        code = str(value or "").strip()
+        if not code:
+            return ""
+        return self.WHEEL_OFFER_TYPE_LABELS.get(code, code)
+
     def generate_slug(self):
         """
-        Slug format:
-        - cars: obiava-{id}-{brand}-{model}
-        - others: obiava-{id}-{title}
-        Always unique because it includes ID.
+        Category-specific slug format:
+        - cars, buses, trucks, motorcycles: obiava-{id}-{brand}-{model}
+        - wheels: obiava-{id}-{offer_type-label}-{brand}
+        - parts: obiava-{id}-{part_category}-{part_element}
+        - agriculture, industrial, forklifts, rvs: obiava-{id}-{equipment_type}-{brand}
+        - yachts, trailer: obiava-{id}-{category}-{brand}
+        - accessories: obiava-{id}-{classified_for-label}-{accessory_category}
+        - buy: obiava-{id}-{classified_for-label}-{buy_category}
+        - services: obiava-{id}-{classified_for-label}-{service_category}
         """
         if not self.id:
             return None
 
-        cars = getattr(self, "cars_details", None)
-        if cars and cars.brand and cars.model:
-            brand_slug = slugify(cars.brand)
-            model_slug = slugify(cars.model)
-            if brand_slug and model_slug:
-                return f"obiava-{self.id}-{brand_slug}-{model_slug}"
+        details = self._get_slug_detail_instance()
+        if details is None:
+            return f"obiava-{self.id}"
 
-        if self.title:
-            title_slug = slugify(self.title)[:80]
-            if title_slug:
-                return f"obiava-{self.id}-{title_slug}"
+        if self.main_category in {"cars", "buses", "trucks", "motorcycles"}:
+            return self._build_category_slug(details.brand, details.model)
+
+        if self.main_category == "wheels":
+            wheel_brand = details.wheel_brand or details.tire_brand
+            offer_type = self._get_wheel_offer_slug_label(details.offer_type)
+            return self._build_category_slug(offer_type, wheel_brand)
+
+        if self.main_category == "parts":
+            return self._build_category_slug(details.part_category, details.part_element)
+
+        if self.main_category in {"agriculture", "industrial", "forklifts", "rvs"}:
+            return self._build_category_slug(details.equipment_type, details.model)
+
+        if self.main_category == "yachts":
+            return self._build_category_slug(details.boat_category, details.model)
+
+        if self.main_category == "trailer":
+            return self._build_category_slug(details.trailer_category, details.model)
+
+        if self.main_category == "accessories":
+            classified_for = self._get_topmenu_slug_label(details.classified_for)
+            return self._build_category_slug(classified_for, details.accessory_category)
+
+        if self.main_category == "buy":
+            classified_for = self._get_topmenu_slug_label(details.classified_for)
+            return self._build_category_slug(classified_for, details.buy_category)
+
+        if self.main_category == "services":
+            classified_for = self._get_topmenu_slug_label(details.classified_for)
+            return self._build_category_slug(classified_for, details.service_category)
 
         return f"obiava-{self.id}"
 
@@ -473,7 +576,7 @@ class BaseListing(models.Model):
 
         # Price history
         if price_changed:
-            CarListingPriceHistory.objects.create(
+            BaseListingPriceHistory.objects.create(
                 listing=self,
                 old_price=old_price,
                 new_price=self.price,
@@ -482,20 +585,7 @@ class BaseListing(models.Model):
 
         self._original_price = self.price
 
-
-class CarListing(BaseListing):
-    """
-    Compatibility proxy for legacy lazy references ('listings.CarListing').
-    Uses the same table/data as BaseListing.
-    """
-
-    class Meta:
-        proxy = True
-        verbose_name = "Listing"
-        verbose_name_plural = "Listings"
-
-
-class CarListingPriceHistory(models.Model):
+class BaseListingPriceHistory(models.Model):
     """Track price changes for listings."""
     listing = models.ForeignKey(BaseListing, on_delete=models.CASCADE, related_name="price_history")
     old_price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -504,6 +594,7 @@ class CarListingPriceHistory(models.Model):
     changed_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        db_table = "listings_carlistingpricehistory"
         ordering = ["-changed_at"]
         indexes = [
             models.Index(fields=["listing", "changed_at"], name="list_price_hist_idx"),
@@ -578,7 +669,24 @@ class ListingPurchase(models.Model):
 # CATEGORY DETAILS (ONE TABLE PER CATEGORY)
 # ======================================================================
 
-class CarsListing(models.Model):
+class ListingDetailSlugSyncMixin(models.Model):
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+
+        listing = getattr(self, "listing", None)
+        if not listing or not listing.id:
+            return
+
+        new_slug = listing.generate_slug()
+        if new_slug and new_slug != listing.slug:
+            BaseListing.objects.filter(pk=listing.pk).update(slug=new_slug)
+            listing.slug = new_slug
+
+
+class CarsListing(ListingDetailSlugSyncMixin):
     """Details for main_category='cars' (Автомобили и Джипове)."""
 
     FUEL_CHOICES = [
@@ -625,7 +733,7 @@ class CarsListing(models.Model):
 
     listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="cars_details")
 
-    # Car details (moved out of CarListing)
+    # Car details stored in the category detail model.
     category = models.CharField(max_length=20, choices=CAR_TYPE_CHOICES, null=True, blank=True)
 
     brand = models.CharField(max_length=100, default="")
@@ -646,7 +754,7 @@ class CarsListing(models.Model):
     displacement = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
     euro_standard = models.CharField(max_length=1, choices=EURO_STANDARD_CHOICES, null=True, blank=True)
 
-    # Features (moved out of CarListing; car-specific)
+    # Car-specific features.
     features = models.JSONField(default=list, blank=True)
 
     class Meta:
@@ -664,29 +772,20 @@ class CarsListing(models.Model):
     def __str__(self):
         return f"{self.brand} {self.model} (listing={self.listing_id})"
 
-    def save(self, *args, **kwargs):
-        """
-        If listing has only a basic slug, upgrade it to brand/model slug.
-        This keeps the old behavior without forcing listing to be saved twice.
-        """
-        super().save(*args, **kwargs)
 
-        listing = self.listing
-        if not listing:
-            return
-
-        # If slug missing or is the minimal form, regenerate with brand/model
-        if not listing.slug or listing.slug == f"obiava-{listing.id}":
-            new_slug = listing.generate_slug()
-            if new_slug and new_slug != listing.slug:
-                BaseListing.objects.filter(pk=listing.pk).update(slug=new_slug)
-                listing.slug = new_slug
-
-
-class WheelsListing(models.Model):
+class WheelsListing(ListingDetailSlugSyncMixin):
     listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="wheels_details")
     wheel_for = models.CharField(max_length=8, blank=True)
     offer_type = models.CharField(max_length=8, blank=True)
+    brand = models.CharField(max_length=100, blank=True, default="")
+    model = models.CharField(max_length=100, blank=True, default="")
+    year_from = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1900), MaxValueValidator(2100)],
+    )
+    color = models.CharField(max_length=50, blank=True, default="")
+    condition = models.CharField(max_length=1, blank=True, default="")
     tire_brand = models.CharField(max_length=120, blank=True)
     tire_width = models.CharField(max_length=16, blank=True)
     tire_height = models.CharField(max_length=16, blank=True)
@@ -710,11 +809,12 @@ class WheelsListing(models.Model):
         return f"Wheels details for listing {self.listing_id}"
 
 
-class PartsListing(models.Model):
+class PartsListing(ListingDetailSlugSyncMixin):
     listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="parts_details")
     part_for = models.CharField(max_length=8, blank=True)
     part_category = models.CharField(max_length=120, blank=True)
     part_element = models.CharField(max_length=120, blank=True)
+    condition = models.CharField(max_length=1, blank=True, default="")
     part_year_from = models.IntegerField(
         null=True,
         blank=True,
@@ -730,82 +830,188 @@ class PartsListing(models.Model):
         return f"Parts details for listing {self.listing_id}"
 
 
-class BusesListing(models.Model):
+class BusesListing(ListingDetailSlugSyncMixin):
     listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="buses_details")
+    brand = models.CharField(max_length=100, blank=True, default="")
+    model = models.CharField(max_length=100, blank=True, default="")
+    year_from = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1900), MaxValueValidator(2100)],
+    )
+    month = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(12)])
+    vin = models.CharField(max_length=17, null=True, blank=True)
+    mileage = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
+    color = models.CharField(max_length=50, blank=True, default="")
+    condition = models.CharField(max_length=1, blank=True, default="")
+    power = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
+    displacement = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
     axles = models.PositiveSmallIntegerField(null=True, blank=True)
     seats = models.PositiveIntegerField(null=True, blank=True)
     load_kg = models.PositiveIntegerField(null=True, blank=True)
     transmission = models.CharField(max_length=60, blank=True)
     engine_type = models.CharField(max_length=60, blank=True)
     euro_standard = models.CharField(max_length=24, blank=True)
+    features = models.JSONField(default=list, blank=True)
 
     def __str__(self):
         return f"Bus details for listing {self.listing_id}"
 
 
-class TrucksListing(models.Model):
+class TrucksListing(ListingDetailSlugSyncMixin):
     listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="trucks_details")
+    brand = models.CharField(max_length=100, blank=True, default="")
+    model = models.CharField(max_length=100, blank=True, default="")
+    year_from = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1900), MaxValueValidator(2100)],
+    )
+    month = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(12)])
+    vin = models.CharField(max_length=17, null=True, blank=True)
+    mileage = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
+    color = models.CharField(max_length=50, blank=True, default="")
+    condition = models.CharField(max_length=1, blank=True, default="")
+    power = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
+    displacement = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
     axles = models.PositiveSmallIntegerField(null=True, blank=True)
     seats = models.PositiveIntegerField(null=True, blank=True)
     load_kg = models.PositiveIntegerField(null=True, blank=True)
     transmission = models.CharField(max_length=60, blank=True)
     engine_type = models.CharField(max_length=60, blank=True)
     euro_standard = models.CharField(max_length=24, blank=True)
+    features = models.JSONField(default=list, blank=True)
 
     def __str__(self):
         return f"Truck details for listing {self.listing_id}"
 
 
-class MotoListing(models.Model):
+class MotoListing(ListingDetailSlugSyncMixin):
     listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="moto_details")
+    brand = models.CharField(max_length=100, blank=True, default="")
+    model = models.CharField(max_length=100, blank=True, default="")
+    year_from = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1900), MaxValueValidator(2100)],
+    )
+    color = models.CharField(max_length=50, blank=True, default="")
+    condition = models.CharField(max_length=1, blank=True, default="")
+    power = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
     displacement_cc = models.PositiveIntegerField(null=True, blank=True)
     transmission = models.CharField(max_length=60, blank=True)
     engine_type = models.CharField(max_length=60, blank=True)
+    moto_category = models.CharField(max_length=120, blank=True, default="")
+    moto_cooling_type = models.CharField(max_length=120, blank=True, default="")
+    moto_engine_kind = models.CharField(max_length=120, blank=True, default="")
+    features = models.JSONField(default=list, blank=True)
 
     def __str__(self):
         return f"Moto details for listing {self.listing_id}"
 
 
-class AgriListing(models.Model):
+class AgriListing(ListingDetailSlugSyncMixin):
     listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="agri_details")
+    brand = models.CharField(max_length=100, blank=True, default="")
+    model = models.CharField(max_length=100, blank=True, default="")
+    year_from = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1900), MaxValueValidator(2100)],
+    )
+    power = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
+    color = models.CharField(max_length=50, blank=True, default="")
+    condition = models.CharField(max_length=1, blank=True, default="")
     equipment_type = models.CharField(max_length=120, blank=True)
+    engine_type = models.CharField(max_length=60, blank=True, default="")
+    transmission = models.CharField(max_length=60, blank=True, default="")
+    drive_type = models.CharField(max_length=60, blank=True, default="")
+    hours = models.PositiveIntegerField(null=True, blank=True)
+    euro_standard = models.CharField(max_length=24, blank=True, default="")
+    features = models.JSONField(default=list, blank=True)
 
     def __str__(self):
         return f"Agri details for listing {self.listing_id}"
 
 
-class IndustrialListing(models.Model):
+class IndustrialListing(ListingDetailSlugSyncMixin):
     listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="industrial_details")
+    brand = models.CharField(max_length=100, blank=True, default="")
+    model = models.CharField(max_length=100, blank=True, default="")
+    year_from = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1900), MaxValueValidator(2100)],
+    )
+    power = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
+    color = models.CharField(max_length=50, blank=True, default="")
+    condition = models.CharField(max_length=1, blank=True, default="")
     equipment_type = models.CharField(max_length=120, blank=True)
+    engine_type = models.CharField(max_length=60, blank=True, default="")
+    features = models.JSONField(default=list, blank=True)
 
     def __str__(self):
         return f"Industrial details for listing {self.listing_id}"
 
 
-class ForkliftListing(models.Model):
+class ForkliftListing(ListingDetailSlugSyncMixin):
     listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="forklift_details")
+    brand = models.CharField(max_length=100, blank=True, default="")
+    model = models.CharField(max_length=100, blank=True, default="")
+    equipment_type = models.CharField(max_length=120, blank=True, default="")
+    year_from = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1900), MaxValueValidator(2100)],
+    )
+    month = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(12)])
+    power = models.IntegerField(null=True, blank=True, validators=[MinValueValidator(0)])
+    color = models.CharField(max_length=50, blank=True, default="")
+    condition = models.CharField(max_length=1, blank=True, default="")
     engine_type = models.CharField(max_length=60, blank=True)
     lift_capacity_kg = models.PositiveIntegerField(null=True, blank=True)
     hours = models.PositiveIntegerField(null=True, blank=True)
+    features = models.JSONField(default=list, blank=True)
 
     def __str__(self):
         return f"Forklift details for listing {self.listing_id}"
 
 
-class CaravanListing(models.Model):
+class CaravanListing(ListingDetailSlugSyncMixin):
     listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="caravan_details")
+    brand = models.CharField(max_length=100, blank=True, default="")
+    model = models.CharField(max_length=100, blank=True, default="")
+    equipment_type = models.CharField(max_length=120, blank=True, default="")
+    year_from = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1900), MaxValueValidator(2100)],
+    )
+    vin = models.CharField(max_length=17, null=True, blank=True)
+    color = models.CharField(max_length=50, blank=True, default="")
+    condition = models.CharField(max_length=1, blank=True, default="")
     beds = models.PositiveSmallIntegerField(null=True, blank=True)
     length_m = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     has_toilet = models.BooleanField(default=False)
     has_heating = models.BooleanField(default=False)
     has_air_conditioning = models.BooleanField(default=False)
+    features = models.JSONField(default=list, blank=True)
 
     def __str__(self):
         return f"Caravan details for listing {self.listing_id}"
 
 
-class BoatsListing(models.Model):
+class BoatsListing(ListingDetailSlugSyncMixin):
     listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="boats_details")
+    brand = models.CharField(max_length=100, blank=True, default="")
+    model = models.CharField(max_length=100, blank=True, default="")
+    year_from = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1900), MaxValueValidator(2100)],
+    )
+    color = models.CharField(max_length=50, blank=True, default="")
+    condition = models.CharField(max_length=1, blank=True, default="")
     boat_category = models.CharField(max_length=120, blank=True)
     engine_type = models.CharField(max_length=60, blank=True)
     engine_count = models.PositiveSmallIntegerField(null=True, blank=True)
@@ -820,8 +1026,17 @@ class BoatsListing(models.Model):
         return f"Boats details for listing {self.listing_id}"
 
 
-class TrailersListing(models.Model):
+class TrailersListing(ListingDetailSlugSyncMixin):
     listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="trailers_details")
+    brand = models.CharField(max_length=100, blank=True, default="")
+    model = models.CharField(max_length=100, blank=True, default="")
+    year_from = models.IntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1900), MaxValueValidator(2100)],
+    )
+    color = models.CharField(max_length=50, blank=True, default="")
+    condition = models.CharField(max_length=1, blank=True, default="")
     trailer_category = models.CharField(max_length=120, blank=True)
     load_kg = models.PositiveIntegerField(null=True, blank=True)
     axles = models.PositiveSmallIntegerField(null=True, blank=True)
@@ -831,16 +1046,18 @@ class TrailersListing(models.Model):
         return f"Trailer details for listing {self.listing_id}"
 
 
-class AccessoriesListing(models.Model):
+class AccessoriesListing(ListingDetailSlugSyncMixin):
     listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="accessories_details")
     classified_for = models.CharField(max_length=8, blank=True)
     accessory_category = models.CharField(max_length=160, blank=True)
+    color = models.CharField(max_length=50, blank=True, default="")
+    condition = models.CharField(max_length=1, blank=True, default="")
 
     def __str__(self):
         return f"Accessory details for listing {self.listing_id}"
 
 
-class BuyListing(models.Model):
+class BuyListing(ListingDetailSlugSyncMixin):
     listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="buy_details")
     classified_for = models.CharField(max_length=8, blank=True)
     buy_category = models.CharField(max_length=160, blank=True)
@@ -849,7 +1066,7 @@ class BuyListing(models.Model):
         return f"Buy details for listing {self.listing_id}"
 
 
-class ServicesListing(models.Model):
+class ServicesListing(ListingDetailSlugSyncMixin):
     listing = models.OneToOneField(BaseListing, on_delete=models.CASCADE, related_name="services_details")
     classified_for = models.CharField(max_length=8, blank=True)
     service_category = models.CharField(max_length=160, blank=True)

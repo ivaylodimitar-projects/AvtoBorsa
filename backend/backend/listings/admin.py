@@ -8,7 +8,7 @@ from .models import (
     BuyListing,
     CarImage,
     BaseListing,
-    CarListingPriceHistory,
+    BaseListingPriceHistory,
     ListingPurchase,
     CaravanListing,
     CarsListing,
@@ -25,7 +25,7 @@ from .models import (
 
 admin.site.register(BaseListing)
 admin.site.register(CarImage)
-admin.site.register(CarListingPriceHistory)
+admin.site.register(BaseListingPriceHistory)
 admin.site.register(ListingPurchase)
 admin.site.register(Favorite)
 admin.site.register(CarsListing)

@@ -28,7 +28,7 @@ interface PriceHistoryEntry {
   changed_at: string;
 }
 
-interface CarListing {
+interface ListingRecord {
   id: number;
   slug: string;
   main_category: string;
@@ -226,7 +226,7 @@ const normalizeDetailMainCategory = (value?: string | null) => {
 };
 
 const resolveListingDisplayTitle = (
-  listing: Pick<CarListing, 'title' | 'brand' | 'model' | 'main_category' | 'year_from'>
+  listing: Pick<ListingRecord, 'title' | 'brand' | 'model' | 'main_category' | 'year_from'>
 ) => {
   const baseTitle = (listing.title || `${listing.brand} ${listing.model}`).trim() || 'Обява';
   const hasLeadingYear = /^\d{4}\b/.test(baseTitle);
@@ -253,7 +253,7 @@ const DETAIL_CACHE_MAX_ITEMS = 24;
 const DETAIL_INITIAL_PHOTO_LIMIT = 1;
 
 type CachedDetailEntry = {
-  payload: CarListing;
+  payload: ListingRecord;
   etag: string | null;
   cachedAt: number;
 };
@@ -350,7 +350,7 @@ const scheduleIdleTask = (task: () => void, timeoutMs = 700) => {
   return () => window.clearTimeout(timeoutId);
 };
 
-const updateDetailCache = (listingId: number, payload: CarListing, etag: string | null) => {
+const updateDetailCache = (listingId: number, payload: ListingRecord, etag: string | null) => {
   listingDetailCache.set(listingId, {
     payload,
     etag,
@@ -367,7 +367,7 @@ const updateDetailCache = (listingId: number, payload: CarListing, etag: string 
   }
 };
 
-const persistRecentlyViewed = (listing: CarListing) => {
+const persistRecentlyViewed = (listing: ListingRecord) => {
   if (!listing?.id || !listing.slug) return;
   try {
     const entry = {
@@ -427,7 +427,7 @@ const VehicleDetailsPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const listingId = slug ? extractIdFromSlug(slug) : null;
   const { ensureFreshAccessToken } = useAuth();
-  const [listing, setListing] = useState<CarListing | null>(null);
+  const [listing, setListing] = useState<ListingRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -595,7 +595,7 @@ const VehicleDetailsPage: React.FC = () => {
           signal: controller.signal,
         });
 
-        let resolvedListing: CarListing | null = null;
+        let resolvedListing: ListingRecord | null = null;
         let nextEtag = response.headers.get('ETag');
         if (response.status === 304 && cachedEntry) {
           resolvedListing = cachedEntry.payload;

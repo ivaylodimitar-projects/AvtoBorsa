@@ -33,7 +33,7 @@ import KapariranoBadge from "./KapariranoBadge";
 import ResponsiveImage, { type ApiPhoto } from "./ResponsiveImage";
 import { API_BASE_URL } from "../config/api";
 
-type CarListing = {
+type ListingRecord = {
   id: number;
   slug: string;
   title?: string;
@@ -177,7 +177,7 @@ const normalizeMainCategory = (value: unknown): string => {
   return MAIN_CATEGORY_ALIAS_MAP[lowered] || lowered;
 };
 
-const isTopListing = (listing: CarListing) => {
+const isTopListing = (listing: ListingRecord) => {
   if (listing.is_top || listing.is_top_listing || listing.is_top_ad) return true;
   const numericType = Number(listing.listing_type);
   if (!Number.isNaN(numericType) && numericType === 1) return true;
@@ -189,7 +189,7 @@ const isTopListing = (listing: CarListing) => {
   return display.includes("топ") || display.includes("top");
 };
 
-const isVipListing = (listing: CarListing) => {
+const isVipListing = (listing: ListingRecord) => {
   if (isTopListing(listing)) return false;
   if (listing.is_vip || listing.is_vip_listing || listing.is_vip_ad) return true;
 
@@ -226,9 +226,9 @@ const SearchPage: React.FC = () => {
     isLoading: isAuthLoading,
     ensureFreshAccessToken,
   } = useAuth();
-  const [pageCache, setPageCache] = useState<Record<number, CarListing[]>>({});
-  const pageCacheRef = useRef<Record<number, CarListing[]>>({});
-  const prefetchCacheRef = useRef<Record<number, CarListing[]>>({});
+  const [pageCache, setPageCache] = useState<Record<number, ListingRecord[]>>({});
+  const pageCacheRef = useRef<Record<number, ListingRecord[]>>({});
+  const prefetchCacheRef = useRef<Record<number, ListingRecord[]>>({});
   const [totalCount, setTotalCount] = useState<number | null>(null);
   const [totalPages, setTotalPages] = useState(1);
   const [hasLoadedPrimary, setHasLoadedPrimary] = useState(false);
@@ -673,7 +673,7 @@ const SearchPage: React.FC = () => {
     return code;
   };
 
-  const formatTireSize = (listing: CarListing) => {
+  const formatTireSize = (listing: ListingRecord) => {
     const width = toText(listing.tire_width);
     const height = toText(listing.tire_height);
     const diameter = toText(listing.tire_diameter);
@@ -689,7 +689,7 @@ const SearchPage: React.FC = () => {
     return fromYear || toYear;
   };
 
-  const getListingTechnicalParams = (listing: CarListing) => {
+  const getListingTechnicalParams = (listing: ListingRecord) => {
     const params: Array<{ label: string; value: string; icon: React.ComponentType<any> }> = [];
     const conditionLabel = formatConditionLabel(
       toText(listing.condition_display) || toText(listing.condition)

@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from . import views
 
 router = DefaultRouter()
-router.register(r'listings', views.CarListingViewSet, basename='listing')
+router.register(r'listings', views.BaseListingViewSet, basename='listing')
 
 urlpatterns = [
     path('listings/latest/', views.latest_listings, name='latest_listings'),

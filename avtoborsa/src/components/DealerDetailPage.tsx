@@ -20,7 +20,7 @@ import {
   extractDealerIdFromSlug,
 } from "../utils/slugify";
 
-type CarListing = {
+type ListingRecord = {
   id: number;
   slug: string;
   main_category?: string;
@@ -70,10 +70,10 @@ type DealerDetail = {
   profile_image_url: string | null;
   listing_count: number;
   created_at: string;
-  listings: CarListing[];
+  listings: ListingRecord[];
 };
 
-const isTopListing = (listing: CarListing) => {
+const isTopListing = (listing: ListingRecord) => {
   if (listing.is_top || listing.is_top_listing || listing.is_top_ad) return true;
   const numericType = Number(listing.listing_type);
   if (!Number.isNaN(numericType) && numericType === 1) return true;
@@ -83,7 +83,7 @@ const isTopListing = (listing: CarListing) => {
   return display.includes("топ");
 };
 
-const isVipListing = (listing: CarListing) => {
+const isVipListing = (listing: ListingRecord) => {
   if (isTopListing(listing)) return false;
   if (listing.is_vip || listing.is_vip_listing || listing.is_vip_ad) return true;
 
@@ -384,7 +384,7 @@ const DealerDetailPage: React.FC = () => {
     return `${clean.slice(0, maxLength).trim()}…`;
   };
 
-  const getTechnicalSpecs = (listing: CarListing) => {
+  const getTechnicalSpecs = (listing: ListingRecord) => {
     const specs: Array<{ label: string; value: string; icon: React.ComponentType<any> }> = [];
 
     const addSpec = (label: string, value: unknown, icon: React.ComponentType<any>) => {
@@ -421,7 +421,7 @@ const DealerDetailPage: React.FC = () => {
     return String(value).trim();
   };
 
-  const getEffectiveListingBrand = (listing: CarListing) => {
+  const getEffectiveListingBrand = (listing: ListingRecord) => {
     const mainCategory = toText(listing.main_category);
     const rawBrand = toText(listing.brand);
     const rawModel = toText(listing.model);

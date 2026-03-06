@@ -60,7 +60,7 @@ import karBgQrCodeAnimation from "../assets/karbgqrcode.json";
 import topBadgeImage from "../assets/top_badge.png";
 import vipBadgeImage from "../assets/vip_badge.jpg";
 
-interface CarListing {
+interface ListingRecord {
   id: number;
   slug: string;
   main_category?: string;
@@ -184,7 +184,7 @@ type PublicProfilePayload = {
   profile?: {
     title?: string;
   };
-  listings?: CarListing[];
+  listings?: ListingRecord[];
 };
 
 type TabType = "active" | "archived" | "drafts" | "liked" | "top" | "vip" | "expired";
@@ -611,11 +611,11 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
   const resolvedPublicProfileSlug = (publicProfileSlug || routeParams.publicProfileSlug || "").trim();
   const isPublicView = publicView && resolvedPublicProfileSlug.length > 0;
   const isBusinessUser = !isPublicView && user?.userType === "business";
-  const [activeListings, setActiveListings] = useState<CarListing[]>([]);
-  const [archivedListings, setArchivedListings] = useState<CarListing[]>([]);
-  const [draftListings, setDraftListings] = useState<CarListing[]>([]);
-  const [expiredListings, setExpiredListings] = useState<CarListing[]>([]);
-  const [likedListings, setLikedListings] = useState<CarListing[]>([]);
+  const [activeListings, setActiveListings] = useState<ListingRecord[]>([]);
+  const [archivedListings, setArchivedListings] = useState<ListingRecord[]>([]);
+  const [draftListings, setDraftListings] = useState<ListingRecord[]>([]);
+  const [expiredListings, setExpiredListings] = useState<ListingRecord[]>([]);
+  const [likedListings, setLikedListings] = useState<ListingRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [requiresAuthPrompt, setRequiresAuthPrompt] = useState(false);
@@ -649,10 +649,10 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     vipPlan: "7d",
   });
   const [promoteLoadingTailVisible, setPromoteLoadingTailVisible] = useState(false);
-  const [previewListing, setPreviewListing] = useState<CarListing | null>(null);
+  const [previewListing, setPreviewListing] = useState<ListingRecord | null>(null);
   const [previewTab, setPreviewTab] = useState<TabType | null>(null);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
-  const [qrListing, setQrListing] = useState<CarListing | null>(null);
+  const [qrListing, setQrListing] = useState<ListingRecord | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
   const [qrTargetUrl, setQrTargetUrl] = useState("");
   const [qrGenerationError, setQrGenerationError] = useState<string | null>(null);
@@ -671,10 +671,10 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     return MAIN_CATEGORY_ALIAS_MAP[lowered] || lowered;
   };
 
-  const normalizeListingRecord = (item: unknown): CarListing | null => {
+  const normalizeListingRecord = (item: unknown): ListingRecord | null => {
     if (!item || typeof item !== "object") return null;
     const listing = item as Record<string, unknown>;
-    const baseListing = listing as unknown as CarListing;
+    const baseListing = listing as unknown as ListingRecord;
     const numericId = Number(listing.id);
     if (!Number.isInteger(numericId) || numericId <= 0) return null;
 
@@ -688,7 +688,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
   };
 
   const sanitizeListingsArray = (items: unknown[], excludedListingIds: ReadonlySet<number>) => {
-    const byId = new Map<number, CarListing>();
+    const byId = new Map<number, ListingRecord>();
 
     items.forEach((item) => {
       const listing = normalizeListingRecord(item);
@@ -701,9 +701,9 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
   };
 
   const sanitizeListingsPayload = (
-    payload: MyAdsCachePayload<CarListing>,
+    payload: MyAdsCachePayload<ListingRecord>,
     excludedListingIds: ReadonlySet<number>
-  ): MyAdsCachePayload<CarListing> => ({
+  ): MyAdsCachePayload<ListingRecord> => ({
     activeListings: sanitizeListingsArray(payload.activeListings, excludedListingIds),
     archivedListings: sanitizeListingsArray(payload.archivedListings, excludedListingIds),
     draftListings: sanitizeListingsArray(payload.draftListings, excludedListingIds),
@@ -711,7 +711,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     likedListings: sanitizeListingsArray(payload.likedListings, excludedListingIds),
   });
 
-  const applyListingsPayload = (payload: MyAdsCachePayload<CarListing>) => {
+  const applyListingsPayload = (payload: MyAdsCachePayload<ListingRecord>) => {
     setActiveListings(payload.activeListings);
     setArchivedListings(payload.archivedListings);
     setDraftListings(payload.draftListings);
@@ -788,7 +788,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
       invalidateMyAdsCache(user?.id);
     }
 
-    const cachedPayloadRaw = forceRefreshFromPublish ? null : readMyAdsCache<CarListing>(user?.id);
+    const cachedPayloadRaw = forceRefreshFromPublish ? null : readMyAdsCache<ListingRecord>(user?.id);
     const cachedPayload = cachedPayloadRaw
       ? sanitizeListingsPayload(cachedPayloadRaw, deletedListingIdsRef.current)
       : null;
@@ -884,10 +884,10 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
         const settledValue = (result: PromiseSettledResult<unknown[]>) =>
           result.status === "fulfilled" ? result.value : [];
 
-        const activeData = settledValue(activeRes) as CarListing[];
-        const archivedData = settledValue(archivedRes) as CarListing[];
-        const draftsData = settledValue(draftsRes) as CarListing[];
-        const expiredData = settledValue(expiredRes) as CarListing[];
+        const activeData = settledValue(activeRes) as ListingRecord[];
+        const archivedData = settledValue(archivedRes) as ListingRecord[];
+        const draftsData = settledValue(draftsRes) as ListingRecord[];
+        const expiredData = settledValue(expiredRes) as ListingRecord[];
         const favoritesData = settledValue(favoritesRes);
 
         const likedFromFavorites = favoritesData
@@ -895,12 +895,12 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
             if (!item || typeof item !== "object") return null;
             const favoriteItem = item as { listing?: unknown };
             if (favoriteItem.listing && typeof favoriteItem.listing === "object") {
-              return favoriteItem.listing as CarListing;
+              return favoriteItem.listing as ListingRecord;
             }
-            return item as CarListing;
+            return item as ListingRecord;
           })
           .filter(
-            (listing): listing is CarListing =>
+            (listing): listing is ListingRecord =>
               Boolean(listing && typeof listing === "object" && "id" in listing)
           );
 
@@ -919,7 +919,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
 
         const hasFailedRequests = allResults.some((result) => result.status === "rejected");
         if (!hasFailedRequests) {
-          writeMyAdsCache<CarListing>(user?.id, sanitizedPayload);
+          writeMyAdsCache<ListingRecord>(user?.id, sanitizedPayload);
         } else {
           invalidateMyAdsCache(user?.id);
           console.warn("MyAds: partial fetch failure", allResults);
@@ -1044,12 +1044,12 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     }
   };
 
-  const goToEdit = (listing: CarListing) => {
+  const goToEdit = (listing: ListingRecord) => {
     invalidateMyAdsCache(user?.id);
     navigate(`/publish?edit=${listing.id}`, { state: { listing } });
   };
 
-  const openPreview = (listing: CarListing) => {
+  const openPreview = (listing: ListingRecord) => {
     setPreviewListing(listing);
     setPreviewTab(activeTab);
     setPreviewImageIndex(0);
@@ -1060,12 +1060,12 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     setPreviewTab(null);
   };
 
-  const getListingDisplayTitle = (listing: CarListing) => {
+  const getListingDisplayTitle = (listing: ListingRecord) => {
     const fallbackTitle = `${listing.brand || ""} ${listing.model || ""}`.trim();
     return (listing.title || fallbackTitle || "Обява").trim();
   };
 
-  const buildListingQrTargetUrl = (listing: CarListing) => {
+  const buildListingQrTargetUrl = (listing: ListingRecord) => {
     const url = new URL(`/details/${encodeURIComponent(listing.slug)}`, window.location.origin);
     url.searchParams.set("source", QR_BRAND_TAG);
     return url.toString();
@@ -1148,7 +1148,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     setIsQrGenerating(false);
   };
 
-  const openQrModal = async (listing: CarListing) => {
+  const openQrModal = async (listing: ListingRecord) => {
     if (activeTab !== "active" && activeTab !== "top" && activeTab !== "vip") {
       return;
     }
@@ -1330,7 +1330,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     }
   };
 
-  const getCoverPhoto = (listing: CarListing): ApiPhoto | null => {
+  const getCoverPhoto = (listing: ListingRecord): ApiPhoto | null => {
     const orderedImages = Array.isArray(listing.images) ? listing.images : [];
     return (
       listing.photo ||
@@ -1340,7 +1340,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     );
   };
 
-  const getCardImageSources = (listing: CarListing): CardImageSource => {
+  const getCardImageSources = (listing: ListingRecord): CardImageSource => {
     const coverPhoto = getCoverPhoto(listing);
     const fallbackRaw =
       (listing.image_url ||
@@ -1367,7 +1367,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     };
   };
 
-  const getPreviewImages = (listing: CarListing): PreviewImageSource[] => {
+  const getPreviewImages = (listing: ListingRecord): PreviewImageSource[] => {
     const orderedImages = Array.isArray(listing.images) ? listing.images : [];
     const resolved: PreviewImageSource[] = [];
     const seen = new Set<string>();
@@ -1438,7 +1438,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     });
   };
 
-  const getListingExpiryLabel = (listing: CarListing) => {
+  const getListingExpiryLabel = (listing: ListingRecord) => {
     if (!listing.created_at) return "";
     const createdAtMs = new Date(listing.created_at).getTime();
     if (Number.isNaN(createdAtMs)) return "";
@@ -1503,7 +1503,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     return listingAgeMs >= 0 && listingAgeMs <= NEW_LISTING_BADGE_WINDOW_MS;
   };
 
-  const getTopRemainingLabel = (listing: CarListing) => {
+  const getTopRemainingLabel = (listing: ListingRecord) => {
     if (listing.listing_type !== "top") return "";
     if (!listing.top_expires_at) return "";
     const expiresAtMs = new Date(listing.top_expires_at).getTime();
@@ -1519,7 +1519,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     return `ТОП изтича: ${minutes}мин`;
   };
 
-  const getVipRemainingLabel = (listing: CarListing) => {
+  const getVipRemainingLabel = (listing: ListingRecord) => {
     if (listing.listing_type !== "vip") return "";
     if (!listing.vip_expires_at) return "VIP активно";
     const expiresAtMs = new Date(listing.vip_expires_at).getTime();
@@ -1547,7 +1547,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
   const getVipPlanLabel = (vipPlan: VipPlan) =>
     vipPlan === "lifetime" ? "до изтичане на обявата (30 дни)" : "за 7 дни";
 
-  const isTopActive = (listing: CarListing | null) =>
+  const isTopActive = (listing: ListingRecord | null) =>
     Boolean(
       listing &&
         listing.listing_type === "top" &&
@@ -1556,7 +1556,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
         new Date(listing.top_expires_at).getTime() > currentTimeMs
     );
 
-  const isVipActive = (listing: CarListing | null) =>
+  const isVipActive = (listing: ListingRecord | null) =>
     Boolean(
       listing &&
         listing.listing_type === "vip" &&
@@ -1565,7 +1565,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
         new Date(listing.vip_expires_at).getTime() > currentTimeMs
     );
 
-  const getVipRemainingDays = (listing: CarListing | null) => {
+  const getVipRemainingDays = (listing: ListingRecord | null) => {
     if (!isVipActive(listing) || !listing?.vip_expires_at) return 0;
     const diffMs = new Date(listing.vip_expires_at).getTime() - currentTimeMs;
     if (diffMs <= 0) return 0;
@@ -1573,7 +1573,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
   };
 
   const getPromotePrice = (
-    listing: CarListing | null,
+    listing: ListingRecord | null,
     listingType: ListingType,
     topPlan: TopPlan,
     vipPlan: VipPlan
@@ -1614,7 +1614,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
   };
 
   const openListingTypeModal = (
-    listing: CarListing,
+    listing: ListingRecord,
     mode: "republish" | "promote",
     defaultType: ListingType
   ) => {
@@ -1833,7 +1833,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     }
   };
 
-  const handleKapariranoToggle = async (listing: CarListing, e: React.MouseEvent) => {
+  const handleKapariranoToggle = async (listing: ListingRecord, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!isBusinessUser) return;
 
@@ -1871,7 +1871,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
       if (!updatedListing) {
         throw new Error("Невалиден отговор от сървъра.");
       }
-      const applyUpdate = (items: CarListing[]) =>
+      const applyUpdate = (items: ListingRecord[]) =>
         items.map((item) => (item.id === updatedListing.id ? updatedListing : item));
 
       setActiveListings((prev) => applyUpdate(prev));
@@ -2125,7 +2125,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     return code;
   };
 
-  const formatTireSize = (listing: CarListing) => {
+  const formatTireSize = (listing: ListingRecord) => {
     const width = toText(listing.tire_width);
     const height = toText(listing.tire_height);
     const diameter = toText(listing.tire_diameter);
@@ -2171,7 +2171,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     return "";
   };
 
-  const getEffectiveListingBrand = (listing: CarListing) => {
+  const getEffectiveListingBrand = (listing: ListingRecord) => {
     const mainCategory = normalizeMainCategoryValue(
       listing.main_category ?? listing.mainCategory ?? listing.maincategory
     );
@@ -2212,7 +2212,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     return rawBrand || modelFirstToken || rawModel;
   };
 
-  const getTechnicalSpecs = (listing: CarListing) => {
+  const getTechnicalSpecs = (listing: ListingRecord) => {
     const specs: Array<{ label: string; value: string; icon: React.ComponentType<any> }> = [];
     const seenSpecs = new Set<string>();
     const addSpec = (label: string, value: unknown, icon: React.ComponentType<any>) => {
@@ -2379,7 +2379,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     return specs;
   };
 
-  const getListingCategoryBadge = (listing: CarListing) => {
+  const getListingCategoryBadge = (listing: ListingRecord) => {
     const mainCode = normalizeMainCategoryValue(
       listing.main_category ?? listing.mainCategory ?? listing.maincategory
     );

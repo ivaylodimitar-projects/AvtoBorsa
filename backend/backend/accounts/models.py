@@ -88,7 +88,7 @@ class ImportApiUsageEvent(models.Model):
         blank=True,
     )
     imported_listing = models.ForeignKey(
-        "listings.CarListing",
+        "listings.BaseListing",
         on_delete=models.SET_NULL,
         related_name="import_api_usage_events",
         null=True,
