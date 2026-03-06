@@ -9,9 +9,53 @@ def _normalize_email(value: str) -> str:
     return str(value).strip().lower()
 
 
+EMAIL_MAX_LENGTH = 254
+BUSINESS_LOGIN_IDENTIFIER_MAX_LENGTH = 150
+BG_PHONE_PREFIX = "+359"
+BG_PHONE_DIGIT_COUNT = 8
+
 PASSWORD_POLICY_ERROR = (
     "Паролата трябва да е поне 8 символа, с поне 1 главна буква и 1 цифра."
 )
+
+EMAIL_ERROR_MESSAGES = {
+    "blank": "Имейлът е задължителен.",
+    "required": "Имейлът е задължителен.",
+    "invalid": "Въведете валиден имейл адрес.",
+    "max_length": f"Имейлът може да бъде най-много {EMAIL_MAX_LENGTH} символа.",
+}
+
+PRIVATE_USERNAME_ERROR_MESSAGES = {
+    "blank": "Потребителското име е задължително.",
+    "required": "Потребителското име е задължително.",
+    "min_length": "Потребителското име трябва да е поне 3 символа.",
+    "max_length": "Потребителското име може да бъде най-много 32 символа.",
+}
+
+BUSINESS_LOGIN_IDENTIFIER_ERROR_MESSAGES = {
+    "blank": "Полето за вход е задължително.",
+    "required": "Полето за вход е задължително.",
+    "min_length": "Полето за вход трябва да е поне 3 символа.",
+    "max_length": (
+        f"Полето за вход може да бъде най-много "
+        f"{BUSINESS_LOGIN_IDENTIFIER_MAX_LENGTH} символа."
+    ),
+}
+
+PASSWORD_FIELD_ERROR_MESSAGES = {
+    "blank": "Паролата е задължителна.",
+    "required": "Паролата е задължителна.",
+    "min_length": "Паролата трябва да е поне 8 символа.",
+}
+
+CONFIRM_PASSWORD_ERROR_MESSAGES = {
+    "blank": "Потвърждението на паролата е задължително.",
+    "required": "Потвърждението на паролата е задължително.",
+    "min_length": "Потвърждението на паролата трябва да е поне 8 символа.",
+}
+
+ACCEPTED_TERMS_REQUIRED_MESSAGE = "Трябва да приемете Общите условия."
+BG_PHONE_ERROR_MESSAGE = f"Номерът трябва да е във формат {BG_PHONE_PREFIX}12345678."
 
 
 def _validate_password_policy(password: str) -> None:
@@ -21,13 +65,38 @@ def _validate_password_policy(password: str) -> None:
         raise serializers.ValidationError(PASSWORD_POLICY_ERROR)
 
 
+def _validate_bg_phone_number(value: str) -> str:
+    phone = str(value or "").strip()
+    if not re.fullmatch(rf"\{BG_PHONE_PREFIX}\d{{{BG_PHONE_DIGIT_COUNT}}}", phone):
+        raise serializers.ValidationError(BG_PHONE_ERROR_MESSAGE)
+    return phone
+
+
 class PrivateUserSerializer(serializers.ModelSerializer):
     """Serializer for private user registration"""
-    username = serializers.CharField(min_length=3, max_length=32)
-    email = serializers.EmailField()
-    password = serializers.CharField(write_only=True, min_length=8)
-    confirm_password = serializers.CharField(write_only=True, min_length=8)
-    accepted_terms = serializers.BooleanField(write_only=True)
+    username = serializers.CharField(
+        min_length=3,
+        max_length=32,
+        error_messages=PRIVATE_USERNAME_ERROR_MESSAGES,
+    )
+    email = serializers.EmailField(
+        max_length=EMAIL_MAX_LENGTH,
+        error_messages=EMAIL_ERROR_MESSAGES,
+    )
+    password = serializers.CharField(
+        write_only=True,
+        min_length=8,
+        error_messages=PASSWORD_FIELD_ERROR_MESSAGES,
+    )
+    confirm_password = serializers.CharField(
+        write_only=True,
+        min_length=8,
+        error_messages=CONFIRM_PASSWORD_ERROR_MESSAGES,
+    )
+    accepted_terms = serializers.BooleanField(
+        write_only=True,
+        error_messages={"required": ACCEPTED_TERMS_REQUIRED_MESSAGE},
+    )
 
     class Meta:
         model = PrivateUser
@@ -38,7 +107,7 @@ class PrivateUserSerializer(serializers.ModelSerializer):
         if data['password'] != data['confirm_password']:
             raise serializers.ValidationError({"confirm_password": "Паролите не съвпадат"})
         if not data.get('accepted_terms'):
-            raise serializers.ValidationError({"accepted_terms": "Трябва да приемете Общите условия."})
+            raise serializers.ValidationError({"accepted_terms": ACCEPTED_TERMS_REQUIRED_MESSAGE})
         return data
 
     def validate_email(self, value):
@@ -86,10 +155,30 @@ class PrivateUserSerializer(serializers.ModelSerializer):
 
 class BusinessUserSerializer(serializers.ModelSerializer):
     """Serializer for business user registration"""
-    email = serializers.EmailField()
-    password = serializers.CharField(write_only=True, min_length=8)
-    confirm_password = serializers.CharField(write_only=True, min_length=8)
-    accepted_terms = serializers.BooleanField(write_only=True)
+    username = serializers.CharField(
+        min_length=3,
+        max_length=BUSINESS_LOGIN_IDENTIFIER_MAX_LENGTH,
+        trim_whitespace=True,
+        error_messages=BUSINESS_LOGIN_IDENTIFIER_ERROR_MESSAGES,
+    )
+    email = serializers.EmailField(
+        max_length=EMAIL_MAX_LENGTH,
+        error_messages=EMAIL_ERROR_MESSAGES,
+    )
+    password = serializers.CharField(
+        write_only=True,
+        min_length=8,
+        error_messages=PASSWORD_FIELD_ERROR_MESSAGES,
+    )
+    confirm_password = serializers.CharField(
+        write_only=True,
+        min_length=8,
+        error_messages=CONFIRM_PASSWORD_ERROR_MESSAGES,
+    )
+    accepted_terms = serializers.BooleanField(
+        write_only=True,
+        error_messages={"required": ACCEPTED_TERMS_REQUIRED_MESSAGE},
+    )
 
     class Meta:
         model = BusinessUser
@@ -105,9 +194,7 @@ class BusinessUserSerializer(serializers.ModelSerializer):
         if data['password'] != data['confirm_password']:
             raise serializers.ValidationError({"confirm_password": "Паролите не съвпадат"})
         if not data.get('accepted_terms'):
-            raise serializers.ValidationError({"accepted_terms": "Трябва да приемете Общите условия."})
-        if len(data['username']) < 3:
-            raise serializers.ValidationError({"username": "Потребителското име трябва да е поне 3 символа"})
+            raise serializers.ValidationError({"accepted_terms": ACCEPTED_TERMS_REQUIRED_MESSAGE})
         if len(data['bulstat']) != 9:
             raise serializers.ValidationError({"bulstat": "БУЛСТАТ/ЕИК трябва да е 9 символа"})
         return data
@@ -118,11 +205,27 @@ class BusinessUserSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Потребител с този имейл вече съществува.")
         return email
 
+    def validate_username(self, value):
+        username = str(value).strip()
+        if User.objects.filter(username__iexact=username).exists():
+            raise serializers.ValidationError("Това поле за вход вече се използва.")
+        if PrivateUser.objects.filter(username__iexact=username).exists():
+            raise serializers.ValidationError("Това поле за вход вече се използва.")
+        if BusinessUser.objects.filter(username__iexact=username).exists():
+            raise serializers.ValidationError("Това поле за вход вече се използва.")
+        return username
+
     def validate_dealer_name(self, value):
         dealer_name = str(value).strip()
         if BusinessUser.objects.filter(dealer_name__iexact=dealer_name).exists():
             raise serializers.ValidationError("Името на дилъра вече съществува.")
         return dealer_name
+
+    def validate_phone(self, value):
+        return _validate_bg_phone_number(value)
+
+    def validate_admin_phone(self, value):
+        return _validate_bg_phone_number(value)
 
     def create(self, validated_data):
         email = validated_data['email']

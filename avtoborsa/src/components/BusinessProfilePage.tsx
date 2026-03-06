@@ -3,15 +3,43 @@ import { useNavigate } from "react-router-dom";
 import { Briefcase } from "lucide-react";
 
 import { API_BASE_URL, RECAPTCHA_ENABLED, RECAPTCHA_SITE_KEY } from "../config/api";
+import { normalizeFormErrors } from "../utils/normalizeFormErrors";
 import RecaptchaField from "./RecaptchaField";
 
 const PASSWORD_POLICY_MESSAGE =
   "Паролата трябва да е поне 8 символа, с поне 1 главна буква и 1 цифра";
 const EMAIL_CONFIRMATION_MESSAGE =
   "Ще изпратим линк за потвърждение на този имейл.";
+const LOGIN_IDENTIFIER_HINT =
+  "Може да използваш имейл или потребителско име за вход в системата.";
+const LOGIN_IDENTIFIER_MAX_LENGTH = 150;
+const PHONE_PREFIX = "+359";
+const PHONE_DIGIT_COUNT = 8;
+const PHONE_MAX_LENGTH = PHONE_PREFIX.length + PHONE_DIGIT_COUNT;
+const PHONE_ERROR_MESSAGE = `Номерът трябва да е във формат ${PHONE_PREFIX}12345678`;
+const BUSINESS_REGISTRATION_ERROR_FIELD_MAP: Record<string, string> = {
+  accepted_terms: "acceptedTerms",
+  admin_name: "adminName",
+  admin_phone: "adminPhone",
+  company_name: "companyName",
+  confirm_password: "confirmPassword",
+  dealer_name: "dealerName",
+  non_field_errors: "submit",
+  registration_address: "registrationAddress",
+  vat_number: "vatNumber",
+};
 
 const isPasswordValid = (password: string) =>
   password.length >= 8 && /\p{Lu}/u.test(password) && /\d/.test(password);
+
+const normalizePhoneInput = (value: string) => {
+  const digits = value.replace(/\D/g, "");
+  const digitsWithoutCountryCode = digits.startsWith("359") ? digits.slice(3) : digits;
+  return `${PHONE_PREFIX}${digitsWithoutCountryCode.slice(0, PHONE_DIGIT_COUNT)}`;
+};
+
+const isPhoneValid = (value: string) =>
+  new RegExp(`^\\${PHONE_PREFIX}\\d{${PHONE_DIGIT_COUNT}}$`).test(value.trim());
 
 const CITIES = [
   "София", "Пловдив", "Варна", "Бургас", "Русе", "Стара Загора", "Плевен",
@@ -27,7 +55,7 @@ const BusinessProfilePage: React.FC = () => {
     dealerName: "", 
     city: "",
     address: "",
-    phone: "",
+    phone: PHONE_PREFIX,
     email: "",
     website: "",
     username: "",
@@ -39,7 +67,7 @@ const BusinessProfilePage: React.FC = () => {
     bulstat: "",
     vatNumber: "",
     adminName: "",
-    adminPhone: "",
+    adminPhone: PHONE_PREFIX,
     description: "",
   });
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -52,7 +80,10 @@ const BusinessProfilePage: React.FC = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const nextValue =
+      name === "phone" || name === "adminPhone" ? normalizePhoneInput(value) : value;
+
+    setFormData((prev) => ({ ...prev, [name]: nextValue }));
     // Clear error for this field when user starts typing
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
@@ -71,19 +102,21 @@ const BusinessProfilePage: React.FC = () => {
     if (!formData.address.trim()) {
       newErrors.address = "Адрес е задължителен";
     }
-    if (!formData.phone.trim()) {
-      newErrors.phone = "Телефон е задължителен";
+    if (!isPhoneValid(formData.phone)) {
+      newErrors.phone = PHONE_ERROR_MESSAGE;
     }
     if (!formData.email.trim()) {
-      newErrors.email = "Email е задължителен";
+      newErrors.email = "Имейлът е задължителен";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Невалиден email адрес";
+      newErrors.email = "Невалиден имейл адрес";
     }
 
     if (!formData.username.trim()) {
-      newErrors.username = "Потребителско име е задължително";
+      newErrors.username = "Полето за вход е задължително";
     } else if (formData.username.length < 3) {
-      newErrors.username = "Потребителското име трябва да е поне 3 символа";
+      newErrors.username = "Полето за вход трябва да е поне 3 символа";
+    } else if (formData.username.trim().length > LOGIN_IDENTIFIER_MAX_LENGTH) {
+      newErrors.username = `Полето за вход може да бъде най-много ${LOGIN_IDENTIFIER_MAX_LENGTH} символа`;
     }
     if (!formData.password.trim()) {
       newErrors.password = "Паролата е задължителна";
@@ -112,8 +145,8 @@ const BusinessProfilePage: React.FC = () => {
     if (!formData.adminName.trim()) {
       newErrors.adminName = "Име и Фамилия на администратор е задължително";
     }
-    if (!formData.adminPhone.trim()) {
-      newErrors.adminPhone = "Мобилен телефон на администратор е задължителен";
+    if (!isPhoneValid(formData.adminPhone)) {
+      newErrors.adminPhone = PHONE_ERROR_MESSAGE;
     }
 
     if (RECAPTCHA_ENABLED) {
@@ -144,7 +177,7 @@ const BusinessProfilePage: React.FC = () => {
         dealer_name: formData.dealerName,
         city: formData.city,
         address: formData.address,
-        phone: formData.phone,
+        phone: formData.phone.trim(),
         email: formData.email.trim().toLowerCase(),
         username: formData.username,
         password: formData.password,
@@ -156,7 +189,7 @@ const BusinessProfilePage: React.FC = () => {
         bulstat: formData.bulstat,
         vat_number: formData.vatNumber,
         admin_name: formData.adminName,
-        admin_phone: formData.adminPhone,
+        admin_phone: formData.adminPhone.trim(),
         description: formData.description,
       };
 
@@ -184,7 +217,7 @@ const BusinessProfilePage: React.FC = () => {
           dealerName: "",
           city: "",
           address: "",
-          phone: "",
+          phone: PHONE_PREFIX,
           email: "",
           website: "",
           username: "",
@@ -196,7 +229,7 @@ const BusinessProfilePage: React.FC = () => {
           bulstat: "",
           vatNumber: "",
           adminName: "",
-          adminPhone: "",
+          adminPhone: PHONE_PREFIX,
           description: "",
         });
         setAcceptedTerms(false);
@@ -205,11 +238,7 @@ const BusinessProfilePage: React.FC = () => {
       } else {
         const errorData = await response.json();
         console.error("Backend error response:", errorData);
-        if (errorData?.error) {
-          setErrors({ submit: errorData.error });
-        } else {
-          setErrors(errorData);
-        }
+        setErrors(normalizeFormErrors(errorData, BUSINESS_REGISTRATION_ERROR_FIELD_MAP));
         if (RECAPTCHA_ENABLED) {
           setRecaptchaToken(null);
           setRecaptchaResetKey((prev) => prev + 1);
@@ -584,9 +613,11 @@ const BusinessProfilePage: React.FC = () => {
                   style={{ ...styles.input, borderColor: errors.phone ? "#fca5a5" : "#e2e8f0" }}
                   type="tel"
                   name="phone"
-                  placeholder="+359 88 123 4567"
+                  placeholder="+35912345678"
                   value={formData.phone}
                   onChange={handleChange}
+                  inputMode="numeric"
+                  maxLength={PHONE_MAX_LENGTH}
                 />
                 {errors.phone && <span style={styles.errorText}>{errors.phone}</span>}
               </div>
@@ -602,6 +633,7 @@ const BusinessProfilePage: React.FC = () => {
                   onChange={handleChange}
                 />
                 {errors.email && <span style={styles.errorText}>{errors.email}</span>}
+                <p style={styles.footNote}>{EMAIL_CONFIRMATION_MESSAGE}</p>
               </div>
             </div>
 
@@ -611,13 +643,13 @@ const BusinessProfilePage: React.FC = () => {
             </div>
           </div>
 
-          {/* Потребителско име и парола */}
+          {/* Данни за вход */}
           <div style={{ ...styles.section }}>
-            <h2 style={styles.sectionTitle}>Имейл и парола</h2>
-            <h3 style={styles.footNote}>Имейлът ще бъде използван като потребителско име за вход в системата</h3>
+            <h2 style={styles.sectionTitle}>Данни за вход</h2>
+            <h3 style={styles.footNote}>{LOGIN_IDENTIFIER_HINT}</h3>
 
             <div style={styles.formRow}>
-              <label style={styles.label}>Имейл *</label>
+              <label style={styles.label}>Имейл или потребителско име *</label>
               <div className="business-username-row" style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
                 <input
                   style={{ ...styles.input, borderColor: errors.username ? "#fca5a5" : "#e2e8f0", flex: 1 }}
@@ -628,8 +660,6 @@ const BusinessProfilePage: React.FC = () => {
                   onChange={handleChange}
                 />
               </div>
-              <p style={styles.footNote}>{EMAIL_CONFIRMATION_MESSAGE}</p>
-
               {errors.username && <span style={styles.errorText}>{errors.username}</span>}
             </div>
 
@@ -712,7 +742,7 @@ const BusinessProfilePage: React.FC = () => {
 
               <div style={styles.formRow}>
                 <label style={styles.label}>Мобилен телефон *</label>
-                <input style={{ ...styles.input, borderColor: errors.adminPhone ? "#fca5a5" : "#e2e8f0" }} type="tel" name="adminPhone" placeholder="+359 88 123 4567" value={formData.adminPhone} onChange={handleChange} />
+                <input style={{ ...styles.input, borderColor: errors.adminPhone ? "#fca5a5" : "#e2e8f0" }} type="tel" name="adminPhone" placeholder="+35912345678" value={formData.adminPhone} onChange={handleChange} inputMode="numeric" maxLength={PHONE_MAX_LENGTH} />
                 {errors.adminPhone && <span style={styles.errorText}>{errors.adminPhone}</span>}
               </div>
             </div>

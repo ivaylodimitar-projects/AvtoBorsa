@@ -44,7 +44,7 @@ class AuthFlowTests(APITestCase):
                 "dealer_name": "Demo Dealer",
                 "city": "Sofia",
                 "address": "Demo Street 1",
-                "phone": "+359881112233",
+                "phone": "+35912345678",
                 "email": "businessuser@example.com",
                 "username": "dealer_demo",
                 "password": "StrongPass123!",
@@ -55,7 +55,7 @@ class AuthFlowTests(APITestCase):
                 "mol": "Demo MOL",
                 "bulstat": "123456789",
                 "admin_name": "Admin Demo",
-                "admin_phone": "+359881112244",
+                "admin_phone": "+35987654321",
             },
             format="json",
         )
@@ -154,7 +154,7 @@ class AuthFlowTests(APITestCase):
                 "dealer_name": "Weak Dealer",
                 "city": "Sofia",
                 "address": "Weak Street 1",
-                "phone": "+359881112233",
+                "phone": "+35912345678",
                 "email": "weak-business@example.com",
                 "username": "weak_dealer",
                 "password": "weakpass1",
@@ -165,12 +165,92 @@ class AuthFlowTests(APITestCase):
                 "mol": "Weak MOL",
                 "bulstat": "123456789",
                 "admin_name": "Weak Admin",
-                "admin_phone": "+359881112244",
+                "admin_phone": "+35987654321",
             },
             format="json",
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("Паролата", str(response.data))
+
+    def test_business_registration_rejects_phone_without_exact_8_digits_after_prefix(self):
+        response = self.client.post(
+            "/api/auth/register/business/",
+            {
+                "dealer_name": "Invalid Phone Dealer",
+                "city": "Sofia",
+                "address": "Phone Street 1",
+                "phone": "+359123456789",
+                "email": "invalid-phone@example.com",
+                "username": "invalid_phone_dealer",
+                "password": "StrongPass123!",
+                "confirm_password": "StrongPass123!",
+                "accepted_terms": True,
+                "company_name": "Invalid Phone LTD",
+                "registration_address": "Sofia",
+                "mol": "Phone MOL",
+                "bulstat": "123456789",
+                "admin_name": "Phone Admin",
+                "admin_phone": "+35987654321",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.data["phone"][0],
+            "Номерът трябва да е във формат +35912345678.",
+        )
+
+    def test_business_registration_accepts_login_identifier_longer_than_16_chars(self):
+        response = self.client.post(
+            "/api/auth/register/business/",
+            {
+                "dealer_name": "Long Login Dealer",
+                "city": "Sofia",
+                "address": "Long Street 1",
+                "phone": "+35912345678",
+                "email": "long-login-dealer@example.com",
+                "username": "dealer.long.login.identifier@example.com",
+                "password": "StrongPass123!",
+                "confirm_password": "StrongPass123!",
+                "accepted_terms": True,
+                "company_name": "Long Login LTD",
+                "registration_address": "Sofia",
+                "mol": "Long Login MOL",
+                "bulstat": "123456789",
+                "admin_name": "Long Admin",
+                "admin_phone": "+35987654321",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+
+    def test_business_registration_returns_bulgarian_error_for_too_long_login_identifier(self):
+        response = self.client.post(
+            "/api/auth/register/business/",
+            {
+                "dealer_name": "Too Long Login Dealer",
+                "city": "Sofia",
+                "address": "Long Street 2",
+                "phone": "+35912345678",
+                "email": "too-long-login@example.com",
+                "username": "x" * 151,
+                "password": "StrongPass123!",
+                "confirm_password": "StrongPass123!",
+                "accepted_terms": True,
+                "company_name": "Too Long Login LTD",
+                "registration_address": "Sofia",
+                "mol": "Too Long MOL",
+                "bulstat": "123456789",
+                "admin_name": "Too Long Admin",
+                "admin_phone": "+35987654321",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.data["username"][0],
+            "Полето за вход може да бъде най-много 150 символа.",
+        )
 
     def test_private_registration_requires_terms_acceptance(self):
         response = self.client.post(
@@ -194,7 +274,7 @@ class AuthFlowTests(APITestCase):
                 "dealer_name": "Terms Dealer",
                 "city": "Sofia",
                 "address": "Terms Street 1",
-                "phone": "+359881112233",
+                "phone": "+35912345678",
                 "email": "terms-business@example.com",
                 "username": "terms_dealer",
                 "password": "StrongPass123!",
@@ -205,7 +285,7 @@ class AuthFlowTests(APITestCase):
                 "mol": "Terms MOL",
                 "bulstat": "123456789",
                 "admin_name": "Terms Admin",
-                "admin_phone": "+359881112244",
+                "admin_phone": "+35987654321",
             },
             format="json",
         )

@@ -174,7 +174,7 @@ class BusinessUser(models.Model):
     website = models.URLField(blank=True, null=True)
 
     # Потребителско име и парола (Username and Password)
-    username = models.CharField(max_length=16, unique=True)
+    username = models.CharField(max_length=150, unique=True)
 
     # Фирмени данни (Company Data)
     company_name = models.CharField(max_length=60)

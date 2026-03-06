@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { API_BASE_URL, RECAPTCHA_ENABLED, RECAPTCHA_SITE_KEY } from "../config/api";
+import { normalizeFormErrors } from "../utils/normalizeFormErrors";
 import RecaptchaField from "./RecaptchaField";
 
 const PASSWORD_POLICY_MESSAGE =
@@ -9,6 +10,11 @@ const PASSWORD_POLICY_MESSAGE =
 const EMAIL_CONFIRMATION_MESSAGE =
   "Ще изпратим линк за потвърждение на този имейл.";
 const PUBLIC_PROFILE_BASE_URL = "https://kar.bg";
+const PRIVATE_REGISTRATION_ERROR_FIELD_MAP: Record<string, string> = {
+  accepted_terms: "acceptedTerms",
+  confirm_password: "confirmPassword",
+  non_field_errors: "submit",
+};
 
 const isPasswordValid = (password: string) =>
   password.length >= 8 && /\p{Lu}/u.test(password) && /\d/.test(password);
@@ -54,9 +60,9 @@ const PrivateProfilePage: React.FC = () => {
     }
 
     if (!formData.email.trim()) {
-      newErrors.email = "Email е задължителен";
+      newErrors.email = "Имейлът е задължителен";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = "Невалиден email адрес";
+      newErrors.email = "Невалиден имейл адрес";
     }
 
     if (!formData.password.trim()) {
@@ -127,11 +133,7 @@ const PrivateProfilePage: React.FC = () => {
       } else {
         const errorData = await response.json();
         console.error("Backend error response:", errorData);
-        if (errorData?.error) {
-          setErrors({ submit: errorData.error });
-        } else {
-          setErrors(errorData);
-        }
+        setErrors(normalizeFormErrors(errorData, PRIVATE_REGISTRATION_ERROR_FIELD_MAP));
         if (RECAPTCHA_ENABLED) {
           setRecaptchaToken(null);
           setRecaptchaResetKey((prev) => prev + 1);
