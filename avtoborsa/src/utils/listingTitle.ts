@@ -8,6 +8,7 @@ import {
 
 export type ListingTitleInput = {
   title?: string | null;
+  display_title?: string | null;
   brand?: string | null;
   model?: string | null;
   main_category?: string | null;
@@ -149,6 +150,10 @@ const buildStructuredListingTitle = (listing: ListingTitleInput): string => {
 };
 
 const isPlaceholderListingTitle = (title: string, mainCategory: string): boolean => {
+  if (/^обява\s*#/i.test(title.trim())) {
+    return true;
+  }
+
   const normalizedTitle = normalizeForCompare(title);
   if (!normalizedTitle) {
     return true;
@@ -163,20 +168,29 @@ const isPlaceholderListingTitle = (title: string, mainCategory: string): boolean
   }
 
   const mainCategoryLabel = getMainCategoryLabel(mainCategory);
+  const normalizedCategoryTitle = normalizeForCompare(mainCategoryLabel);
   const genericCategoryTitle = normalizeForCompare(`${mainCategoryLabel} обява`);
-  if (!genericCategoryTitle) {
+  if (!normalizedCategoryTitle && !genericCategoryTitle) {
     return false;
   }
 
   return (
-    normalizedTitle === genericCategoryTitle || normalizedWithoutYears === genericCategoryTitle
+    normalizedTitle === normalizedCategoryTitle ||
+    normalizedWithoutYears === normalizedCategoryTitle ||
+    normalizedTitle === genericCategoryTitle ||
+    normalizedWithoutYears === genericCategoryTitle
   );
 };
 
 export const resolveListingBaseTitle = (listing: ListingTitleInput): string => {
   const mainCategory = resolveMainCategory(listing.main_category);
+  const displayTitle = trimToValue(listing.display_title);
   const rawTitle = trimToValue(listing.title);
   const structuredTitle = buildStructuredListingTitle(listing);
+
+  if (displayTitle && !isPlaceholderListingTitle(displayTitle, mainCategory)) {
+    return displayTitle;
+  }
 
   if (rawTitle && !isPlaceholderListingTitle(rawTitle, mainCategory)) {
     return rawTitle;

@@ -851,6 +851,33 @@ class ListingDetailSerializerPersistenceTests(APITestCase):
         self.assertIn("ABS", serialized["features"])
         self.assertIn(moto_meta_features[0], serialized["features"])
 
+    def test_serializer_returns_category_aware_display_title_for_non_car_listing(self):
+        services_listing = self._create_listing(
+            main_category="services",
+            title="Услуги обява",
+            classified_for="1",
+            buy_service_category="Пътна помощ",
+        )
+        services_serialized = BaseListingSerializer(instance=services_listing).data
+
+        self.assertEqual(services_serialized["display_title"], "Пътна помощ")
+        self.assertEqual(services_serialized["buy_service_category"], "Пътна помощ")
+
+        buses_listing = self._create_listing(
+            main_category="buses",
+            title="Бусове обява",
+            brand="Mercedes-Benz",
+            model="Sprinter",
+            year_from=2020,
+            fuel="dizel",
+            gearbox="avtomatik",
+            mileage=120000,
+            condition="1",
+        )
+        buses_serialized = BaseListingSerializer(instance=buses_listing).data
+
+        self.assertEqual(buses_serialized["display_title"], "Mercedes-Benz Sprinter")
+
     def test_generate_slug_uses_category_specific_rules(self):
         cases = [
             {

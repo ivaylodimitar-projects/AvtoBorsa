@@ -78,6 +78,18 @@ type BuildListingSeoOptions = {
 const DEFAULT_SITE_NAME = "Kar.bg";
 const DEFAULT_PRICE_CURRENCY = "EUR";
 const DEFAULT_OG_IMAGE = "/karbgbannerlogo.jpg";
+const VEHICLE_SEO_MAIN_CATEGORIES = new Set([
+  "cars",
+  "buses",
+  "trucks",
+  "motorcycles",
+  "agriculture",
+  "industrial",
+  "forklifts",
+  "rvs",
+  "yachts",
+  "trailer",
+]);
 
 const trimToValue = (value: unknown): string => {
   if (typeof value !== "string") {
@@ -213,6 +225,35 @@ const buildTransmissionLabel = (listing: ListingSeoListing) => {
   return formatGearboxLabel(gearbox) || gearbox;
 };
 
+const buildDescription = (
+  listing: ListingSeoListing,
+  listingName: string,
+  mainCategoryLabel: string,
+  cityLabel: string,
+  siteName: string
+) => {
+  const mainCategory = normalizeMainCategory(listing.main_category) || "";
+  const details: string[] = [];
+  const fuel = trimToValue(listing.fuel_display) || trimToValue(listing.fuel);
+  const gearbox = trimToValue(listing.gearbox_display) || trimToValue(listing.gearbox);
+  const mileage = toNumber(listing.mileage);
+
+  if (VEHICLE_SEO_MAIN_CATEGORIES.has(mainCategory)) {
+    if (mileage !== null && mileage >= 0) {
+      details.push(formatMileageLabel(listing.mileage));
+    }
+    if (fuel) {
+      details.push(buildFuelLabel(listing));
+    }
+    if (gearbox) {
+      details.push(buildTransmissionLabel(listing));
+    }
+  }
+
+  const detailsText = details.length ? `, ${details.join(", ")}` : "";
+  return `${listingName}${detailsText}. Обява в категория ${mainCategoryLabel} в ${cityLabel}. Виж повече в ${siteName}.`;
+};
+
 const withLeadingSlash = (path: string) => (path.startsWith("/") ? path : `/${path}`);
 
 const buildBreadcrumbs = (
@@ -245,9 +286,10 @@ export const buildListingSeoPayload = (
 
   const year = toNumber(listing.year_from);
   const priceLabel = formatPriceLabel(listing.price);
-  const mileageLabel = formatMileageLabel(listing.mileage);
-  const fuelLabel = buildFuelLabel(listing);
-  const transmissionLabel = buildTransmissionLabel(listing);
+  const fuel = trimToValue(listing.fuel_display) || trimToValue(listing.fuel);
+  const gearbox = trimToValue(listing.gearbox_display) || trimToValue(listing.gearbox);
+  const fuelLabel = fuel ? buildFuelLabel(listing) : undefined;
+  const transmissionLabel = gearbox ? buildTransmissionLabel(listing) : undefined;
   const cityLabel = trimToValue(listing.city) || "България";
   const mainCategoryLabel = resolveListingCategoryLabel(listing.main_category);
   const displayTitle = resolveListingDisplayTitle(listing);
@@ -268,7 +310,13 @@ export const buildListingSeoPayload = (
   const listingName = displayTitle;
   const h1 = `${displayTitle} – ${priceLabel}`;
   const title = `${h1} | ${siteName}`;
-  const description = `${listingName}, ${mileageLabel}, ${fuelLabel}, ${transmissionLabel}. Обява в категория ${mainCategoryLabel} в ${cityLabel}. Виж повече в ${siteName}.`;
+  const description = buildDescription(
+    listing,
+    listingName,
+    mainCategoryLabel,
+    cityLabel,
+    siteName
+  );
 
   const breadcrumbs = buildBreadcrumbs(listing, siteUrl, canonicalPath);
 
@@ -343,11 +391,10 @@ export const buildListingSeoPayload = (
     aiSummary: {
       whatTheSiteIs: `${siteName} е онлайн авто marketplace за обяви на превозни средства и авто услуги.`,
       service:
-        "Платформата свързва продавачи и купувачи чрез публикуване, търсене и сравнение на автомобилни обяви.",
+        "Платформата свързва продавачи и купувачи чрез публикуване, търсене и сравнение на обяви за превозни средства, части и услуги.",
       country: "България",
       audience: "Частни лица, автокъщи, дилъри и търговци на авто услуги.",
-      marketplaceType: "C2C и B2C marketplace за автомобилни обяви.",
+      marketplaceType: "C2C и B2C marketplace за превозни средства, части и услуги.",
     },
   };
 };
-

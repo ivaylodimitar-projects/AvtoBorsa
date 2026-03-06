@@ -2,6 +2,7 @@
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 import json
+import re
 from .models import (
     BaseListing,
     CarImage,
@@ -1024,6 +1025,15 @@ for _detail_fields in DETAIL_FIELDS_BY_MAIN_CATEGORY.values():
 MAIN_CATEGORIES_WITH_EQUIPMENT_TYPE = {"agriculture", "industrial", "forklifts", "rvs"}
 
 MAIN_CATEGORY_LABELS = {value: label for value, label in BaseListing.MAIN_CATEGORY_CHOICES}
+GENERIC_TITLE_PLACEHOLDERS = {
+    "автомобил",
+    "автомобил модел",
+    "автомобил марка модел",
+    "марка",
+    "марка модел",
+    "модел",
+    "обява",
+}
 WHEEL_OFFER_TYPE_LABELS = {
     "1": "Гуми",
     "2": "Джанти",
@@ -1059,6 +1069,45 @@ def _text_or_empty(value):
 def _join_display_parts(*values):
     parts = [_text_or_empty(value) for value in values]
     return " ".join(part for part in parts if part).strip()
+
+
+def _normalize_title_for_compare(value):
+    return re.sub(r"[^0-9a-zа-я]+", " ", _text_or_empty(value).lower()).strip()
+
+
+def _strip_year_tokens(value):
+    normalized = re.sub(r"\b(19|20)\d{2}\b", " ", _text_or_empty(value))
+    return re.sub(r"(^|\s)г\.?(?=\s|$)", " ", normalized, flags=re.IGNORECASE).strip()
+
+
+def _is_placeholder_listing_title(title, main_category):
+    normalized_title = _normalize_title_for_compare(title)
+    if not normalized_title:
+        return True
+
+    if re.match(r"^обява\s*#", _text_or_empty(title), flags=re.IGNORECASE):
+        return True
+
+    normalized_without_years = _normalize_title_for_compare(_strip_year_tokens(title))
+    if (
+        normalized_title in GENERIC_TITLE_PLACEHOLDERS
+        or normalized_without_years in GENERIC_TITLE_PLACEHOLDERS
+    ):
+        return True
+
+    main_category_label = _text_or_empty(MAIN_CATEGORY_LABELS.get(main_category, ""))
+    if not main_category_label:
+        return False
+
+    normalized_category_title = _normalize_title_for_compare(main_category_label)
+    normalized_generic_category_title = _normalize_title_for_compare(f"{main_category_label} обява")
+    return normalized_title in {
+        normalized_category_title,
+        normalized_generic_category_title,
+    } or normalized_without_years in {
+        normalized_category_title,
+        normalized_generic_category_title,
+    }
 
 
 MOTO_CATEGORY_PREFIX = "Категория: "
@@ -1177,19 +1226,21 @@ def _build_parts_display_title(details):
 
 
 def _build_listing_display_title(instance):
-    explicit_title = _text_or_empty(getattr(instance, "title", ""))
-    if explicit_title:
-        return explicit_title
-
     normalized_main_category = (
         _canonical_main_category(getattr(instance, "main_category", None), default="cars") or "cars"
     )
+    explicit_title = _text_or_empty(getattr(instance, "title", ""))
+    if explicit_title and not _is_placeholder_listing_title(explicit_title, normalized_main_category):
+        return explicit_title
+
     model_and_relation = DETAIL_MODEL_MAP.get(normalized_main_category)
     relation_name = model_and_relation[1] if model_and_relation else None
     details = _safe_related(instance, relation_name)
 
     if normalized_main_category == "cars":
-        return _join_display_parts(getattr(instance, "brand", ""), getattr(instance, "model", ""))
+        cars_title = _join_display_parts(getattr(instance, "brand", ""), getattr(instance, "model", ""))
+        if cars_title:
+            return cars_title
     if normalized_main_category == "wheels":
         wheels_title = _build_wheels_display_title(details)
         if wheels_title:
@@ -1198,6 +1249,14 @@ def _build_listing_display_title(instance):
         parts_title = _build_parts_display_title(details)
         if parts_title:
             return parts_title
+
+    detail_brand_model = _join_display_parts(
+        getattr(details, "brand", "") if details is not None else "",
+        getattr(details, "model", "") if details is not None else "",
+    )
+    if detail_brand_model:
+        return detail_brand_model
+
     if normalized_main_category == "accessories" and details is not None:
         accessory_category = _text_or_empty(getattr(details, "accessory_category", ""))
         if accessory_category:
@@ -1273,6 +1332,7 @@ class BaseListingSerializer(ListingPriceFieldsMixin, serializers.ModelSerializer
     """Serializer for car listings with per-main-category detail models."""
 
     images = serializers.SerializerMethodField()
+    display_title = serializers.SerializerMethodField()
     user_email = serializers.CharField(source='user.email', read_only=True)
     fuel_display = serializers.SerializerMethodField()
     gearbox_display = serializers.SerializerMethodField()
@@ -1376,7 +1436,7 @@ class BaseListingSerializer(ListingPriceFieldsMixin, serializers.ModelSerializer
     class Meta:
         model = BaseListing
         fields = [
-            'id', 'slug', 'user', 'user_email', 'main_category', 'category', 'category_display', 'title', 'brand', 'model',
+            'id', 'slug', 'user', 'user_email', 'main_category', 'category', 'category_display', 'title', 'display_title', 'brand', 'model',
             'year_from', 'month', 'vin', 'price', 'currency', 'price_eur', 'price_bgn', 'location_country', 'location_region', 'city',
             'fuel', 'fuel_display', 'gearbox', 'gearbox_display', 'mileage', 'color', 'condition', 'condition_display',
             'power', 'displacement', 'euro_standard',
@@ -1402,10 +1462,13 @@ class BaseListingSerializer(ListingPriceFieldsMixin, serializers.ModelSerializer
         read_only_fields = [
             'id', 'slug', 'user', 'user_email', 'created_at', 'updated_at', 'images', 'image_url', 'is_favorited', 'favorites_count',
             'is_active', 'fuel_display', 'gearbox_display', 'condition_display', 'category_display',
-            'listing_type_display', 'seller_name', 'seller_type', 'seller_created_at', 'price_history', 'photo',
+            'listing_type_display', 'seller_name', 'seller_type', 'seller_created_at', 'price_history', 'photo', 'display_title',
             'top_expires_at', 'vip_expires_at', 'view_count', 'is_kaparirano',
             'risk_score', 'risk_flags', 'requires_moderation',
         ]
+
+    def get_display_title(self, obj):
+        return _build_listing_display_title(obj)
 
     def get_fuel_display(self, obj):
         return obj.fuel
@@ -1925,34 +1988,7 @@ class BaseListingSerializer(ListingPriceFieldsMixin, serializers.ModelSerializer
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        normalized_main_category = _canonical_main_category(instance.main_category)
-        model_and_relation = DETAIL_MODEL_MAP.get(normalized_main_category)
-        if not model_and_relation:
-            return data
-
-        detail_fields = DETAIL_FIELDS_BY_MAIN_CATEGORY.get(normalized_main_category, [])
-        has_derived_fields = normalized_main_category in {
-            'buses',
-            'trucks',
-            'yachts',
-            'trailer',
-            'buy',
-            'services',
-        }
-        if not detail_fields and not has_derived_fields:
-            return data
-
-        _, relation_name = model_and_relation
-        detail_instance = getattr(instance, relation_name, None)
-        if detail_instance is None:
-            return data
-
-        for field_name in detail_fields:
-            value = getattr(detail_instance, field_name, None)
-            if isinstance(value, Decimal):
-                value = str(value)
-            data[field_name] = value
-        return _inject_derived_detail_fields(data, normalized_main_category, detail_instance)
+        return _inject_listing_detail_fields(data, instance)
 
     def create(self, validated_data):
         images_data = validated_data.pop('images_upload', [])

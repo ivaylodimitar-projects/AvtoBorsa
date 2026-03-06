@@ -13,6 +13,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 
 from .models import CarImage, BaseListing, get_expiry_cutoff
+from .serializers import _build_listing_display_title, _canonical_main_category
 
 PRERENDER_PUBLIC_CACHE_SECONDS = 300
 PRERENDER_PUBLIC_STALE_SECONDS = 900
@@ -29,6 +30,19 @@ PRERENDER_BOT_SIGNATURES = (
     "linkedinbot",
     "whatsapp",
 )
+MAIN_CATEGORY_LABELS = {value: label for value, label in BaseListing.MAIN_CATEGORY_CHOICES}
+VEHICLE_SEO_MAIN_CATEGORIES = {
+    "cars",
+    "buses",
+    "trucks",
+    "motorcycles",
+    "agriculture",
+    "industrial",
+    "forklifts",
+    "rvs",
+    "yachts",
+    "trailer",
+}
 
 
 def _to_positive_int(value):
@@ -202,10 +216,10 @@ def _build_image_srcset(image_candidates):
     return ", ".join(f"{item['url']} {item['width']}w" for item in image_candidates)
 
 
-def _build_listing_image_alt(brand, model, year, city, site_name):
-    year_part = str(year) if year else "обява"
+def _build_listing_image_alt(display_title, city, site_name):
     city_part = _trim_to_value(city, fallback="България")
-    return f"{brand} {model} {year_part} - {city_part} - обява в {site_name}"
+    title_part = _trim_to_value(display_title, fallback="Обява")
+    return f"{title_part} - {city_part} - обява в {site_name}"
 
 
 def _normalize_slug(listing):
@@ -219,28 +233,53 @@ def _normalize_slug(listing):
 
 
 def _normalize_listing_title(listing):
-    brand = _trim_to_value(listing.brand, fallback="Автомобил")
-    model = _trim_to_value(listing.model, fallback="Модел")
-    year = _to_positive_int(getattr(listing, "year_from", None))
-    if year:
-        return f"{brand} {model} {year}".strip()
-    return f"{brand} {model}".strip()
+    listing_title = _trim_to_value(_build_listing_display_title(listing))
+    if listing_title:
+        return listing_title
+
+    normalized_main_category = _canonical_main_category(
+        getattr(listing, "main_category", None),
+        default="cars",
+    ) or "cars"
+    return MAIN_CATEGORY_LABELS.get(normalized_main_category, f"Обява #{listing.id}")
 
 
 def _build_breadcrumb_items(listing, frontend_base_url, canonical_path):
-    brand = _trim_to_value(listing.brand, fallback="Марка")
-    model = _trim_to_value(listing.model, fallback="Модел")
-    cars_path = "/search?mainCategory=cars"
-    brand_path = f"{cars_path}&brand={quote(brand)}"
-    model_path = f"{brand_path}&model={quote(model)}"
+    normalized_main_category = _canonical_main_category(
+        getattr(listing, "main_category", None),
+        default="cars",
+    ) or "cars"
+    category_label = MAIN_CATEGORY_LABELS.get(normalized_main_category, "Обяви")
+    category_path = f"/search?mainCategory={quote(normalized_main_category)}"
     listing_path = canonical_path if canonical_path.startswith("/") else f"/{canonical_path}"
+    listing_label = _normalize_listing_title(listing)
     return [
         {"name": "Начало", "path": "/", "url": f"{frontend_base_url}/"},
-        {"name": "Автомобили", "path": cars_path, "url": f"{frontend_base_url}{cars_path}"},
-        {"name": brand, "path": brand_path, "url": f"{frontend_base_url}{brand_path}"},
-        {"name": model, "path": model_path, "url": f"{frontend_base_url}{model_path}"},
-        {"name": "Обява", "path": listing_path, "url": f"{frontend_base_url}{listing_path}"},
+        {"name": category_label, "path": category_path, "url": f"{frontend_base_url}{category_path}"},
+        {"name": listing_label, "path": listing_path, "url": f"{frontend_base_url}{listing_path}"},
     ]
+
+
+def _build_description_value(listing, listing_name, main_category_code, main_category_label, city_label, site_name):
+    details = []
+    if main_category_code in VEHICLE_SEO_MAIN_CATEGORIES:
+        mileage = _to_positive_int(getattr(listing, "mileage", None))
+        if mileage is not None:
+            details.append(_format_mileage_label(mileage))
+
+        fuel_label = _trim_to_value(listing.get_fuel_display() or listing.fuel)
+        if fuel_label:
+            details.append(fuel_label)
+
+        transmission_label = _trim_to_value(listing.get_gearbox_display() or listing.gearbox)
+        if transmission_label:
+            details.append(transmission_label)
+
+    details_text = f", {', '.join(details)}" if details else ""
+    return (
+        f"{listing_name}{details_text}. "
+        f"Обява в категория {main_category_label} в {city_label}. Виж повече в {site_name}."
+    )
 
 
 def _drop_none_values(payload):
@@ -350,32 +389,29 @@ def prerender_listing(request, listing_id):
     canonical_path = f"/details/{canonical_slug}"
     canonical_url = f"{frontend_base_url}{canonical_path}"
 
+    normalized_main_category = _canonical_main_category(
+        getattr(listing, "main_category", None),
+        default="cars",
+    ) or "cars"
+    main_category_label = MAIN_CATEGORY_LABELS.get(normalized_main_category, "Обяви")
     listing_name = _normalize_listing_title(listing)
     price_label = _format_price_label(listing.price)
     h1_value = f"{listing_name} – {price_label}"
-    fuel_label = _trim_to_value(listing.get_fuel_display() or listing.fuel, fallback="непосочено гориво")
-    transmission_label = _trim_to_value(
-        listing.get_gearbox_display() or listing.gearbox,
-        fallback="непосочена трансмисия",
-    )
-    mileage_label = _format_mileage_label(listing.mileage)
     city_label = _trim_to_value(listing.city, fallback="България")
-    description_value = (
-        f"{listing_name}, {mileage_label}, {fuel_label}, {transmission_label}. "
-        f"Обява за автомобил в {city_label}. Виж повече в {site_name}."
+    description_value = _build_description_value(
+        listing,
+        listing_name,
+        normalized_main_category,
+        main_category_label,
+        city_label,
+        site_name,
     )
     title_value = f"{h1_value} | {site_name}"
 
     default_share_image = f"{frontend_base_url}/karbgbannerlogo.jpg"
     gallery_rows = []
     first_image_url = ""
-    image_alt = _build_listing_image_alt(
-        _trim_to_value(listing.brand, fallback="Автомобил"),
-        _trim_to_value(listing.model, fallback="Модел"),
-        _to_positive_int(listing.year_from),
-        city_label,
-        site_name,
-    )
+    image_alt = _build_listing_image_alt(listing_name, city_label, site_name)
 
     for index, image_obj in enumerate(images):
         candidates = _collect_image_candidates(image_obj, frontend_base_url)
@@ -407,12 +443,12 @@ def prerender_listing(request, listing_id):
             "name": listing_name,
             "brand": {
                 "@type": "Brand",
-                "name": _trim_to_value(listing.brand, fallback="Автомобил"),
+                "name": _trim_to_value(listing.brand, fallback=main_category_label),
             },
             "model": _trim_to_value(listing.model, fallback="Модел"),
             "vehicleModelDate": str(_to_positive_int(listing.year_from) or ""),
-            "fuelType": fuel_label,
-            "vehicleTransmission": transmission_label,
+            "fuelType": _trim_to_value(listing.get_fuel_display() or listing.fuel),
+            "vehicleTransmission": _trim_to_value(listing.get_gearbox_display() or listing.gearbox),
             "mileageFromOdometer": {
                 "@type": "QuantitativeValue",
                 "value": _to_positive_int(listing.mileage),
@@ -457,11 +493,11 @@ def prerender_listing(request, listing_id):
     }
 
     ai_summary = {
-        "what_the_site_is": f"{site_name} е онлайн авто marketplace за обяви на автомобили в България.",
-        "service": "Платформата позволява публикуване, търсене и сравнение на автомобилни обяви.",
+        "what_the_site_is": f"{site_name} е онлайн marketplace за обяви на превозни средства, части и услуги в България.",
+        "service": "Платформата позволява публикуване, търсене и сравнение на обяви в различни авто категории.",
         "country": "България",
-        "audience": "Частни лица, автокъщи и автомобилни дилъри.",
-        "marketplace_type": "C2C и B2C marketplace за авто обяви.",
+        "audience": "Частни лица, автокъщи, дилъри и търговци на авто услуги.",
+        "marketplace_type": "C2C и B2C marketplace за превозни средства, части и услуги.",
     }
 
     breadcrumb_html = "".join(
