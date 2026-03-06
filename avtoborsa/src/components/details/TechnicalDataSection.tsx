@@ -18,9 +18,12 @@ import {
 import { getMainCategoryLabel, normalizeMainCategory } from '../../constants/karbgdata';
 import {
   formatConditionLabel,
+  formatEngineTypeLabel,
   formatEuroStandardLabel,
   formatFuelLabel,
   formatGearboxLabel,
+  formatTireSeasonLabel,
+  formatTransmissionLabel,
 } from '../../utils/listingLabels';
 
 interface TechnicalDataSectionProps {
@@ -28,10 +31,12 @@ interface TechnicalDataSectionProps {
   year?: number | string | null;
   month?: number;
   fuel?: string;
+  fuelDisplay?: string;
   power?: number | string | null;
   displacement?: number | string | null;
   displacementCc?: number | string | null;
   gearbox?: string;
+  gearboxDisplay?: string;
   category?: string;
   mileage?: number | string | null;
   color?: string;
@@ -215,11 +220,13 @@ const TechnicalDataSection: React.FC<TechnicalDataSectionProps> = ({
   mainCategory,
   year,
   month,
-  fuel,
+  fuel: rawFuel,
+  fuelDisplay,
   power,
   displacement,
   displacementCc,
-  gearbox,
+  gearbox: rawGearbox,
+  gearboxDisplay,
   category,
   mileage,
   color: rawColor,
@@ -235,7 +242,7 @@ const TechnicalDataSection: React.FC<TechnicalDataSectionProps> = ({
   tireWidth,
   tireHeight,
   tireDiameter,
-  tireSeason,
+  tireSeason: rawTireSeason,
   tireSpeedIndex,
   tireLoadIndex,
   tireTread,
@@ -254,8 +261,8 @@ const TechnicalDataSection: React.FC<TechnicalDataSectionProps> = ({
   partElement,
   partYearFrom,
   partYearTo,
-  transmission,
-  engineType,
+  transmission: rawTransmission,
+  engineType: rawEngineType,
   axles,
   seats,
   loadKg,
@@ -390,6 +397,11 @@ const TechnicalDataSection: React.FC<TechnicalDataSectionProps> = ({
   const color = formatColor(rawColor);
   const normalizedMainCategory = normalizeCategoryKey(mainCategory);
   const isCarCategory = !normalizedMainCategory || normalizedMainCategory === 'cars';
+  const fuel = formatFuelLabel(fuelDisplay || rawFuel);
+  const gearbox = formatGearboxLabel(gearboxDisplay || rawGearbox);
+  const tireSeason = formatTireSeasonLabel(rawTireSeason);
+  const transmission = formatTransmissionLabel(rawTransmission);
+  const engineType = formatEngineTypeLabel(rawEngineType);
 
   switch (normalizedMainCategory) {
     case 'parts':

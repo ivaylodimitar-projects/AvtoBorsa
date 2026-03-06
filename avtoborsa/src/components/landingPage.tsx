@@ -40,6 +40,11 @@ import {
 } from "../utils/latestListingsCache";
 import { CAR_BRANDS, CAR_MODELS } from "../constants/carBrandModels";
 import { APP_MAIN_CATEGORY_OPTIONS, getMainCategoryLabel } from "../constants/karbgdata";
+import {
+  getListingCardMeta,
+  getListingCardTitle,
+  type ListingCardInfoInput,
+} from "../utils/listingCardInfo";
 import { formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 import { resolvePriceBadgeState } from "../utils/priceChangeBadge";
 import { getListingPriceSummary } from "../utils/listingCurrency";
@@ -48,12 +53,9 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 const PUBLIC_API_DOCS_URL = `${API_BASE_URL}/docs/api/`;
 
-type ListingRecord = {
+type ListingRecord = ListingCardInfoInput & {
   id: number;
   slug: string;
-  main_category?: string;
-  title?: string;
-  display_title?: string;
   brand: string;
   model: string;
   year_from: number;
@@ -62,10 +64,6 @@ type ListingRecord = {
   price_eur?: number | string;
   price_bgn?: number | string;
   mileage: number;
-  fuel: string;
-  fuel_display?: string;
-  gearbox: string;
-  gearbox_display?: string;
   power: number;
   city: string;
   location_region?: string;
@@ -80,8 +78,6 @@ type ListingRecord = {
   is_top?: boolean;
   is_top_listing?: boolean;
   is_top_ad?: boolean;
-  part_for?: string;
-  part_element?: string;
   price_change?: {
     delta?: number | string;
     direction?: string;
@@ -791,6 +787,7 @@ export default function LandingPage() {
   };
 
   const getLatestListingMeta = (listing: ListingRecord) => {
+    return getListingCardMeta(listing);
     const mainCategory = (listing.main_category || "").toString().trim();
     const isPartsCategory = mainCategory === "parts";
     const isCarCategory = !mainCategory || mainCategory === "cars";
@@ -842,6 +839,7 @@ export default function LandingPage() {
   };
 
   const getLatestListingTitle = (listing: ListingRecord) => {
+    return getListingCardTitle(listing);
     const brandModelTitle = [listing.brand, listing.model]
       .map((value) => (value || "").toString().trim())
       .filter(Boolean)

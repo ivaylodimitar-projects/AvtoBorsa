@@ -1,6 +1,13 @@
-﻿import { useState, useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getMainCategoryLabel } from "../constants/karbgdata";
 import { useAuth } from "../context/AuthContext";
+import {
+  formatConditionLabel,
+  formatEngineTypeLabel,
+  formatFuelLabel,
+  formatGearboxLabel,
+  formatTransmissionLabel,
+} from "../utils/listingLabels";
 
 export interface RecentSearch {
   id: string;
@@ -20,12 +27,178 @@ const getRecentSearchesStorageKey = (userId?: number | null) => {
   return `${STORAGE_KEY_PREFIX}${userId}`;
 };
 
+const hasBrokenEncoding = (value: string) => /Ð|Ñ|â€|â€¢|â€“|âˆž/.test(value);
+
+const repairBrokenEncoding = (value: string) => {
+  if (!value || !hasBrokenEncoding(value)) {
+    return value;
+  }
+
+  try {
+    const bytes = Uint8Array.from(value, (char) => char.charCodeAt(0) & 0xff);
+    const decoded = new TextDecoder("utf-8").decode(bytes);
+    return decoded || value;
+  } catch {
+    return value;
+  }
+};
+
+const toDisplayText = (value: unknown) => {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  return repairBrokenEncoding(String(value).trim());
+};
+
+const formatNumericValue = (value: unknown) => {
+  const textValue = toDisplayText(value);
+  if (!textValue) return "";
+  const numeric = Number(textValue);
+  if (!Number.isFinite(numeric)) return textValue;
+  return numeric.toLocaleString("bg-BG");
+};
+
+const formatRange = (
+  from: unknown,
+  to: unknown,
+  suffix = "",
+  options?: { allowZeroAsDefault?: boolean }
+) => {
+  const fromText = toDisplayText(from);
+  const toText = toDisplayText(to);
+  if (!fromText && !toText) return "";
+
+  const resolvedFrom = fromText || (options?.allowZeroAsDefault ? "0" : "");
+  const resolvedTo = toText || "∞";
+
+  if (!resolvedFrom) {
+    return `до ${formatNumericValue(resolvedTo)}${suffix}`;
+  }
+  if (!toText) {
+    return `от ${formatNumericValue(resolvedFrom)}${suffix}`;
+  }
+
+  return `${formatNumericValue(resolvedFrom)}-${formatNumericValue(resolvedTo)}${suffix}`;
+};
+
+const pushPart = (parts: string[], value: unknown) => {
+  const text = toDisplayText(value);
+  if (!text) return;
+  if (parts.includes(text)) return;
+  parts.push(text);
+};
+
+const generateSearchLabel = (criteria: Record<string, any>): string => {
+  const parts: string[] = [];
+  const mainCategoryCode = toDisplayText(criteria.mainCategory || criteria.main_category);
+  const mainCategoryLabel = getMainCategoryLabel(mainCategoryCode);
+
+  pushPart(parts, mainCategoryLabel);
+
+  if (criteria.equipmentType) {
+    pushPart(parts, `Вид: ${criteria.equipmentType}`);
+  }
+
+  const brand = toDisplayText(criteria.brand || criteria.marka);
+  const model = toDisplayText(criteria.model);
+  if (brand) {
+    pushPart(parts, brand);
+  }
+  if (model) {
+    pushPart(parts, model);
+  }
+
+  pushPart(parts, criteria.category);
+  pushPart(parts, criteria.motoCategory);
+  pushPart(parts, criteria.partCategory);
+  pushPart(parts, criteria.partElement);
+  pushPart(parts, criteria.accessoryCategory);
+  pushPart(parts, criteria.buyServiceCategory);
+
+  const yearRange = formatRange(criteria.yearFrom, criteria.yearTo, " г.");
+  pushPart(parts, yearRange);
+
+  const currency = toDisplayText(criteria.currency) || "EUR";
+  if (criteria.maxPrice) {
+    pushPart(parts, `до ${formatNumericValue(criteria.maxPrice)} ${currency}`);
+  } else {
+    const priceRange = formatRange(criteria.priceFrom, criteria.priceTo, ` ${currency}`, {
+      allowZeroAsDefault: true,
+    });
+    pushPart(parts, priceRange);
+  }
+
+  pushPart(
+    parts,
+    formatRange(criteria.mileageFrom, criteria.mileageTo, " км", {
+      allowZeroAsDefault: true,
+    })
+  );
+
+  pushPart(
+    parts,
+    formatRange(criteria.engineFrom, criteria.engineTo, " к.с.", {
+      allowZeroAsDefault: true,
+    })
+  );
+
+  pushPart(parts, criteria.region);
+  pushPart(parts, formatFuelLabel(toDisplayText(criteria.fuel)));
+  pushPart(parts, formatGearboxLabel(toDisplayText(criteria.gearbox)));
+  pushPart(parts, formatConditionLabel(toDisplayText(criteria.condition)));
+  pushPart(parts, formatEngineTypeLabel(toDisplayText(criteria.engineType || criteria.engine_type)));
+  pushPart(parts, formatTransmissionLabel(toDisplayText(criteria.transmission)));
+
+  if (parts.length === 0) {
+    return "Всички обяви";
+  }
+
+  return parts.join(" • ");
+};
+
+const normalizeStoredSearches = (value: unknown): RecentSearch[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry, index) => {
+      const criteria =
+        entry && typeof entry === "object" && entry.criteria && typeof entry.criteria === "object"
+          ? (entry.criteria as Record<string, any>)
+          : {};
+      const fallbackLabel =
+        entry && typeof entry === "object" && "displayLabel" in entry
+          ? toDisplayText((entry as { displayLabel?: unknown }).displayLabel)
+          : "";
+      const displayLabel = Object.keys(criteria).length > 0
+        ? generateSearchLabel(criteria)
+        : fallbackLabel || "Всички обяви";
+
+      const rawId =
+        entry && typeof entry === "object" && "id" in entry
+          ? toDisplayText((entry as { id?: unknown }).id)
+          : "";
+      const rawTimestamp =
+        entry && typeof entry === "object" && "timestamp" in entry
+          ? Number((entry as { timestamp?: unknown }).timestamp)
+          : Number.NaN;
+
+      return {
+        id: rawId || `${Date.now()}-${index}`,
+        criteria,
+        timestamp: Number.isFinite(rawTimestamp) ? rawTimestamp : Date.now(),
+        displayLabel,
+      };
+    })
+    .slice(0, MAX_SEARCHES);
+};
+
 export const useRecentSearches = () => {
   const { user } = useAuth();
   const storageKey = useMemo(() => getRecentSearchesStorageKey(user?.id), [user?.id]);
   const [searches, setSearches] = useState<RecentSearch[]>([]);
 
-  // Load searches from user-scoped localStorage key
   useEffect(() => {
     const stored = localStorage.getItem(storageKey);
     if (!stored) {
@@ -35,9 +208,11 @@ export const useRecentSearches = () => {
 
     try {
       const parsed = JSON.parse(stored);
-      setSearches(Array.isArray(parsed) ? parsed : []);
-    } catch (e) {
-      console.error("Error loading recent searches:", e);
+      const normalized = normalizeStoredSearches(parsed);
+      setSearches(normalized);
+      localStorage.setItem(storageKey, JSON.stringify(normalized));
+    } catch (error) {
+      console.error("Error loading recent searches:", error);
       setSearches([]);
     }
   }, [storageKey]);
@@ -53,10 +228,7 @@ export const useRecentSearches = () => {
     };
 
     setSearches((prev) => {
-      // Remove duplicate search if it exists (by criteria)
-      const filtered = prev.filter((s) => JSON.stringify(s.criteria) !== JSON.stringify(criteria));
-
-      // Add new search at the beginning and keep only MAX_SEARCHES
+      const filtered = prev.filter((search) => JSON.stringify(search.criteria) !== JSON.stringify(criteria));
       const updated = [newSearch, ...filtered].slice(0, MAX_SEARCHES);
 
       localStorage.setItem(storageKey, JSON.stringify(updated));
@@ -66,7 +238,7 @@ export const useRecentSearches = () => {
 
   const removeSearch = (id: string) => {
     setSearches((prev) => {
-      const updated = prev.filter((s) => s.id !== id);
+      const updated = prev.filter((search) => search.id !== id);
       localStorage.setItem(storageKey, JSON.stringify(updated));
       return updated;
     });
@@ -84,99 +256,3 @@ export const useRecentSearches = () => {
     clearAllSearches,
   };
 };
-
-const generateSearchLabel = (criteria: Record<string, any>): string => {
-  const parts: string[] = [];
-  const mainCategoryCode = String(criteria.mainCategory || criteria.main_category || "").trim();
-  const mainCategoryLabel = getMainCategoryLabel(mainCategoryCode);
-
-  if (mainCategoryLabel) {
-    parts.push(mainCategoryLabel);
-  }
-
-  // Brand and Model
-  if (criteria.equipmentType) {
-    parts.push(`Ð’Ð¸Ð´: ${criteria.equipmentType}`);
-  }
-
-  const brand = criteria.brand || criteria.marka;
-  if (brand) {
-    parts.push(brand);
-    if (criteria.model) parts.push(criteria.model);
-  }
-
-  // Category
-  if (criteria.category) {
-    parts.push(criteria.category);
-  }
-  if (criteria.motoCategory) {
-    parts.push(criteria.motoCategory);
-  }
-
-  // Year Range
-  if (criteria.yearFrom) {
-    if (criteria.yearTo) {
-      parts.push(`${criteria.yearFrom}â€“${criteria.yearTo} Ð³.`);
-    } else {
-      parts.push(`Ð¾Ñ‚ ${criteria.yearFrom} Ð³.`);
-    }
-  } else if (criteria.yearTo) {
-    parts.push(`Ð´Ð¾ ${criteria.yearTo} Ð³.`);
-  }
-
-  // Price Range
-  const activeCurrency = criteria.currency || "EUR";
-  if (criteria.maxPrice) {
-    parts.push(`до ${activeCurrency} ${criteria.maxPrice}`);
-  } else if (criteria.priceFrom || criteria.priceTo) {
-    const from = criteria.priceFrom || "0";
-    const to = criteria.priceTo || "âˆž";
-    parts.push(`${activeCurrency} ${from}–${to}`);
-  }
-
-  // Mileage Range
-  if (criteria.mileageFrom || criteria.mileageTo) {
-    const from = criteria.mileageFrom || "0";
-    const to = criteria.mileageTo || "âˆž";
-    parts.push(`${from}â€“${to} ÐºÐ¼`);
-  }
-
-  // Engine/Power Range
-  if (criteria.engineFrom || criteria.engineTo) {
-    const from = criteria.engineFrom || "0";
-    const to = criteria.engineTo || "âˆž";
-    parts.push(`${from}â€“${to} Ðº.Ñ.`);
-  }
-
-  // Region
-  if (criteria.region) {
-    parts.push(criteria.region);
-  }
-
-  // Fuel
-  if (criteria.fuel) {
-    parts.push(criteria.fuel);
-  }
-
-  // Gearbox
-  if (criteria.gearbox) {
-    parts.push(criteria.gearbox);
-  }
-
-  // Color
-  if (criteria.color) {
-    parts.push(criteria.color);
-  }
-
-  // Condition
-  if (criteria.condition) {
-    parts.push(criteria.condition);
-  }
-
-  if (parts.length === 0) {
-    return "Ð’ÑÐ¸Ñ‡ÐºÐ¸ Ð¾Ð±ÑÐ²Ð¸";
-  }
-
-  return parts.join(" â€¢ ");
-};
-

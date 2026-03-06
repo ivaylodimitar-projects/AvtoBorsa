@@ -735,6 +735,10 @@ class BaseListingLiteSerializer(ListingPriceFieldsMixin, serializers.ModelSerial
             details = None
         return getattr(details, 'part_element', "") if details else ""
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        return _inject_listing_detail_fields(data, instance)
+
 
 class BaseListingListSerializer(ListingPriceFieldsMixin, serializers.ModelSerializer):
     """Optimized serializer for search/list pages."""

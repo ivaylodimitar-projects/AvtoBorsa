@@ -63,7 +63,7 @@ LISTINGS_PUBLIC_STALE_SECONDS = 120
 TOP_DEMOTION_MIN_INTERVAL_SECONDS = 60
 TOP_DEMOTION_LOCK_KEY = "listings:demote-expired-top:lock"
 LATEST_LISTINGS_CACHE_SECONDS = 30
-LATEST_LISTINGS_CACHE_KEY = "listings:latest:v5"
+LATEST_LISTINGS_CACHE_KEY = "listings:latest:v6"
 DETAIL_PUBLIC_CACHE_SECONDS = 60
 DETAIL_PUBLIC_STALE_SECONDS = 120
 DETAIL_RELATED_SELECT_FIELDS = (
@@ -2355,7 +2355,7 @@ def latest_listings(request):
             is_archived=False,
             created_at__gte=cutoff
         )
-        .select_related('parts_details', 'cars_details')
+        .select_related(*DETAIL_RELATED_SELECT_FIELDS)
         .prefetch_related(image_prefetch)
         .annotate(
             first_image=Coalesce(

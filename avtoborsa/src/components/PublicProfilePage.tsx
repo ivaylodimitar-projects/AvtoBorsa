@@ -5,6 +5,7 @@ import ResponsiveImage, { type ApiPhoto } from "./ResponsiveImage";
 import { API_BASE_URL } from "../config/api";
 import { getMainCategoryLabel } from "../constants/karbgdata";
 import { getListingPriceSummary } from "../utils/listingCurrency";
+import { formatFuelLabel } from "../utils/listingLabels";
 
 type PublicListing = {
   id: number;
@@ -320,7 +321,7 @@ const PublicProfilePage: React.FC = () => {
                   </div>
                   <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", color: "#475569", fontSize: 14 }}>
                     {listing.city ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><MapPin size={14} />{listing.city}</span> : null}
-                    {isCarCategory && listing.fuel_display ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><Fuel size={14} />{listing.fuel_display}</span> : null}
+                    {isCarCategory && listing.fuel_display ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><Fuel size={14} />{formatFuelLabel(listing.fuel_display)}</span> : null}
                     {listing.mileage ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><Gauge size={14} />{Number(listing.mileage).toLocaleString("bg-BG")} км</span> : null}
                   </div>
                 </div>

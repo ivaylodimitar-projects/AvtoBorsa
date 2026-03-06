@@ -1,4 +1,11 @@
 import { formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
+import { normalizeMainCategory } from "../constants/karbgdata";
+import {
+  resolveListingBaseTitle,
+  resolveListingCategoryLabel,
+  resolveListingDisplayTitle,
+  type ListingTitleInput,
+} from "../utils/listingTitle";
 
 type ListingSeoRendition = {
   url?: string | null;
@@ -16,7 +23,7 @@ type ListingSeoImage = {
   is_cover?: boolean | null;
 };
 
-export type ListingSeoListing = {
+export type ListingSeoListing = ListingTitleInput & {
   id: number;
   slug?: string | null;
   brand: string;
@@ -187,12 +194,9 @@ const pickBestRenditionUrl = (images: ListingSeoImage[] | null | undefined) => {
 };
 
 const buildImageAlt = (listing: ListingSeoListing, siteName: string) => {
-  const brand = trimToValue(listing.brand) || "Автомобил";
-  const model = trimToValue(listing.model) || "";
-  const year = toNumber(listing.year_from);
+  const displayTitle = resolveListingDisplayTitle(listing);
   const city = trimToValue(listing.city) || "България";
-  const modelDatePart = year ? `${year}` : "обява";
-  return `${brand} ${model} ${modelDatePart} - ${city} - обява в ${siteName}`
+  return `${displayTitle} - ${city} - обява в ${siteName}`
     .replace(/\s+/g, " ")
     .trim();
 };
@@ -216,20 +220,18 @@ const buildBreadcrumbs = (
   siteUrl: string,
   canonicalPath: string
 ): BreadcrumbItem[] => {
-  const brand = trimToValue(listing.brand) || "Марка";
-  const model = trimToValue(listing.model) || "Модел";
-
-  const carsPath = "/search?mainCategory=cars";
-  const brandPath = `${carsPath}&brand=${encodeURIComponent(brand)}`;
-  const modelPath = `${brandPath}&model=${encodeURIComponent(model)}`;
+  const categoryCode = trimToValue(normalizeMainCategory(listing.main_category) || listing.main_category);
+  const categoryLabel = resolveListingCategoryLabel(listing.main_category);
+  const categoryPath = categoryCode
+    ? `/search?mainCategory=${encodeURIComponent(categoryCode)}`
+    : "/search";
   const listingPath = withLeadingSlash(canonicalPath);
+  const listingLabel = resolveListingDisplayTitle(listing);
 
   return [
     { name: "Начало", path: "/", url: `${siteUrl}/` },
-    { name: "Автомобили", path: carsPath, url: `${siteUrl}${carsPath}` },
-    { name: brand, path: brandPath, url: `${siteUrl}${brandPath}` },
-    { name: model, path: modelPath, url: `${siteUrl}${modelPath}` },
-    { name: "Обява", path: listingPath, url: `${siteUrl}${listingPath}` },
+    { name: categoryLabel, path: categoryPath, url: `${siteUrl}${categoryPath}` },
+    { name: listingLabel, path: listingPath, url: `${siteUrl}${listingPath}` },
   ];
 };
 
@@ -241,15 +243,17 @@ export const buildListingSeoPayload = (
   const siteUrl = resolveSiteUrl(options.siteUrl);
   const priceCurrency = trimToValue(options.priceCurrency) || DEFAULT_PRICE_CURRENCY;
 
-  const brand = trimToValue(listing.brand) || "Автомобил";
-  const model = trimToValue(listing.model) || "Модел";
   const year = toNumber(listing.year_from);
-  const yearLabel = year ? `${year}` : "г.";
   const priceLabel = formatPriceLabel(listing.price);
   const mileageLabel = formatMileageLabel(listing.mileage);
   const fuelLabel = buildFuelLabel(listing);
   const transmissionLabel = buildTransmissionLabel(listing);
   const cityLabel = trimToValue(listing.city) || "България";
+  const mainCategoryLabel = resolveListingCategoryLabel(listing.main_category);
+  const displayTitle = resolveListingDisplayTitle(listing);
+  const baseTitle = resolveListingBaseTitle(listing);
+  const brand = trimToValue(listing.brand) || mainCategoryLabel || baseTitle;
+  const model = trimToValue(listing.model);
 
   const slug = resolveSlug(listing);
   const canonicalPath = `/details/${slug}`;
@@ -261,10 +265,10 @@ export const buildListingSeoPayload = (
     toAbsoluteUrl(pickBestRenditionUrl(listing.images), siteUrl) ||
     fallbackShareImage;
 
-  const listingName = `${brand} ${model} ${yearLabel}`.replace(/\s+/g, " ").trim();
-  const h1 = `${listingName} – ${priceLabel}`;
+  const listingName = displayTitle;
+  const h1 = `${displayTitle} – ${priceLabel}`;
   const title = `${h1} | ${siteName}`;
-  const description = `${listingName}, ${mileageLabel}, ${fuelLabel}, ${transmissionLabel}. Обява за автомобил в ${cityLabel}. Виж повече в ${siteName}.`;
+  const description = `${listingName}, ${mileageLabel}, ${fuelLabel}, ${transmissionLabel}. Обява в категория ${mainCategoryLabel} в ${cityLabel}. Виж повече в ${siteName}.`;
 
   const breadcrumbs = buildBreadcrumbs(listing, siteUrl, canonicalPath);
 
@@ -276,7 +280,7 @@ export const buildListingSeoPayload = (
       "@type": "Brand",
       name: brand,
     },
-    model,
+    model: model || undefined,
     vehicleModelDate: year ? `${year}` : undefined,
     fuelType: fuelLabel,
     vehicleTransmission: transmissionLabel,
@@ -346,6 +350,4 @@ export const buildListingSeoPayload = (
     },
   };
 };
-
-
 

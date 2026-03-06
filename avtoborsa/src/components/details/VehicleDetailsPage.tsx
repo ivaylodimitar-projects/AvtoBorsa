@@ -15,6 +15,12 @@ import { API_BASE_URL } from '../../config/api';
 import { normalizeMainCategory } from '../../constants/karbgdata';
 import { buildListingSeoPayload } from '../../seo/listingSeo';
 import { getListingPriceSummary } from '../../utils/listingCurrency';
+import { resolveListingDisplayTitle } from '../../utils/listingTitle';
+import {
+  getListingCardMeta,
+  getListingCardTitle,
+  type ListingCardInfoInput,
+} from '../../utils/listingCardInfo';
 
 interface CarImage extends ApiPhoto {
   id: number;
@@ -133,7 +139,7 @@ interface ListingRecord {
   buy_service_category?: string;
 }
 
-interface SimilarListing {
+interface SimilarListing extends ListingCardInfoInput {
   id: number;
   slug: string;
   brand: string;
@@ -215,37 +221,8 @@ const isVipListing = (listing: ListingWithPromoStatus) => {
   return false;
 };
 
-const TITLE_WITH_YEAR_MAIN_CATEGORIES = new Set([
-  'cars',
-  'buses',
-  'trucks',
-  'motorcycles',
-  'agriculture',
-  'industrial',
-  'forklifts',
-  'rvs',
-  'yachts',
-  'trailer',
-]);
-
 const normalizeDetailMainCategory = (value?: string | null) => {
   return normalizeMainCategory(value) || (value ?? '').toString().trim().toLowerCase();
-};
-
-const resolveListingDisplayTitle = (
-  listing: Pick<ListingRecord, 'title' | 'brand' | 'model' | 'main_category' | 'year_from'>
-) => {
-  const baseTitle = (listing.title || `${listing.brand} ${listing.model}`).trim() || 'Обява';
-  const hasLeadingYear = /^\d{4}\b/.test(baseTitle);
-  const includeYearInTitle = TITLE_WITH_YEAR_MAIN_CATEGORIES.has(
-    normalizeDetailMainCategory(listing.main_category)
-  );
-
-  if (includeYearInTitle && listing.year_from && !hasLeadingYear) {
-    return `${listing.year_from} ${baseTitle}`;
-  }
-
-  return baseTitle;
 };
 
 const NEW_LISTING_BADGE_MINUTES = 10;
@@ -1505,10 +1482,12 @@ const VehicleDetailsPage: React.FC = () => {
             year={listing.year_from}
             month={listing.month}
             fuel={listing.fuel}
+            fuelDisplay={listing.fuel_display}
             power={listing.power}
             displacement={listing.displacement}
             displacementCc={listing.displacement_cc}
             gearbox={listing.gearbox}
+            gearboxDisplay={listing.gearbox_display}
             category={listing.category}
             mileage={listing.mileage}
             color={listing.color}
@@ -1676,7 +1655,12 @@ const VehicleDetailsPage: React.FC = () => {
                       ? `${powerValue} к.с.`
                       : '—';
                   const yearLabel = item.year_from ? `${item.year_from} г.` : '—';
+                  void mileageLabel;
+                  void powerLabel;
+                  void yearLabel;
                   const createdLabel = getRelativeTime(item.created_at);
+                  const similarTitle = getListingCardTitle(item);
+                  const similarMeta = getListingCardMeta(item, 3);
 
                     return (
                       <div
@@ -1701,7 +1685,12 @@ const VehicleDetailsPage: React.FC = () => {
                             <ResponsiveImage
                               photo={coverPhoto}
                               fallbackPath={imageFallbackPath}
-                              alt={buildCardImageAlt(item.brand, item.model, item.year_from, item.city)}
+                              alt={buildCardImageAlt(
+                                item.brand || similarTitle,
+                                item.model || '',
+                                item.year_from,
+                                item.city
+                              )}
                               kind="grid"
                               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
                               loading="lazy"
@@ -1718,14 +1707,18 @@ const VehicleDetailsPage: React.FC = () => {
                         </div>
                       <div style={styles.similarInfo}>
                         <div style={styles.similarName}>
-                          {item.brand} {item.model}
+                          {similarTitle}
                         </div>
                         <div style={styles.similarPrice}>{priceLabel}</div>
-                        <div style={styles.similarMeta}>
-                          <span style={styles.similarMetaItem}>{yearLabel}</span>
-                          <span style={styles.similarMetaItem}>{mileageLabel}</span>
-                          <span style={styles.similarMetaItem}>{powerLabel}</span>
-                        </div>
+                        {similarMeta.length > 0 && (
+                          <div style={styles.similarMeta}>
+                            {similarMeta.map((metaValue, metaIndex) => (
+                              <span key={`${item.id}-meta-${metaIndex}`} style={styles.similarMetaItem}>
+                                {metaValue}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                         <div style={styles.similarFooter}>
                           <div style={styles.similarFooterItem}>
                             <MapPin size={14} style={styles.similarFooterIcon} />

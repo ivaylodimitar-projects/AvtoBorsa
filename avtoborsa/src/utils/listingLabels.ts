@@ -1,4 +1,11 @@
-const normalize = (value?: string | null) => (value ?? "").toString().trim().toLowerCase();
+const normalize = (value?: string | null) =>
+  (value ?? "").toString().trim().toLocaleLowerCase("bg-BG");
+
+const normalizeLookup = (value?: string | null) =>
+  normalize(value)
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9а-я]+/gi, "");
 
 const FUEL_LABELS: Record<string, string> = {
   benzin: "Бензин",
@@ -61,6 +68,22 @@ const EURO_LABELS: Record<string, string> = {
   "6": "Евро 6",
 };
 
+const TIRE_SEASON_LABELS: Record<string, string> = {
+  летни: "Летни",
+  letni: "Летни",
+  summer: "Летни",
+  summertires: "Летни",
+  зимни: "Зимни",
+  zimni: "Зимни",
+  winter: "Зимни",
+  wintertires: "Зимни",
+  всесезонни: "Всесезонни",
+  vsesezonni: "Всесезонни",
+  allseason: "Всесезонни",
+  allseasons: "Всесезонни",
+  allweather: "Всесезонни",
+};
+
 export const formatFuelLabel = (fuel?: string | null) => {
   if (!fuel) return "";
   const key = normalize(fuel);
@@ -87,4 +110,107 @@ export const formatEuroStandardLabel = (euro?: string | null) => {
   const match = key.match(/\d+/);
   if (match) return `Евро ${match[0]}`;
   return euro;
+};
+
+export const formatEngineTypeLabel = (engineType?: string | null) => {
+  if (!engineType) return "";
+  const value = engineType.toString().trim();
+  if (!value) return "";
+
+  const lookup = normalizeLookup(value);
+  if (!lookup) return value;
+
+  if (
+    lookup.includes("бездвигател") ||
+    lookup.includes("nodvigatel") ||
+    lookup.includes("noengine") ||
+    lookup === "none"
+  ) {
+    return "Без двигател";
+  }
+  if (lookup.includes("pluginhibrid") || lookup.includes("phev")) {
+    return "Plug-in хибрид";
+  }
+  if (lookup.includes("hibrid") || lookup.includes("hybrid")) {
+    return "Хибрид";
+  }
+  if (
+    lookup.includes("elektr") ||
+    lookup.includes("electric") ||
+    lookup === "ev"
+  ) {
+    return "Електро";
+  }
+  if (lookup.includes("dizel") || lookup.includes("diesel")) {
+    return "Дизел";
+  }
+  if (
+    lookup.includes("gaz") ||
+    lookup.includes("gas") ||
+    lookup.includes("lpg") ||
+    lookup.includes("cng") ||
+    lookup.includes("metan")
+  ) {
+    return "Газ";
+  }
+  if (lookup.includes("vodorod") || lookup.includes("hydrogen")) {
+    return "Водород";
+  }
+  if (
+    lookup.includes("benzin") ||
+    lookup.includes("petrol") ||
+    lookup.includes("gasoline")
+  ) {
+    return "Бензин";
+  }
+
+  return value;
+};
+
+export const formatTransmissionLabel = (transmission?: string | null) => {
+  if (!transmission) return "";
+  const value = transmission.toString().trim();
+  if (!value) return "";
+
+  const lookup = normalizeLookup(value);
+  if (!lookup) return value;
+
+  if (
+    lookup.includes("poluavtomat") ||
+    lookup.includes("semiauto") ||
+    lookup.includes("semiautomatic") ||
+    lookup.includes("robot")
+  ) {
+    return "Полуавтоматична";
+  }
+  if (
+    lookup.includes("avtomat") ||
+    lookup.includes("automatic") ||
+    lookup.includes("cvt") ||
+    lookup.includes("dct") ||
+    lookup.includes("dsg")
+  ) {
+    return "Автоматична";
+  }
+  if (
+    lookup.includes("ruchna") ||
+    lookup.includes("manual") ||
+    lookup.includes("stick")
+  ) {
+    return "Ръчна";
+  }
+
+  return value;
+};
+
+export const formatTireSeasonLabel = (season?: string | null) => {
+  if (!season) return "";
+  const value = season.toString().trim();
+  if (!value) return "";
+
+  const exact = TIRE_SEASON_LABELS[normalize(value)];
+  if (exact) return exact;
+
+  const lookup = normalizeLookup(value);
+  return TIRE_SEASON_LABELS[lookup] || value;
 };
