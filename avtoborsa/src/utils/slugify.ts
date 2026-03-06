@@ -2,6 +2,63 @@
  * Slugify utility functions for creating SEO-friendly URLs.
  */
 
+const CYRILLIC_TO_LATIN_SLUG_MAP: Record<string, string> = {
+  а: "a",
+  б: "b",
+  в: "v",
+  г: "g",
+  д: "d",
+  е: "e",
+  ж: "zh",
+  з: "z",
+  и: "i",
+  й: "y",
+  к: "k",
+  л: "l",
+  м: "m",
+  н: "n",
+  о: "o",
+  п: "p",
+  р: "r",
+  с: "s",
+  т: "t",
+  у: "u",
+  ф: "f",
+  х: "h",
+  ц: "ts",
+  ч: "ch",
+  ш: "sh",
+  щ: "sht",
+  ъ: "a",
+  ь: "y",
+  ю: "yu",
+  я: "ya",
+  ѝ: "i",
+  ё: "yo",
+  ы: "y",
+  э: "e",
+  є: "e",
+  і: "i",
+  ї: "yi",
+  ґ: "g",
+};
+
+const safeDecodeURIComponent = (value: string): string => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
+
+const transliterateSlugText = (value: string): string => {
+  const normalized = safeDecodeURIComponent(value).normalize("NFKC").trim().toLowerCase();
+  if (!normalized) return "";
+  return Array.from(normalized)
+    .map((char) => CYRILLIC_TO_LATIN_SLUG_MAP[char] || char)
+    .join("");
+};
+
 const toSlugPart = (value: string): string => {
   const normalized = value
     .normalize("NFKC")
@@ -15,12 +72,68 @@ const toSlugPart = (value: string): string => {
   return normalized || "dealer";
 };
 
+const toLatinSlugPart = (value: string): string => {
+  const normalized = transliterateSlugText(value)
+    .replace(/[^a-z0-9\s-]+/g, " ")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return normalized;
+};
+
+const toListingId = (value: unknown): number | null => {
+  if (typeof value === "number") {
+    return Number.isInteger(value) && value > 0 ? value : null;
+  }
+  if (typeof value === "string" && /^\d+$/.test(value.trim())) {
+    const parsed = parseInt(value.trim(), 10);
+    return parsed > 0 ? parsed : null;
+  }
+  return null;
+};
+
+export const normalizeListingSlug = (
+  value: string | null | undefined,
+  fallbackId?: number | string | null
+): string => {
+  const rawValue = safeDecodeURIComponent((value || "").trim())
+    .replace(/^https?:\/\/[^/]+/i, "")
+    .replace(/^\/+details\/+/i, "")
+    .replace(/^\/+/, "");
+  const matched = rawValue.match(/^obiava-(\d+)(?:-(.*))?$/i);
+  const listingId = toListingId(fallbackId) ?? toListingId(matched?.[1]);
+
+  if (!listingId) {
+    return "";
+  }
+
+  const suffixSource =
+    matched?.[2] ||
+    (!matched && rawValue && !/^\d+$/.test(rawValue) ? rawValue : "");
+  const normalizedSuffix = toLatinSlugPart(suffixSource);
+  return normalizedSuffix ? `obiava-${listingId}-${normalizedSuffix}` : `obiava-${listingId}`;
+};
+
+export const buildListingDetailPath = (
+  slug: string | null | undefined,
+  fallbackId?: number | string | null
+): string => {
+  const normalizedSlug = normalizeListingSlug(slug, fallbackId);
+  if (!normalizedSlug) {
+    const listingId = toListingId(fallbackId);
+    return listingId ? `/details/obiava-${listingId}` : "/details";
+  }
+  return `/details/${normalizedSlug}`;
+};
+
 /**
  * Extract ID from listing slug.
  * Example: "obiava-3-audi-a6" -> 3
  */
 export const extractIdFromSlug = (slug: string): number | null => {
-  const match = slug.match(/^obiava-(\d+)-/);
+  const normalizedSlug = safeDecodeURIComponent((slug || "").trim());
+  const match = normalizedSlug.match(/^obiava-(\d+)(?:-|$)/i);
   return match ? parseInt(match[1], 10) : null;
 };
 

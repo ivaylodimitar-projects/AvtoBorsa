@@ -6,6 +6,7 @@ import io
 import logging
 import os
 import posixpath
+import unicodedata
 from threading import Lock
 from urllib.parse import unquote, urlparse
 
@@ -23,6 +24,54 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 logger = logging.getLogger(__name__)
+
+CYRILLIC_TO_LATIN_SLUG_MAP = {
+    "а": "a",
+    "б": "b",
+    "в": "v",
+    "г": "g",
+    "д": "d",
+    "е": "e",
+    "ж": "zh",
+    "з": "z",
+    "и": "i",
+    "й": "y",
+    "к": "k",
+    "л": "l",
+    "м": "m",
+    "н": "n",
+    "о": "o",
+    "п": "p",
+    "р": "r",
+    "с": "s",
+    "т": "t",
+    "у": "u",
+    "ф": "f",
+    "х": "h",
+    "ц": "ts",
+    "ч": "ch",
+    "ш": "sh",
+    "щ": "sht",
+    "ъ": "a",
+    "ь": "y",
+    "ю": "yu",
+    "я": "ya",
+    "ѝ": "i",
+    "ё": "yo",
+    "ы": "y",
+    "э": "e",
+    "є": "e",
+    "і": "i",
+    "ї": "yi",
+    "ґ": "g",
+}
+
+
+def transliterate_slug_text(value):
+    text = unicodedata.normalize("NFKC", str(value or "").strip())
+    if not text:
+        return ""
+    return "".join(CYRILLIC_TO_LATIN_SLUG_MAP.get(char, char) for char in text.lower())
 
 # ----------------------------
 # Listing promotion windows
@@ -437,7 +486,7 @@ class BaseListing(models.Model):
         text = str(value or "").strip()
         if not text:
             return ""
-        return slugify(text, allow_unicode=True)[:80]
+        return slugify(transliterate_slug_text(text))[:80]
 
     def _build_category_slug(self, *values):
         slug_parts = []
@@ -618,12 +667,10 @@ class BaseListing(models.Model):
 
         super().save(*args, **kwargs)
 
-        # Slug: set once, using UPDATE to avoid a second model save()
-        if not self.slug:
-            generated = self.generate_slug()
-            if generated:
-                BaseListing.objects.filter(pk=self.pk).update(slug=generated)
-                self.slug = generated
+        generated = self.generate_slug()
+        if generated and generated != self.slug:
+            BaseListing.objects.filter(pk=self.pk).update(slug=generated)
+            self.slug = generated
 
         # Price history
         if price_changed:

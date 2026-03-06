@@ -1,5 +1,6 @@
 import { formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 import { normalizeMainCategory } from "../constants/karbgdata";
+import { normalizeListingSlug } from "../utils/slugify";
 import {
   resolveListingBaseTitle,
   resolveListingCategoryLabel,
@@ -165,7 +166,7 @@ const formatMileageLabel = (value: unknown, locale = "bg-BG") => {
 };
 
 const resolveSlug = (listing: ListingSeoListing) => {
-  const slug = trimToValue(listing.slug);
+  const slug = normalizeListingSlug(trimToValue(listing.slug), listing.id);
   if (slug) return slug;
   return `obiava-${listing.id}`;
 };

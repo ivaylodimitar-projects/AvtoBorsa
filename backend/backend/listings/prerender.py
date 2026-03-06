@@ -223,12 +223,12 @@ def _build_listing_image_alt(display_title, city, site_name):
 
 
 def _normalize_slug(listing):
-    slug_value = _trim_to_value(getattr(listing, "slug", ""))
-    if slug_value:
-        return slug_value
     generated_slug = listing.generate_slug()
     if generated_slug:
         return generated_slug
+    slug_value = _trim_to_value(getattr(listing, "slug", ""))
+    if slug_value:
+        return slug_value
     return f"obiava-{listing.id}"
 
 

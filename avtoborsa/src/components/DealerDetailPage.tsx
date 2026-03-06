@@ -18,6 +18,7 @@ import { API_BASE_URL } from "../config/api";
 import {
   buildDealerSlug,
   buildDealerProfilePath,
+  buildListingDetailPath,
   extractDealerIdFromSlug,
 } from "../utils/slugify";
 
@@ -1357,7 +1358,7 @@ const DealerDetailPage: React.FC = () => {
                     }}
                     onMouseEnter={() => setHoveredCard(listing.id)}
                     onMouseLeave={() => setHoveredCard(null)}
-                    onClick={() => navigate(`/details/${listing.slug}`)}
+                    onClick={() => navigate(buildListingDetailPath(listing.slug, listing.id))}
                   >
                     <div style={styles.listingMedia}>
                       {isTop && (

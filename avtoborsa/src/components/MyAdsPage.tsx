@@ -35,6 +35,7 @@ import Lottie from "lottie-react";
 import QRCode from "qrcode";
 import { jsPDF } from "jspdf";
 import { useAuth } from "../context/AuthContext";
+import { buildListingDetailPath } from "../utils/slugify";
 import {
   formatConditionLabel,
   formatEuroStandardLabel,
@@ -1070,7 +1071,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
   };
 
   const buildListingQrTargetUrl = (listing: ListingRecord) => {
-    const url = new URL(`/details/${encodeURIComponent(listing.slug)}`, window.location.origin);
+    const url = new URL(buildListingDetailPath(listing.slug, listing.id), window.location.origin);
     url.searchParams.set("source", QR_BRAND_TAG);
     return url.toString();
   };
@@ -5179,7 +5180,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                   openPreview(listing);
                   return;
                 }
-                navigate(`/details/${listing.slug}`);
+                navigate(buildListingDetailPath(listing.slug, listing.id));
               }}
               onMouseEnter={(e) => {
                 if (isDeletingListing) return;

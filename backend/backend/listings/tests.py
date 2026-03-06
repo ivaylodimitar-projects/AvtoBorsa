@@ -9,7 +9,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase, APIClient
 
 from backend.accounts.models import BusinessUser, PrivateUser
-from .models import BaseListing, CarsListing, MotoListing, PartsListing
+from .models import BaseListing, CarsListing, MotoListing, PartsListing, transliterate_slug_text
 from .serializers import BaseListingSerializer, _build_moto_meta_features
 
 
@@ -948,10 +948,10 @@ class ListingDetailSerializerPersistenceTests(APITestCase):
                     "brand": "boat",
                     "model": "Bayliner",
                     "year_from": 2015,
-                    "boat_category": "boat",
+                    "boat_category": "Лодка",
                     "condition": "1",
                 },
-                "expected_parts": ["boat", "Bayliner"],
+                "expected_parts": ["Лодка", "Bayliner"],
             },
             {
                 "name": "trailer",
@@ -1000,7 +1000,7 @@ class ListingDetailSerializerPersistenceTests(APITestCase):
             with self.subTest(category=case["name"]):
                 listing = self._create_listing(**case["payload"])
                 expected_suffix = "-".join(
-                    slugify(str(part).strip(), allow_unicode=True)[:80]
+                    slugify(transliterate_slug_text(str(part).strip()))[:80]
                     for part in case["expected_parts"]
                     if str(part).strip()
                 )
@@ -1008,6 +1008,24 @@ class ListingDetailSerializerPersistenceTests(APITestCase):
                     listing.slug,
                     f"obiava-{listing.id}-{expected_suffix}",
                 )
+
+    def test_serializer_returns_latin_slug_when_stored_slug_contains_cyrillic(self):
+        listing = self._create_listing(
+            main_category="yachts",
+            brand="boat",
+            model="Bayliner",
+            year_from=2015,
+            boat_category="Лодка",
+            condition="1",
+        )
+
+        BaseListing.objects.filter(pk=listing.pk).update(
+            slug=f"obiava-{listing.id}-лодка-bayliner"
+        )
+        listing.refresh_from_db()
+
+        serialized = BaseListingSerializer(instance=listing).data
+        self.assertEqual(serialized["slug"], f"obiava-{listing.id}-lodka-bayliner")
 
     def test_serializer_discards_frontend_fallback_vehicle_fields_when_category_does_not_use_them(self):
         cases = [

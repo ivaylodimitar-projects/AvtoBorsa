@@ -6,7 +6,7 @@ import TechnicalDataSection from './TechnicalDataSection';
 import EquipmentSection from './EquipmentSection';
 import ContactSidebar from './ContactSidebar';
 import SkeletonLoader from './SkeletonLoader';
-import { extractIdFromSlug } from '../../utils/slugify';
+import { buildListingDetailPath, extractIdFromSlug, normalizeListingSlug } from '../../utils/slugify';
 import ListingPromoBadge from '../ListingPromoBadge';
 import KapariranoBadge from '../KapariranoBadge';
 import ResponsiveImage, { type ApiPhoto, type PhotoRendition } from '../ResponsiveImage';
@@ -354,9 +354,10 @@ const updateDetailCache = (listingId: number, payload: ListingRecord, etag: stri
 const persistRecentlyViewed = (listing: ListingRecord) => {
   if (!listing?.id || !listing.slug) return;
   try {
+    const normalizedSlug = normalizeListingSlug(listing.slug, listing.id);
     const entry = {
       id: listing.id,
-      slug: listing.slug,
+      slug: normalizedSlug || listing.slug,
       brand: listing.brand,
       model: listing.model,
       price: listing.price,
@@ -921,8 +922,10 @@ const VehicleDetailsPage: React.FC = () => {
   useEffect(() => {
     if (!slug || !listing?.slug || !listingId) return;
     if (listing.id !== listingId) return;
-    if (slug === listing.slug) return;
-    const targetPath = `/details/${listing.slug}`;
+    const normalizedCurrentSlug = normalizeListingSlug(slug, listingId);
+    const normalizedListingSlug = normalizeListingSlug(listing.slug, listing.id);
+    if (normalizedCurrentSlug && normalizedCurrentSlug === normalizedListingSlug) return;
+    const targetPath = buildListingDetailPath(listing.slug, listing.id);
     if (window.location.pathname === targetPath) return;
     navigate(targetPath, { replace: true });
   }, [listing?.id, listing?.slug, listingId, navigate, slug]);
@@ -1670,7 +1673,7 @@ const VehicleDetailsPage: React.FC = () => {
                           ...(index === 0 ? { marginLeft: SIMILAR_FIRST_CARD_OFFSET } : {}),
                         }}
                         className="similar-card"
-                        onClick={() => navigate(`/details/${item.slug}`)}
+                        onClick={() => navigate(buildListingDetailPath(item.slug, item.id))}
                       >
                         <div style={styles.similarMedia}>
                           {isTop && <ListingPromoBadge type="top" size="xs" shadowVariant="similar" />}

@@ -1309,6 +1309,9 @@ def _inject_derived_detail_fields(data, normalized_main_category, detail_instanc
 
 def _inject_listing_detail_fields(data, instance):
     normalized_main_category = _canonical_main_category(getattr(instance, "main_category", None))
+    generated_slug = instance.generate_slug()
+    if generated_slug:
+        data["slug"] = generated_slug
     data["display_title"] = _build_listing_display_title(instance)
 
     model_and_relation = DETAIL_MODEL_MAP.get(normalized_main_category)

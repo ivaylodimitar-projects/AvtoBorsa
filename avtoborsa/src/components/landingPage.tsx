@@ -39,6 +39,7 @@ import {
   writeLatestListingsCache,
 } from "../utils/latestListingsCache";
 import { CAR_BRANDS, CAR_MODELS } from "../constants/carBrandModels";
+import { buildListingDetailPath } from "../utils/slugify";
 import { APP_MAIN_CATEGORY_OPTIONS, getMainCategoryLabel } from "../constants/karbgdata";
 import {
   getListingCardMeta,
@@ -2170,7 +2171,7 @@ const handleMainCategoryTouchEnd = (
                         position: "relative",
                         cursor: "pointer",
                       }}
-                      onClick={() => navigate(`/details/${listing.slug}`)}
+                      onClick={() => navigate(buildListingDetailPath(listing.slug, listing.id))}
                     >
                       {isTop && (
                         <ListingPromoBadge type="top" size="xs" />

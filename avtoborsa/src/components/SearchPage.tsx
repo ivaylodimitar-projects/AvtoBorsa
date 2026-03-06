@@ -33,6 +33,7 @@ import ListingPromoBadge from "./ListingPromoBadge";
 import KapariranoBadge from "./KapariranoBadge";
 import ResponsiveImage, { type ApiPhoto } from "./ResponsiveImage";
 import { API_BASE_URL } from "../config/api";
+import { buildListingDetailPath } from "../utils/slugify";
 
 type ListingRecord = {
   id: number;
@@ -382,9 +383,9 @@ const SearchPage: React.FC = () => {
   }, [scrollRestoreKey, hasLoadedPrimary, isLoading, currentListings.length]);
 
   const openListing = useCallback(
-    (slug: string) => {
+    (slug: string, id?: number) => {
       persistScrollPosition();
-      navigate(`/details/${slug}`);
+      navigate(buildListingDetailPath(slug, id));
     },
     [navigate, persistScrollPosition]
   );
@@ -2293,7 +2294,7 @@ const SearchPage: React.FC = () => {
                     key={listing.id}
                     className="search-result-item"
                     style={styles.item}
-                    onClick={() => openListing(listing.slug)}
+                    onClick={() => openListing(listing.slug, listing.id)}
                   >
                     {isTop && (
                       <span className="search-mobile-promo-badge">
@@ -2411,7 +2412,7 @@ const SearchPage: React.FC = () => {
                           <div style={styles.itemHeader} className="search-item-header">
                             <div style={styles.itemHeaderMain} className="search-item-header-main">
                               <a
-                                href={`/details/${listing.slug}`}
+                                href={buildListingDetailPath(listing.slug, listing.id)}
                                 style={styles.itemTitle}
                                 className="search-item-title"
                                 onClick={(e) => {
@@ -2419,7 +2420,7 @@ const SearchPage: React.FC = () => {
                                   if (e.defaultPrevented) return;
                                   if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button === 1) return;
                                   e.preventDefault();
-                                  openListing(listing.slug);
+                                  openListing(listing.slug, listing.id);
                                 }}
                               >
                                 {listingTitle}

@@ -6,6 +6,7 @@ import { API_BASE_URL } from "../config/api";
 import { getMainCategoryLabel } from "../constants/karbgdata";
 import { getListingPriceSummary } from "../utils/listingCurrency";
 import { formatFuelLabel } from "../utils/listingLabels";
+import { buildListingDetailPath } from "../utils/slugify";
 
 type PublicListing = {
   id: number;
@@ -286,7 +287,7 @@ const PublicProfilePage: React.FC = () => {
             {visibleListings.map((listing) => (
               <article
                 key={listing.id}
-                onClick={() => navigate(`/details/${listing.slug}`)}
+                onClick={() => navigate(buildListingDetailPath(listing.slug, listing.id))}
                 style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: 12, display: "grid", gridTemplateColumns: "160px 1fr", gap: 12, cursor: "pointer" }}
               >
                 {(() => {
