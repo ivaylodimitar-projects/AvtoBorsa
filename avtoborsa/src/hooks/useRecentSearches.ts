@@ -125,12 +125,13 @@ const generateSearchLabel = (criteria: Record<string, any>): string => {
   }
 
   // Price Range
+  const activeCurrency = criteria.currency || "EUR";
   if (criteria.maxPrice) {
-    parts.push(`Ð´Ð¾ â‚¬${criteria.maxPrice}`);
+    parts.push(`до ${activeCurrency} ${criteria.maxPrice}`);
   } else if (criteria.priceFrom || criteria.priceTo) {
     const from = criteria.priceFrom || "0";
     const to = criteria.priceTo || "âˆž";
-    parts.push(`â‚¬${from}â€“${to}`);
+    parts.push(`${activeCurrency} ${from}–${to}`);
   }
 
   // Mileage Range

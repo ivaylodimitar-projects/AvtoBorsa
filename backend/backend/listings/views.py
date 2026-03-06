@@ -771,6 +771,10 @@ class BaseListingViewSet(viewsets.ModelViewSet):
         }
 
         # Price filters
+        currency = str(get_param('currency') or '').strip().upper()
+        if currency in {choice for choice, _ in BaseListing.CURRENCY_CHOICES}:
+            queryset = queryset.filter(currency=currency)
+
         price_from = to_float(get_param('priceFrom'))
         if price_from is not None:
             queryset = queryset.filter(price__gte=price_from)

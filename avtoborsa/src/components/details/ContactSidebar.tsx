@@ -21,6 +21,7 @@ import {
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 import { resolvePriceBadgeState } from '../../utils/priceChangeBadge';
+import { getListingPriceSummary } from '../../utils/listingCurrency';
 
 import { API_BASE_URL } from '../../config/api';
 const DUPLICATE_REPORT_MESSAGE = 'Можете да съобщите за нередност с тази обява само веднъж, благодаря.';
@@ -28,6 +29,9 @@ const SAVE_ACCENT_COLOR = 'rgb(233, 30, 99)';
 
 interface ContactSidebarProps {
   price: number;
+  currency?: string;
+  priceEur?: number | string;
+  priceBgn?: number | string;
   sellerName: string;
   sellerEmail: string;
   phone: string;
@@ -95,6 +99,9 @@ const resolveFavoriteListingId = (favorite: FavoriteResponseItem): number | null
 
 const ContactSidebar: React.FC<ContactSidebarProps> = ({
   price,
+  currency = 'EUR',
+  priceEur,
+  priceBgn,
   sellerName,
   phone,
   sellerType,
@@ -348,13 +355,19 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
     return () => document.removeEventListener('mousedown', handleOutside);
   }, [showShareMenu]);
 
-  const EUR_TO_BGN = 1.9558;
-  const priceInBGN = (price * EUR_TO_BGN).toFixed(2);
+  const priceSummary = getListingPriceSummary({
+    price,
+    currency,
+    priceEur,
+    priceBgn,
+  });
   const priceHistoryPreview = priceHistory.slice(0, 5);
   const priceHistoryMore = priceHistory.length - priceHistoryPreview.length;
   const hasPriceHistory = priceHistory.length > 0;
   const latestPriceChange = priceHistory[0];
-  const latestPriceBadge = resolvePriceBadgeState(latestPriceChange);
+  const latestPriceBadge = resolvePriceBadgeState(
+    latestPriceChange ? { ...latestPriceChange, currency } : null
+  );
   const showPriceDelta = Boolean(latestPriceBadge);
   const PriceDeltaIcon =
     latestPriceBadge?.kind === 'announced'
@@ -897,7 +910,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                 fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
               }}
             >
-              {price.toLocaleString('bg-BG')} &euro;
+              {priceSummary.primary}
             </div>
             {showPriceDelta && (
               <span
@@ -937,9 +950,11 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
               </span>
             )}
           </div>
-          <div style={{ fontSize: 13, color: '#6b7280', fontWeight: 500 }}>
-            {Number(priceInBGN).toLocaleString('bg-BG')} лв.
-          </div>
+          {priceSummary.secondary.map((label) => (
+            <div key={label} style={{ fontSize: 13, color: '#6b7280', fontWeight: 500 }}>
+              {label}
+            </div>
+          ))}
         </div>
 
         {/* Phone */}

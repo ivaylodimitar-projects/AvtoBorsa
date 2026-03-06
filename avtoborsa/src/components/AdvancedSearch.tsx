@@ -346,7 +346,7 @@ const YEAR_OPTIONS = Array.from(
   { length: CURRENT_YEAR - 1929 },
   (_, i) => String(CURRENT_YEAR - i)
 );
-const CURRENCY_OPTIONS = ["EUR", "USD"];
+const CURRENCY_OPTIONS = ["EUR", "USD", "CAD"];
 const AXLE_OPTIONS = ["1", "2", "3", "4", "5", "6", "7", "8"];
 const EURO_STANDARD_OPTIONS = ["Евро 1", "Евро 2", "Евро 3", "Евро 4", "Евро 5", "Евро 6"];
 const SELLER_TYPE_OPTIONS = [
@@ -3511,7 +3511,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               <label className="adv-label">ЦЕНА ДО</label>
               <input
                 type="number"
-                placeholder="€ Без ограничение"
+                placeholder={`${searchCriteria.currency || "EUR"} Без ограничение`}
                 value={searchCriteria.maxPrice}
                 onChange={(e) => handleInputChange("maxPrice", e.target.value)}
                 className="adv-input"
@@ -5005,11 +5005,11 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                 <>
                   {/* Price Range */}
                   <div className="adv-field">
-                    <label className="adv-label">ЦЕНА ОТ (€)</label>
+                    <label className="adv-label">{`ЦЕНА ОТ (${searchCriteria.currency || "EUR"})`}</label>
                     <input type="number" placeholder="Мин." value={searchCriteria.priceFrom} onChange={(e) => handleInputChange("priceFrom", e.target.value)} className="adv-input" />
                   </div>
                   <div className="adv-field">
-                    <label className="adv-label">ЦЕНА ДО (€)</label>
+                    <label className="adv-label">{`ЦЕНА ДО (${searchCriteria.currency || "EUR"})`}</label>
                     <input type="number" placeholder="Макс." value={searchCriteria.priceTo} onChange={(e) => handleInputChange("priceTo", e.target.value)} className="adv-input" />
                   </div>
 

@@ -1,3 +1,5 @@
+import { formatListingMoney, normalizeListingCurrency } from "./listingCurrency";
+
 export type PriceChangeLike = {
   delta?: number | string | null;
   direction?: string | null;
@@ -5,6 +7,7 @@ export type PriceChangeLike = {
   old_price?: number | string | null;
   new_price?: number | string | null;
   current_price?: number | string | null;
+  currency?: string | null;
 };
 
 export type PriceBadgeKind = "up" | "down" | "announced";
@@ -66,9 +69,10 @@ export const resolvePriceBadgeState = (
   }
 
   if (delta !== null && delta !== 0) {
+    const currency = normalizeListingCurrency(latestChange.currency);
     return {
       kind: delta > 0 ? "up" : "down",
-      amountLabel: `${Math.abs(delta).toLocaleString("bg-BG")} €`,
+      amountLabel: formatListingMoney(Math.abs(delta), currency),
       title: delta > 0 ? "Повишена цена" : "Намалена цена",
     };
   }

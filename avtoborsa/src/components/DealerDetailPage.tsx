@@ -4,6 +4,7 @@ import { MapPin, Fuel, Gauge, Zap, Settings } from "lucide-react";
 import { FiBell } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
 import { formatConditionLabel, formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
+import { getListingPriceSummary } from "../utils/listingCurrency";
 import {
   USER_FOLLOWED_DEALERS_UPDATED_EVENT,
   followDealer,
@@ -28,6 +29,9 @@ type ListingRecord = {
   model: string;
   year_from: number;
   price: number;
+  currency?: string;
+  price_eur?: number | string;
+  price_bgn?: number | string;
   mileage: number;
   fuel?: string;
   fuel_display?: string;
@@ -1308,7 +1312,12 @@ const DealerDetailPage: React.FC = () => {
                   const isTop = isTopListing(listing);
                   const isVip = isVipListing(listing);
                   const isNew = isListingNew(listing.created_at);
-                  const priceLabel = `${listing.price.toLocaleString("bg-BG")} €`;
+                  const priceLabel = getListingPriceSummary({
+                    price: listing.price,
+                    currency: listing.currency,
+                    priceEur: listing.price_eur,
+                    priceBgn: listing.price_bgn,
+                  }).primary;
                   const conditionLabel = formatConditionLabel(
                     listing.condition_display ||
                       (listing.condition ? String(listing.condition) : "")

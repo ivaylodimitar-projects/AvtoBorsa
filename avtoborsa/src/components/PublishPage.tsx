@@ -39,6 +39,15 @@ import {
 } from "../constants/motoData";
 import { groupOptionsByInitial, sortUniqueOptions } from "../utils/alphabeticalOptions";
 import {
+  DEFAULT_LISTING_CURRENCY,
+  convertListingAmount,
+  formatListingMoney,
+  getAllowedPublishCurrencies,
+  getListingPriceSummary,
+  normalizeListingCurrency,
+  normalizePublishCurrency,
+} from "../utils/listingCurrency";
+import {
   APP_MAIN_CATEGORY_OPTIONS,
   CLASSIFIED_FOR_OPTIONS as MOBILE_CLASSIFIED_FOR_OPTIONS,
   getAccessoryCategories,
@@ -101,6 +110,7 @@ interface PublishFormData {
   locationCountry: string;
   locationRegion: string;
   price: string;
+  currency: string;
   city: string;
   fuel: string;
   gearbox: string;
@@ -1738,6 +1748,7 @@ const createInitialFormData = (): PublishFormData => ({
   locationCountry: "",
   locationRegion: "",
   price: "",
+  currency: DEFAULT_LISTING_CURRENCY,
   city: "",
   fuel: "",
   gearbox: "",
@@ -2329,60 +2340,19 @@ const PublishPage: React.FC = () => {
   }, [currentStep, totalSteps]);
 
   const updateFormField = <K extends keyof PublishFormData>(key: K, value: PublishFormData[K]) => {
-    setFormData((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const resetForMainCategory = (
-    mainCategory: MainCategoryKey,
-    previous: PublishFormData
-  ): PublishFormData => {
-    const next = createInitialFormData();
-    return {
-      ...next,
-      mainCategory,
-      description: previous.description,
-      phone: previous.phone,
-      email: previous.email,
-      locationCountry: previous.locationCountry,
-      locationRegion: previous.locationRegion,
-      city: previous.city,
-      listingType: previous.listingType,
-      topPlan: previous.topPlan,
-      vipPlan: previous.vipPlan,
-    };
-  };
-
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
-  ) => {
-    const { name } = e.target;
-    const key = name as keyof PublishFormData;
-
-    if (key === "mainCategory") {
-      const selectedMainCategory = (e.target as HTMLSelectElement).value as MainCategoryKey;
-      setFormData((prev) => resetForMainCategory(selectedMainCategory, prev));
-      setCurrentStep(1);
-      setErrors({});
-      return;
-    }
-
-    const inputElement = e.target as HTMLInputElement;
-    const nextValue =
-      inputElement.type === "checkbox" ? inputElement.checked : (e.target as HTMLInputElement).value;
-
     setFormData((prev) => {
-      const next = { ...prev, [key]: nextValue } as PublishFormData;
+      const next = { ...prev, [key]: value } as PublishFormData;
 
       if (key === "brand") {
         next.model = "";
         if (prev.mainCategory === "yachts") {
-          next.boatCategory = String(nextValue ?? "").trim();
+          next.boatCategory = String(value ?? "").trim();
         }
         if (prev.mainCategory === "trailer") {
-          next.trailerCategory = String(nextValue ?? "").trim();
+          next.trailerCategory = String(value ?? "").trim();
         }
         if (prev.mainCategory === "agriculture") {
-          next.equipmentType = String(nextValue ?? "").trim();
+          next.equipmentType = String(value ?? "").trim();
           next.engineType = "";
           next.transmission = "";
           next.power = "";
@@ -2425,7 +2395,7 @@ const PublishPage: React.FC = () => {
         next.wheelTireTread = "";
       }
       if (key === "wheelOfferType") {
-        const normalizedOfferType = String(nextValue ?? "").trim();
+        const normalizedOfferType = String(value ?? "").trim();
         if (normalizedOfferType === "1") {
           next.brand = "";
           next.model = "";
@@ -2458,8 +2428,58 @@ const PublishPage: React.FC = () => {
         next.city = "";
       }
 
+      if (key === "locationCountry" || key === "city" || key === "currency") {
+        next.currency = normalizePublishCurrency(
+          next.locationCountry,
+          next.city,
+          key === "currency" ? value : next.currency
+        );
+      }
+
       return next;
     });
+  };
+
+  const resetForMainCategory = (
+    mainCategory: MainCategoryKey,
+    previous: PublishFormData
+  ): PublishFormData => {
+    const next = createInitialFormData();
+    return {
+      ...next,
+      mainCategory,
+      description: previous.description,
+      phone: previous.phone,
+      email: previous.email,
+      locationCountry: previous.locationCountry,
+      locationRegion: previous.locationRegion,
+      city: previous.city,
+      currency: normalizePublishCurrency(previous.locationCountry, previous.city, previous.currency),
+      listingType: previous.listingType,
+      topPlan: previous.topPlan,
+      vipPlan: previous.vipPlan,
+    };
+  };
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
+    const { name } = e.target;
+    const key = name as keyof PublishFormData;
+
+    if (key === "mainCategory") {
+      const selectedMainCategory = (e.target as HTMLSelectElement).value as MainCategoryKey;
+      setFormData((prev) => resetForMainCategory(selectedMainCategory, prev));
+      setCurrentStep(1);
+      setErrors({});
+      return;
+    }
+
+    const inputElement = e.target as HTMLInputElement;
+    const nextValue =
+      inputElement.type === "checkbox" ? inputElement.checked : (e.target as HTMLInputElement).value;
+
+    updateFormField(key, nextValue as PublishFormData[typeof key]);
   };
 
   const handleListingTypeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2935,6 +2955,12 @@ const PublishPage: React.FC = () => {
         toStringOrEmpty(data.location_country ?? data.locationCountry),
       locationRegion: toStringOrEmpty(data.location_region ?? data.locationRegion),
       price: toStringOrEmpty(data.price),
+      currency: normalizePublishCurrency(
+        normalizedLocationCountryValue ||
+          toStringOrEmpty(data.location_country ?? data.locationCountry),
+        toStringOrEmpty(data.city),
+        normalizeListingCurrency(data.currency)
+      ),
       city: toStringOrEmpty(data.city),
       fuel: normalizedFuelValue || toStringOrEmpty(data.fuel),
       gearbox: normalizedGearboxValue || toStringOrEmpty(data.gearbox),
@@ -3115,6 +3141,18 @@ const PublishPage: React.FC = () => {
   const locationDetailOptions = isOutsideBulgariaLocation
     ? OUTSIDE_BULGARIA_COUNTRY_OPTIONS
     : BULGARIAN_CITIES_BY_REGION[formData.locationCountry] || [];
+  const allowedCurrencyOptions = getAllowedPublishCurrencies(formData.locationCountry, formData.city);
+  const selectedCurrency = normalizePublishCurrency(
+    formData.locationCountry,
+    formData.city,
+    formData.currency
+  );
+  const priceSummaryValues = getListingPriceSummary({
+    price: formData.price,
+    currency: selectedCurrency,
+  });
+  const publishPriceEur = convertListingAmount(formData.price, selectedCurrency, "EUR");
+  const publishPriceBgn = convertListingAmount(formData.price, selectedCurrency, "BGN");
   const currentExistingImagesSnapshot = serializeExistingImagesSnapshot(existingListingImages);
   const hasExistingImagesChanges =
     isEditMode &&
@@ -3131,7 +3169,7 @@ const PublishPage: React.FC = () => {
   const priceSummary = {
     price: requiresPrice(formData.mainCategory)
       ? formData.price
-        ? `${formData.price} EUR`
+        ? priceSummaryValues.primary
         : "не е въведена"
       : "не се използва",
     region: formData.locationCountry ? formData.locationCountry : "не е избран",
@@ -3533,6 +3571,10 @@ const PublishPage: React.FC = () => {
         appendIfValue("vin", formData.vin);
       }
       appendIfValue("price", normalizedPrice);
+      appendIfValue(
+        "currency",
+        normalizePublishCurrency(formData.locationCountry, normalizedCity, formData.currency)
+      );
       appendIfValue("location_country", formData.locationCountry);
       appendIfValue("location_region", formData.locationRegion);
       appendIfValue("city", normalizedCity);
@@ -6368,8 +6410,36 @@ const PublishPage: React.FC = () => {
               </h2>
               <div className="field-grid">
                 {requiresPrice(formData.mainCategory) && (
-                  <FormFieldWithTooltip label="Цена (EUR)" required tooltip="Цена на обявата">
+                  <FormFieldWithTooltip
+                    label={`Цена (${selectedCurrency})`}
+                    required
+                    tooltip="Цена на обявата"
+                  >
                     <input style={styles.input} type="number" name="price" placeholder="Въведи цена" min="0" step="0.01" value={formData.price} onChange={handleChange} required />
+                    <select
+                      style={{ ...styles.input, marginTop: 12 }}
+                      name="currency"
+                      value={selectedCurrency}
+                      onChange={handleChange}
+                    >
+                      {allowedCurrencyOptions.map((currencyOption) => (
+                        <option key={currencyOption} value={currencyOption}>
+                          {currencyOption}
+                        </option>
+                      ))}
+                    </select>
+                    {formData.price && publishPriceEur !== null && publishPriceBgn !== null && (
+                      <div style={{ marginTop: 10, color: "#64748b", fontSize: 13, display: "grid", gap: 4 }}>
+                        {selectedCurrency !== "EUR" && (
+                          <span>
+                            <strong>EUR:</strong> {formatListingMoney(publishPriceEur, "EUR")}
+                          </span>
+                        )}
+                        <span>
+                          <strong>BGN:</strong> {formatListingMoney(publishPriceBgn, "BGN")}
+                        </span>
+                      </div>
+                    )}
                     <div className="price-summary">
                       <span>
                         <strong>Цена:</strong> {priceSummary.price}
@@ -6789,6 +6859,7 @@ const PublishPage: React.FC = () => {
             model={formData.model}
             year={previewYear}
             price={previewPrice}
+            currency={selectedCurrency}
             city={formData.city}
             mileage={previewMileage}
             fuel={previewFuel}

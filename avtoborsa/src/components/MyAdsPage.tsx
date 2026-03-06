@@ -42,6 +42,7 @@ import {
   formatGearboxLabel,
 } from "../utils/listingLabels";
 import { resolvePriceBadgeState } from "../utils/priceChangeBadge";
+import { getListingPriceSummary } from "../utils/listingCurrency";
 import { getMainCategoryLabel } from "../constants/karbgdata";
 import {
   readMyAdsCache,
@@ -73,6 +74,9 @@ interface ListingRecord {
   month: number;
   vin: string;
   price: number;
+  currency?: string;
+  price_eur?: number | string;
+  price_bgn?: number | string;
   location_country: string;
   location_region: string;
   city: string;
@@ -4121,9 +4125,15 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     : null;
   const modalPreviewTitle = (modalSourceListing?.title || listingTypeModal.listingTitle || "Обявата").trim();
   const modalPreviewPriceValue = modalSourceListing ? Number(modalSourceListing.price) : Number.NaN;
+  const modalPreviewPriceSummary = getListingPriceSummary({
+    price: modalSourceListing?.price,
+    currency: modalSourceListing?.currency,
+    priceEur: modalSourceListing?.price_eur,
+    priceBgn: modalSourceListing?.price_bgn,
+  });
   const modalPreviewPriceLabel =
     Number.isFinite(modalPreviewPriceValue) && modalPreviewPriceValue > 0
-      ? `${modalPreviewPriceValue.toLocaleString("bg-BG")} €`
+      ? modalPreviewPriceSummary.primary
       : "Цена не е зададена";
   const modalPreviewBadgeType =
     listingTypeModal.selectedType === "top"
@@ -4153,12 +4163,23 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
   const previewImages = previewListing ? getPreviewImages(previewListing) : [];
   const previewImage = previewImages[previewImageIndex] || null;
   const previewPriceValue = previewListing ? Number(previewListing.price) : Number.NaN;
+  const previewPriceSummary = getListingPriceSummary({
+    price: previewListing?.price,
+    currency: previewListing?.currency,
+    priceEur: previewListing?.price_eur,
+    priceBgn: previewListing?.price_bgn,
+  });
   const previewPriceLabel =
     Number.isFinite(previewPriceValue) && previewPriceValue > 0
-      ? `€${previewPriceValue.toLocaleString("bg-BG")}`
+      ? previewPriceSummary.primary
       : "Цена не е зададена";
   const previewLatestHistory = previewListing?.price_history?.[0];
-  const previewPriceBadge = resolvePriceBadgeState(previewLatestHistory, currentTimeMs);
+  const previewPriceBadge = resolvePriceBadgeState(
+    previewLatestHistory && previewListing
+      ? { ...previewLatestHistory, currency: previewListing.currency }
+      : null,
+    currentTimeMs
+  );
   const showPreviewPriceChange = Boolean(previewPriceBadge);
   const PreviewChangeIcon =
     previewPriceBadge?.kind === "announced"
@@ -5093,12 +5114,21 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                   const nonPromotedLabel =
                     !topRemainingLabel && !vipRemainingLabel ? "Непромотирана обява" : "";
                   const priceValue = Number(listing.price);
+                  const priceSummary = getListingPriceSummary({
+                    price: listing.price,
+                    currency: listing.currency,
+                    priceEur: listing.price_eur,
+                    priceBgn: listing.price_bgn,
+                  });
                   const priceLabel =
                     Number.isFinite(priceValue) && priceValue > 0
-                      ? `${priceValue.toLocaleString("bg-BG")} €`
+                      ? priceSummary.primary
                       : "Цена не е зададена";
                   const latestPriceHistory = listing.price_history?.[0];
-                  const priceBadge = resolvePriceBadgeState(latestPriceHistory, currentTimeMs);
+                  const priceBadge = resolvePriceBadgeState(
+                    latestPriceHistory ? { ...latestPriceHistory, currency: listing.currency } : null,
+                    currentTimeMs
+                  );
                   const showPriceChange = Boolean(priceBadge);
                   const PriceChangeIcon =
                     priceBadge?.kind === "announced"
@@ -6013,4 +6043,3 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
 };
 
 export default MyAdsPage;
-

@@ -1,6 +1,7 @@
 # models.py
-from datetime import timedelta
 from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
+from decimal import Decimal, ROUND_HALF_UP
 import io
 import logging
 import os
@@ -50,6 +51,26 @@ CAR_IMAGE_LOW_RES_MIN_WIDTH = 800
 # Safety: skip extremely huge images (avoid memory spikes)
 # You can tune this from settings if needed.
 CAR_IMAGE_MAX_PIXELS = int(getattr(settings, "CAR_IMAGE_MAX_PIXELS", 40_000_000))  # 40 MP default
+
+LISTING_CURRENCY_CHOICES = [
+    ("EUR", "EUR"),
+    ("USD", "USD"),
+    ("CAD", "CAD"),
+]
+LISTING_CURRENCY_UNITS_PER_EUR = {
+    # ECB reference rates published on March 6, 2026.
+    "EUR": Decimal("1"),
+    "USD": Decimal("1.1561"),
+    "CAD": Decimal("1.5782"),
+    # Fixed conversion rate used for BGN display conversions.
+    "BGN": Decimal("1.95583"),
+}
+LISTING_ALLOWED_FOREIGN_CURRENCIES = {
+    "Канада": {"EUR", "CAD"},
+    "САЩ": {"EUR", "USD"},
+}
+LISTING_DEFAULT_CURRENCY = "EUR"
+LISTING_PRICE_QUANTIZE = Decimal("0.01")
 
 
 def _resolve_rendition_worker_count():
@@ -173,6 +194,9 @@ class BaseListing(models.Model):
         "3": "Гуми с джанти",
     }
 
+    CURRENCY_CHOICES = LISTING_CURRENCY_CHOICES
+    DEFAULT_CURRENCY = LISTING_DEFAULT_CURRENCY
+
     # User and basic info
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="car_listings")
     main_category = models.CharField(max_length=20, choices=MAIN_CATEGORY_CHOICES, default="cars")
@@ -181,6 +205,7 @@ class BaseListing(models.Model):
 
     # Price and location
     price = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default=DEFAULT_CURRENCY)
     location_country = models.CharField(max_length=100, null=True, blank=True)
     location_region = models.CharField(max_length=100, null=True, blank=True)
     city = models.CharField(max_length=100)
@@ -216,7 +241,7 @@ class BaseListing(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = "listings_carlisting"
+        db_table = "listings_baselisting"
         ordering = ["-created_at"]
         verbose_name = "Listing"
         verbose_name_plural = "Listings"
@@ -242,6 +267,32 @@ class BaseListing(models.Model):
 
     def __str__(self):
         return self.display_title
+
+    @staticmethod
+    def normalize_currency(value):
+        currency = str(value or LISTING_DEFAULT_CURRENCY).strip().upper()
+        if currency in {choice for choice, _ in LISTING_CURRENCY_CHOICES}:
+            return currency
+        return LISTING_DEFAULT_CURRENCY
+
+    def convert_price(self, target_currency):
+        source_currency = self.normalize_currency(self.currency)
+        normalized_target = str(target_currency or "EUR").strip().upper()
+        if normalized_target not in LISTING_CURRENCY_UNITS_PER_EUR:
+            normalized_target = "EUR"
+
+        amount = self.price if isinstance(self.price, Decimal) else Decimal(str(self.price or "0"))
+        eur_amount = amount / LISTING_CURRENCY_UNITS_PER_EUR[source_currency]
+        converted = eur_amount * LISTING_CURRENCY_UNITS_PER_EUR[normalized_target]
+        return converted.quantize(LISTING_PRICE_QUANTIZE, rounding=ROUND_HALF_UP)
+
+    @property
+    def price_eur(self):
+        return self.convert_price("EUR")
+
+    @property
+    def price_bgn(self):
+        return self.convert_price("BGN")
 
     def _cars_detail(self):
         try:

@@ -21,6 +21,8 @@ from .models import (
     AccessoriesListing,
     BuyListing,
     ServicesListing,
+    LISTING_ALLOWED_FOREIGN_CURRENCIES,
+    LISTING_DEFAULT_CURRENCY,
 )
 from decimal import Decimal, InvalidOperation
 from .risk_scoring import (
@@ -63,6 +65,19 @@ def _to_positive_int(value):
     if number <= 0:
         return None
     return number
+
+
+def _normalize_listing_currency(value):
+    return BaseListing.normalize_currency(value)
+
+
+def _allowed_listing_currencies(location_country, city):
+    if str(location_country or "").strip() != "Извън страната":
+        return {LISTING_DEFAULT_CURRENCY}
+    return LISTING_ALLOWED_FOREIGN_CURRENCIES.get(
+        str(city or "").strip(),
+        {LISTING_DEFAULT_CURRENCY},
+    )
 
 
 def _file_field_name(file_field):
@@ -593,7 +608,19 @@ class CarImageDetailSerializer(CarImageSerializer):
         }
 
 
-class BaseListingLiteSerializer(serializers.ModelSerializer):
+class ListingPriceFieldsMixin:
+    currency = serializers.CharField(read_only=True)
+    price_eur = serializers.SerializerMethodField()
+    price_bgn = serializers.SerializerMethodField()
+
+    def get_price_eur(self, obj):
+        return obj.price_eur
+
+    def get_price_bgn(self, obj):
+        return obj.price_bgn
+
+
+class BaseListingLiteSerializer(ListingPriceFieldsMixin, serializers.ModelSerializer):
     """Lightweight serializer for list views like the landing page."""
     display_title = serializers.SerializerMethodField()
     fuel_display = serializers.SerializerMethodField()
@@ -607,7 +634,7 @@ class BaseListingLiteSerializer(serializers.ModelSerializer):
     class Meta:
         model = BaseListing
         fields = [
-            'id', 'slug', 'main_category', 'title', 'display_title', 'brand', 'model', 'year_from', 'price', 'mileage',
+            'id', 'slug', 'main_category', 'title', 'display_title', 'brand', 'model', 'year_from', 'price', 'currency', 'price_eur', 'price_bgn', 'mileage',
             'fuel', 'fuel_display', 'power', 'city', 'created_at',
             'listing_type', 'listing_type_display', 'image_url', 'photo', 'price_change',
             'is_kaparirano',
@@ -709,7 +736,7 @@ class BaseListingLiteSerializer(serializers.ModelSerializer):
         return getattr(details, 'part_element', "") if details else ""
 
 
-class BaseListingListSerializer(serializers.ModelSerializer):
+class BaseListingListSerializer(ListingPriceFieldsMixin, serializers.ModelSerializer):
     """Optimized serializer for search/list pages."""
     display_title = serializers.SerializerMethodField()
     main_category_display = serializers.SerializerMethodField()
@@ -730,7 +757,7 @@ class BaseListingListSerializer(serializers.ModelSerializer):
     class Meta:
         model = BaseListing
         fields = [
-            'id', 'slug', 'main_category', 'main_category_display', 'title', 'display_title', 'brand', 'model', 'year_from', 'price', 'mileage', 'power', 'location_country', 'city',
+            'id', 'slug', 'main_category', 'main_category_display', 'title', 'display_title', 'brand', 'model', 'year_from', 'price', 'currency', 'price_eur', 'price_bgn', 'mileage', 'power', 'location_country', 'city',
             'fuel', 'fuel_display', 'gearbox', 'gearbox_display',
             'category', 'category_display', 'condition', 'condition_display',
             'description_preview', 'created_at', 'updated_at',
@@ -884,7 +911,7 @@ class BaseListingSearchCompactSerializer(BaseListingListSerializer):
     class Meta:
         model = BaseListing
         fields = [
-            'id', 'slug', 'main_category', 'main_category_display', 'title', 'display_title', 'brand', 'model', 'year_from', 'price', 'mileage', 'power', 'location_country', 'city',
+            'id', 'slug', 'main_category', 'main_category_display', 'title', 'display_title', 'brand', 'model', 'year_from', 'price', 'currency', 'price_eur', 'price_bgn', 'mileage', 'power', 'location_country', 'city',
             'fuel_display', 'gearbox_display', 'category_display', 'condition_display',
             'description_preview', 'created_at', 'updated_at',
             'listing_type', 'listing_type_display',
@@ -1238,7 +1265,7 @@ def _inject_listing_detail_fields(data, instance):
     return _inject_derived_detail_fields(data, normalized_main_category, detail_instance)
 
 
-class BaseListingSerializer(serializers.ModelSerializer):
+class BaseListingSerializer(ListingPriceFieldsMixin, serializers.ModelSerializer):
     """Serializer for car listings with per-main-category detail models."""
 
     images = serializers.SerializerMethodField()
@@ -1263,6 +1290,7 @@ class BaseListingSerializer(serializers.ModelSerializer):
     year_from = serializers.IntegerField(required=False, allow_null=True)
     month = serializers.IntegerField(required=False, allow_null=True)
     vin = serializers.CharField(required=False, allow_blank=True)
+    currency = serializers.ChoiceField(choices=BaseListing.CURRENCY_CHOICES, required=False, default=LISTING_DEFAULT_CURRENCY)
     fuel = serializers.CharField(required=False, allow_blank=True)
     gearbox = serializers.CharField(required=False, allow_blank=True)
     mileage = serializers.IntegerField(required=False, allow_null=True)
@@ -1345,7 +1373,7 @@ class BaseListingSerializer(serializers.ModelSerializer):
         model = BaseListing
         fields = [
             'id', 'slug', 'user', 'user_email', 'main_category', 'category', 'category_display', 'title', 'brand', 'model',
-            'year_from', 'month', 'vin', 'price', 'location_country', 'location_region', 'city',
+            'year_from', 'month', 'vin', 'price', 'currency', 'price_eur', 'price_bgn', 'location_country', 'location_region', 'city',
             'fuel', 'fuel_display', 'gearbox', 'gearbox_display', 'mileage', 'color', 'condition', 'condition_display',
             'power', 'displacement', 'euro_standard',
             'description', 'phone', 'email', 'features', 'listing_type', 'listing_type_display',
@@ -1555,6 +1583,37 @@ class BaseListingSerializer(serializers.ModelSerializer):
         if attrs.get("description") is None:
             attrs["description"] = ""
 
+        location_country = self._next_field_value(
+            attrs,
+            "location_country",
+            self.instance.location_country if self.instance else "",
+        )
+        city = self._next_field_value(
+            attrs,
+            "city",
+            self.instance.city if self.instance else "",
+        )
+        requested_currency = _normalize_listing_currency(
+            self._next_field_value(
+                attrs,
+                "currency",
+                self.instance.currency if self.instance else LISTING_DEFAULT_CURRENCY,
+            )
+        )
+        allowed_currencies = _allowed_listing_currencies(location_country, city)
+        if requested_currency not in allowed_currencies:
+            if str(location_country or "").strip() == "Извън страната" and str(city or "").strip() in LISTING_ALLOWED_FOREIGN_CURRENCIES:
+                raise serializers.ValidationError(
+                    {
+                        "currency": (
+                            "Избраната валута не е позволена за тази държава. "
+                            f"Разрешени: {', '.join(sorted(allowed_currencies))}."
+                        )
+                    }
+                )
+            requested_currency = LISTING_DEFAULT_CURRENCY
+        attrs["currency"] = requested_currency
+
         risk_assessment = evaluate_listing_risk(
             text_fields=self._build_risk_text_payload(attrs),
             phone=str(self._next_field_value(attrs, "phone", "") or ""),
@@ -1695,6 +1754,9 @@ class BaseListingSerializer(serializers.ModelSerializer):
         for source_key, target_key in camel_to_snake.items():
             if source_key in mutable_data and target_key not in mutable_data:
                 mutable_data[target_key] = mutable_data.get(source_key)
+
+        if "currency" in mutable_data:
+            mutable_data["currency"] = _normalize_listing_currency(mutable_data.get("currency"))
 
         for numeric_key in [
             "month", "year_from", "price", "mileage", "power", "displacement",
@@ -1943,5 +2005,3 @@ class FavoriteSerializer(serializers.ModelSerializer):
         model = Favorite
         fields = ['id', 'listing', 'listing_id', 'created_at']
         read_only_fields = ['id', 'created_at']
-
-

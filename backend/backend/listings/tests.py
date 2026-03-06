@@ -1048,6 +1048,85 @@ class ListingDetailSerializerPersistenceTests(APITestCase):
                 for field_name in case["expected_null"]:
                     self.assertIsNone(getattr(details, field_name))
 
+    def test_serializer_defaults_listing_currency_to_eur(self):
+        listing = self._create_listing(
+            main_category="cars",
+            brand="BMW",
+            model="320d",
+            year_from=2020,
+            fuel="dizel",
+            gearbox="avtomatik",
+            mileage=120000,
+            condition="1",
+        )
+
+        self.assertEqual(listing.currency, "EUR")
+        self.assertEqual(listing.price_eur, Decimal("1000.00"))
+        self.assertEqual(listing.price_bgn, Decimal("1955.83"))
+
+    def test_serializer_allows_country_specific_foreign_currencies(self):
+        usa_listing = self._create_listing(
+            main_category="cars",
+            brand="Ford",
+            model="F-150",
+            year_from=2021,
+            fuel="benzin",
+            gearbox="avtomatik",
+            mileage=50000,
+            condition="1",
+            price="11561.00",
+            currency="USD",
+            location_country="Извън страната",
+            city="САЩ",
+        )
+        canada_listing = self._create_listing(
+            main_category="cars",
+            brand="Hyundai",
+            model="Tucson",
+            year_from=2022,
+            fuel="benzin",
+            gearbox="avtomatik",
+            mileage=25000,
+            condition="1",
+            price="15782.00",
+            currency="CAD",
+            location_country="Извън страната",
+            city="Канада",
+        )
+
+        self.assertEqual(usa_listing.currency, "USD")
+        self.assertEqual(usa_listing.price_eur, Decimal("10000.00"))
+        self.assertEqual(usa_listing.price_bgn, Decimal("19558.30"))
+        self.assertEqual(canada_listing.currency, "CAD")
+        self.assertEqual(canada_listing.price_eur, Decimal("10000.00"))
+        self.assertEqual(canada_listing.price_bgn, Decimal("19558.30"))
+
+    def test_serializer_rejects_invalid_currency_for_supported_foreign_country(self):
+        serializer = BaseListingSerializer(
+            data={
+                "main_category": "cars",
+                "brand": "BMW",
+                "model": "X5",
+                "year_from": 2021,
+                "fuel": "dizel",
+                "gearbox": "avtomatik",
+                "mileage": 90000,
+                "condition": "1",
+                "price": "5000.00",
+                "currency": "CAD",
+                "location_country": "Извън страната",
+                "city": "САЩ",
+                "description": "Test listing",
+                "phone": "+359888123456",
+                "email": "detail-owner@example.com",
+                "is_draft": True,
+                "listing_type": "normal",
+            }
+        )
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("currency", serializer.errors)
+
 
 class AdminListingDeleteReasonTests(APITestCase):
     def setUp(self):

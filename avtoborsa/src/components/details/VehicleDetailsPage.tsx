@@ -14,6 +14,7 @@ import ListingSeo from '../seo/ListingSeo';
 import { API_BASE_URL } from '../../config/api';
 import { normalizeMainCategory } from '../../constants/karbgdata';
 import { buildListingSeoPayload } from '../../seo/listingSeo';
+import { getListingPriceSummary } from '../../utils/listingCurrency';
 
 interface CarImage extends ApiPhoto {
   id: number;
@@ -40,6 +41,9 @@ interface ListingRecord {
   month: number;
   vin: string;
   price: number;
+  currency?: string;
+  price_eur?: number | string;
+  price_bgn?: number | string;
   location_country: string;
   location_region: string;
   city: string;
@@ -136,6 +140,9 @@ interface SimilarListing {
   model: string;
   year_from?: number;
   price: number | string;
+  currency?: string;
+  price_eur?: number | string;
+  price_bgn?: number | string;
   mileage: number | string;
   power?: number | string;
   city?: string;
@@ -1648,9 +1655,15 @@ const VehicleDetailsPage: React.FC = () => {
                     const isVip = isSimilarVipListing(item);
                     const isNew = isRecentListing(item.created_at);
                     const priceValue = typeof item.price === 'string' ? Number(item.price) : item.price;
+                    const priceSummary = getListingPriceSummary({
+                      price: item.price,
+                      currency: item.currency,
+                      priceEur: item.price_eur,
+                      priceBgn: item.price_bgn,
+                    });
                     const priceLabel =
                       Number.isFinite(priceValue) && priceValue > 0
-                        ? `€ ${priceValue.toLocaleString('bg-BG')}`
+                        ? priceSummary.primary
                         : 'Цена при запитване';
                   const mileageValue = typeof item.mileage === 'string' ? Number(item.mileage) : item.mileage;
                   const mileageLabel =
@@ -1739,6 +1752,9 @@ const VehicleDetailsPage: React.FC = () => {
         {!isMobile && (
           <ContactSidebar
             price={listing.price}
+            currency={listing.currency}
+            priceEur={listing.price_eur}
+            priceBgn={listing.price_bgn}
             sellerName={sellerName}
             sellerEmail={listing.user_email}
             phone={listing.phone}
@@ -1763,6 +1779,9 @@ const VehicleDetailsPage: React.FC = () => {
       {isMobile && (
         <ContactSidebar
           price={listing.price}
+          currency={listing.currency}
+          priceEur={listing.price_eur}
+          priceBgn={listing.price_bgn}
           sellerName={sellerName}
           sellerEmail={listing.user_email}
           phone={listing.phone}

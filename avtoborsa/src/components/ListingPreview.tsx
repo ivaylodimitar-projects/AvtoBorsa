@@ -1,6 +1,7 @@
 import React from "react";
 import { FiCheckCircle, FiHome, FiImage } from "react-icons/fi";
 import { formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
+import { getListingPriceSummary } from "../utils/listingCurrency";
 import ListingPromoBadge from "./ListingPromoBadge";
 import ResponsiveImage, { type ApiPhoto } from "./ResponsiveImage";
 
@@ -10,6 +11,7 @@ interface ListingPreviewProps {
   model: string;
   year: string;
   price: string;
+  currency?: string;
   city: string;
   mileage: string;
   fuel: string;
@@ -32,6 +34,7 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
   model,
   year,
   price,
+  currency = "EUR",
   city,
   mileage,
   fuel,
@@ -59,8 +62,9 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
     Number.isFinite(powerValue) && powerValue > 0 ? `${powerValue} к.с.` : "";
   const numericPrice = Number(price);
   const hasValidPrice = Number.isFinite(numericPrice) && numericPrice > 0;
+  const priceSummary = getListingPriceSummary({ price, currency });
   const priceLabel = hasValidPrice
-    ? `${new Intl.NumberFormat("bg-BG", { maximumFractionDigits: 0 }).format(numericPrice)} EUR`
+    ? priceSummary.primary
     : priceRequired
       ? "Добави цена"
       : "По договаряне";
@@ -304,6 +308,13 @@ const ListingPreview: React.FC<ListingPreviewProps> = ({
         </div>
 
         <div style={styles.price}>{priceLabel}</div>
+        {hasValidPrice && priceSummary.secondary.length > 0 && (
+          <div style={{ ...styles.priceMeta, marginTop: -4 }}>
+            <span style={{ ...styles.priceMetaItem, justifyContent: "center", width: "100%" }}>
+              {priceSummary.secondary.join(" | ")}
+            </span>
+          </div>
+        )}
         <div style={styles.priceMeta}>
           <span style={styles.priceMetaItem}>
             <FiImage size={14} />

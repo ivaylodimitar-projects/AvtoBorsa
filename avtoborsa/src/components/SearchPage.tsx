@@ -28,6 +28,7 @@ import { formatConditionLabel, formatFuelLabel, formatGearboxLabel } from "../ut
 import { getMainCategoryFromTopmenu, getMainCategoryLabel } from "../constants/karbgdata";
 import { useSavedSearches } from "../hooks/useSavedSearches";
 import { resolvePriceBadgeState } from "../utils/priceChangeBadge";
+import { getListingPriceSummary } from "../utils/listingCurrency";
 import ListingPromoBadge from "./ListingPromoBadge";
 import KapariranoBadge from "./KapariranoBadge";
 import ResponsiveImage, { type ApiPhoto } from "./ResponsiveImage";
@@ -41,6 +42,9 @@ type ListingRecord = {
   model: string;
   year_from: number;
   price: number;
+  currency?: string;
+  price_eur?: number | string;
+  price_bgn?: number | string;
   mileage: number;
   fuel: string;
   fuel_display?: string;
@@ -2196,7 +2200,15 @@ const SearchPage: React.FC = () => {
                     listing.updated_at && listing.updated_at !== listing.created_at
                       ? getRelativeTime(listing.updated_at, "Редактирана")
                       : null;
-                  const priceBadge = resolvePriceBadgeState(listing.price_change);
+                  const priceSummary = getListingPriceSummary({
+                    price: listing.price,
+                    currency: listing.currency,
+                    priceEur: listing.price_eur,
+                    priceBgn: listing.price_bgn,
+                  });
+                  const priceBadge = resolvePriceBadgeState(
+                    listing.price_change ? { ...listing.price_change, currency: listing.currency } : null
+                  );
                   const showPriceChange = Boolean(priceBadge);
                   const PriceChangeIcon =
                     priceBadge?.kind === "announced"
@@ -2414,7 +2426,7 @@ const SearchPage: React.FC = () => {
                               </a>
                             </div>
                             <div style={styles.itemPrice} className="search-item-price">
-                              € {listing.price.toLocaleString("bg-BG")}
+                              {priceSummary.primary}
                               {showPriceChange && (
                                 <span
                                   className="search-price-change-badge"
@@ -2445,7 +2457,7 @@ const SearchPage: React.FC = () => {
                                 </span>
                               )}
                               <div style={styles.itemPriceSmall} className="search-item-price-small">
-                                {(listing.price * 1.96).toLocaleString("bg-BG", { maximumFractionDigits: 2 })} лв.
+                                {priceSummary.secondary.join(" | ")}
                               </div>
                             </div>
                           </div>

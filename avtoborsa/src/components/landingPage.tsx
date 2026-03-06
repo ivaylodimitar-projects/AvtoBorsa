@@ -42,6 +42,7 @@ import { CAR_BRANDS, CAR_MODELS } from "../constants/carBrandModels";
 import { APP_MAIN_CATEGORY_OPTIONS, getMainCategoryLabel } from "../constants/karbgdata";
 import { formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 import { resolvePriceBadgeState } from "../utils/priceChangeBadge";
+import { getListingPriceSummary } from "../utils/listingCurrency";
 import { API_BASE_URL } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -57,6 +58,9 @@ type ListingRecord = {
   model: string;
   year_from: number;
   price: number;
+  currency?: string;
+  price_eur?: number | string;
+  price_bgn?: number | string;
   mileage: number;
   fuel: string;
   fuel_display?: string;
@@ -2140,11 +2144,18 @@ const handleMainCategoryTouchEnd = (
                     listing.price_change
                       ? {
                           ...listing.price_change,
+                          currency: listing.currency,
                           current_price: listing.price,
                           changed_at: listing.price_change.changed_at || listing.created_at,
                         }
                       : null
                   );
+                  const priceSummary = getListingPriceSummary({
+                    price: listing.price,
+                    currency: listing.currency,
+                    priceEur: listing.price_eur,
+                    priceBgn: listing.price_bgn,
+                  });
                   const showPriceChange = Boolean(priceBadge);
                   return (
                     <div
@@ -2268,7 +2279,7 @@ const handleMainCategoryTouchEnd = (
                             lineHeight: 1,
                           }}
                         >
-                          <span>{listing.price.toLocaleString("bg-BG")} €</span>
+                          <span>{priceSummary.primary}</span>
                         </div>
                       </div>
 

@@ -4,6 +4,7 @@ import { MapPin, Fuel, Gauge } from "lucide-react";
 import ResponsiveImage, { type ApiPhoto } from "./ResponsiveImage";
 import { API_BASE_URL } from "../config/api";
 import { getMainCategoryLabel } from "../constants/karbgdata";
+import { getListingPriceSummary } from "../utils/listingCurrency";
 
 type PublicListing = {
   id: number;
@@ -13,6 +14,9 @@ type PublicListing = {
   model?: string;
   year_from?: number;
   price?: number;
+  currency?: string;
+  price_eur?: number | string;
+  price_bgn?: number | string;
   city?: string;
   fuel_display?: string;
   mileage?: number;
@@ -307,7 +311,12 @@ const PublicProfilePage: React.FC = () => {
                     {[listing.brand, listing.model, listing.year_from].filter(Boolean).join(" ")}
                   </h2>
                   <div style={{ marginTop: 8, fontSize: 22, fontWeight: 700, color: "#0f766e" }}>
-                    {Number(listing.price || 0).toLocaleString("bg-BG")} EUR
+                    {getListingPriceSummary({
+                      price: listing.price || 0,
+                      currency: listing.currency,
+                      priceEur: listing.price_eur,
+                      priceBgn: listing.price_bgn,
+                    }).primary}
                   </div>
                   <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", color: "#475569", fontSize: 14 }}>
                     {listing.city ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><MapPin size={14} />{listing.city}</span> : null}
