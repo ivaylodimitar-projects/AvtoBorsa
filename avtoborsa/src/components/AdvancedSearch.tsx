@@ -22,6 +22,12 @@ import {
   MOTO_ENGINE_KIND_OPTIONS,
 } from "../constants/motoData";
 import { API_BASE_URL } from "../config/api";
+import {
+  DEFAULT_LISTING_CURRENCY,
+  getAllowedPublishCurrencies as getAllowedSearchCurrencies,
+  normalizePublishCurrency as normalizeSearchCurrency,
+  type ListingCurrency,
+} from "../utils/listingCurrency";
 
 interface SearchCriteria {
   mainCategory?: string;
@@ -347,7 +353,10 @@ const YEAR_OPTIONS = Array.from(
   { length: CURRENT_YEAR - 1929 },
   (_, i) => String(CURRENT_YEAR - i)
 );
-const CURRENCY_OPTIONS = ["EUR", "USD", "CAD"];
+const FOREIGN_SEARCH_DEFAULT_CURRENCIES: Partial<Record<string, ListingCurrency>> = {
+  "Канада": "CAD",
+  "САЩ": "USD",
+};
 const AXLE_OPTIONS = ["1", "2", "3", "4", "5", "6", "7", "8"];
 const EURO_STANDARD_OPTIONS = ["Евро 1", "Евро 2", "Евро 3", "Евро 4", "Евро 5", "Евро 6"];
 const SELLER_TYPE_OPTIONS = [
@@ -705,6 +714,13 @@ const SERVICES_CATEGORY_OPTIONS = [
   "Шофьорски курсове",
 ];
 
+const getPreferredSearchCurrency = (region: string, city: string): ListingCurrency => {
+  if (region !== "Извън страната") {
+    return DEFAULT_LISTING_CURRENCY;
+  }
+  return FOREIGN_SEARCH_DEFAULT_CURRENCIES[city] || DEFAULT_LISTING_CURRENCY;
+};
+
 export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   onSearch,
   brands,
@@ -772,7 +788,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     region: "",
     city: "",
     color: "",
-    currency: "EUR",
+    currency: DEFAULT_LISTING_CURRENCY,
     taxCreditOnly: false,
     hasPhoto: false,
     hasVideo: false,
@@ -1017,6 +1033,15 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     : cities.length > 0
       ? "Всички"
       : "Избери област първо";
+  const allowedCurrencyOptions = useMemo(
+    () => getAllowedSearchCurrencies(searchCriteria.region, searchCriteria.city),
+    [searchCriteria.city, searchCriteria.region]
+  );
+  const selectedCurrency = useMemo(
+    () =>
+      normalizeSearchCurrency(searchCriteria.region, searchCriteria.city, searchCriteria.currency),
+    [searchCriteria.city, searchCriteria.currency, searchCriteria.region]
+  );
 
   const brandMainCategory = useMemo(() => {
     if (isWheelsCategory) {
@@ -1085,10 +1110,23 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
 
   const handleInputChange = (field: keyof SearchCriteria, value: string | boolean) => {
     setSearchCriteria((prev) => {
-      if (typeof value === "string" && (value === "true" || value === "false")) {
-        return { ...prev, [field]: value === "true" };
+      const normalizedValue =
+        typeof value === "string" && (value === "true" || value === "false")
+          ? value === "true"
+          : value;
+      const next = { ...prev, [field]: normalizedValue } as SearchCriteria;
+
+      if (field === "region") {
+        next.city = "";
       }
-      return { ...prev, [field]: value };
+
+      if (field === "currency") {
+        next.currency = normalizeSearchCurrency(next.region, next.city, normalizedValue);
+      } else if (field === "region" || field === "city") {
+        next.currency = getPreferredSearchCurrency(next.region, next.city);
+      }
+
+      return next;
     });
   };
 
@@ -1606,7 +1644,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       region: "",
       city: "",
       color: "",
-      currency: "EUR",
+      currency: DEFAULT_LISTING_CURRENCY,
       taxCreditOnly: false,
       hasPhoto: false,
       hasVideo: false,
@@ -3530,7 +3568,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
               <label className="adv-label">ЦЕНА ДО</label>
               <input
                 type="number"
-                placeholder={`${searchCriteria.currency || "EUR"} Без ограничение`}
+                placeholder={`${selectedCurrency} Без ограничение`}
                 value={searchCriteria.maxPrice}
                 onChange={(e) => handleInputChange("maxPrice", e.target.value)}
                 className="adv-input"
@@ -3731,11 +3769,11 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                   <div className="adv-field">
                     <label className="adv-label">ВАЛУТА</label>
                     <select
-                      value={searchCriteria.currency}
+                      value={selectedCurrency}
                       onChange={(e) => handleInputChange("currency", e.target.value)}
                       className="adv-select"
                     >
-                      {CURRENCY_OPTIONS.map((currency) => (
+                      {allowedCurrencyOptions.map((currency) => (
                         <option key={currency} value={currency}>
                           {currency}
                         </option>
@@ -5024,11 +5062,11 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                 <>
                   {/* Price Range */}
                   <div className="adv-field">
-                    <label className="adv-label">{`ЦЕНА ОТ (${searchCriteria.currency || "EUR"})`}</label>
+                    <label className="adv-label">{`ЦЕНА ОТ (${selectedCurrency})`}</label>
                     <input type="number" placeholder="Мин." value={searchCriteria.priceFrom} onChange={(e) => handleInputChange("priceFrom", e.target.value)} className="adv-input" />
                   </div>
                   <div className="adv-field">
-                    <label className="adv-label">{`ЦЕНА ДО (${searchCriteria.currency || "EUR"})`}</label>
+                    <label className="adv-label">{`ЦЕНА ДО (${selectedCurrency})`}</label>
                     <input type="number" placeholder="Макс." value={searchCriteria.priceTo} onChange={(e) => handleInputChange("priceTo", e.target.value)} className="adv-input" />
                   </div>
 
