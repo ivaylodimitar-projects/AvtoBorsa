@@ -1173,6 +1173,60 @@ class ListingDetailSerializerPersistenceTests(APITestCase):
         self.assertIn("currency", serializer.errors)
 
 
+class ListingPrerenderCurrencyTests(APITestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.owner = user_model.objects.create_user(
+            username="prerender-owner",
+            email="prerender-owner@example.com",
+            password="testpass123",
+        )
+
+    def test_prerender_uses_supported_listing_currencies_in_meta_and_schema(self):
+        cases = [
+            {
+                "currency": "EUR",
+                "price": "10000.00",
+                "expected_price": "10 000 €",
+            },
+            {
+                "currency": "USD",
+                "price": "11561.00",
+                "expected_price": "11 561 USD",
+            },
+            {
+                "currency": "CAD",
+                "price": "15782.00",
+                "expected_price": "15 782 CAD",
+            },
+        ]
+
+        for index, case in enumerate(cases, start=1):
+            with self.subTest(currency=case["currency"]):
+                listing = _create_cars_listing(
+                    self.owner,
+                    brand="BMW",
+                    model=f"320d-{index}",
+                    year_from=2020 + index,
+                    price=case["price"],
+                    city="Sofia",
+                    fuel="dizel",
+                    gearbox="avtomatik",
+                    mileage=120000,
+                    description=f"Listing in {case['currency']}",
+                    phone=f"+35988812345{index}",
+                    email=f"prerender-{index}@example.com",
+                )
+                BaseListing.objects.filter(pk=listing.pk).update(currency=case["currency"])
+
+                url = reverse("prerender_listing", args=[listing.id])
+                response = self.client.get(f"{url}?force=1")
+
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                html = response.content.decode("utf-8")
+                self.assertIn(case["expected_price"], html)
+                self.assertIn(f'"priceCurrency": "{case["currency"]}"', html)
+
 class AdminListingDeleteReasonTests(APITestCase):
     def setUp(self):
         user_model = get_user_model()

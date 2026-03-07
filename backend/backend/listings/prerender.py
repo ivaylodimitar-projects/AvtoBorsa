@@ -82,7 +82,11 @@ def _is_supported_prerender_bot(user_agent):
     return any(signature in normalized for signature in PRERENDER_BOT_SIGNATURES)
 
 
-def _format_price_label(price):
+def _normalize_listing_currency(currency):
+    return BaseListing.normalize_currency(currency)
+
+
+def _format_price_label(price, currency=None):
     try:
         normalized_price = Decimal(price)
     except (InvalidOperation, TypeError, ValueError):
@@ -91,11 +95,15 @@ def _format_price_label(price):
     if normalized_price <= 0:
         return "Цена по запитване"
 
+    normalized_currency = _normalize_listing_currency(currency)
     quantized = normalized_price.quantize(Decimal("0.01"))
     if quantized == quantized.to_integral():
         formatted = f"{int(quantized):,}".replace(",", " ")
     else:
         formatted = f"{quantized:,.2f}".replace(",", " ")
+    if normalized_currency == "EUR":
+        return f"{formatted} €"
+    return f"{formatted} {normalized_currency}"
     return f"{formatted} €"
 
 
@@ -323,6 +331,7 @@ def _build_prerender_etag(listing, images):
         "slug": _normalize_slug(listing),
         "updated_at": int(listing.updated_at.timestamp()) if listing.updated_at else 0,
         "price": str(getattr(listing, "price", "")),
+        "currency": _normalize_listing_currency(getattr(listing, "currency", None)),
         "view_count": int(getattr(listing, "view_count", 0) or 0),
         "images": [
             {
@@ -412,7 +421,8 @@ def prerender_listing(request, listing_id):
     ) or "cars"
     main_category_label = MAIN_CATEGORY_LABELS.get(normalized_main_category, "Обяви")
     listing_name = _normalize_listing_title(listing)
-    price_label = _format_price_label(listing.price)
+    listing_currency = _normalize_listing_currency(getattr(listing, "currency", None))
+    price_label = _format_price_label(listing.price, listing_currency)
     h1_value = f"{listing_name} – {price_label}"
     city_label = _trim_to_value(listing.city, fallback="България")
     description_value = _build_description_value(
@@ -477,7 +487,7 @@ def prerender_listing(request, listing_id):
             "offers": {
                 "@type": "Offer",
                 "price": _format_price_for_schema(listing.price),
-                "priceCurrency": "EUR",
+                "priceCurrency": listing_currency,
                 "availability": "https://schema.org/InStock",
                 "url": canonical_url,
             },
