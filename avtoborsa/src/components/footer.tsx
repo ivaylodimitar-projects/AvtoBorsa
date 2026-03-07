@@ -1,10 +1,45 @@
 import React from "react";
+import type { IconType } from "react-icons";
+import { FaFacebookF, FaInstagram, FaTiktok } from "react-icons/fa6";
+import { FiMail } from "react-icons/fi";
 import { API_BASE_URL } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import karBgLogo from "../assets/karbglogo.png";
 
 const PUBLIC_API_DOCS_URL = `${API_BASE_URL}/docs/api/`;
+
+type SocialLink = {
+  label: string;
+  handle: string;
+  href: string;
+  icon: IconType;
+  accent: string;
+};
+
+const SOCIAL_LINKS: SocialLink[] = [
+  {
+    label: "Instagram",
+    handle: "@karbgonline",
+    href: "https://www.instagram.com/karbgonline/",
+    icon: FaInstagram,
+    accent: "#e1306c",
+  },
+  {
+    label: "TikTok",
+    handle: "karbgonline",
+    href: "https://www.tiktok.com/@karbgonline",
+    icon: FaTiktok,
+    accent: "#111827",
+  },
+  {
+    label: "Facebook",
+    handle: "Kar.bg",
+    href: "https://www.facebook.com/karbgonline",
+    icon: FaFacebookF,
+    accent: "#1877f2",
+  },
+];
 
 export default function Footer() {
   const { user } = useAuth();
@@ -30,12 +65,59 @@ export default function Footer() {
           <p style={styles.footerText}>
             Платформа за покупко-продажба на автомобили, части и услуги.
           </p>
-          <a href="mailto:sales@kar.bg" style={styles.footerLink}>
-            sales@kar.bg
-          </a>
-          <a href="mailto:support@kar.bg" style={styles.footerLink}>
-            support@kar.bg
-          </a>
+          <div style={styles.footerContactRow}>
+            <a
+              href="mailto:support@kar.bg"
+              style={styles.footerContactLink}
+              className="footer-contact-link"
+              aria-label="Изпрати имейл до support@kar.bg"
+            >
+              <span style={styles.footerContactIcon}>
+                <FiMail size={14} />
+              </span>
+              support@kar.bg
+            </a>
+            <a
+              href="mailto:sales@kar.bg"
+              style={styles.footerContactLink}
+              className="footer-contact-link"
+              aria-label="Изпрати имейл до sales@kar.bg"
+            >
+              <span style={styles.footerContactIcon}>
+                <FiMail size={14} />
+              </span>
+              sales@kar.bg
+            </a>
+          </div>
+          <div style={styles.socialSection}>
+            <div style={styles.socialList}>
+              {SOCIAL_LINKS.map(({ label, handle, href, icon: Icon, accent }) => (
+                <a
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={styles.socialCard}
+                  className="footer-social-card"
+                  aria-label={`${label} ${handle}`}
+                >
+                  <span
+                    style={{
+                      ...styles.socialIconWrap,
+                      color: accent,
+                      backgroundColor: `${accent}14`,
+                    }}
+                  >
+                    <Icon size={14} />
+                  </span>
+                  <span style={styles.socialMeta}>
+                    <span style={styles.socialLabel}>{label}</span>
+                    <span style={styles.socialHandle}>{handle}</span>
+                  </span>
+                </a>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div style={styles.footerCol}>
@@ -61,12 +143,11 @@ export default function Footer() {
           <a href="/contacts" style={styles.footerLink}>
             Контактна страница
           </a>
-          <p style={styles.footerText}>Работно време по телефон: Понеделник - Петък, 09:00 - 18:00 ч.</p>
           <p style={styles.footerText}>Поддръжка по имейл: 24/7 (по всяко време).</p>
         </div>
       </div>
 
-      <div style={styles.bottomRow}>
+      <div style={styles.bottomRow} className="footer-bottom">
         <span>© {new Date().getFullYear()} Kar.bg. Всички права запазени.</span>
       </div>
 
@@ -117,6 +198,38 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 14,
     padding: "4px 0",
   },
+  footerContactRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "nowrap",
+    overflowX: "auto",
+    paddingBottom: 2,
+  },
+  footerContactLink: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    width: "fit-content",
+    color: "#475569",
+    textDecoration: "none",
+    fontSize: 14,
+    fontWeight: 600,
+    padding: "4px 0",
+    transition: "color 0.2s ease, transform 0.2s ease",
+  },
+  footerContactIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    color: "#0f766e",
+    background: "#ecfdf5",
+    border: "1px solid #ccfbf1",
+  },
   footerApiButton: {
     marginTop: 8,
     border: "none",
@@ -130,6 +243,55 @@ const styles: Record<string, React.CSSProperties> = {
     width: "fit-content",
     boxShadow: "0 6px 14px rgba(15, 118, 110, 0.2)",
     transition: "transform 0.2s ease, filter 0.2s ease",
+  },
+  socialSection: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+    marginTop: 10,
+  },
+  socialList: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  socialCard: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "8px 10px",
+    borderRadius: 14,
+    border: "1px solid #e2e8f0",
+    background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)",
+    textDecoration: "none",
+    transition: "transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease",
+  },
+  socialIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  socialMeta: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 2,
+    minWidth: 0,
+  },
+  socialLabel: {
+    color: "#0f172a",
+    fontSize: 12,
+    fontWeight: 700,
+    lineHeight: 1.2,
+  },
+  socialHandle: {
+    color: "#64748b",
+    fontSize: 12,
+    lineHeight: 1.2,
+    whiteSpace: "nowrap",
   },
   bottomRow: {
     maxWidth: 1200,
@@ -149,6 +311,17 @@ const footerCss = `
   .footer-api-btn:hover {
     filter: brightness(1.06);
     transform: translateY(-1px);
+  }
+
+  .footer-contact-link:hover {
+    color: #0f172a;
+    transform: translateX(1px);
+  }
+
+  .footer-social-card:hover {
+    transform: translateY(-1px);
+    border-color: #cbd5e1;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
   }
 
   @media (max-width: 1023px) {
