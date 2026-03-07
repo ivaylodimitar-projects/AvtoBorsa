@@ -160,6 +160,9 @@
         <li><code>Authorization: ApiKey &lt;YOUR_KEY&gt;</code></li>
         <li><code>X-Karbg-Api-Key: &lt;YOUR_KEY&gt;</code></li>
     </ul>
+    <div class="note">
+        Rate limit: maximum 2 API requests per minute per API key.
+    </div>
 
     <h2 class="section-title">Category Endpoints</h2>
     <table>
@@ -179,7 +182,7 @@
         <tr>
             <td>Мотоциклети</td>
             <td><code>5</code></td>
-            <td><code>POST /api/public/ads/motorcycles/</code></td>
+            <td><code>POST /api/public/ads/moto/</code> <span class="muted">(alias: <code>/api/public/ads/motorcycles/</code>)</span></td>
         </tr>
         <tr>
             <td>Бусове</td>
@@ -210,17 +213,17 @@
         <tbody>
         <tr>
             <td>TOP</td>
-            <td><code>1d</code> (1 ден)</td>
+            <td><code>1</code> (1 ден)</td>
             <td>{{ top_1d }}</td>
         </tr>
         <tr>
             <td>TOP</td>
-            <td><code>7d</code> (7 дни)</td>
+            <td><code>7</code> (7 дни)</td>
             <td>{{ top_7d }}</td>
         </tr>
         <tr>
             <td>VIP</td>
-            <td><code>7d</code> (7 дни)</td>
+            <td><code>7</code> (7 дни)</td>
             <td>{{ vip_7d }}</td>
         </tr>
         <tr>
@@ -237,6 +240,7 @@
     <div class="note">
         За директно публикуване използвай <code>is_draft=false</code> + минимум 3 изображения.
         API приема файлове чрез <code>images_upload</code>, <code>images</code>, <code>images[]</code>, <code>photos</code>.
+        Required fields below describe the direct publish contract; draft creation can omit publish-only category fields.
     </div>
 
     <div class="grid" style="margin-top: 14px;">
@@ -287,9 +291,9 @@
     </div>
 
     <h2 class="section-title">TOP/VIP Пример</h2>
-    <pre>{
+<pre>{
   "listing_type": "top",
-  "top_plan": "7d"
+  "top_plan": "7"
 }</pre>
 </div>
 
@@ -448,7 +452,10 @@
       button.classList.toggle("active", button.dataset.key === categoryKey);
     });
 
-    selectedEndpointEl.innerHTML = `Endpoint: <code>POST ${category.endpoint}</code> (main_category=${category.main_category})`;
+    const alternateEndpoints = Array.isArray(category.alternate_endpoints) && category.alternate_endpoints.length > 0
+      ? `<br><span class="muted">Aliases: ${category.alternate_endpoints.map((endpoint) => `<code>POST ${endpoint}</code>`).join(", ")}</span>`
+      : "";
+    selectedEndpointEl.innerHTML = `Endpoint: <code>POST ${category.endpoint}</code> (main_category=${category.main_category})${alternateEndpoints}`;
     categoryPayloadEl.textContent = JSON.stringify(payload, null, 2);
     renderFieldRows(commonFieldsBodyEl, docsConfig.common_fields);
     renderFieldRows(specificFieldsBodyEl, category.specific_fields || []);

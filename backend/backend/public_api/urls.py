@@ -5,6 +5,7 @@ from . import views
 urlpatterns = [
     path("public/docs/", views.public_api_docs, name="public_api_docs"),
     path("public/ads/cars/", views.PublicCarsCreateView.as_view(), name="public_api_create_cars"),
+    path("public/ads/moto/", views.PublicMotorcyclesCreateView.as_view(), name="public_api_create_moto"),
     path(
         "public/ads/motorcycles/",
         views.PublicMotorcyclesCreateView.as_view(),

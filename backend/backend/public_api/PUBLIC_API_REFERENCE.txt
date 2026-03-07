@@ -1,0 +1,713 @@
+Public API Reference
+Last verified against code on 2026-03-07
+
+Purpose
+This file documents how the business-facing public listing API works in the current backend code. It covers:
+- authentication
+- endpoints and flows
+- shared validation rules
+- draft vs publish behavior
+- promotion charging
+- category-specific fields and constraints for cars, motorcycles, buses, and trucks
+
+Source of truth
+The main implementation lives in:
+- backend/backend/public_api/urls.py
+- backend/backend/public_api/views.py
+- backend/backend/public_api/validators.py
+- backend/backend/public_api/authentication.py
+- backend/backend/listings/serializers.py
+- backend/backend/listings/models.py
+- backend/backend/listings/views.py
+- backend/backend/listings/risk_scoring.py
+
+Supported endpoints
+The public API is mounted under /api/ in tests and current routing.
+
+Routes:
+- POST /api/public/ads/cars/
+- POST /api/public/ads/moto/
+- POST /api/public/ads/motorcycles/
+- POST /api/public/ads/buses/
+- POST /api/public/ads/trucks/
+- POST /api/public/listings/<listing_id>/publish/
+- GET /api/public/docs/
+
+What each route does
+- /api/public/ads/<category>/ creates a new listing for a fixed main category.
+- /api/public/listings/<id>/publish/ publishes an existing draft owned by the authenticated API user.
+- /api/public/docs/ is a public HTML docs page backed by the same config constants as the API validators.
+
+Authentication
+Authentication class: PublicApiKeyAuthentication
+
+Rules:
+- An API key is required.
+- The key must belong to an active user.
+- The user must have a business profile. Private accounts are rejected.
+- Rate limit: maximum 2 API requests per minute per API key.
+- The key can be passed in one of these headers:
+  - Authorization: ApiKey <raw_key>
+  - X-Karbg-Api-Key: <raw_key>
+  - X-Api-Key: <raw_key>
+
+Failure modes:
+- Missing key -> 401 "API key is missing."
+- Invalid key / inactive user -> 401 "API key is invalid."
+- Non-business account -> 401 "API key is allowed only for business accounts."
+- More than 2 requests in 1 minute for the same API key -> 429 "Rate limit exceeded. Maximum 2 requests per minute."
+
+Accepted request formats
+The views accept:
+- multipart/form-data
+- application/x-www-form-urlencoded
+- application/json
+
+Practical consequence:
+- Direct publish on create normally must use multipart/form-data, because publishing requires at least 3 images and JSON cannot carry uploaded files.
+- Publishing an existing draft can use JSON if the draft already has enough images attached.
+
+Main category handling
+Each create endpoint is fixed to one main category:
+- /cars/ -> cars
+- /moto/ and /motorcycles/ -> motorcycles
+- /buses/ -> buses
+- /trucks/ -> trucks
+
+The endpoint always forces main_category internally.
+You may omit main_category entirely.
+If you send main_category, it must match the endpoint after public-api normalization.
+
+Accepted public main_category aliases when present:
+- cars: "1", "car", "cars"
+- buses: "3", "bus", "buses"
+- trucks: "4", "truck", "trucks"
+- motorcycles: "5", "moto", "motorcycle", "motorcycles"
+
+Mismatch behavior:
+- POST /api/public/ads/moto/ with main_category=cars -> 400
+- POST /api/public/listings/<id>/publish/ with a different main_category than the draft -> 400
+
+Supported listing lifecycle
+There are 3 important flows.
+
+1. Create draft
+- POST to /api/public/ads/<category>/
+- Send is_draft=true
+- Only the draft-required fields for that category are needed.
+- No promotion may be applied while saving as draft.
+- charged_amount in the response is always "0.00"
+
+2. Create and publish immediately
+- POST to /api/public/ads/<category>/
+- If is_draft is omitted, the code treats the request as publish, not draft.
+- Publish-required fields for that category must be present.
+- At least 3 images must be attached.
+- listing_type may be normal, top, or vip.
+- TOP/VIP charges happen before the listing is saved, inside the same DB transaction.
+
+3. Publish existing draft
+- POST to /api/public/listings/<listing_id>/publish/
+- The listing must exist, belong to the API-key user, be in a supported category, and still be a draft.
+- The serializer runs in partial-update mode.
+- Existing draft values count toward publish requirements, so you only need to send what is missing or what you want to change.
+- Existing images count toward the minimum image requirement and the 12-image total limit.
+- On successful publish, the code sets:
+  - is_draft = false
+  - is_active = true
+  - is_archived = false
+  - created_at = timezone.now()
+
+Important default
+On create, omitted is_draft behaves like false.
+That means a minimal JSON payload without is_draft is treated as a publish attempt and will fail unless all publish-only fields and images are present.
+
+Shared request fields
+Common base fields accepted by all 4 public categories:
+- main_category
+- title
+- price
+- currency
+- location_country
+- location_region
+- city
+- description
+- phone
+- email
+- is_draft
+- listing_type
+- top_plan
+- vip_plan
+- images_upload
+- brand
+- model
+- year_from
+- color
+- condition
+- power
+- features
+
+Serializer-level alias handling
+The listing serializer accepts many camelCase aliases and normalizes them before validation.
+Relevant public-api aliases include:
+- mainCategory -> main_category
+- yearFrom -> year_from
+- locationCountry -> location_country
+- locationRegion -> location_region
+- listingType -> listing_type
+- topPlan -> top_plan
+- vipPlan -> vip_plan
+- euroStandard -> euro_standard
+- engineType -> engine_type
+- heavyAxles -> axles
+- heavySeats -> seats
+- heavyLoad -> load_kg
+- heavyEuroStandard -> heavy_euro_standard
+- motoDisplacement -> displacement_cc
+- motoCategory -> moto_category
+- motoCoolingType -> moto_cooling_type
+- motoEngineKind -> moto_engine_kind
+
+List field handling
+features can be sent as:
+- a real array
+- repeated multipart keys
+- a JSON array encoded as a string
+- a comma-separated string
+
+Image upload field aliases
+Uploaded image files are collected from any of these request field names:
+- images_upload
+- images
+- images[]
+- photos
+- photos[]
+
+If the same uploaded file object appears under multiple aliases in one request, the collector de-duplicates it.
+
+Shared validation order
+Roughly, the request goes through these steps:
+
+1. Endpoint/main_category validation
+- Optional main_category must match the endpoint category.
+
+2. BaseListingSerializer normalization
+- camelCase aliases are converted to snake_case
+- choice aliases are normalized
+- empty strings for numeric fields are turned into null
+- list-style fields are normalized
+
+3. BaseListingSerializer validation
+- publishing requires at least 3 total images for these categories
+- currency is normalized/restricted
+- links are blocked
+- a risk score is calculated
+- high-risk listings cannot be published
+
+4. public_api validator pass
+- disallows non-empty fields outside the category's allowed set
+- checks draft-vs-publish required fields
+- checks public image limits
+- validates detail-model field constraints with Django model field clean()
+
+5. Promotion resolution and charging
+- listing_type/top_plan/vip_plan are normalized and charged if needed
+- charges and listing writes happen in a transaction
+
+Shared validation details
+
+Allowed-field enforcement
+- The public API only allows fields whitelisted for the current category.
+- If a category-incompatible field is present with a non-empty value, the request fails.
+- Example: sending fuel for motorcycles returns 400.
+
+Required fields for drafts
+All 4 supported categories share the same draft minimum:
+- brand
+- model
+- year_from
+- price
+- city
+- phone
+- email
+
+Required fields for publish
+Publish requirements depend on category and are stricter. See the per-category sections below.
+
+Images
+The public API adds these image rules on top of the serializer:
+- max 12 uploaded images per request
+- max 12 total images on a listing after the request
+- each uploaded image must be non-empty
+- each uploaded image must be <= 12 MB
+
+The serializer also adds:
+- at least 3 total images are required for publish for these categories
+
+Image persistence behavior:
+- On create, uploaded images are saved in the order received.
+- The first image of a newly created listing becomes is_cover=true.
+- On draft publish/update, new images are appended after existing ones and are not marked as cover automatically.
+
+Currency rules
+Base currency behavior:
+- Supported stored currencies are EUR, USD, CAD.
+- Unknown currency values are normalized to EUR.
+
+Location-specific rule:
+- If location_country is not exactly "Извън страната", only EUR is allowed.
+- If location_country is "Извън страната", current special cases are:
+  - city "Канада" -> EUR or CAD
+  - city "САЩ" -> EUR or USD
+
+Validation nuance:
+- For normal domestic listings, unsupported currencies silently fall back to EUR.
+- For the recognized foreign-country flow above, an unsupported currency returns a validation error instead of silently falling back.
+
+Risk scoring and blocked content
+The serializer evaluates title/description/contact text for abuse and fraud signals.
+
+Hard block:
+- Any detected external link in the analyzed fields causes validation failure immediately.
+
+High-risk publish block:
+- The request gets a risk score from 0 to 100.
+- Score >= 70 blocks publishing.
+- The error instructs the client to save the listing as draft and edit the content.
+
+Signals used by risk scoring include:
+- direct links
+- obfuscated links
+- contact-bypass keywords
+- risky payment keywords
+- multiple phone numbers in text
+- excessive repeated characters
+- excessive punctuation
+- excessive caps in title
+
+Important nuance:
+- High-risk listings can still be stored as drafts.
+- They cannot be published through this flow until the risky content is removed.
+
+Description/content notes
+- description is optional
+- if description=null, the serializer turns it into an empty string
+- there is no public-api-specific phone format validator
+- email uses Django/DRF email validation
+
+Promotions and charging
+Supported listing_type values:
+- normal
+- top
+- vip
+
+Rules:
+- top_plan may be sent only when listing_type=top
+- vip_plan may be sent only when listing_type=vip
+- top/vip are allowed only during publish, never for draft creation
+- omitted listing_type behaves like normal
+
+Accepted top plan aliases:
+- 1 -> 1d
+- 7 -> 7d
+
+Accepted vip plan aliases:
+- 7 -> 7d
+- lifetime
+
+Current prices:
+- TOP 1d: 2.49 EUR
+- TOP 7d: 7.49 EUR
+- VIP 7d: 1.99 EUR
+- VIP lifetime: 6.99 EUR
+
+Charge timing:
+- Direct publish charges before the listing is created.
+- Draft publish charges before the draft is switched to published.
+- Both happen inside a DB transaction, so a failed charge prevents the publish state change.
+
+Balance failure:
+- insufficient balance raises a validation error from the purchase helpers
+- publish does not happen
+
+Promotion persistence:
+- TOP sets top_plan, top_paid_at, top_expires_at and clears VIP fields
+- VIP sets vip_plan, vip_paid_at, vip_expires_at and clears TOP fields
+- VIP lifetime currently expires when the listing itself expires, not literally forever
+
+Response shape
+Create endpoints return HTTP 201.
+Publish-draft returns HTTP 200.
+
+Response body:
+- listing: full BaseListingSerializer payload
+- charged_amount: decimal string with 2 digits after the decimal point
+- balance: user balance after the operation, as a decimal string
+
+Error response shape:
+- message: top-level human-readable summary
+- detail: present for general request errors such as auth, throttling, or insufficient funds
+- field-specific keys: preserved for validation errors such as missing fields or unsupported values
+- wait_seconds: present on 429 rate-limit responses
+
+Useful response details:
+- main_category is returned in canonical form, for example motorcycles
+- display_title is derived if title is empty
+- price_eur and price_bgn are included
+- images is serialized with image metadata and URLs
+
+Category reference
+
+Cars
+Endpoint:
+- POST /api/public/ads/cars/
+
+Allowed car-specific fields:
+- category
+- month
+- vin
+- fuel
+- gearbox
+- mileage
+- displacement
+- euro_standard
+
+Draft-required fields:
+- brand
+- model
+- year_from
+- price
+- city
+- phone
+- email
+
+Publish-required fields:
+- brand
+- model
+- year_from
+- price
+- city
+- phone
+- email
+- color
+- condition
+- category
+- fuel
+- gearbox
+- mileage
+- power
+- displacement
+- euro_standard
+
+Field constraints:
+- brand: required; detail model max_length=100
+- model: required; detail model max_length=100
+- year_from: required; integer; 1900..2100
+- month: optional; integer; 1..12
+- vin: optional; max_length=17
+- color: publish-required; max_length=50
+- condition: publish-required; must be one of 0, 1, 2, 3
+- category: publish-required; choices are:
+  - van
+  - jeep
+  - cabriolet
+  - wagon
+  - coupe
+  - minivan
+  - pickup
+  - sedan
+  - stretch_limo
+  - hatchback
+- fuel: publish-required; choices are:
+  - benzin
+  - dizel
+  - gaz_benzin
+  - hibrid
+  - elektro
+- gearbox: publish-required; choices are:
+  - ruchna
+  - avtomatik
+- mileage: publish-required; integer >= 0
+- power: publish-required; integer >= 0
+- displacement: publish-required; integer >= 0
+- euro_standard: publish-required; normalized aliases accepted for 1..6, Euro 1..6, Eur 1..6; stored value must fit the car choices 1..6
+- features: optional list stored in JSON
+
+Accepted choice aliases for cars
+fuel aliases:
+- petrol, gasoline, бензин -> benzin
+- diesel, дизел -> dizel
+- газ/бензин, газ бензин, gas/benzin, gas/benzine, gasoline+gas, lpg/petrol -> gaz_benzin
+- hybrid, хибрид -> hibrid
+- electric, ev, електро -> elektro
+
+gearbox aliases:
+- manual, stick, ръчна -> ruchna
+- automatic, auto, автоматик, автоматична -> avtomatik
+
+condition aliases:
+- new, нов, нова -> 0
+- used, second hand, употребяван, използван -> 1
+- damaged, повреден, ударен -> 2
+- parts, за части -> 3
+
+category aliases:
+- Bulgarian labels like джип, комби, седан, хечбек are normalized to the canonical car category codes above
+
+Motorcycles
+Endpoints:
+- POST /api/public/ads/moto/
+- POST /api/public/ads/motorcycles/
+
+Allowed motorcycle-specific fields:
+- displacement_cc
+- transmission
+- engine_type
+- moto_category
+- moto_cooling_type
+- moto_engine_kind
+
+Draft-required fields:
+- brand
+- model
+- year_from
+- price
+- city
+- phone
+- email
+
+Publish-required fields:
+- brand
+- model
+- year_from
+- price
+- city
+- phone
+- email
+- color
+- condition
+- power
+- displacement_cc
+- engine_type
+- moto_category
+- moto_cooling_type
+- moto_engine_kind
+
+Field constraints:
+- brand: required; max_length=100
+- model: required; max_length=100
+- year_from: required; integer; 1900..2100
+- color: publish-required; max_length=50
+- condition: publish-required; must be one of 0, 1, 2, 3
+- power: publish-required; integer >= 0
+- displacement_cc: publish-required; PositiveIntegerField in the detail model
+- transmission: optional; max_length=60
+- engine_type: publish-required; free text; max_length=60
+- moto_category: publish-required; free text; max_length=120
+- moto_cooling_type: publish-required; free text; max_length=120
+- moto_engine_kind: publish-required; free text; max_length=120
+- features: optional list stored in JSON
+
+Moto metadata derived from features
+If a publish request omits any of:
+- moto_category
+- moto_cooling_type
+- moto_engine_kind
+
+the validator will try to derive them from features entries with these exact prefixes:
+- "Категория: "
+- "Охлаждане: "
+- "Вид двигател: "
+
+Example feature entries that satisfy publish requirements:
+- "Категория: Adventure"
+- "Охлаждане: Liquid"
+- "Вид двигател: 4-stroke"
+
+Important nuance:
+- The parser only recognizes those exact Bulgarian prefixes.
+- Plain feature labels like "Adventure" or "Liquid cooling" do not populate the dedicated moto fields automatically.
+- In serialized output, the motorcycle response merges those meta values back into the features array and also exposes them as dedicated fields.
+
+Buses
+Endpoint:
+- POST /api/public/ads/buses/
+
+Allowed bus-specific fields:
+- month
+- vin
+- mileage
+- displacement
+- axles
+- seats
+- load_kg
+- transmission
+- engine_type
+- heavy_euro_standard
+- euro_standard
+
+Draft-required fields:
+- brand
+- model
+- year_from
+- price
+- city
+- phone
+- email
+
+Publish-required fields:
+- brand
+- model
+- year_from
+- price
+- city
+- phone
+- email
+- color
+- condition
+- mileage
+- power
+- axles
+- seats
+- load_kg
+- transmission
+- engine_type
+- heavy_euro_standard
+
+Field constraints:
+- brand: required; max_length=100
+- model: required; max_length=100
+- year_from: required; integer; 1900..2100
+- month: optional; integer; 1..12
+- vin: optional; max_length=17
+- color: publish-required; max_length=50
+- condition: publish-required; must be one of 0, 1, 2, 3
+- mileage: publish-required; integer >= 0
+- power: publish-required; integer >= 0
+- displacement: optional; integer >= 0
+- axles: publish-required; PositiveSmallIntegerField
+- seats: publish-required; PositiveIntegerField
+- load_kg: publish-required; PositiveIntegerField
+- transmission: publish-required; free text; max_length=60
+- engine_type: publish-required; free text; max_length=60
+- heavy_euro_standard: semantically required for publish; resolved against heavy_euro_standard or euro_standard
+- features: optional list stored in JSON
+
+Euro-standard behavior for buses
+- heavy_euro_standard and euro_standard are treated as two public names for the same stored field.
+- If both are sent, their normalized values must match.
+- Common aliases 1..6, Euro 1..6, and Eur 1..6 are normalized.
+- Unlike cars, the underlying bus detail field is a free CharField(max_length=24), so the code does not enforce a strict enum after normalization.
+- The response exposes heavy_euro_standard derived from the stored euro_standard value.
+
+Trucks
+Endpoint:
+- POST /api/public/ads/trucks/
+
+Allowed truck-specific fields:
+- month
+- vin
+- mileage
+- displacement
+- axles
+- seats
+- load_kg
+- transmission
+- engine_type
+- heavy_euro_standard
+- euro_standard
+
+Draft-required fields:
+- brand
+- model
+- year_from
+- price
+- city
+- phone
+- email
+
+Publish-required fields:
+- brand
+- model
+- year_from
+- price
+- city
+- phone
+- email
+- color
+- condition
+- mileage
+- power
+- axles
+- seats
+- load_kg
+- transmission
+- engine_type
+- heavy_euro_standard
+
+Field constraints:
+- brand: required; max_length=100
+- model: required; max_length=100
+- year_from: required; integer; 1900..2100
+- month: optional; integer; 1..12
+- vin: optional; max_length=17
+- color: publish-required; max_length=50
+- condition: publish-required; must be one of 0, 1, 2, 3
+- mileage: publish-required; integer >= 0
+- power: publish-required; integer >= 0
+- displacement: optional; integer >= 0
+- axles: publish-required; PositiveSmallIntegerField
+- seats: publish-required; PositiveIntegerField
+- load_kg: publish-required; PositiveIntegerField
+- transmission: publish-required; free text; max_length=60
+- engine_type: publish-required; free text; max_length=60
+- heavy_euro_standard: semantically required for publish; resolved against heavy_euro_standard or euro_standard
+- features: optional list stored in JSON
+
+Euro-standard behavior for trucks
+- Same behavior as buses.
+- If both heavy_euro_standard and euro_standard are sent, they must normalize to the same value.
+- Common 1..6 / Euro 1..6 / Eur 1..6 aliases are normalized.
+- The stored truck detail field is also free text with max_length=24.
+
+Field constraints inherited from BaseListing
+These apply to all supported public categories:
+- title: optional; max_length=200
+- price: required; DecimalField(max_digits=10, decimal_places=2)
+- currency: optional; stored as one of EUR/USD/CAD after normalization
+- location_country: optional; max_length=100
+- location_region: optional; max_length=100
+- city: required; max_length=100
+- description: optional text
+- phone: required; max_length=20
+- email: required; valid email
+- listing_type: normal/top/vip
+- top_plan: optional; max_length=12
+- vip_plan: optional; max_length=12
+
+Notable non-rules
+These are important because callers sometimes assume they exist:
+- The public API does not add a phone-number format validator beyond max_length.
+- The public API does not add a public-specific minimum-price validator.
+- VIN is length-limited but not pattern-validated.
+- features list items are not validated against a fixed catalog by this layer.
+
+Operational notes
+- Only cars, motorcycles, buses, and trucks are supported by the public publish route.
+- Publishing a non-draft listing through /publish/ returns 400 "Listing is already published."
+- After successful create/publish, latest-listings cache is invalidated.
+- The draft-publish route updates the existing listing rather than cloning it.
+
+Testing coverage in current repo
+The current public-api tests cover:
+- missing API key
+- moto alias endpoint
+- main_category mismatch
+- category-incompatible field rejection
+- missing publish-only fields
+- draft publish main_category lock
+- top-charge publish flow
+- insufficient balance
+- direct publish with images
+- too many images
+- public docs page

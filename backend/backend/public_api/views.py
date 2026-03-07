@@ -1,10 +1,12 @@
+import re
 from decimal import Decimal
+from math import ceil
 
 from django.db import transaction as db_transaction
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import Throttled, ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -20,148 +22,146 @@ from backend.listings.views import (
     VIP_LISTING_PRICE_LIFETIME_EUR,
     _apply_top_listing_window,
     _apply_vip_listing_window,
+    _attach_purchase_record_to_listing,
+    _build_listing_snapshot_from_validated_data,
     _charge_top_listing_fee,
     _charge_vip_listing_fee,
     _clear_top_listing_window,
     _clear_vip_listing_window,
     _invalidate_latest_listings_cache,
-    _attach_purchase_record_to_listing,
-    _build_listing_snapshot_from_validated_data,
     _normalize_top_plan,
     _normalize_vip_plan,
 )
 
 from .authentication import PublicApiKeyAuthentication
+from .throttling import PublicApiRateThrottle
+from .validators import (
+    PUBLIC_API_BASE_PAYLOAD,
+    PUBLIC_API_CATEGORY_CONFIG,
+    PUBLIC_API_COMMON_FIELDS,
+    SUPPORTED_PUBLIC_MAIN_CATEGORIES,
+    normalize_public_api_promotion_inputs,
+    validate_public_api_payload,
+    validate_requested_main_category,
+)
 
 
-SUPPORTED_PUBLIC_MAIN_CATEGORIES = {"cars", "motorcycles", "buses", "trucks"}
 IMAGE_UPLOAD_FIELD_ALIASES = ("images_upload", "images", "images[]", "photos", "photos[]")
-
-PUBLIC_API_COMMON_FIELDS = [
-    {"name": "brand", "type": "string", "required": True, "description": "Марка"},
-    {"name": "model", "type": "string", "required": True, "description": "Модел"},
-    {"name": "year_from", "type": "integer", "required": True, "description": "Година"},
-    {"name": "price", "type": "decimal", "required": True, "description": "Цена"},
-    {"name": "city", "type": "string", "required": True, "description": "Град"},
-    {"name": "fuel", "type": "string", "required": True, "description": "Гориво"},
-    {"name": "gearbox", "type": "string", "required": True, "description": "Скоростна кутия"},
-    {"name": "mileage", "type": "integer", "required": True, "description": "Пробег"},
-    {"name": "description", "type": "string", "required": False, "description": "Описание"},
-    {"name": "phone", "type": "string", "required": True, "description": "Телефон"},
-    {"name": "email", "type": "string", "required": True, "description": "Email за контакт"},
-    {"name": "is_draft", "type": "boolean", "required": False, "description": "false за директно публикуване"},
-    {"name": "listing_type", "type": "string", "required": False, "description": "normal, top или vip"},
-    {"name": "top_plan", "type": "string", "required": False, "description": "1d или 7d (когато listing_type=top)"},
-    {"name": "vip_plan", "type": "string", "required": False, "description": "7d или lifetime (когато listing_type=vip)"},
-    {"name": "images_upload", "type": "file[]", "required": True, "description": "Минимум 3 изображения за директно публикуване"},
-]
-
-PUBLIC_API_BASE_PAYLOAD = {
-    "brand": "BMW",
-    "model": "X5",
-    "year_from": 2020,
-    "price": "35500.00",
-    "city": "Sofia",
-    "fuel": "dizel",
-    "gearbox": "avtomatik",
-    "mileage": 120000,
-    "description": "Imported listing",
-    "phone": "+359888123456",
-    "email": "dealer@example.com",
-    "is_draft": True,
+PUBLIC_API_RATE_LIMIT_MESSAGE = "Rate limit exceeded. Maximum 2 requests per minute."
+PUBLIC_API_ENGLISH_ERROR_MAP = {
+    "Недостатъчни средства": "Insufficient funds.",
+    "Невалиден VIP пакет": "Invalid VIP plan.",
+    "Невалиден TOP пакет": "Invalid TOP plan.",
+    "Линкове в обявите не са позволени. Премахнете URL адресите и опитайте отново.": (
+        "Links are not allowed in listings. Remove the URL(s) and try again."
+    ),
 }
+PUBLIC_API_MIN_IMAGES_ERROR_RE = re.compile(
+    r"^Минимум (?P<count>\d+) снимки са задължителни за тази категория\.$"
+)
+PUBLIC_API_ALLOWED_CURRENCY_ERROR_RE = re.compile(
+    r"^Избраната валута не е позволена за тази държава\. Разрешени: (?P<allowed>.+)$"
+)
 
-PUBLIC_API_CATEGORY_CONFIG = {
-    "cars": {
-        "label": "Автомобили и джипове",
-        "endpoint": "/api/public/ads/cars/",
-        "main_category": "cars",
-        "specific_fields": [
-            {"name": "category", "type": "string", "required": False, "description": "jeep, sedan, wagon, ..."},
-            {"name": "condition", "type": "string", "required": False, "description": "0,1,2,3"},
-            {"name": "power", "type": "integer", "required": False, "description": "Конски сили"},
-            {"name": "displacement", "type": "integer", "required": False, "description": "Кубатура (cc)"},
-            {"name": "euro_standard", "type": "string", "required": False, "description": "1..6"},
-            {"name": "features", "type": "string[]", "required": False, "description": "Списък с екстри"},
-        ],
-        "payload_overrides": {
-            "category": "jeep",
-            "condition": "1",
-            "power": 286,
-            "displacement": 2993,
-            "euro_standard": "6",
-            "features": ["4x4", "Кожа", "Навигация"],
-            "is_draft": False,
-            "listing_type": "normal",
-        },
-    },
-    "motorcycles": {
-        "label": "Мотоциклети",
-        "endpoint": "/api/public/ads/motorcycles/",
-        "main_category": "motorcycles",
-        "specific_fields": [
-            {"name": "displacement_cc", "type": "integer", "required": False, "description": "Кубатура"},
-            {"name": "transmission", "type": "string", "required": False, "description": "Ръчни/автоматични"},
-            {"name": "engine_type", "type": "string", "required": False, "description": "2T, 4T, electric"},
-        ],
-        "payload_overrides": {
-            "model": "R 1250 GS",
-            "displacement_cc": 1254,
-            "transmission": "manual",
-            "engine_type": "4T",
-            "is_draft": False,
-            "listing_type": "normal",
-        },
-    },
-    "buses": {
-        "label": "Бусове",
-        "endpoint": "/api/public/ads/buses/",
-        "main_category": "buses",
-        "specific_fields": [
-            {"name": "axles", "type": "integer", "required": False, "description": "ОсИ"},
-            {"name": "seats", "type": "integer", "required": False, "description": "Брой места"},
-            {"name": "load_kg", "type": "integer", "required": False, "description": "Товароносимост"},
-            {"name": "transmission", "type": "string", "required": False, "description": "Тип трансмисия"},
-            {"name": "engine_type", "type": "string", "required": False, "description": "Тип двигател"},
-            {"name": "heavy_euro_standard", "type": "string", "required": False, "description": "Euro стандарт"},
-        ],
-        "payload_overrides": {
-            "model": "Sprinter 316",
-            "axles": 2,
-            "seats": 3,
-            "load_kg": 1400,
-            "transmission": "manual",
-            "engine_type": "diesel",
-            "heavy_euro_standard": "6",
-            "is_draft": False,
-            "listing_type": "normal",
-        },
-    },
-    "trucks": {
-        "label": "Камиони",
-        "endpoint": "/api/public/ads/trucks/",
-        "main_category": "trucks",
-        "specific_fields": [
-            {"name": "axles", "type": "integer", "required": False, "description": "ОсИ"},
-            {"name": "seats", "type": "integer", "required": False, "description": "Брой места"},
-            {"name": "load_kg", "type": "integer", "required": False, "description": "Товароносимост"},
-            {"name": "transmission", "type": "string", "required": False, "description": "Тип трансмисия"},
-            {"name": "engine_type", "type": "string", "required": False, "description": "Тип двигател"},
-            {"name": "heavy_euro_standard", "type": "string", "required": False, "description": "Euro стандарт"},
-        ],
-        "payload_overrides": {
-            "model": "Actros 1845",
-            "axles": 2,
-            "seats": 2,
-            "load_kg": 18000,
-            "transmission": "automatic",
-            "engine_type": "diesel",
-            "heavy_euro_standard": "6",
-            "is_draft": False,
-            "listing_type": "normal",
-        },
-    },
-}
+
+def _translate_public_api_error_text(value):
+    text = str(value or "").strip()
+    if not text:
+        return text
+
+    translated = PUBLIC_API_ENGLISH_ERROR_MAP.get(text)
+    if translated is not None:
+        return translated
+
+    min_images_match = PUBLIC_API_MIN_IMAGES_ERROR_RE.match(text)
+    if min_images_match:
+        return (
+            f"At least {min_images_match.group('count')} images are required for this category."
+        )
+
+    allowed_currency_match = PUBLIC_API_ALLOWED_CURRENCY_ERROR_RE.match(text)
+    if allowed_currency_match:
+        return (
+            "The selected currency is not allowed for this country. "
+            f"Allowed: {allowed_currency_match.group('allowed')}"
+        )
+
+    if text.startswith("Обявата е маркирана за ръчна модерация "):
+        return (
+            "This listing was flagged for manual moderation. "
+            "Save it as a draft and edit the content."
+        )
+
+    return text
+
+
+def _normalize_public_api_error_detail(detail):
+    if isinstance(detail, dict):
+        return {
+            str(field_name): _normalize_public_api_error_detail(value)
+            for field_name, value in detail.items()
+        }
+
+    if isinstance(detail, list):
+        return [_normalize_public_api_error_detail(item) for item in detail]
+
+    return _translate_public_api_error_text(detail)
+
+
+def _extract_public_api_error_message(detail, field_name=None):
+    if isinstance(detail, dict):
+        for key, value in detail.items():
+            if key == "message":
+                continue
+            nested_field_name = None if key in {"detail", "non_field_errors"} else key
+            message = _extract_public_api_error_message(value, nested_field_name)
+            if message:
+                return message
+        return ""
+
+    if isinstance(detail, list):
+        for item in detail:
+            message = _extract_public_api_error_message(item, field_name)
+            if message:
+                return message
+        return ""
+
+    message = _translate_public_api_error_text(detail)
+    if field_name:
+        return f"{field_name}: {message}"
+    return message
+
+
+def _format_public_api_error_payload(detail, exc):
+    if isinstance(exc, Throttled):
+        payload = {
+            "message": PUBLIC_API_RATE_LIMIT_MESSAGE,
+            "detail": PUBLIC_API_RATE_LIMIT_MESSAGE,
+        }
+        if getattr(exc, "wait", None) is not None:
+            payload["wait_seconds"] = max(1, int(ceil(exc.wait)))
+        return payload
+
+    normalized_detail = _normalize_public_api_error_detail(detail)
+
+    if isinstance(normalized_detail, dict):
+        payload = dict(normalized_detail)
+    elif isinstance(normalized_detail, list):
+        if len(normalized_detail) == 1:
+            payload = {"detail": normalized_detail[0]}
+        else:
+            payload = {"detail": normalized_detail}
+    else:
+        payload = {"detail": normalized_detail}
+
+    message = _extract_public_api_error_message(payload)
+    if message:
+        payload = {"message": message, **payload}
+
+    if isinstance(exc, Throttled) and getattr(exc, "wait", None) is not None:
+        payload["wait_seconds"] = max(1, int(ceil(exc.wait)))
+
+    return payload
 
 
 def _prepare_payload(data, forced_fields=None, request_files=None):
@@ -186,6 +186,10 @@ def _prepare_payload(data, forced_fields=None, request_files=None):
 
     for key, value in (forced_fields or {}).items():
         payload[key] = value
+
+    for key, value in normalize_public_api_promotion_inputs(data).items():
+        payload[key] = value
+
     return payload
 
 
@@ -278,15 +282,33 @@ def _apply_promotion_window(listing, listing_type, top_plan=None, vip_plan=None,
     )
 
 
-class PublicCategoryListingCreateView(APIView):
-    """Create a listing in a fixed main category via API key auth."""
-
+class PublicApiBaseView(APIView):
     authentication_classes = [PublicApiKeyAuthentication]
     permission_classes = [IsAuthenticated]
     parser_classes = (MultiPartParser, FormParser, JSONParser)
+    throttle_classes = [PublicApiRateThrottle]
+
+    def throttled(self, request, wait):
+        raise Throttled(wait=wait, detail=PUBLIC_API_RATE_LIMIT_MESSAGE)
+
+    def handle_exception(self, exc):
+        response = super().handle_exception(exc)
+        if response is not None:
+            response.data = _format_public_api_error_payload(response.data, exc)
+        return response
+
+
+class PublicCategoryListingCreateView(PublicApiBaseView):
+    """Create a listing in a fixed main category via API key auth."""
+
     main_category = None
 
     def post(self, request):
+        validate_requested_main_category(
+            request.data,
+            expected_main_category=self.main_category,
+        )
+
         payload = _prepare_payload(
             request.data,
             forced_fields={"main_category": self.main_category},
@@ -296,6 +318,12 @@ class PublicCategoryListingCreateView(APIView):
         serializer.is_valid(raise_exception=True)
 
         is_draft = bool(serializer.validated_data.get("is_draft", False))
+        validate_public_api_payload(
+            serializer.validated_data,
+            main_category=self.main_category,
+            is_publish=not is_draft,
+        )
+
         listing_type, top_plan, vip_plan, charged_amount = _resolve_promotion(
             serializer.validated_data,
             allow_promotions=not is_draft,
@@ -346,7 +374,9 @@ class PublicCategoryListingCreateView(APIView):
         return Response(
             {
                 "listing": response_serializer.data,
-                "charged_amount": _format_decimal(charged_amount if not is_draft else Decimal("0.00")),
+                "charged_amount": _format_decimal(
+                    charged_amount if not is_draft else Decimal("0.00")
+                ),
                 "balance": _format_decimal(_get_user_balance(request.user)),
             },
             status=status.HTTP_201_CREATED,
@@ -369,28 +399,28 @@ class PublicTrucksCreateView(PublicCategoryListingCreateView):
     main_category = "trucks"
 
 
-class PublicDraftPublishView(APIView):
+class PublicDraftPublishView(PublicApiBaseView):
     """Publish an existing draft listing owned by the API key user."""
-
-    authentication_classes = [PublicApiKeyAuthentication]
-    permission_classes = [IsAuthenticated]
-    parser_classes = (MultiPartParser, FormParser, JSONParser)
 
     def post(self, request, listing_id):
         listing = get_object_or_404(BaseListing, id=listing_id, user=request.user)
         if listing.main_category not in SUPPORTED_PUBLIC_MAIN_CATEGORIES:
             raise ValidationError(
-                {"detail": "Only cars, motorcycles, buses, and trucks can be published here."}
+                {"detail": "Only cars, moto, buses, and trucks can be published here."}
             )
         if not listing.is_draft:
             raise ValidationError({"detail": "Listing is already published."})
 
+        validate_requested_main_category(
+            request.data,
+            expected_main_category=listing.main_category,
+        )
+
         payload = _prepare_payload(
             request.data,
             forced_fields={
+                "main_category": listing.main_category,
                 "is_draft": False,
-                "is_active": True,
-                "is_archived": False,
             },
             request_files=request.FILES,
         )
@@ -401,6 +431,13 @@ class PublicDraftPublishView(APIView):
             context={"request": request},
         )
         serializer.is_valid(raise_exception=True)
+
+        validate_public_api_payload(
+            serializer.validated_data,
+            main_category=listing.main_category,
+            is_publish=True,
+            listing=listing,
+        )
 
         listing_type, top_plan, vip_plan, charged_amount = _resolve_promotion(
             serializer.validated_data,
