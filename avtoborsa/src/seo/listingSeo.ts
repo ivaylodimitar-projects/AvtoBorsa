@@ -1,6 +1,7 @@
 import { formatFuelLabel, formatGearboxLabel } from "../utils/listingLabels";
 import { normalizeMainCategory } from "../constants/karbgdata";
 import { normalizeListingSlug } from "../utils/slugify";
+import { normalizeListingCurrency } from "../utils/listingCurrency";
 import {
   resolveListingBaseTitle,
   resolveListingCategoryLabel,
@@ -31,6 +32,7 @@ export type ListingSeoListing = ListingTitleInput & {
   model: string;
   year_from?: number | null;
   price?: number | string | null;
+  currency?: string | null;
   mileage?: number | string | null;
   fuel?: string | null;
   fuel_display?: string | null;
@@ -138,17 +140,24 @@ const toNumber = (value: unknown): number | null => {
   return null;
 };
 
-const formatPriceLabel = (value: unknown, locale = "bg-BG") => {
+const formatPriceLabel = (
+  value: unknown,
+  currency: unknown = DEFAULT_PRICE_CURRENCY,
+  locale = "bg-BG"
+) => {
   const parsed = toNumber(value);
   if (parsed === null || parsed <= 0) {
     return "Цена по запитване";
   }
+  const normalizedCurrency = normalizeListingCurrency(currency);
   const hasFraction = Math.abs(parsed % 1) > 0;
   const formatted = parsed.toLocaleString(locale, {
     minimumFractionDigits: hasFraction ? 2 : 0,
     maximumFractionDigits: hasFraction ? 2 : 0,
   });
-  return `${formatted} €`;
+  return normalizedCurrency === "EUR"
+    ? `${formatted} €`
+    : `${formatted} ${normalizedCurrency}`;
 };
 
 const formatPriceForSchema = (value: unknown) => {
@@ -283,10 +292,12 @@ export const buildListingSeoPayload = (
 ): ListingSeoPayload => {
   const siteName = resolveSiteName(options.siteName);
   const siteUrl = resolveSiteUrl(options.siteUrl);
-  const priceCurrency = trimToValue(options.priceCurrency) || DEFAULT_PRICE_CURRENCY;
+  const priceCurrency = normalizeListingCurrency(
+    trimToValue(options.priceCurrency) || listing.currency || DEFAULT_PRICE_CURRENCY
+  );
 
   const year = toNumber(listing.year_from);
-  const priceLabel = formatPriceLabel(listing.price);
+  const priceLabel = formatPriceLabel(listing.price, priceCurrency);
   const fuel = trimToValue(listing.fuel_display) || trimToValue(listing.fuel);
   const gearbox = trimToValue(listing.gearbox_display) || trimToValue(listing.gearbox);
   const fuelLabel = fuel ? buildFuelLabel(listing) : undefined;
