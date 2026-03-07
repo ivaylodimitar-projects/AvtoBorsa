@@ -392,6 +392,8 @@ const globalCss = `
   #root { width: 100%; }
   input, select, button, textarea { font-family: inherit; }
   [role="button"]:focus-visible { outline: 2px solid #0f766e; outline-offset: 2px; }
+  .mobile-story-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+  .mobile-story-scroll::-webkit-scrollbar { display: none; }
   .similar-card:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12); }
   .similar-nav-button:hover { transform: translateY(-1px); box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12); }
   .similar-nav-button:active { transform: translateY(0); }
@@ -1069,98 +1071,41 @@ const VehicleDetailsPage: React.FC = () => {
     },
     mobileStorySection: {
       position: 'relative',
-      overflow: 'hidden',
-      background:
-        'radial-gradient(circle at top right, rgba(15, 118, 110, 0.14), transparent 36%), linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
-      borderRadius: 18,
-      border: '1px solid #dbe4ef',
-      boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)',
-      padding: 14,
-    },
-    mobileStoryHeader: {
-      display: 'flex',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-      gap: 12,
-      marginBottom: 14,
-    },
-    mobileStoryIntro: {
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 4,
-      minWidth: 0,
-    },
-    mobileStoryEyebrow: {
-      fontSize: 11,
-      fontWeight: 800,
-      letterSpacing: 0.4,
-      textTransform: 'uppercase',
-      color: '#0f766e',
-    },
-    mobileStoryTitle: {
-      margin: 0,
-      fontSize: 18,
-      fontWeight: 800,
-      color: '#0f172a',
-      fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
-      lineHeight: 1.2,
-    },
-    mobileStoryCaption: {
-      margin: 0,
-      fontSize: 12,
-      lineHeight: 1.45,
-      color: '#64748b',
-      fontWeight: 600,
-    },
-    mobileStoryBadge: {
-      flexShrink: 0,
-      display: 'inline-flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '6px 10px',
-      borderRadius: 999,
-      background: '#ecfdf5',
-      border: '1px solid #99f6e4',
-      color: '#0f766e',
-      fontSize: 11,
-      fontWeight: 800,
-      whiteSpace: 'nowrap',
     },
     mobileStoryGrid: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-      gap: 10,
+      display: 'flex',
+      alignItems: 'stretch',
+      gap: 8,
+      overflowX: 'auto',
+      overflowY: 'hidden',
+      paddingBottom: 2,
+      WebkitOverflowScrolling: 'touch',
+      scrollSnapType: 'x proximity',
     },
     mobileStoryCard: {
       position: 'relative',
-      minHeight: 126,
-      borderRadius: 18,
-      border: '1px solid transparent',
-      padding: 12,
+      minHeight: 0,
+      borderRadius: 16,
+      border: '1px solid #e2e8f0',
+      padding: '10px 12px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      flex: '0 0 auto',
+      background: '#ffffff',
+      boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
+      scrollSnapAlign: 'start',
+    },
+    mobileStoryCardBody: {
       display: 'flex',
       flexDirection: 'column',
-      justifyContent: 'space-between',
-      gap: 12,
-      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.78)',
-    },
-    mobileStoryCardTop: {
-      display: 'flex',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-      gap: 8,
-    },
-    mobileStoryCardLabel: {
-      fontSize: 11,
-      fontWeight: 800,
-      textTransform: 'uppercase',
-      letterSpacing: 0.36,
-      color: '#475569',
-      lineHeight: 1.3,
+      gap: 2,
+      minWidth: 0,
     },
     mobileStoryIconWrap: {
-      width: 38,
-      height: 38,
-      borderRadius: 14,
+      width: 32,
+      height: 32,
+      borderRadius: 10,
       display: 'inline-flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -1168,18 +1113,18 @@ const VehicleDetailsPage: React.FC = () => {
       boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8)',
     },
     mobileStoryCardValue: {
-      fontSize: 15,
+      fontSize: 13,
       fontWeight: 800,
       color: '#0f172a',
-      lineHeight: 1.3,
-      wordBreak: 'break-word',
+      lineHeight: 1.2,
+      whiteSpace: 'nowrap',
     },
     mobileStoryCardHint: {
-      fontSize: 12,
+      fontSize: 11,
       fontWeight: 600,
-      color: '#475569',
-      lineHeight: 1.4,
-      wordBreak: 'break-word',
+      color: '#64748b',
+      lineHeight: 1.2,
+      whiteSpace: 'nowrap',
     },
     aiSummarySection: {
       position: 'absolute',
@@ -1563,6 +1508,18 @@ const VehicleDetailsPage: React.FC = () => {
         'linear-gradient(135deg, rgba(59, 130, 246, 0.16) 0%, rgba(255, 255, 255, 0.98) 72%)',
     },
     {
+      key: 'views',
+      label: 'Преглеждания',
+      value: viewCountValue.toLocaleString('bg-BG'),
+      hint: `${viewCountValue === 1 ? 'преглеждане' : 'преглеждания'} до момента`,
+      icon: Eye,
+      accent: '#7c3aed',
+      iconBackground: '#ede9fe',
+      borderColor: '#c4b5fd',
+      background:
+        'linear-gradient(135deg, rgba(124, 58, 237, 0.16) 0%, rgba(255, 255, 255, 0.98) 72%)',
+    },
+    {
       key: 'updated',
       label: 'Редактирана',
       value:
@@ -1576,18 +1533,6 @@ const VehicleDetailsPage: React.FC = () => {
       borderColor: '#fdba74',
       background:
         'linear-gradient(135deg, rgba(249, 115, 22, 0.18) 0%, rgba(255, 255, 255, 0.98) 72%)',
-    },
-    {
-      key: 'views',
-      label: 'Преглеждания',
-      value: viewCountValue.toLocaleString('bg-BG'),
-      hint: `${viewCountValue === 1 ? 'преглеждане' : 'преглеждания'} до момента`,
-      icon: Eye,
-      accent: '#7c3aed',
-      iconBackground: '#ede9fe',
-      borderColor: '#c4b5fd',
-      background:
-        'linear-gradient(135deg, rgba(124, 58, 237, 0.16) 0%, rgba(255, 255, 255, 0.98) 72%)',
     },
   ];
   const hasFeaturePayload = Array.isArray(listing.features)
@@ -1681,39 +1626,26 @@ const VehicleDetailsPage: React.FC = () => {
 
           {isMobile && (
             <section style={styles.mobileStorySection} aria-label="Информация за обявата">
-              <div style={styles.mobileStoryHeader}>
-                <div style={styles.mobileStoryIntro}>
-                  <span style={styles.mobileStoryEyebrow}>Важно накратко</span>
-                  <h2 style={styles.mobileStoryTitle}>Информация за обявата</h2>
-                </div>
-              </div>
-
-              <div style={styles.mobileStoryGrid}>
+              <div style={styles.mobileStoryGrid} className="mobile-story-scroll">
                 {mobileListingStoryItems.map((item) => {
                   const Icon = item.icon;
 
                   return (
                     <article
                       key={item.key}
-                      style={{
-                        ...styles.mobileStoryCard,
-                        background: item.background,
-                        borderColor: item.borderColor,
-                      }}
+                      aria-label={`${item.label}: ${item.value}${item.hint ? `, ${item.hint}` : ''}`}
+                      style={styles.mobileStoryCard}
                     >
-                      <div style={styles.mobileStoryCardTop}>
-                        <div style={styles.mobileStoryCardLabel}>{item.label}</div>
-                        <span
-                          style={{
-                            ...styles.mobileStoryIconWrap,
-                            background: item.iconBackground,
-                            color: item.accent,
-                          }}
-                        >
-                          <Icon size={18} />
-                        </span>
-                      </div>
-                      <div>
+                      <span
+                        style={{
+                          ...styles.mobileStoryIconWrap,
+                          background: item.iconBackground,
+                          color: item.accent,
+                        }}
+                      >
+                        <Icon size={16} />
+                      </span>
+                      <div style={styles.mobileStoryCardBody}>
                         <div style={styles.mobileStoryCardValue}>{item.value}</div>
                         <div style={styles.mobileStoryCardHint}>{item.hint}</div>
                       </div>
