@@ -1309,7 +1309,7 @@ const Navbar: React.FC = () => {
                           className={`notifications-tab ${notificationsTab === "subscriptions" ? "active" : ""}`}
                           onClick={() => setNotificationsTab("subscriptions")}
                         >
-                          Абонирани ({followedDealers.length})
+                          Последвани ({followedDealers.length})
                         </button>
                       </div>
 

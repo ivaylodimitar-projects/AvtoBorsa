@@ -139,6 +139,7 @@ interface AdvancedSearchProps {
   recentSearches?: RecentSearch[];
   hideMainCategoryField?: boolean;
   topContent?: React.ReactNode;
+  titlePrefix?: React.ReactNode;
   renderCategoryIcon?: (
     categoryValue: string,
     options: { isActive: boolean; compact: boolean }
@@ -714,6 +715,7 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   recentSearches = [],
   hideMainCategoryField = false,
   topContent,
+  titlePrefix,
   renderCategoryIcon,
 }) => {
   const navigate = useNavigate();
@@ -1748,6 +1750,16 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       color: #333;
       margin-bottom: 8px;
       font-family: "Space Grotesk", "Manrope", "Segoe UI", sans-serif;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .adv-search-title-prefix {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #0f766e;
+      flex-shrink: 0;
     }
     .adv-header {
       display: flex;
@@ -2673,7 +2685,14 @@ export const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     <div className="adv-search-root">
       <style>{advancedSearchCSS}</style>
       <div className="adv-header">
-        <div className="adv-search-title">Търсене</div>
+        <div className="adv-search-title">
+          {titlePrefix ? (
+            <span className="adv-search-title-prefix" aria-hidden="true">
+              {titlePrefix}
+            </span>
+          ) : null}
+          <span>Търсене</span>
+        </div>
         <div className="adv-recent-dropdown">
           <button
             type="button"

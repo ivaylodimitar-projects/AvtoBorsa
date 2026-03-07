@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { Clock3, Info, Search, Star } from "lucide-react";
 import { CAR_FEATURES } from "../constants/carFeatures";
 import { AdvancedSearch } from "./AdvancedSearch";
 import { useRecentSearches } from "../hooks/useRecentSearches";
@@ -438,6 +439,19 @@ export default function LandingPage() {
   const brandTouchStartXRef = useRef<number | null>(null);
   const brandTouchStartYRef = useRef<number | null>(null);
   const suppressBrandCardClickUntilRef = useRef(0);
+
+  const renderSectionTitle = (
+    label: string,
+    icon: React.ReactNode,
+    className?: string
+  ) => (
+    <h2 style={{ ...styles.h2, ...styles.sectionTitleWithIcon }} className={className}>
+      <span style={styles.sectionTitleIcon} aria-hidden="true">
+        {icon}
+      </span>
+      <span style={styles.sectionTitleText}>{label}</span>
+    </h2>
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1177,6 +1191,7 @@ const handleMainCategoryTouchEnd = (
             onMainCategoryChange={setCategory}
             recentSearches={searches}
             hideMainCategoryField
+            titlePrefix={<Search size={22} strokeWidth={2.2} />}
             renderCategoryIcon={(categoryValue, options) =>
               renderMainCategoryIcon(categoryValue, options)
             }
@@ -2109,7 +2124,10 @@ const handleMainCategoryTouchEnd = (
 
           <div style={{ ...styles.latestContainer, overflow: "visible", position: "relative", zIndex: 1 }}>
             <div style={{ ...styles.sectionHeader, ...styles.containerHeader, marginBottom: 0 }}>
-              <h2 style={styles.h2}>Последни обяви</h2>
+              {renderSectionTitle(
+                "Последни обяви",
+                <Clock3 size={23} strokeWidth={2.2} />
+              )}
               <p style={styles.sectionLead}>
                 Най-новите публикувани обяви на пазара
               </p>
@@ -2363,7 +2381,11 @@ const handleMainCategoryTouchEnd = (
         >
           <div style={styles.popularBrandsContainer} className="popular-brands-shell">
             <div className="popular-brands-header" style={{ ...styles.sectionHeader, ...styles.containerHeader, marginBottom: 12 }}>
-              <h2 style={styles.h2} className="popular-brands-title">Популярни марки</h2>
+              {renderSectionTitle(
+                "Популярни марки",
+                <Star size={23} strokeWidth={2.2} />,
+                "popular-brands-title"
+              )}
               <p style={styles.sectionLead} className="popular-brands-lead">
                 Избери марка и виж всички актуални обяви.
               </p>
@@ -2492,12 +2514,11 @@ const handleMainCategoryTouchEnd = (
         <section id="about" style={styles.section}>
           <div style={styles.infoContainer}>
             <div style={{ ...styles.sectionHeader, ...styles.containerHeader }}>
-              <div style={styles.aboutBadge}>По-малко шум. Повече сделки.</div>
-              <h2 style={styles.h2}>За Kar.bg</h2>
+              <div style={styles.aboutBadge}>Най-новата и най-модерната</div>
+              {renderSectionTitle("За платформата", <Info size={23} strokeWidth={2.2} />)}
               <p style={styles.aboutLead}>
-                Ако в познатите големи портали губиш време в безкраен скрол и повтарящи се обяви,
-                <span style={styles.infoHighlight}> Kar.bg </span>
-                е свежата алтернатива: по-ясни резултати, по-бърз избор и директен контакт.
+                <span style={styles.infoHighlight}>Kar.bg</span> е новото място, в което обявите са
+                подредени по-ясно и се стига по-бързо до това, което търсиш. Разглеждаш по-лесно и контактуваш директно с продавача.
               </p>
             </div>
 
@@ -2512,11 +2533,10 @@ const handleMainCategoryTouchEnd = (
               <div style={styles.infoCard} className="info-card">
                 <div style={styles.infoTitle}>Защо Kar.bg е различен</div>
                 <p style={styles.infoText}>
-                  Не сме просто още един "листинг" сайт. Платформата е подредена така, че да стигаш до правилната кола
-                  за минути, а не за часове.
+                  Всички обяви за превозни средства на едно място — подредени така, че да откриеш най-подходящото бързо, лесно и удобно.
                 </p>
                 <p style={{ ...styles.infoText, marginBottom: 0 }}>
-                  <span style={styles.infoHighlight}>Ясни филтри, чисти карти, реална информация</span> за офертата.
+                  <span style={styles.infoHighlight}>Ясни филтри, функционалност, реална информация</span> за офертата.
                 </p>
               </div>
 
@@ -2524,16 +2544,16 @@ const handleMainCategoryTouchEnd = (
                 <div style={styles.infoTitle}>С какво печелиш пред "старите" портали</div>
                 <ul style={styles.infoList}>
                   <li style={styles.infoListItem}>
-                    <span style={styles.infoHighlight}>По-малко дублирани резултати</span> и по-ясно сравнение.
+                    <span style={styles.infoHighlight}>API достъп за автокъщи</span> за по-лесна работа.
                   </li>
                   <li style={styles.infoListItem}>
-                    <span style={styles.infoHighlight}>По-четим дизайн</span> без визуален шум.
+                    <span style={styles.infoHighlight}>Модерен дизайн</span> удобен, разбираем и ефективен.
                   </li>
                   <li style={styles.infoListItem}>
-                    <span style={styles.infoHighlight}>Скоростно търсене</span> по марка, модел, цена, регион и още.
+                    <span style={styles.infoHighlight}>Детайлно и бързо търсене</span> по марка, валута, модел, цена, регион и още.
                   </li>
                   <li style={styles.infoListItem}>
-                    <span style={styles.infoHighlight}>Бърз контакт</span> с продавача, когато вече си избрал.
+                    <span style={styles.infoHighlight}>QR кодове</span> за лесен достъп до твоята обява.
                   </li>
                 </ul>
               </div>
@@ -2541,14 +2561,14 @@ const handleMainCategoryTouchEnd = (
               <div style={styles.infoCard} className="info-card">
                 <div style={styles.infoTitle}>За продавачи и автокъщи</div>
                 <p style={styles.infoText}>
-                  Качваш обява бързо и я позиционираш точно пред хората, които реално търсят твоя тип автомобил.
+                  Създаваш обява бързо и я насочваш към хората, които реално се интересуват от твоя тип превозно средство.
                 </p>
                 <p style={{ ...styles.infoText, marginBottom: 0 }}>
-                  <span style={styles.infoHighlight}>TOP/VIP опции, гъвкави планове и бърза поддръжка</span> за по-добра видимост.
+                  <span style={styles.infoHighlight}>Повече видимост, по-силен интерес и по-бърз резултат — с TOP и VIP опции и планове, създадени да продават.</span>.
                 </p>
                 <div style={styles.infoContactRow}>
                   <div style={styles.infoContactPill}>Поддръжка</div>
-                  <div style={styles.infoContactText}>Пон‑Пет · 09:00–18:00 · бърз отговор</div>
+                  <div style={styles.infoContactText}>support@kar.bg</div>
                 </div>
               </div>
             </div>
@@ -2951,6 +2971,21 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     color: "#333",
     fontFamily: "\"Space Grotesk\", \"Manrope\", \"Segoe UI\", sans-serif",
+  },
+  sectionTitleWithIcon: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+  },
+  sectionTitleIcon: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#0f766e",
+    flexShrink: 0,
+  },
+  sectionTitleText: {
+    whiteSpace: "nowrap",
   },
   sectionLead: { margin: "6px 0 0", color: "#666", fontSize: 15, lineHeight: 1.6 },
 
