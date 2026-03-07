@@ -11,7 +11,6 @@ type ContactFormData = {
 
 const CONTACT_EMAIL = "support@kar.bg";
 const SALES_EMAIL = "sales@kar.bg";
-const CONTACT_PHONE = "+359 XX XXX XXXX";
 
 const contactsCss = `
   @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
@@ -535,10 +534,7 @@ const ContactsPage: React.FC = () => {
                   {CONTACT_EMAIL}
                 </a>
               </p>
-              <p className="contacts-side-text">
-                Телефон: <strong>{CONTACT_PHONE}</strong>
-              </p>
-              <div className="contacts-pill">Пон - Пет | 09:00 - 18:00</div>
+              <div className="contacts-pill">24/7 (по всяко време)</div>
             </div>
 
             <div className="contacts-side-card">
