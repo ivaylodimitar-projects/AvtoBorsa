@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { API_BASE_URL } from "../config/api";
+import RecaptchaField from "./RecaptchaField";
+import { API_BASE_URL, RECAPTCHA_ENABLED, RECAPTCHA_SITE_KEY } from "../config/api";
 
 type ContactFormData = {
   name: string;
@@ -329,6 +330,9 @@ const ContactsPage: React.FC = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [sending, setSending] = useState(false);
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const [recaptchaResetKey, setRecaptchaResetKey] = useState(0);
+  const [recaptchaError, setRecaptchaError] = useState("");
 
   const handleFieldChange =
     (field: keyof ContactFormData) =>
@@ -343,10 +347,22 @@ const ContactsPage: React.FC = () => {
     event.preventDefault();
     setError("");
     setSuccess("");
+    setRecaptchaError("");
 
     if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
       setError("Моля, попълни име, имейл и съобщение.");
       return;
+    }
+
+    if (RECAPTCHA_ENABLED) {
+      if (!RECAPTCHA_SITE_KEY) {
+        setRecaptchaError("Липсва VITE_RECAPTCHA_SITE_KEY във frontend .env.");
+        return;
+      }
+      if (!recaptchaToken) {
+        setRecaptchaError("Моля, потвърди, че не си робот.");
+        return;
+      }
     }
 
     setSending(true);
@@ -359,6 +375,7 @@ const ContactsPage: React.FC = () => {
           email: formData.email.trim().toLowerCase(),
           topic: formData.topic.trim(),
           message: formData.message.trim(),
+          recaptcha_token: recaptchaToken ?? undefined,
         }),
       });
 
@@ -370,7 +387,13 @@ const ContactsPage: React.FC = () => {
             : typeof data.detail === "string"
               ? data.detail
               : "Грешка при изпращане на запитването.";
-        setError(errorMessage);
+        if (/recaptcha|captcha/i.test(errorMessage)) {
+          setRecaptchaError(errorMessage);
+          setRecaptchaToken(null);
+          setRecaptchaResetKey((prev) => prev + 1);
+        } else {
+          setError(errorMessage);
+        }
         return;
       }
 
@@ -381,6 +404,9 @@ const ContactsPage: React.FC = () => {
         topic: "Общ въпрос",
         message: "",
       });
+      setRecaptchaToken(null);
+      setRecaptchaError("");
+      setRecaptchaResetKey((prev) => prev + 1);
     } catch {
       setError("Грешка при свързване със сървъра.");
     } finally {
@@ -477,6 +503,17 @@ const ContactsPage: React.FC = () => {
                   required
                 />
               </div>
+
+              <RecaptchaField
+                error={recaptchaError}
+                onChange={(token) => {
+                  setRecaptchaToken(token);
+                  if (recaptchaError) {
+                    setRecaptchaError("");
+                  }
+                }}
+                resetKey={recaptchaResetKey}
+              />
 
               <div className="contacts-actions">
                 <button className="contacts-submit-btn" type="submit" disabled={sending}>

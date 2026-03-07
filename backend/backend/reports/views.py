@@ -5,6 +5,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
+from backend.accounts.views import _validate_recaptcha_request
 from backend.listings.models import BaseListing
 from .models import ContactInquiry, ListingReport
 from .serializers import ContactInquiryCreateSerializer, ListingReportCreateSerializer
@@ -27,6 +28,10 @@ def create_listing_report(request, listing_id):
     if ListingReport.objects.filter(user=request.user, listing=listing).exists():
         return Response({'detail': DUPLICATE_REPORT_MESSAGE}, status=status.HTTP_409_CONFLICT)
 
+    recaptcha_error_response = _validate_recaptcha_request(request)
+    if recaptcha_error_response is not None:
+        return recaptcha_error_response
+
     serializer = ListingReportCreateSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
 
@@ -40,6 +45,10 @@ def create_listing_report(request, listing_id):
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def create_contact_inquiry(request):
+    recaptcha_error_response = _validate_recaptcha_request(request)
+    if recaptcha_error_response is not None:
+        return recaptcha_error_response
+
     serializer = ContactInquiryCreateSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     inquiry: ContactInquiry = serializer.save()

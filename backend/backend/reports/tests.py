@@ -1,10 +1,13 @@
+from unittest.mock import patch
+
 from django.contrib.auth.models import User
 from django.test import TestCase
 from rest_framework import status
+from rest_framework.response import Response
 from rest_framework.test import APIClient
 
 from backend.listings.models import BaseListing, CarsListing
-from backend.reports.models import ListingReport
+from backend.reports.models import ContactInquiry, ListingReport
 from backend.reports.views import DUPLICATE_REPORT_MESSAGE
 
 
@@ -121,3 +124,71 @@ class CreateListingReportTests(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch('backend.reports.views._validate_recaptcha_request')
+    def test_requires_recaptcha_for_listing_report_when_validator_rejects(self, mock_validate_recaptcha):
+        self.client.force_authenticate(user=self.reporter)
+        mock_validate_recaptcha.return_value = Response(
+            {'error': 'Моля, потвърди, че не си робот.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+        response = self.client.post(
+            f'/api/listings/{self.listing.id}/report/',
+            {
+                'incorrect_price': True,
+                'other_issue': False,
+                'message': '',
+                'accepted_terms': True,
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data.get('error'), 'Моля, потвърди, че не си робот.')
+        self.assertEqual(ListingReport.objects.count(), 0)
+
+
+class CreateContactInquiryTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_anonymous_user_can_create_contact_inquiry(self):
+        response = self.client.post(
+            '/api/contact-inquiries/',
+            {
+                'name': 'Ivan Petrov',
+                'email': 'ivan@example.com',
+                'topic': 'Общ въпрос',
+                'message': 'Искам повече информация за услугата.',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(ContactInquiry.objects.count(), 1)
+        inquiry = ContactInquiry.objects.first()
+        self.assertEqual(inquiry.name, 'Ivan Petrov')
+        self.assertEqual(inquiry.email, 'ivan@example.com')
+
+    @patch('backend.reports.views._validate_recaptcha_request')
+    def test_requires_recaptcha_for_contact_inquiry_when_validator_rejects(self, mock_validate_recaptcha):
+        mock_validate_recaptcha.return_value = Response(
+            {'error': 'Моля, потвърди, че не си робот.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+        response = self.client.post(
+            '/api/contact-inquiries/',
+            {
+                'name': 'Ivan Petrov',
+                'email': 'ivan@example.com',
+                'topic': 'Общ въпрос',
+                'message': 'Искам повече информация за услугата.',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data.get('error'), 'Моля, потвърди, че не си робот.')
+        self.assertEqual(ContactInquiry.objects.count(), 0)

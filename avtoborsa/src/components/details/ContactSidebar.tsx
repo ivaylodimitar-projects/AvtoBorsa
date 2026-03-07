@@ -21,8 +21,9 @@ import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 import { resolvePriceBadgeState } from '../../utils/priceChangeBadge';
 import { getListingPriceSummary } from '../../utils/listingCurrency';
+import RecaptchaField from '../RecaptchaField';
 
-import { API_BASE_URL } from '../../config/api';
+import { API_BASE_URL, RECAPTCHA_ENABLED, RECAPTCHA_SITE_KEY } from '../../config/api';
 const DUPLICATE_REPORT_MESSAGE = 'Можете да съобщите за нередност с тази обява само веднъж, благодаря.';
 const SAVE_ACCENT_COLOR = 'rgb(233, 30, 99)';
 
@@ -65,6 +66,7 @@ type FavoriteResponseItem = {
 
 type ReportResponsePayload = {
   detail?: string;
+  error?: string;
   message?: string;
   non_field_errors?: string[];
 };
@@ -131,6 +133,9 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
   const [reportMessage, setReportMessage] = useState('');
   const [reportAcceptedTerms, setReportAcceptedTerms] = useState(false);
   const [isReporting, setIsReporting] = useState(false);
+  const [reportRecaptchaToken, setReportRecaptchaToken] = useState<string | null>(null);
+  const [reportRecaptchaResetKey, setReportRecaptchaResetKey] = useState(0);
+  const [reportRecaptchaError, setReportRecaptchaError] = useState('');
   const [isPhoneRevealed, setIsPhoneRevealed] = useState(false);
   const shareMenuRef = useRef<HTMLDivElement | null>(null);
   const shareButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -239,6 +244,9 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
     setReportOtherIssue(false);
     setReportMessage('');
     setReportAcceptedTerms(false);
+    setReportRecaptchaToken(null);
+    setReportRecaptchaError('');
+    setReportRecaptchaResetKey((prev) => prev + 1);
   };
 
   const handleSubmitReport = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -270,6 +278,21 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
       return;
     }
 
+    if (RECAPTCHA_ENABLED) {
+      if (!RECAPTCHA_SITE_KEY) {
+        const message = 'Липсва VITE_RECAPTCHA_SITE_KEY във frontend .env.';
+        setReportRecaptchaError(message);
+        showToast(message, { type: 'error' });
+        return;
+      }
+      if (!reportRecaptchaToken) {
+        const message = 'Моля, потвърди, че не си робот.';
+        setReportRecaptchaError(message);
+        showToast(message, { type: 'error' });
+        return;
+      }
+    }
+
     setIsReporting(true);
     try {
       const response = await fetch(`${API_BASE_URL}/api/listings/${listingId}/report/`, {
@@ -283,6 +306,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
           other_issue: reportOtherIssue,
           message: reportMessage.trim(),
           accepted_terms: reportAcceptedTerms,
+          recaptcha_token: reportRecaptchaToken ?? undefined,
         }),
       });
 
@@ -301,8 +325,13 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
 
       if (!response.ok) {
         const backendMessage =
-          (payload && (payload.detail || payload.message || payload.non_field_errors?.[0])) ||
+          (payload && (payload.detail || payload.error || payload.message || payload.non_field_errors?.[0])) ||
           'Грешка при изпращане на доклада.';
+        if (/recaptcha|captcha/i.test(String(backendMessage))) {
+          setReportRecaptchaError(String(backendMessage));
+          setReportRecaptchaToken(null);
+          setReportRecaptchaResetKey((prev) => prev + 1);
+        }
         showToast(String(backendMessage), { type: 'error' });
         return;
       }
@@ -1538,6 +1567,17 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
                   </a>
                 </span>
               </label>
+
+              <RecaptchaField
+                error={reportRecaptchaError}
+                onChange={(token) => {
+                  setReportRecaptchaToken(token);
+                  if (reportRecaptchaError) {
+                    setReportRecaptchaError('');
+                  }
+                }}
+                resetKey={reportRecaptchaResetKey}
+              />
 
               <button
                 type="submit"
