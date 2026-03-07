@@ -104,7 +104,6 @@ def _format_price_label(price, currency=None):
     if normalized_currency == "EUR":
         return f"{formatted} €"
     return f"{formatted} {normalized_currency}"
-    return f"{formatted} €"
 
 
 def _format_price_for_schema(price):
