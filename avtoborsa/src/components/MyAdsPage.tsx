@@ -329,11 +329,32 @@ const globalCss = `
   .myads-icon-btn {
     position: relative;
     overflow: visible;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    -webkit-appearance: none;
+    appearance: none;
+    -webkit-tap-highlight-color: transparent;
+    transform: translateZ(0);
   }
   .myads-icon-btn > svg {
     width: 20px !important;
     height: 20px !important;
     stroke-width: 2.2;
+  }
+  .myads-action-icon {
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 20px;
+    pointer-events: none;
+  }
+  .myads-action-icon > svg {
+    width: 20px !important;
+    height: 20px !important;
+    stroke-width: 2.2;
+    display: block;
   }
   .myads-delete-icon-wrap {
     width: 16px;
@@ -1048,6 +1069,12 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
   };
+
+  const renderActionIcon = (icon: React.ReactNode) => (
+    <span className="myads-action-icon" aria-hidden="true">
+      {icon}
+    </span>
+  );
 
   const handleTabsWheel: React.WheelEventHandler<HTMLDivElement> = (event) => {
     const slider = tabsSliderRef.current;
@@ -3876,6 +3903,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     width: 58,
     height: 58,
     minWidth: 58,
+    flexShrink: 0,
     borderRadius: 16,
     border: "1px solid #cbd5e1",
     background: "#fff",
@@ -3887,6 +3915,10 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     justifyContent: "center",
     transition: "transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease",
     boxShadow: "0 2px 10px rgba(15, 23, 42, 0.1)",
+    WebkitAppearance: "none" as const,
+    appearance: "none" as const,
+    WebkitTapHighlightColor: "transparent",
+    overflow: "hidden",
   },
   qrTriggerButtonDisabled: {
     opacity: 0.5,
@@ -3918,6 +3950,13 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     justifyContent: "center",
     gap: 0,
     minWidth: 42,
+    lineHeight: 0,
+    overflow: "hidden",
+    position: "relative" as const,
+    flexShrink: 0,
+    WebkitAppearance: "none" as const,
+    appearance: "none" as const,
+    WebkitTapHighlightColor: "transparent",
   },
   editButton: {
     background: "#d97706",
@@ -5034,8 +5073,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                         goToEdit(previewListing);
                       }}
                     >
-                      <Edit2 size={14} />
-                      Редактирай
+                      {renderActionIcon(<Edit2 size={14} />)}
                     </button>
                     <button
                       type="button"
@@ -5621,8 +5659,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                           e.currentTarget.style.boxShadow = "0 2px 8px rgba(217, 119, 6, 0.3)";
                         }}
                       >
-                        <Edit2 size={14} />
-                        Редактирай
+                        {renderActionIcon(<Edit2 size={14} />)}
                       </button>
 
                       {isPrepayWindowOpen && (
@@ -5662,8 +5699,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                             }
                           }}
                         >
-                          <Tag size={14} />
-                          Промотирай
+                          {renderActionIcon(<Tag size={14} />)}
                         </button>
                       )}
 
@@ -5711,12 +5747,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                             }
                           }}
                         >
-                          <Lock size={14} />
-                          {actionLoading === listing.id
-                            ? "..."
-                            : listing.is_kaparirano
-                              ? "Махни капаро"
-                              : "Капарирай"}
+                          {renderActionIcon(<Lock size={14} />)}
                         </button>
                       )}
 
@@ -5750,8 +5781,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                           }
                         }}
                       >
-                        <Archive size={14} />
-                        {actionLoading === listing.id ? "..." : "Архивирай"}
+                        {renderActionIcon(<Archive size={14} />)}
                       </button>
 
                       <button
@@ -5790,7 +5820,6 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                           <Trash2 className="myads-delete-icon myads-delete-icon--primary" size={14} />
                           <Trash className="myads-delete-icon myads-delete-icon--confirm" size={14} />
                         </span>
-                        {deleteConfirm === listing.id ? "Потвърди" : "Изтрий"}
                       </button>
                     </>
                   )}
@@ -5816,8 +5845,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                           e.currentTarget.style.boxShadow = "none";
                         }}
                       >
-                        <Eye size={14} />
-                        Преглед
+                        {renderActionIcon(<Eye size={14} />)}
                       </button>
 
                       <button
@@ -5842,8 +5870,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                           e.currentTarget.style.boxShadow = "0 2px 8px rgba(217, 119, 6, 0.3)";
                         }}
                       >
-                        <Edit2 size={14} />
-                        Редактирай
+                        {renderActionIcon(<Edit2 size={14} />)}
                       </button>
 
                       <button
@@ -5874,8 +5901,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                           }
                         }}
                       >
-                        <ArchiveRestore size={14} />
-                        {actionLoading === listing.id ? "..." : "Върни в активни"}
+                        {renderActionIcon(<ArchiveRestore size={14} />)}
                       </button>
 
                       <button
@@ -5914,7 +5940,6 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                           <Trash2 className="myads-delete-icon myads-delete-icon--primary" size={14} />
                           <Trash className="myads-delete-icon myads-delete-icon--confirm" size={14} />
                         </span>
-                        {deleteConfirm === listing.id ? "Потвърди" : "Изтрий"}
                       </button>
                     </>
                   )}
@@ -5940,8 +5965,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                           e.currentTarget.style.boxShadow = "none";
                         }}
                       >
-                        <Eye size={14} />
-                        Преглед
+                        {renderActionIcon(<Eye size={14} />)}
                       </button>
 
                       <button
@@ -5966,8 +5990,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                           e.currentTarget.style.boxShadow = "0 2px 8px rgba(217, 119, 6, 0.3)";
                         }}
                       >
-                        <Edit2 size={14} />
-                        Редактирай
+                        {renderActionIcon(<Edit2 size={14} />)}
                       </button>
 
                       <button
@@ -6007,8 +6030,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                           }
                         }}
                       >
-                        <ArchiveRestore size={14} />
-                        {actionLoading === listing.id ? "..." : "Пусни пак"}
+                        {renderActionIcon(<ArchiveRestore size={14} />)}
                       </button>
 
                       <button
@@ -6047,7 +6069,6 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                           <Trash2 className="myads-delete-icon myads-delete-icon--primary" size={14} />
                           <Trash className="myads-delete-icon myads-delete-icon--confirm" size={14} />
                         </span>
-                        {deleteConfirm === listing.id ? "Потвърди" : "Изтрий"}
                       </button>
                     </>
                   )}
@@ -6073,8 +6094,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                           e.currentTarget.style.boxShadow = "none";
                         }}
                       >
-                        <Eye size={14} />
-                        Преглед
+                        {renderActionIcon(<Eye size={14} />)}
                       </button>
 
                       <button
@@ -6095,8 +6115,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                           e.currentTarget.style.borderColor = "#d97706";
                         }}
                       >
-                        <Edit2 size={14} style={{ marginRight: "4px" }} />
-                        Продължи редакция
+                        {renderActionIcon(<Edit2 size={14} />)}
                       </button>
 
                       <button
@@ -6135,7 +6154,6 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                           <Trash2 className="myads-delete-icon myads-delete-icon--primary" size={14} />
                           <Trash className="myads-delete-icon myads-delete-icon--confirm" size={14} />
                         </span>
-                        {deleteConfirm === listing.id ? "Потвърди" : "Изтрий"}
                       </button>
                     </>
                   )}
@@ -6169,8 +6187,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
                         }
                       }}
                     >
-                      <Heart size={14} />
-                      {actionLoading === listing.id ? "..." : "Премахни от любими"}
+                      {renderActionIcon(<Heart size={14} />)}
                     </button>
                   )}
                     </div>
