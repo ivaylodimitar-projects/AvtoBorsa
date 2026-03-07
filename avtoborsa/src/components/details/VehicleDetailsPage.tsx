@@ -1,6 +1,6 @@
 import React, { Suspense, useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Clock, ImageOff, MapPin } from 'lucide-react';
+import { Calendar, Clock, Eye, ImageOff, MapPin } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import TechnicalDataSection from './TechnicalDataSection';
 import EquipmentSection from './EquipmentSection';
@@ -891,6 +891,22 @@ const VehicleDetailsPage: React.FC = () => {
     return 'току-що';
   }, [currentTimeMs]);
 
+  const formatDetailDateTime = useCallback((dateString?: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return '';
+    const datePart = date.toLocaleDateString('bg-BG', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+    const timePart = date.toLocaleTimeString('bg-BG', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    return `${datePart} · ${timePart} ч.`;
+  }, []);
+
   const handleFavoriteChange = useCallback(
     (nextIsFavorite: boolean) => {
       if (!listingId) return;
@@ -1049,6 +1065,120 @@ const VehicleDetailsPage: React.FC = () => {
       fontWeight: 800,
       lineHeight: 1.25,
       fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
+      wordBreak: 'break-word',
+    },
+    mobileStorySection: {
+      position: 'relative',
+      overflow: 'hidden',
+      background:
+        'radial-gradient(circle at top right, rgba(15, 118, 110, 0.14), transparent 36%), linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+      borderRadius: 18,
+      border: '1px solid #dbe4ef',
+      boxShadow: '0 8px 24px rgba(15, 23, 42, 0.06)',
+      padding: 14,
+    },
+    mobileStoryHeader: {
+      display: 'flex',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 12,
+      marginBottom: 14,
+    },
+    mobileStoryIntro: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 4,
+      minWidth: 0,
+    },
+    mobileStoryEyebrow: {
+      fontSize: 11,
+      fontWeight: 800,
+      letterSpacing: 0.4,
+      textTransform: 'uppercase',
+      color: '#0f766e',
+    },
+    mobileStoryTitle: {
+      margin: 0,
+      fontSize: 18,
+      fontWeight: 800,
+      color: '#0f172a',
+      fontFamily: '"Space Grotesk", "Manrope", "Segoe UI", sans-serif',
+      lineHeight: 1.2,
+    },
+    mobileStoryCaption: {
+      margin: 0,
+      fontSize: 12,
+      lineHeight: 1.45,
+      color: '#64748b',
+      fontWeight: 600,
+    },
+    mobileStoryBadge: {
+      flexShrink: 0,
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '6px 10px',
+      borderRadius: 999,
+      background: '#ecfdf5',
+      border: '1px solid #99f6e4',
+      color: '#0f766e',
+      fontSize: 11,
+      fontWeight: 800,
+      whiteSpace: 'nowrap',
+    },
+    mobileStoryGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+      gap: 10,
+    },
+    mobileStoryCard: {
+      position: 'relative',
+      minHeight: 126,
+      borderRadius: 18,
+      border: '1px solid transparent',
+      padding: 12,
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'space-between',
+      gap: 12,
+      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.78)',
+    },
+    mobileStoryCardTop: {
+      display: 'flex',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 8,
+    },
+    mobileStoryCardLabel: {
+      fontSize: 11,
+      fontWeight: 800,
+      textTransform: 'uppercase',
+      letterSpacing: 0.36,
+      color: '#475569',
+      lineHeight: 1.3,
+    },
+    mobileStoryIconWrap: {
+      width: 38,
+      height: 38,
+      borderRadius: 14,
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.8)',
+    },
+    mobileStoryCardValue: {
+      fontSize: 15,
+      fontWeight: 800,
+      color: '#0f172a',
+      lineHeight: 1.3,
+      wordBreak: 'break-word',
+    },
+    mobileStoryCardHint: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: '#475569',
+      lineHeight: 1.4,
       wordBreak: 'break-word',
     },
     aiSummarySection: {
@@ -1389,8 +1519,77 @@ const VehicleDetailsPage: React.FC = () => {
   const isBusinessSeller = listing.seller_type === 'business';
   const cityLabel = listing.city || listing.location_region || 'Град';
   const updatedLabel = listing.updated_at ? getRelativeTime(listing.updated_at) : null;
+  const publishedLabel = listing.created_at ? getRelativeTime(listing.created_at) : null;
   const priceHistory = listing.price_history || [];
   const normalizedMainCategory = normalizeDetailMainCategory(listing.main_category);
+  const locationParts = [listing.city, listing.location_region, listing.location_country]
+    .map((value) => (value || '').toString().trim())
+    .filter(Boolean)
+    .filter((value, index, array) => array.indexOf(value) === index);
+  const locationPrimaryLabel = locationParts[0] || 'Не е посочена';
+  const locationSecondaryLabel =
+    locationParts.length > 1 ? locationParts.slice(1).join(' · ') : 'Локацията на обявата';
+  const publishedFullLabel = formatDetailDateTime(listing.created_at);
+  const updatedFullLabel = formatDetailDateTime(listing.updated_at);
+  const viewCountValue = Number.isFinite(Number(listing.view_count))
+    ? Number(listing.view_count)
+    : 0;
+  const mobileListingStoryItems = [
+    {
+      key: 'location',
+      label: 'Локация',
+      value: locationPrimaryLabel,
+      hint: locationSecondaryLabel,
+      icon: MapPin,
+      accent: '#0f766e',
+      iconBackground: '#ccfbf1',
+      borderColor: '#99f6e4',
+      background:
+        'linear-gradient(135deg, rgba(20, 184, 166, 0.18) 0%, rgba(255, 255, 255, 0.96) 72%)',
+    },
+    {
+      key: 'published',
+      label: 'Публикувана',
+      value:
+        publishedLabel && publishedLabel !== 'â€”'
+          ? publishedLabel
+          : publishedFullLabel || 'Няма дата',
+      hint: publishedFullLabel || 'Няма налична дата на публикуване',
+      icon: Calendar,
+      accent: '#2563eb',
+      iconBackground: '#dbeafe',
+      borderColor: '#bfdbfe',
+      background:
+        'linear-gradient(135deg, rgba(59, 130, 246, 0.16) 0%, rgba(255, 255, 255, 0.98) 72%)',
+    },
+    {
+      key: 'updated',
+      label: 'Редактирана',
+      value:
+        updatedLabel && updatedLabel !== 'â€”'
+          ? updatedLabel
+          : updatedFullLabel || 'Без редакция',
+      hint: updatedFullLabel || 'Няма редакция след публикуването',
+      icon: Clock,
+      accent: '#ea580c',
+      iconBackground: '#ffedd5',
+      borderColor: '#fdba74',
+      background:
+        'linear-gradient(135deg, rgba(249, 115, 22, 0.18) 0%, rgba(255, 255, 255, 0.98) 72%)',
+    },
+    {
+      key: 'views',
+      label: 'Преглеждания',
+      value: viewCountValue.toLocaleString('bg-BG'),
+      hint: `${viewCountValue === 1 ? 'преглеждане' : 'преглеждания'} до момента`,
+      icon: Eye,
+      accent: '#7c3aed',
+      iconBackground: '#ede9fe',
+      borderColor: '#c4b5fd',
+      background:
+        'linear-gradient(135deg, rgba(124, 58, 237, 0.16) 0%, rgba(255, 255, 255, 0.98) 72%)',
+    },
+  ];
   const hasFeaturePayload = Array.isArray(listing.features)
     ? listing.features.length > 0
     : typeof listing.features === 'string'
@@ -1479,6 +1678,51 @@ const VehicleDetailsPage: React.FC = () => {
               onHeroImageLoad={handleHeroImageLoad}
             />
           </Suspense>
+
+          {isMobile && (
+            <section style={styles.mobileStorySection} aria-label="Информация за обявата">
+              <div style={styles.mobileStoryHeader}>
+                <div style={styles.mobileStoryIntro}>
+                  <span style={styles.mobileStoryEyebrow}>Важно накратко</span>
+                  <h2 style={styles.mobileStoryTitle}>Информация за обявата</h2>
+                </div>
+              </div>
+
+              <div style={styles.mobileStoryGrid}>
+                {mobileListingStoryItems.map((item) => {
+                  const Icon = item.icon;
+
+                  return (
+                    <article
+                      key={item.key}
+                      style={{
+                        ...styles.mobileStoryCard,
+                        background: item.background,
+                        borderColor: item.borderColor,
+                      }}
+                    >
+                      <div style={styles.mobileStoryCardTop}>
+                        <div style={styles.mobileStoryCardLabel}>{item.label}</div>
+                        <span
+                          style={{
+                            ...styles.mobileStoryIconWrap,
+                            background: item.iconBackground,
+                            color: item.accent,
+                          }}
+                        >
+                          <Icon size={18} />
+                        </span>
+                      </div>
+                      <div>
+                        <div style={styles.mobileStoryCardValue}>{item.value}</div>
+                        <div style={styles.mobileStoryCardHint}>{item.hint}</div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
           <TechnicalDataSection
             mainCategory={normalizedMainCategory || listing.main_category}
