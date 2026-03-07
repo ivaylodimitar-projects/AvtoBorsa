@@ -1,7 +1,7 @@
 import React from "react";
 import type { IconType } from "react-icons";
 import { FaFacebookF, FaInstagram, FaTiktok } from "react-icons/fa6";
-import { FiMail } from "react-icons/fi";
+import { FiArrowUpRight, FiMail } from "react-icons/fi";
 import { API_BASE_URL } from "../config/api";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -140,8 +140,16 @@ export default function Footer() {
 
         <div style={styles.footerCol}>
           <div style={styles.footerTitle}>Контакти</div>
-          <a href="/contacts" style={styles.footerLink}>
-            Контактна страница
+          <a
+            href="/contacts"
+            style={styles.footerFormLink}
+            className="footer-form-link"
+            aria-label="Отвори контактната форма"
+          >
+            <span style={styles.footerFormText}>Контактна форма</span>
+            <span style={styles.footerFormArrow}>
+              <FiArrowUpRight size={16} />
+            </span>
           </a>
           <p style={styles.footerText}>Поддръжка по имейл: 24/7 (по всяко време).</p>
         </div>
@@ -244,6 +252,29 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: "0 6px 14px rgba(15, 118, 110, 0.2)",
     transition: "transform 0.2s ease, filter 0.2s ease",
   },
+  footerFormLink: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    width: "fit-content",
+    padding: "4px 0",
+    textDecoration: "none",
+    color: "#0f766e",
+    transition: "color 0.2s ease, transform 0.2s ease",
+  },
+  footerFormText: {
+    color: "inherit",
+    fontSize: 14,
+    fontWeight: 700,
+    lineHeight: 1.2,
+  },
+  footerFormArrow: {
+    color: "inherit",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
   socialSection: {
     display: "flex",
     flexDirection: "column",
@@ -322,6 +353,11 @@ const footerCss = `
     transform: translateY(-1px);
     border-color: #cbd5e1;
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  }
+
+  .footer-form-link:hover {
+    transform: translateX(1px);
+    color: #0b5f58;
   }
 
   @media (max-width: 1023px) {

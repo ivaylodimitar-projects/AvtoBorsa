@@ -30,6 +30,8 @@ import {
   Leaf,
   Tag,
   Printer,
+  ChevronDown,
+  type LucideIcon,
 } from "lucide-react";
 import Lottie from "lottie-react";
 import QRCode from "qrcode";
@@ -196,6 +198,13 @@ type TabType = "active" | "archived" | "drafts" | "liked" | "top" | "vip" | "exp
 type ListingType = "normal" | "top" | "vip";
 type TopPlan = "1d" | "7d";
 type VipPlan = "7d" | "lifetime";
+type MyAdsTabOption = {
+  id: TabType;
+  label: string;
+  Icon: LucideIcon;
+  count: number;
+  promoBadge?: "top" | "vip";
+};
 // Change this value to control how long the "Нова" badge remains visible.
 const NEW_LISTING_BADGE_MINUTES = 10;
 const NEW_LISTING_BADGE_WINDOW_MS = NEW_LISTING_BADGE_MINUTES * 60 * 1000;
@@ -387,12 +396,24 @@ const globalCss = `
   .myads-filter-toggle {
     display: none;
   }
+  .myads-tabs-mobile {
+    display: none;
+  }
   .myads-filter-toggle-icon {
     display: inline-flex;
     transition: transform 0.2s ease;
   }
   .myads-filter-collapse {
     display: block;
+  }
+
+  @media (max-width: 767px) {
+    .myads-tabs-mobile {
+      display: block !important;
+    }
+    .myads-tabs-desktop {
+      display: none !important;
+    }
   }
 
   @media (max-width: 639px) {
@@ -630,6 +651,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
   const [modelFilter, setModelFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [mobileTabMenuOpen, setMobileTabMenuOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [deletingListingIds, setDeletingListingIds] = useState<Set<number>>(new Set());
   const [actionLoading, setActionLoading] = useState<number | null>(null);
@@ -667,6 +689,7 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
   const deleteAnimationTimeoutIdsRef = React.useRef<number[]>([]);
   const deletedListingIdsRef = React.useRef<Set<number>>(new Set());
   const tabsSliderRef = React.useRef<HTMLDivElement | null>(null);
+  const mobileTabMenuRef = React.useRef<HTMLDivElement | null>(null);
   const [currentTimeMs, setCurrentTimeMs] = useState(() => Date.now());
 
   const normalizeMainCategoryValue = (value: unknown) => {
@@ -1007,6 +1030,20 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
       document.body.style.touchAction = previousTouchAction;
     };
   }, [listingTypeModal.isOpen]);
+
+  useEffect(() => {
+    if (!mobileTabMenuOpen) return;
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (mobileTabMenuRef.current && !mobileTabMenuRef.current.contains(target)) {
+        setMobileTabMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [mobileTabMenuOpen]);
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
@@ -2523,6 +2560,140 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     width: "100%",
     paddingBottom: 4,
   },
+  mobileTabSelectWrap: {
+    marginBottom: 20,
+  },
+  mobileTabSelectLabel: {
+    display: "block",
+    marginBottom: 8,
+    color: "#0f172a",
+    fontSize: 12,
+    fontWeight: 800,
+    letterSpacing: "0.3px",
+    textTransform: "uppercase",
+  },
+  mobileTabMenuWrap: {
+    position: "relative",
+  },
+  mobileTabTrigger: {
+    width: "100%",
+    minHeight: 48,
+    padding: "0 14px",
+    borderRadius: 16,
+    border: "1px solid #cbd5e1",
+    background: "#ffffff",
+    color: "#0f172a",
+    fontSize: 15,
+    fontWeight: 700,
+    boxShadow: "0 8px 18px rgba(15, 23, 42, 0.06)",
+    outline: "none",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    cursor: "pointer",
+    textAlign: "left",
+    transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+  },
+  mobileTabTriggerOpen: {
+    border: "1px solid #0f766e",
+    boxShadow: "0 10px 22px rgba(15, 118, 110, 0.14)",
+  },
+  mobileTabTriggerMain: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 10,
+    minWidth: 0,
+  },
+  mobileTabTriggerLabel: {
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  mobileTabTriggerMeta: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    flexShrink: 0,
+  },
+  mobileTabTriggerCount: {
+    minWidth: 28,
+    padding: "2px 8px",
+    borderRadius: 999,
+    background: "#f1f5f9",
+    color: "#475569",
+    fontSize: 12,
+    fontWeight: 800,
+    textAlign: "center",
+  },
+  mobileTabTriggerChevron: {
+    color: "#64748b",
+    transition: "transform 0.2s ease",
+  },
+  mobileTabPromoBadgeImage: {
+    width: 20,
+    height: 20,
+    objectFit: "contain",
+    display: "block",
+    filter: "drop-shadow(0 2px 4px rgba(15, 23, 42, 0.25))",
+    flexShrink: 0,
+  },
+  mobileTabMenu: {
+    position: "absolute",
+    top: "calc(100% + 8px)",
+    left: 0,
+    right: 0,
+    zIndex: 15,
+    padding: 8,
+    borderRadius: 18,
+    border: "1px solid #dbeafe",
+    background: "#ffffff",
+    boxShadow: "0 18px 40px rgba(15, 23, 42, 0.14)",
+    display: "grid",
+    gap: 6,
+  },
+  mobileTabMenuItem: {
+    width: "100%",
+    minHeight: 46,
+    padding: "0 12px",
+    borderRadius: 14,
+    border: "1px solid transparent",
+    background: "#ffffff",
+    color: "#334155",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    cursor: "pointer",
+    textAlign: "left",
+    transition: "background 0.2s ease, border-color 0.2s ease, color 0.2s ease",
+  },
+  mobileTabMenuItemActive: {
+    background: "#ecfdf5",
+    border: "1px solid #99f6e4",
+    color: "#0f766e",
+  },
+  mobileTabMenuItemCount: {
+    minWidth: 28,
+    padding: "2px 8px",
+    borderRadius: 999,
+    background: "#f8fafc",
+    color: "#64748b",
+    fontSize: 12,
+    fontWeight: 800,
+    textAlign: "center",
+  },
+  mobileTabMenuItemCountActive: {
+    minWidth: 28,
+    padding: "2px 8px",
+    borderRadius: 999,
+    background: "rgba(15, 118, 110, 0.12)",
+    color: "#0f766e",
+    fontSize: 12,
+    fontWeight: 800,
+    textAlign: "center",
+  },
   tab: {
     padding: "11px 12px",
     background: "#fff",
@@ -4008,6 +4179,54 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
     likedListings.length;
   const topListingsCount = activeListings.filter((listing) => listing.listing_type === "top").length;
   const vipListingsCount = activeListings.filter((listing) => listing.listing_type === "vip").length;
+  const tabOptions: MyAdsTabOption[] = isPublicView
+    ? [
+        { id: "active", label: "Обяви", Icon: List, count: activeListings.length },
+        {
+          id: "top",
+          label: "TOP обяви",
+          Icon: PackageOpen,
+          count: topListingsCount,
+          promoBadge: "top",
+        },
+        {
+          id: "vip",
+          label: "VIP обяви",
+          Icon: Tag,
+          count: vipListingsCount,
+          promoBadge: "vip",
+        },
+      ]
+    : [
+        { id: "active", label: "Активни", Icon: List, count: activeListings.length },
+        {
+          id: "top",
+          label: "Топ обяви",
+          Icon: PackageOpen,
+          count: topListingsCount,
+          promoBadge: "top",
+        },
+        {
+          id: "vip",
+          label: "VIP обяви",
+          Icon: Tag,
+          count: vipListingsCount,
+          promoBadge: "vip",
+        },
+        { id: "archived", label: "Архивирани", Icon: Archive, count: archivedListings.length },
+        { id: "expired", label: "Изтекли", Icon: Clock, count: expiredListings.length },
+        { id: "drafts", label: "Чернови", Icon: FileText, count: draftListings.length },
+        { id: "liked", label: "Любими", Icon: Heart, count: likedListings.length },
+      ];
+  const currentTabOption =
+    tabOptions.find((tab) => tab.id === activeTab) ?? tabOptions[0] ?? null;
+  const handleTabChange = (nextTab: TabType) => {
+    setActiveTab(nextTab);
+    setCurrentPage(1);
+    setMobileFiltersOpen(false);
+    setMobileTabMenuOpen(false);
+    setModelFilter("all");
+  };
   const isModalBusy =
     listingTypeModal.isOpen && actionLoading === listingTypeModal.listingId;
   const showPromoteLoadingOverlay =
@@ -4833,61 +5052,108 @@ const MyAdsPage: React.FC<MyAdsPageProps> = ({ publicView = false, publicProfile
         )}
 
         {/* Tabs */}
+        <div className="myads-tabs-mobile" style={styles.mobileTabSelectWrap}>
+          <label style={styles.mobileTabSelectLabel}>
+            Раздел
+          </label>
+          <div ref={mobileTabMenuRef} style={styles.mobileTabMenuWrap}>
+            <button
+              type="button"
+              onClick={() => setMobileTabMenuOpen((prev) => !prev)}
+              aria-expanded={mobileTabMenuOpen}
+              aria-haspopup="menu"
+              style={{
+                ...styles.mobileTabTrigger,
+                ...(mobileTabMenuOpen ? styles.mobileTabTriggerOpen : {}),
+              }}
+            >
+              <span style={styles.mobileTabTriggerMain}>
+                {currentTabOption?.promoBadge ? (
+                  <img
+                    src={currentTabOption.promoBadge === "top" ? topBadgeImage : vipBadgeImage}
+                    alt={currentTabOption.promoBadge === "top" ? "Топ" : "VIP"}
+                    style={styles.mobileTabPromoBadgeImage}
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ) : currentTabOption ? (
+                  <currentTabOption.Icon size={18} />
+                ) : null}
+                <span style={styles.mobileTabTriggerLabel}>
+                  {currentTabOption?.label ?? "Избери раздел"}
+                </span>
+              </span>
+              <span style={styles.mobileTabTriggerMeta}>
+                <span style={styles.mobileTabTriggerCount}>
+                  {currentTabOption?.count ?? 0}
+                </span>
+                <ChevronDown
+                  size={18}
+                  style={{
+                    ...styles.mobileTabTriggerChevron,
+                    transform: mobileTabMenuOpen ? "rotate(180deg)" : "rotate(0deg)",
+                  }}
+                />
+              </span>
+            </button>
+            {mobileTabMenuOpen && (
+              <div role="menu" style={styles.mobileTabMenu}>
+                {tabOptions.map((tab) => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={isActive}
+                      onClick={() => handleTabChange(tab.id)}
+                      style={{
+                        ...styles.mobileTabMenuItem,
+                        ...(isActive ? styles.mobileTabMenuItemActive : {}),
+                      }}
+                    >
+                      <span style={styles.mobileTabTriggerMain}>
+                        {tab.promoBadge ? (
+                          <img
+                            src={tab.promoBadge === "top" ? topBadgeImage : vipBadgeImage}
+                            alt={tab.promoBadge === "top" ? "Топ" : "VIP"}
+                            style={styles.mobileTabPromoBadgeImage}
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          <tab.Icon size={18} />
+                        )}
+                        <span style={styles.mobileTabTriggerLabel}>{tab.label}</span>
+                      </span>
+                      <span
+                        style={
+                          isActive
+                            ? styles.mobileTabMenuItemCountActive
+                            : styles.mobileTabMenuItemCount
+                        }
+                      >
+                        {tab.count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
         <div
+          className="myads-tabs-desktop"
           style={styles.tabsContainer}
           ref={tabsSliderRef}
           onWheel={handleTabsWheel}
         >
-          {(isPublicView
-            ? [
-                { id: "active", label: "Обяви", Icon: List, count: activeListings.length },
-                {
-                  id: "top",
-                  label: "TOP обяви",
-                  Icon: PackageOpen,
-                  count: topListingsCount,
-                  promoBadge: "top" as const,
-                },
-                {
-                  id: "vip",
-                  label: "VIP обяви",
-                  Icon: Tag,
-                  count: vipListingsCount,
-                  promoBadge: "vip" as const,
-                },
-              ]
-            : [
-                { id: "active", label: "Активни", Icon: List, count: activeListings.length },
-                {
-                  id: "top",
-                  label: "Топ обяви",
-                  Icon: PackageOpen,
-                  count: topListingsCount,
-                  promoBadge: "top" as const,
-                },
-                {
-                  id: "vip",
-                  label: "VIP обяви",
-                  Icon: Tag,
-                  count: vipListingsCount,
-                  promoBadge: "vip" as const,
-                },
-                { id: "archived", label: "Архивирани", Icon: Archive, count: archivedListings.length },
-                { id: "expired", label: "Изтекли", Icon: Clock, count: expiredListings.length },
-                { id: "drafts", label: "Чернови", Icon: FileText, count: draftListings.length },
-                { id: "liked", label: "Любими", Icon: Heart, count: likedListings.length },
-              ]
-          ).map((tab) => {
+          {tabOptions.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => {
-                  setActiveTab(tab.id as TabType);
-                  setCurrentPage(1);
-                  setMobileFiltersOpen(false);
-                  setModelFilter("all");
-                }}
+                onClick={() => handleTabChange(tab.id)}
                 style={{
                   ...styles.tab,
                   ...(isActive ? styles.tabActive : {}),

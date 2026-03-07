@@ -5,7 +5,6 @@ import {
   Share2,
   Flag,
   MapPin,
-  Mail,
   Check,
   User,
   Clock,
@@ -13,11 +12,11 @@ import {
   TrendingUp,
   TrendingDown,
   Link,
-  MessageCircle,
-  Send,
   Eye,
   Calendar,
 } from 'lucide-react';
+import { FaFacebookF, FaTelegramPlane, FaViber, FaWhatsapp } from 'react-icons/fa';
+import { FiMail } from 'react-icons/fi';
 import { useToast } from '../../context/ToastContext';
 import { useAuth } from '../../context/AuthContext';
 import { resolvePriceBadgeState } from '../../utils/priceChangeBadge';
@@ -470,40 +469,147 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
         await handleCopyLink();
         setShowShareMenu(false);
       },
-      isPrimary: true,
-      icon: copied ? Check : Link,
+      icon: copied ? <Check size={16} /> : <Link size={16} />,
+      tone: copied
+        ? {
+            background: '#ecfdf5',
+            borderColor: '#99f6e4',
+            color: '#0f766e',
+          }
+        : {
+            background: '#eff6ff',
+            borderColor: '#bfdbfe',
+            color: '#2563eb',
+          },
     },
     {
       id: 'whatsapp',
       label: 'WhatsApp',
       url: `https://wa.me/?text=${encodedText}%20${encodedUrl}`,
-      icon: MessageCircle,
+      icon: <FaWhatsapp size={17} />,
+      tone: {
+        background: '#f0fdf4',
+        borderColor: '#bbf7d0',
+        color: '#16a34a',
+      },
     },
     {
       id: 'telegram',
       label: 'Telegram',
       url: `https://t.me/share/url?url=${encodedUrl}&text=${encodedText}`,
-      icon: Send,
+      icon: <FaTelegramPlane size={17} />,
+      tone: {
+        background: '#eff6ff',
+        borderColor: '#bfdbfe',
+        color: '#0284c7',
+      },
     },
     {
       id: 'viber',
       label: 'Viber',
       url: `viber://forward?text=${encodedText}%20${encodedUrl}`,
-      icon: Share2,
+      icon: <FaViber size={16} />,
+      tone: {
+        background: '#f5f3ff',
+        borderColor: '#ddd6fe',
+        color: '#7c3aed',
+      },
     },
     {
       id: 'facebook',
       label: 'Facebook',
       url: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
-      icon: User,
+      icon: <FaFacebookF size={15} />,
+      tone: {
+        background: '#eff6ff',
+        borderColor: '#bfdbfe',
+        color: '#1877f2',
+      },
     },
     {
       id: 'email',
       label: 'Имейл',
       url: `mailto:?subject=${encodedText}&body=${encodedText}%0A${encodedUrl}`,
-      icon: Mail,
+      icon: <FiMail size={16} />,
+      tone: {
+        background: '#fff7ed',
+        borderColor: '#fed7aa',
+        color: '#ea580c',
+      },
     },
   ];
+
+  const renderShareOption = (option: (typeof shareOptions)[number]) => {
+    const baseStyle: React.CSSProperties = {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: 44,
+      height: 40,
+      padding: 0,
+      borderRadius: 16,
+      border: '1px solid #e2e8f0',
+      background: '#f8fafc',
+      color: '#334155',
+      cursor: 'pointer',
+      textDecoration: 'none',
+      transition: 'transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease',
+      flexShrink: 0,
+    };
+
+    const toneStyle: React.CSSProperties = option.tone ?? {};
+
+    if (option.onClick) {
+      return (
+        <button
+          key={option.id}
+          type="button"
+          onClick={option.onClick}
+          title={option.label}
+          aria-label={option.label}
+          style={{ ...baseStyle, ...toneStyle }}
+          onMouseEnter={(event) => {
+            event.currentTarget.style.transform = 'translateY(-1px)';
+            event.currentTarget.style.boxShadow = '0 8px 18px rgba(15, 23, 42, 0.08)';
+          }}
+          onMouseLeave={(event) => {
+            event.currentTarget.style.transform = 'translateY(0)';
+            event.currentTarget.style.boxShadow = 'none';
+          }}
+        >
+          {option.icon}
+        </button>
+      );
+    }
+
+    if (option.url) {
+      const isHttp = option.url.startsWith('http');
+      return (
+        <a
+          key={option.id}
+          href={option.url}
+          target={isHttp ? '_blank' : undefined}
+          rel={isHttp ? 'noopener noreferrer' : undefined}
+          title={option.label}
+          aria-label={option.label}
+          style={{ ...baseStyle, ...toneStyle }}
+          onClick={() => setShowShareMenu(false)}
+          onMouseEnter={(event) => {
+            event.currentTarget.style.transform = 'translateY(-1px)';
+            event.currentTarget.style.boxShadow = '0 8px 18px rgba(15, 23, 42, 0.08)';
+          }}
+          onMouseLeave={(event) => {
+            event.currentTarget.style.transform = 'translateY(0)';
+            event.currentTarget.style.boxShadow = 'none';
+          }}
+        >
+          {option.icon}
+        </a>
+      );
+    }
+
+    return null;
+  };
 
   const initials = sellerName
     .split(' ')
@@ -671,6 +777,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
         <button
           type="button"
           onClick={() => {
+            setShowShareMenu(false);
             if (!hasPriceHistory) return;
             setShowPriceHistoryTooltip((prev) => !prev);
           }}
@@ -698,10 +805,41 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
           Цена
         </button>
         <button
+          ref={shareButtonRef}
+          type="button"
+          onClick={() => {
+            setShowPriceHistoryTooltip(false);
+            setShowShareMenu((prev) => !prev);
+          }}
           style={{
             flex: 1,
             minHeight: 41,
-            padding: '10px 11px',
+            minWidth: 0,
+            padding: '10px 8px',
+            background: showShareMenu ? '#ecfeff' : '#f8fafc',
+            color: showShareMenu ? '#0f766e' : '#374151',
+            border: `1px solid ${showShareMenu ? '#99f6e4' : '#eef2f7'}`,
+            borderRadius: 13,
+            fontSize: 11,
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 5,
+            whiteSpace: 'nowrap',
+          }}
+          aria-label="Сподели обявата"
+        >
+          <Share2 size={14} />
+          Сподели
+        </button>
+        <button
+          style={{
+            flex: '0 0 46px',
+            minHeight: 41,
+            minWidth: 46,
+            padding: '10px 0',
             background: isFavorite ? '#fff1f7' : '#f8fafc',
             color: isFavorite ? SAVE_ACCENT_COLOR : '#374151',
             border: `1px solid ${isFavorite ? '#f8bbd0' : '#eef2f7'}`,
@@ -721,6 +859,30 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
           <Heart size={16} fill={isFavorite ? 'currentColor' : 'none'} />
         </button>
         </div>
+        {showShareMenu && (
+          <div
+            ref={shareMenuRef}
+            style={{
+              position: 'fixed',
+              left: 56,
+              right: 10,
+              bottom: 64,
+              padding: '10px 12px',
+              borderRadius: 16,
+              border: '1px solid #e5e7eb',
+              background: '#fff',
+              boxShadow: '0 12px 30px rgba(15, 23, 42, 0.12)',
+              display: 'flex',
+              gap: 8,
+              zIndex: 120,
+              overflowX: 'auto',
+              scrollbarWidth: 'thin',
+              scrollbarColor: '#cbd5f5 transparent',
+            }}
+          >
+            {shareOptions.map(renderShareOption)}
+          </div>
+        )}
       </>
     );
   }
@@ -1218,66 +1380,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
               transition: 'all 0.2s ease',
             }}
           >
-            {shareOptions.map((option) => {
-              const Icon = option.icon;
-              const baseStyle: React.CSSProperties = {
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 44,
-                height: 40,
-                padding: 0,
-                borderRadius: 16,
-                border: '1px solid transparent',
-                background: '#f8fafc',
-                color: '#334155',
-                cursor: 'pointer',
-                textDecoration: 'none',
-              };
-
-              const primaryStyle: React.CSSProperties = option.isPrimary
-                ? {
-                    background: '#ecfdf5',
-                    borderColor: '#99f6e4',
-                    color: '#0f766e',
-                  }
-                : {};
-
-                if (option.onClick) {
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={option.onClick}
-                      title={option.label}
-                      aria-label={option.label}
-                      style={{ ...baseStyle, ...primaryStyle }}
-                    >
-                      {Icon ? <Icon size={16} /> : null}
-                    </button>
-                  );
-                }
-
-                if (option.url) {
-                  const isHttp = option.url.startsWith('http');
-                  return (
-                    <a
-                      key={option.id}
-                      href={option.url}
-                      target={isHttp ? '_blank' : undefined}
-                      rel={isHttp ? 'noopener noreferrer' : undefined}
-                      title={option.label}
-                      aria-label={option.label}
-                      style={{ ...baseStyle, ...primaryStyle }}
-                      onClick={() => setShowShareMenu(false)}
-                    >
-                      {Icon ? <Icon size={16} /> : null}
-                    </a>
-                  );
-                }
-
-              return null;
-            })}
+            {shareOptions.map(renderShareOption)}
           </div>
         </div>
 
