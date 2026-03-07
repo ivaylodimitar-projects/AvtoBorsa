@@ -29,15 +29,6 @@ PRERENDER_BOT_SIGNATURES = (
     "twitterbot",
     "linkedinbot",
     "whatsapp",
-    "viber",
-    "telegrambot",
-    "telegram",
-    "slackbot",
-    "discordbot",
-    "redditbot",
-    "pinterest",
-    "vkshare",
-    "skypeuripreview",
 )
 MAIN_CATEGORY_LABELS = {value: label for value, label in BaseListing.MAIN_CATEGORY_CHOICES}
 VEHICLE_SEO_MAIN_CATEGORIES = {
@@ -553,15 +544,12 @@ def prerender_listing(request, listing_id):
   <meta property="og:description" content="{escape(description_value)}" />
   <meta property="og:url" content="{escape(canonical_url)}" />
   <meta property="og:image" content="{escape(og_image)}" />
-  <meta property="og:image:secure_url" content="{escape(og_image)}" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="{escape(image_alt)}" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="{escape(title_value)}" />
   <meta name="twitter:description" content="{escape(description_value)}" />
   <meta name="twitter:image" content="{escape(og_image)}" />
-  <meta name="twitter:image:alt" content="{escape(image_alt)}" />
   <style>
     body {{ margin: 0; padding: 24px; font-family: Arial, sans-serif; background: #f8fafc; color: #111827; }}
     main {{ max-width: 1000px; margin: 0 auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 18px; }}

@@ -35,14 +35,9 @@ PRERENDER_BOT_SIGNATURES = (
     "linkedinbot",
     "whatsapp",
     "viber",
-    "telegrambot",
-    "telegram",
-    "slackbot",
-    "discordbot",
     "redditbot",
-    "pinterest",
-    "vkshare",
-    "skypeuripreview",
+    "telegram",
+    "discordbot",
 )
 
 _CARD_WIDTH = 1200
@@ -616,7 +611,6 @@ def prerender_dealer(request, dealer_slug):
         },
         "description": description_value,
     }
-    image_alt = f"Dealer profile for {dealer.dealer_name}"
     dealer_schema_json = json.dumps(dealer_schema, ensure_ascii=False)
 
     html_document = f"""<!doctype html>
@@ -634,22 +628,20 @@ def prerender_dealer(request, dealer_slug):
   <meta property="og:description" content="{escape(description_value)}" />
   <meta property="og:url" content="{escape(canonical_url)}" />
   <meta property="og:image" content="{escape(og_image)}" />
-  <meta property="og:image:secure_url" content="{escape(og_image)}" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="{escape(image_alt)}"/>
+  <meta property="og:image:alt" content="{escape(f'Визитка на автокъща {dealer.dealer_name}')}"/>
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="{escape(title_value)}" />
   <meta name="twitter:description" content="{escape(description_value)}" />
   <meta name="twitter:image" content="{escape(og_image)}" />
-  <meta name="twitter:image:alt" content="{escape(image_alt)}" />
   <script type="application/ld+json">{dealer_schema_json}</script>
 </head>
 <body>
   <main>
     <h1>{escape(dealer.dealer_name)}</h1>
     <p>{escape(description_value)}</p>
-    <img src="{escape(og_image)}" alt="{escape(image_alt)}" />
+    <img src="{escape(og_image)}" alt="{escape(f'Визитка на автокъща {dealer.dealer_name}')}" />
   </main>
 </body>
 </html>
