@@ -207,6 +207,11 @@ const CLIENT_IMAGE_OPTIMIZABLE_TYPES = new Set([
   "image/webp",
 ]);
 const optimizedUploadImageCache = new WeakMap<File, File>();
+const PHONE_PREFIX = "+359";
+const PHONE_DIGIT_COUNT = 9;
+const PHONE_MAX_LENGTH = PHONE_PREFIX.length + PHONE_DIGIT_COUNT;
+const PHONE_PATTERN = `\\${PHONE_PREFIX}\\d{${PHONE_DIGIT_COUNT}}`;
+const PHONE_REGEX = new RegExp(`^${PHONE_PATTERN}$`);
 
 type DecodedImageSource = {
   width: number;
@@ -291,6 +296,14 @@ const resolveOutputExtension = (mimeType: string): "jpg" | "png" | "webp" => {
   if (mimeType === "image/webp") return "webp";
   return "jpg";
 };
+
+const normalizePhoneInput = (value: string) => {
+  const digits = value.replace(/\D/g, "");
+  const digitsWithoutCountryCode = digits.startsWith("359") ? digits.slice(3) : digits;
+  return `${PHONE_PREFIX}${digitsWithoutCountryCode.slice(0, PHONE_DIGIT_COUNT)}`;
+};
+
+const isPhoneValid = (value: string) => PHONE_REGEX.test(value.trim());
 
 const optimizeImageForUpload = async (file: File): Promise<File> => {
   const normalizedType = String(file.type || "").toLowerCase();
@@ -1759,7 +1772,7 @@ const createInitialFormData = (): PublishFormData => ({
   displacement: "",
   euroStandard: "",
   description: "",
-  phone: "",
+  phone: PHONE_PREFIX,
   email: "",
   pictures: [],
   features: [],
@@ -2476,8 +2489,10 @@ const PublishPage: React.FC = () => {
     }
 
     const inputElement = e.target as HTMLInputElement;
-    const nextValue =
+    const rawValue =
       inputElement.type === "checkbox" ? inputElement.checked : (e.target as HTMLInputElement).value;
+    const nextValue =
+      key === "phone" ? normalizePhoneInput(String(rawValue ?? "")) : rawValue;
 
     updateFormField(key, nextValue as PublishFormData[typeof key]);
   };
@@ -2729,7 +2744,11 @@ const PublishPage: React.FC = () => {
     const fields = requiredByStep[stepKey] ?? [];
     return fields
       .filter((field) => (field.when ? field.when(data) : true))
-      .filter((field) => isFieldMissing(data[field.key]))
+      .filter((field) =>
+        field.key === "phone"
+          ? isFieldMissing(data[field.key]) || !isPhoneValid(String(data[field.key] ?? ""))
+          : isFieldMissing(data[field.key])
+      )
       .map((field) => field.label);
   };
 
@@ -2741,7 +2760,11 @@ const PublishPage: React.FC = () => {
     const fields = requiredByStep[stepKey] ?? [];
     return fields
       .filter((field) => (field.when ? field.when(data) : true))
-      .filter((field) => isFieldMissing(data[field.key]))
+      .filter((field) =>
+        field.key === "phone"
+          ? isFieldMissing(data[field.key]) || !isPhoneValid(String(data[field.key] ?? ""))
+          : isFieldMissing(data[field.key])
+      )
       .map((field) => field.key);
   };
 
@@ -2971,7 +2994,7 @@ const PublishPage: React.FC = () => {
       displacement: toStringOrEmpty(data.displacement),
       euroStandard: normalizeCarEuroStandard(toStringOrEmpty(data.euro_standard ?? data.euroStandard)),
       description: rawDescription,
-      phone: toStringOrEmpty(data.phone),
+      phone: toStringOrEmpty(data.phone) || PHONE_PREFIX,
       email: user?.email || toStringOrEmpty(data.email),
       pictures: [],
       features: parsedMotoFeatures
@@ -6594,9 +6617,14 @@ const PublishPage: React.FC = () => {
                     style={styles.input}
                     type="tel"
                     name="phone"
-                    placeholder="Въведи телефон"
+                    placeholder="+359888123456"
                     value={formData.phone}
                     onChange={handleChange}
+                    inputMode="numeric"
+                    minLength={PHONE_MAX_LENGTH}
+                    maxLength={PHONE_MAX_LENGTH}
+                    pattern={PHONE_PATTERN}
+                    title="Номерът трябва да е във формат +359888123456"
                     required
                   />
                 </FormFieldWithTooltip>

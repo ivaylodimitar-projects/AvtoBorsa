@@ -14,7 +14,7 @@ const LOGIN_IDENTIFIER_HINT =
   "Може да използваш имейл или потребителско име за вход в системата.";
 const LOGIN_IDENTIFIER_MAX_LENGTH = 150;
 const PHONE_PREFIX = "+359";
-const PHONE_DIGIT_COUNT = 8;
+const PHONE_DIGIT_COUNT = 9;
 const PHONE_MAX_LENGTH = PHONE_PREFIX.length + PHONE_DIGIT_COUNT;
 const PHONE_ERROR_MESSAGE = `Номерът трябва да е във формат ${PHONE_PREFIX}12345678`;
 const BUSINESS_REGISTRATION_ERROR_FIELD_MAP: Record<string, string> = {
