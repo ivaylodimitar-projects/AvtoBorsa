@@ -19,7 +19,7 @@
         {
           "type": "header",
           "key": "user-agent",
-          "value": ".*(facebookexternalhit|twitterbot|linkedinbot|whatsapp|slackbot|discordbot|googlebot|bingbot|duckduckbot|applebot|perplexitybot|gptbot|claudebot).*"
+          "value": ".*(facebookexternalhit|twitterbot|linkedinbot|whatsapp|[Vv]iber|slackbot|discordbot|googlebot|bingbot|duckduckbot|applebot|perplexitybot|gptbot|claudebot).*"
         }
       ],
       "destination": "https://api.kar.bg/prerender/listing/:id/"
@@ -30,7 +30,7 @@
         {
           "type": "header",
           "key": "user-agent",
-          "value": ".*(facebookexternalhit|twitterbot|linkedinbot|whatsapp|slackbot|discordbot|googlebot|bingbot|duckduckbot|applebot|perplexitybot|gptbot|claudebot).*"
+          "value": ".*(facebookexternalhit|twitterbot|linkedinbot|whatsapp|[Vv]iber|slackbot|discordbot|googlebot|bingbot|duckduckbot|applebot|perplexitybot|gptbot|claudebot).*"
         }
       ],
       "destination": "https://api.kar.bg/prerender/dealer/:dealerSlug/"

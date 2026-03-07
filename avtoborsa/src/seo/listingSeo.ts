@@ -180,10 +180,15 @@ const resolveSlug = (listing: ListingSeoListing) => {
   return `obiava-${listing.id}`;
 };
 
-const pickBestRenditionUrl = (images: ListingSeoImage[] | null | undefined) => {
+const pickBestShareImageUrl = (images: ListingSeoImage[] | null | undefined) => {
   if (!Array.isArray(images) || images.length === 0) return "";
   const cover = images.find((img) => Boolean(img?.is_cover)) || images[0];
   if (!cover) return "";
+
+  const originalUrl = trimToValue(cover.original_url) || trimToValue(cover.image);
+  if (originalUrl && !originalUrl.toLowerCase().endsWith(".webp")) {
+    return originalUrl;
+  }
 
   if (Array.isArray(cover.renditions) && cover.renditions.length > 0) {
     const normalized = cover.renditions
@@ -315,8 +320,8 @@ export const buildListingSeoPayload = (
   const imageAlt = buildImageAlt(listing, siteName);
   const fallbackShareImage = toAbsoluteUrl(DEFAULT_OG_IMAGE, siteUrl);
   const resolvedShareImage =
+    toAbsoluteUrl(pickBestShareImageUrl(listing.images), siteUrl) ||
     toAbsoluteUrl(listing.image_url, siteUrl) ||
-    toAbsoluteUrl(pickBestRenditionUrl(listing.images), siteUrl) ||
     fallbackShareImage;
 
   const listingName = displayTitle;

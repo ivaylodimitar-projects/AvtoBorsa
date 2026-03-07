@@ -35,6 +35,7 @@ PRERENDER_BOT_SIGNATURES = (
     "linkedinbot",
     "whatsapp",
     "viber",
+    "slackbot",
     "redditbot",
     "telegram",
     "discordbot",

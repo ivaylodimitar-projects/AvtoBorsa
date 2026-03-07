@@ -29,6 +29,9 @@ PRERENDER_BOT_SIGNATURES = (
     "twitterbot",
     "linkedinbot",
     "whatsapp",
+    "slackbot",
+    "discordbot",
+    "viber",
 )
 MAIN_CATEGORY_LABELS = {value: label for value, label in BaseListing.MAIN_CATEGORY_CHOICES}
 VEHICLE_SEO_MAIN_CATEGORIES = {
@@ -208,6 +211,20 @@ def _pick_main_image_source(image_candidates):
     if detail_candidate:
         return detail_candidate["url"]
     return image_candidates[-1]["url"]
+
+
+def _pick_share_image_source(image_candidates):
+    if not image_candidates:
+        return ""
+
+    for candidate in reversed(image_candidates):
+        if candidate["kind"] != "detail":
+            continue
+        if candidate["url"].lower().endswith(".webp"):
+            continue
+        return candidate["url"]
+
+    return _pick_main_image_source(image_candidates)
 
 
 def _build_image_srcset(image_candidates):
@@ -411,6 +428,7 @@ def prerender_listing(request, listing_id):
     default_share_image = f"{frontend_base_url}/karbgbannerlogo.jpg"
     gallery_rows = []
     first_image_url = ""
+    first_share_image_url = ""
     image_alt = _build_listing_image_alt(listing_name, city_label, site_name)
 
     for index, image_obj in enumerate(images):
@@ -422,6 +440,8 @@ def prerender_listing(request, listing_id):
             continue
         if not first_image_url:
             first_image_url = main_src
+        if not first_share_image_url:
+            first_share_image_url = _pick_share_image_source(candidates) or main_src
         gallery_rows.append(
             {
                 "src": main_src,
@@ -433,7 +453,7 @@ def prerender_listing(request, listing_id):
             }
         )
 
-    og_image = first_image_url or default_share_image
+    og_image = first_share_image_url or first_image_url or default_share_image
     breadcrumbs = _build_breadcrumb_items(listing, frontend_base_url, canonical_path)
 
     vehicle_schema = _drop_none_values(
