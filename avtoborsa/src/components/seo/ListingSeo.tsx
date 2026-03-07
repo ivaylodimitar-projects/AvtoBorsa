@@ -56,13 +56,16 @@ const ListingSeo = ({ seo }: ListingSeoProps) => {
     upsertMetaTag("meta[property='og:description']", "property", "og:description", seo.description);
     upsertMetaTag("meta[property='og:url']", "property", "og:url", seo.canonicalUrl);
     upsertMetaTag("meta[property='og:image']", "property", "og:image", seo.ogImage);
+    upsertMetaTag("meta[property='og:image:secure_url']", "property", "og:image:secure_url", seo.ogImage);
     upsertMetaTag("meta[property='og:image:width']", "property", "og:image:width", "1200");
     upsertMetaTag("meta[property='og:image:height']", "property", "og:image:height", "630");
+    upsertMetaTag("meta[property='og:image:alt']", "property", "og:image:alt", seo.imageAlt);
 
     upsertMetaTag("meta[name='twitter:card']", "name", "twitter:card", "summary_large_image");
     upsertMetaTag("meta[name='twitter:title']", "name", "twitter:title", seo.title);
     upsertMetaTag("meta[name='twitter:description']", "name", "twitter:description", seo.description);
     upsertMetaTag("meta[name='twitter:image']", "name", "twitter:image", seo.ogImage);
+    upsertMetaTag("meta[name='twitter:image:alt']", "name", "twitter:image:alt", seo.imageAlt);
 
     upsertCanonicalLink(seo.canonicalUrl);
     upsertJsonLdScript("listing-seo-vehicle-schema", vehicleSchemaJson);
@@ -72,6 +75,7 @@ const ListingSeo = ({ seo }: ListingSeoProps) => {
     breadcrumbSchemaJson,
     seo.canonicalUrl,
     seo.description,
+    seo.imageAlt,
     seo.ogImage,
     seo.siteName,
     seo.title,

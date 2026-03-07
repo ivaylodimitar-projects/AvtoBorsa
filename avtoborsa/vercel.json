@@ -14,12 +14,23 @@
     },
 
     {
+      "source": "/details/obiava-:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|twitterbot|linkedinbot|whatsapp|viber|telegrambot|telegram|slackbot|discordbot|redditbot|pinterest|vkshare|skypeuripreview|googlebot|bingbot|duckduckbot|applebot|perplexitybot|gptbot|claudebot).*"
+        }
+      ],
+      "destination": "https://api.kar.bg/prerender/listing/:id/"
+    },
+    {
       "source": "/details/obiava-:id-:slug*",
       "has": [
         {
           "type": "header",
           "key": "user-agent",
-          "value": ".*(facebookexternalhit|twitterbot|linkedinbot|whatsapp|slackbot|discordbot|googlebot|bingbot|duckduckbot|applebot|perplexitybot|gptbot|claudebot).*"
+          "value": "(?i).*(facebookexternalhit|twitterbot|linkedinbot|whatsapp|viber|telegrambot|telegram|slackbot|discordbot|redditbot|pinterest|vkshare|skypeuripreview|googlebot|bingbot|duckduckbot|applebot|perplexitybot|gptbot|claudebot).*"
         }
       ],
       "destination": "https://api.kar.bg/prerender/listing/:id/"
@@ -30,7 +41,7 @@
         {
           "type": "header",
           "key": "user-agent",
-          "value": ".*(facebookexternalhit|twitterbot|linkedinbot|whatsapp|slackbot|discordbot|googlebot|bingbot|duckduckbot|applebot|perplexitybot|gptbot|claudebot).*"
+          "value": "(?i).*(facebookexternalhit|twitterbot|linkedinbot|whatsapp|viber|telegrambot|telegram|slackbot|discordbot|redditbot|pinterest|vkshare|skypeuripreview|googlebot|bingbot|duckduckbot|applebot|perplexitybot|gptbot|claudebot).*"
         }
       ],
       "destination": "https://api.kar.bg/prerender/dealer/:dealerSlug/"
