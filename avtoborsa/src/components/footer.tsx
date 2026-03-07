@@ -58,7 +58,7 @@ export default function Footer() {
   };
 
   return (
-    <footer style={styles.footer}>
+    <footer style={styles.footer} id="site-footer" data-site-footer="true">
       <div style={styles.footerInner} className="footer-grid">
         <div style={styles.footerCol}>
           <img src={karBgLogo} alt="Kar.bg" style={styles.footerLogo} />

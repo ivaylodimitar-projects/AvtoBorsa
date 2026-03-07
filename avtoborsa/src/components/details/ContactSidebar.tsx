@@ -136,6 +136,7 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
   const [reportRecaptchaToken, setReportRecaptchaToken] = useState<string | null>(null);
   const [reportRecaptchaResetKey, setReportRecaptchaResetKey] = useState(0);
   const [reportRecaptchaError, setReportRecaptchaError] = useState('');
+  const [isFooterVisible, setIsFooterVisible] = useState(false);
   const [isPhoneRevealed, setIsPhoneRevealed] = useState(false);
   const shareMenuRef = useRef<HTMLDivElement | null>(null);
   const shareButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -347,6 +348,156 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
     }
   };
 
+  const renderReportForm = (marginTop = 0) => (
+    <form onSubmit={handleSubmitReport} style={{ marginTop, display: 'grid', gap: 10 }}>
+      <label
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          fontSize: 13,
+          color: '#374151',
+          fontWeight: 600,
+          cursor: 'pointer',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={reportIncorrectPrice}
+          onChange={(event) => setReportIncorrectPrice(event.target.checked)}
+          style={hiddenCheckboxStyle}
+        />
+        <span aria-hidden="true" style={getCustomCheckboxStyle(reportIncorrectPrice)}>
+          {reportIncorrectPrice && <Check size={12} color="#fff" strokeWidth={3} />}
+        </span>
+        Невярна цена
+      </label>
+
+      <label
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          fontSize: 13,
+          color: '#374151',
+          fontWeight: 600,
+          cursor: 'pointer',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={reportOtherIssue}
+          onChange={(event) => {
+            const isChecked = event.target.checked;
+            setReportOtherIssue(isChecked);
+            if (!isChecked) {
+              setReportMessage('');
+            }
+          }}
+          style={hiddenCheckboxStyle}
+        />
+        <span aria-hidden="true" style={getCustomCheckboxStyle(reportOtherIssue)}>
+          {reportOtherIssue && <Check size={12} color="#fff" strokeWidth={3} />}
+        </span>
+        Друга нередност
+      </label>
+
+      <textarea
+        rows={6}
+        placeholder="Вашето съобщение"
+        disabled={!reportOtherIssue}
+        value={reportMessage}
+        onChange={(event) => setReportMessage(event.target.value)}
+        style={{
+          width: '100%',
+          resize: 'none',
+          borderRadius: 16,
+          border: '1px solid #d1d5db',
+          padding: '10px 11px',
+          fontSize: 13,
+          color: '#111827',
+          background: reportOtherIssue ? '#fff' : '#f9fafb',
+          cursor: reportOtherIssue ? 'text' : 'not-allowed',
+        }}
+      />
+
+      <label
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 8,
+          fontSize: 12,
+          lineHeight: 1.45,
+          color: '#4b5563',
+          cursor: 'pointer',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={reportAcceptedTerms}
+          onChange={(event) => setReportAcceptedTerms(event.target.checked)}
+          style={hiddenCheckboxStyle}
+        />
+        <span
+          aria-hidden="true"
+          style={{ ...getCustomCheckboxStyle(reportAcceptedTerms, true), marginTop: 2 }}
+        >
+          {reportAcceptedTerms && <Check size={11} color="#fff" strokeWidth={3} />}
+        </span>
+        <span>
+          Съгласявам се с{' '}
+          <a
+            href="/legal#terms"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#b91c1c', fontWeight: 600 }}
+          >
+            общите условия
+          </a>{' '}
+          и{' '}
+          <a
+            href="/legal#privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#b91c1c', fontWeight: 600 }}
+          >
+            политиките за защита на личните данни
+          </a>
+        </span>
+      </label>
+
+      <RecaptchaField
+        error={reportRecaptchaError}
+        onChange={(token) => {
+          setReportRecaptchaToken(token);
+          if (reportRecaptchaError) {
+            setReportRecaptchaError('');
+          }
+        }}
+        resetKey={reportRecaptchaResetKey}
+      />
+
+      <button
+        type="submit"
+        disabled={isReporting}
+        style={{
+          width: '100%',
+          padding: '10px 12px',
+          borderRadius: 16,
+          border: 'none',
+          background: isReporting ? '#fca5a5' : '#dc2626',
+          color: '#fff',
+          fontSize: 13,
+          fontWeight: 700,
+          cursor: isReporting ? 'not-allowed' : 'pointer',
+          transition: 'background 0.2s ease',
+        }}
+      >
+        {isReporting ? 'Изпращане...' : 'Изпрати'}
+      </button>
+    </form>
+  );
+
   const handleCopyLink = async () => {
     const url = window.location.href;
     try {
@@ -382,6 +533,49 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
     document.addEventListener('mousedown', handleOutside);
     return () => document.removeEventListener('mousedown', handleOutside);
   }, [showShareMenu]);
+
+  useEffect(() => {
+    if (!isMobile || typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') {
+      setIsFooterVisible(false);
+      return;
+    }
+
+    let observer: IntersectionObserver | null = null;
+    let frameId = 0;
+
+    const setupObserver = () => {
+      const footer = document.querySelector('[data-site-footer="true"]');
+      if (!(footer instanceof HTMLElement)) {
+        setIsFooterVisible(false);
+        return;
+      }
+
+      observer = new IntersectionObserver(
+        ([entry]) => {
+          setIsFooterVisible(entry.isIntersecting);
+        },
+        {
+          threshold: 0.05,
+        }
+      );
+
+      observer.observe(footer);
+    };
+
+    frameId = window.requestAnimationFrame(setupObserver);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      observer?.disconnect();
+    };
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!isFooterVisible) return;
+    setShowShareMenu(false);
+    setShowPriceHistoryTooltip(false);
+    setShowReportForm(false);
+  }, [isFooterVisible]);
 
   const priceSummary = getListingPriceSummary({
     price,
@@ -674,13 +868,13 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
   if (isMobile) {
     return (
       <>
-        {showPriceHistoryTooltip && hasPriceHistory && (
+        {!isFooterVisible && showPriceHistoryTooltip && hasPriceHistory && (
           <div
             style={{
               position: 'fixed',
               left: 12,
               right: 12,
-              bottom: 76,
+              bottom: 116,
               borderRadius: 16,
               border: '1px solid #e2e8f0',
               background: '#fff',
@@ -765,137 +959,225 @@ const ContactSidebar: React.FC<ContactSidebarProps> = ({
             </div>
           </div>
         )}
+        {!isFooterVisible && showReportForm && (
+          <div
+            style={{
+              position: 'fixed',
+              left: 12,
+              right: 12,
+              bottom: 118,
+              borderRadius: 18,
+              border: '1px solid #fecaca',
+              background: '#fff',
+              boxShadow: '0 14px 34px rgba(15, 23, 42, 0.16)',
+              padding: '12px 12px 14px',
+              maxHeight: 'min(62vh, 560px)',
+              overflowY: 'auto',
+              zIndex: 150,
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 8,
+                marginBottom: 10,
+              }}
+            >
+              <div style={{ fontSize: 14, fontWeight: 800, color: '#111827' }}>Докладвай обявата</div>
+              <button
+                type="button"
+                onClick={() => setShowReportForm(false)}
+                style={{
+                  border: '1px solid #fecaca',
+                  background: '#fef2f2',
+                  color: '#b91c1c',
+                  borderRadius: 999,
+                  padding: '6px 10px',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                Затвори
+              </button>
+            </div>
+            {renderReportForm()}
+          </div>
+        )}
+        {!isFooterVisible && (
         <div
-        style={{
-          position: 'fixed',
-          bottom: 8,
-          left: 56,
-          right: 10,
-          background: '#fff',
-          border: '1px solid #eef2f7',
-          borderRadius: 14,
-          padding: '6px 8px',
-          display: 'flex',
-          gap: 7,
-          zIndex: 100,
-          boxShadow: '0 -4px 16px rgba(0,0,0,0.06)',
-        }}
-      >
-        <button
           style={{
-            flex: 1,
-            minHeight: 41,
-            padding: '10px 12px',
-            background: '#0f766e',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 13,
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            position: 'fixed',
+            bottom: 8,
+            left: 68,
+            right: 10,
+            background: '#fff',
+            border: '1px solid #eef2f7',
+            borderRadius: 14,
+            padding: '8px',
+            display: 'grid',
             gap: 7,
+            zIndex: 100,
+            boxShadow: '0 -4px 16px rgba(0,0,0,0.06)',
           }}
-          onClick={() => window.open(`tel:${phone}`)}
         >
-          <Phone size={15} />
-          Позвъни
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setShowShareMenu(false);
-            if (!hasPriceHistory) return;
-            setShowPriceHistoryTooltip((prev) => !prev);
-          }}
-          disabled={!hasPriceHistory}
-          style={{
-            flex: 1,
-            minHeight: 41,
-            padding: '10px 11px',
-            background: hasPriceHistory ? '#ecfdf5' : '#f8fafc',
-            color: hasPriceHistory ? '#0f766e' : '#94a3b8',
-            border: `1px solid ${hasPriceHistory ? '#99f6e4' : '#eef2f7'}`,
-            borderRadius: 13,
-            fontSize: 12,
-            fontWeight: 700,
-            cursor: hasPriceHistory ? 'pointer' : 'not-allowed',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6,
-            opacity: hasPriceHistory ? 1 : 0.7,
-          }}
-          title={hasPriceHistory ? 'Разлики в цената' : 'Няма промени в цената'}
-        >
-          <PriceDeltaIcon size={14} />
-          Цена
-        </button>
-        <button
-          ref={shareButtonRef}
-          type="button"
-          onClick={() => {
-            setShowPriceHistoryTooltip(false);
-            setShowShareMenu((prev) => !prev);
-          }}
-          style={{
-            flex: 1,
-            minHeight: 41,
-            minWidth: 0,
-            padding: '10px 8px',
-            background: showShareMenu ? '#ecfeff' : '#f8fafc',
-            color: showShareMenu ? '#0f766e' : '#374151',
-            border: `1px solid ${showShareMenu ? '#99f6e4' : '#eef2f7'}`,
-            borderRadius: 13,
-            fontSize: 11,
-            fontWeight: 700,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 5,
-            whiteSpace: 'nowrap',
-          }}
-          aria-label="Сподели обявата"
-        >
-          <Share2 size={14} />
-          Сподели
-        </button>
-        <button
-          style={{
-            flex: '0 0 46px',
-            minHeight: 41,
-            minWidth: 46,
-            padding: '10px 0',
-            background: isFavorite ? '#fff1f7' : '#f8fafc',
-            color: isFavorite ? SAVE_ACCENT_COLOR : '#374151',
-            border: `1px solid ${isFavorite ? '#f8bbd0' : '#eef2f7'}`,
-            borderRadius: 13,
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 0,
-          }}
-          onClick={handleToggleFavorite}
-          disabled={isLoading}
-          aria-label={isFavorite ? 'Премахни от любими' : 'Запази в любими'}
-        >
-          <Heart size={16} fill={isFavorite ? 'currentColor' : 'none'} />
-        </button>
+          <div style={{ display: 'flex', gap: 7 }}>
+            <button
+              style={{
+                flex: 1,
+                minHeight: 42,
+                padding: '10px 12px',
+                background: '#0f766e',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 13,
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 7,
+                whiteSpace: 'nowrap',
+              }}
+              onClick={() => window.open(`tel:${phone}`)}
+            >
+              <Phone size={15} />
+              Позвъни
+            </button>
+            <button
+              style={{
+                flex: '0 0 46px',
+                minHeight: 42,
+                minWidth: 46,
+                padding: '10px 0',
+                background: isFavorite ? '#fff1f7' : '#f8fafc',
+                color: isFavorite ? SAVE_ACCENT_COLOR : '#374151',
+                border: `1px solid ${isFavorite ? '#f8bbd0' : '#eef2f7'}`,
+                borderRadius: 13,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 0,
+              }}
+              onClick={handleToggleFavorite}
+              disabled={isLoading}
+              aria-label={isFavorite ? 'Премахни от любими' : 'Запази в любими'}
+            >
+              <Heart size={16} fill={isFavorite ? 'currentColor' : 'none'} />
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: 7 }}>
+            <button
+              type="button"
+              onClick={() => {
+                setShowShareMenu(false);
+                setShowReportForm(false);
+                if (!hasPriceHistory) return;
+                setShowPriceHistoryTooltip((prev) => !prev);
+              }}
+              disabled={!hasPriceHistory}
+              style={{
+                flex: 1,
+                minHeight: 36,
+                minWidth: 0,
+                padding: '8px 10px',
+                background: hasPriceHistory ? '#ecfdf5' : '#f8fafc',
+                color: hasPriceHistory ? '#0f766e' : '#94a3b8',
+                border: `1px solid ${hasPriceHistory ? '#99f6e4' : '#eef2f7'}`,
+                borderRadius: 12,
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: hasPriceHistory ? 'pointer' : 'not-allowed',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 5,
+                opacity: hasPriceHistory ? 1 : 0.7,
+                whiteSpace: 'nowrap',
+              }}
+              title={hasPriceHistory ? 'Разлики в цената' : 'Няма промени в цената'}
+            >
+              <PriceDeltaIcon size={13} />
+              Цена
+            </button>
+            <button
+              ref={shareButtonRef}
+              type="button"
+              onClick={() => {
+                setShowPriceHistoryTooltip(false);
+                setShowReportForm(false);
+                setShowShareMenu((prev) => !prev);
+              }}
+              style={{
+                flex: 1,
+                minHeight: 36,
+                minWidth: 0,
+                padding: '8px 10px',
+                background: showShareMenu ? '#ecfeff' : '#f8fafc',
+                color: showShareMenu ? '#0f766e' : '#374151',
+                border: `1px solid ${showShareMenu ? '#99f6e4' : '#eef2f7'}`,
+                borderRadius: 12,
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 5,
+                whiteSpace: 'nowrap',
+              }}
+              aria-label="Сподели обявата"
+            >
+              <Share2 size={13} />
+              Сподели
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowShareMenu(false);
+                setShowPriceHistoryTooltip(false);
+                setShowReportForm((prev) => !prev);
+              }}
+              style={{
+                flex: 1,
+                minHeight: 36,
+                minWidth: 0,
+                padding: '8px 10px',
+                borderRadius: 12,
+                border: '1px solid #fecaca',
+                background: showReportForm ? '#fef2f2' : '#fff',
+                color: '#b91c1c',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 5,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Flag size={13} />
+              Докладвай
+            </button>
+          </div>
         </div>
-        {showShareMenu && (
+        )}
+        {!isFooterVisible && showShareMenu && (
           <div
             ref={shareMenuRef}
             style={{
               position: 'fixed',
-              left: 56,
+              left: 68,
               right: 10,
-              bottom: 64,
+              bottom: 102,
               padding: '10px 12px',
               borderRadius: 16,
               border: '1px solid #e5e7eb',
